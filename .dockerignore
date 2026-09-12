@@ -1,0 +1,11 @@
+.git
+.review
+**/.env
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/node_modules
+**/*.user
+docs/*
+!docs/ControlPlus_Fase4_Documento_y_Complementos.zip

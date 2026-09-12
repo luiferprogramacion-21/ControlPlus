@@ -1,0 +1,11 @@
+# Local configuration and secrets
+.env
+
+# Build and IDE artifacts
+bin/
+obj/
+.vs/
+*.user
+
+# Local review/extraction workspace
+.review/

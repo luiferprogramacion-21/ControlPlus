@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="ControlPlus.Api.Tests/ControlPlus.Api.Tests.csproj" />
+  <Project Path="ControlPlus.Api/ControlPlus.Api.csproj" />
+  <Project Path="ControlPlus.Application/ControlPlus.Application.csproj" />
+  <Project Path="ControlPlus.Domain.Tests/ControlPlus.Domain.Tests.csproj" />
+  <Project Path="ControlPlus.Domain/ControlPlus.Domain.csproj" />
+  <Project Path="ControlPlus.Infrastructure.Tests/ControlPlus.Infrastructure.Tests.csproj" />
+  <Project Path="ControlPlus.Infrastructure/ControlPlus.Infrastructure.csproj" />
+</Solution>

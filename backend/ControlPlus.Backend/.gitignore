@@ -1,0 +1,10 @@
+# Local configuration and secrets
+.env
+appsettings.Local.json
+
+# Build and IDE artifacts
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
