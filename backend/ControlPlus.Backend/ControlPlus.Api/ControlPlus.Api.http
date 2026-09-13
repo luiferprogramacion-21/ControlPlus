@@ -3,6 +3,9 @@
 @adminUser = admin.local
 @adminPassword = replace-locally-never-commit-the-real-password
 @token = paste-the-access-token-returned-by-login
+@categoryId = paste-a-category-id-returned-by-the-api
+@measurementUnitId = paste-a-measurement-unit-id-returned-by-the-api
+@productId = paste-a-product-id-returned-by-the-api
 
 ### Instalación inicial (solo funciona mientras no exista ningún usuario)
 POST {{host}}/api/auth/setup
@@ -59,4 +62,59 @@ Authorization: Bearer {{token}}
 
 ### Auditoría
 GET {{host}}/api/audit-records?page=1&pageSize=100
+Authorization: Bearer {{token}}
+
+### Categorías activas
+GET {{host}}/api/categories?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Crear categoría
+POST {{host}}/api/categories
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Categoría local",
+  "description": null
+}
+
+### Unidades de medida
+GET {{host}}/api/measurement-units
+Authorization: Bearer {{token}}
+
+### Productos disponibles (oculta agotados)
+GET {{host}}/api/products?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Buscar producto (incluye agotados)
+GET {{host}}/api/products?search=CODIGO-LOCAL&page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Crear producto con código de barras generado
+POST {{host}}/api/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "categoryId": "{{categoryId}}",
+  "measurementUnitId": "{{measurementUnitId}}",
+  "supplierId": null,
+  "internalCode": "CODIGO-LOCAL",
+  "barcode": null,
+  "barcodeFormat": null,
+  "generateBarcode": true,
+  "name": "Producto local",
+  "description": null,
+  "retailPrice": 0,
+  "wholesalePrice": null,
+  "taxPercentage": null,
+  "minimumStock": 0
+}
+
+### Consultar producto
+GET {{host}}/api/products/{{productId}}
+Authorization: Bearer {{token}}
+
+### Historial oficial de costos de compra (requiere PRODUCTS.COSTS_READ)
+GET {{host}}/api/products/{{productId}}/purchase-cost-history?page=1&pageSize=20
 Authorization: Bearer {{token}}

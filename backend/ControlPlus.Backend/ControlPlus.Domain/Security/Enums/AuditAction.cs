@@ -31,5 +31,13 @@ public enum AuditAction
     UserPermissionGranted = 23,
     UserPermissionRevoked = 24,
     UserPermissionsReset = 25,
-    RolePermissionsReset = 26
+    RolePermissionsReset = 26,
+    CategoryCreated = 27,
+    CategoryUpdated = 28,
+    CategoryActivated = 29,
+    CategoryDeactivated = 30,
+    ProductCreated = 31,
+    ProductUpdated = 32,
+    ProductActivated = 33,
+    ProductDeactivated = 34
 }

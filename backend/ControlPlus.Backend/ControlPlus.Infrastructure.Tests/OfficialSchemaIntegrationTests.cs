@@ -87,6 +87,45 @@ public sealed class OfficialSchemaIntegrationTests
             """
             SELECT count(*) FROM seguridad.permiso
             """));
+
+        Assert.Equal(1L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM "__EFMigrationsHistory"
+            WHERE "MigrationId" = '20260913010000_SeedMeasurementUnitsV1'
+            """));
+
+        Assert.Equal(3L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM catalogo.unidad_medida
+            WHERE codigo IN ('UNIDAD', 'PAQUETE', 'METRO') AND activo = true
+            """));
+
+        Assert.Equal(11L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            WITH columnas_enteras(esquema, tabla, columna) AS (
+                VALUES
+                    ('catalogo', 'producto', 'stock_actual'),
+                    ('catalogo', 'producto', 'stock_reservado'),
+                    ('catalogo', 'producto', 'stock_minimo'),
+                    ('ventas', 'detalle_venta', 'cantidad'),
+                    ('compras', 'detalle_compra', 'cantidad'),
+                    ('compras', 'movimiento_inventario', 'cantidad_stock'),
+                    ('compras', 'movimiento_inventario', 'cantidad_reservada'),
+                    ('compras', 'movimiento_inventario', 'stock_anterior'),
+                    ('compras', 'movimiento_inventario', 'stock_posterior'),
+                    ('compras', 'movimiento_inventario', 'reservado_anterior'),
+                    ('compras', 'movimiento_inventario', 'reservado_posterior')
+            )
+            SELECT count(*)
+            FROM columnas_enteras e
+            JOIN information_schema.columns c
+              ON c.table_schema = e.esquema
+             AND c.table_name = e.tabla
+             AND c.column_name = e.columna
+            WHERE c.data_type = 'integer'
+            """));
     }
 
     private static async Task<long> ScalarAsync(DbConnection connection, string sql)

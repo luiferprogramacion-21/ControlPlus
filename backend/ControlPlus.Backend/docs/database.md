@@ -9,6 +9,11 @@ La fuente de verdad es `docs/ControlPlus_Fase4_Documento_y_Complementos.zip`. El
 - `20260912010000_OfficialPhase4Baseline`: crea los siete esquemas, 58 tablas, claves, restricciones, índices, vistas y funciones aprobados.
 - `20260912011000_SeedApprovedSecurityCatalog`: crea idempotentemente Administrador, Supervisor y Cajero y sus límites de descuento 100, 20 y 5.
 - `20260912012000_HybridPermissionsV1`: agrega las excepciones individuales de permisos, crea las plantillas V1 y ajusta el límite de Administrador a 80 %, sin modificar la migración base.
+- `20260913010000_SeedMeasurementUnitsV1`: registra idempotentemente las unidades V1 Unidad, Paquete y Metro requeridas para crear productos.
+
+Las cantidades de producto, venta, compra e inventario permanecen enteras, incluidos los metros, de acuerdo con el documento principal y el script PostgreSQL V3 aprobados.
+
+La migración de unidades está aplicada y registrada en la base persistente de desarrollo. No modifica `20260912010000_OfficialPhase4Baseline` ni convierte columnas `integer` a tipos decimales.
 
 Configure la cadena fuera del repositorio y aplique las migraciones con la herramienta local:
 
@@ -22,7 +27,7 @@ No aplique la migración base sobre un esquema existente: el SQL oficial está d
 
 ## Prueba integrada
 
-`OfficialSchemaIntegrationTests` inicia automáticamente PostgreSQL 17 con Testcontainers, aplica las migraciones y verifica 58 tablas base, 58 PK, todas las FK con `ON DELETE RESTRICT` y el seed aprobado.
+`OfficialSchemaIntegrationTests` inicia automáticamente PostgreSQL 17 con Testcontainers, aplica las migraciones y verifica las 59 tablas actuales, sus PK, todas las FK con `ON DELETE RESTRICT`, los catálogos aprobados y las cantidades enteras.
 
 ```powershell
 dotnet test ControlPlus.Infrastructure.Tests

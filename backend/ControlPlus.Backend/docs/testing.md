@@ -6,7 +6,7 @@ Docker Desktop debe estar iniciado. La suite no requiere secretos reales ni una 
 dotnet test ControlPlus.Backend.slnx
 ```
 
-Las pruebas de dominio validan el quinto intento fallido, el reinicio del contador y la reactivación jerárquica. `OfficialSchemaIntegrationTests` aplica las migraciones oficiales en PostgreSQL 17 aislado. `SecurityApiFlowTests` recorre la instalación inicial, Master Key, login, JWT, `/me`, gestión de usuario y rol primario, concesión y revocación dinámica de un permiso técnico vigente, bloqueo al quinto intento y auditoría.
+Las pruebas de dominio validan el quinto intento fallido, el reinicio del contador y la reactivación jerárquica. `OfficialSchemaIntegrationTests` aplica las migraciones en PostgreSQL 17 aislado y comprueba el esquema, permisos, unidades y cantidades enteras. `SecurityApiFlowTests` recorre la instalación inicial, Master Key, login, JWT, `/me`, seguridad híbrida, Categorías, Productos, códigos de barras, agotados, historial de costos y auditoría.
 
 Los secretos usados por las pruebas se generan aleatoriamente dentro del entorno `Testing`. Testcontainers destruye sus contenedores al terminar; la base persistente de desarrollo no se modifica.
 

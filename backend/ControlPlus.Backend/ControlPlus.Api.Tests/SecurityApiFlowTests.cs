@@ -4,7 +4,9 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using ControlPlus.Application.Catalog.Contracts;
 using ControlPlus.Application.Security.Contracts;
+using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Infrastructure.Persistence;
 using ControlPlus.Infrastructure.Persistence.Official;
 using Microsoft.AspNetCore.Hosting;
@@ -483,6 +485,313 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
 
         var cashierSession = await LoginAsync(client, cashier.UserName, "Cashier-New-Test-Password-2026!");
         Assert.Equal(cashier.Id, cashierSession.User.Id);
+    }
+
+    [Fact]
+    public async Task Catalog_CategoryAndProductFlow_EnforcesVisibilityUniquenessAndSensitiveAuthorization()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+
+        var categoryResponse = await client.PostAsJsonAsync(
+            "/api/categories",
+            new CreateCategoryRequest("Categoría ficticia", "Uso exclusivo de pruebas integradas"));
+        var category = await categoryResponse.Content.ReadFromJsonAsync<CategoryDto>();
+        Assert.Equal(HttpStatusCode.Created, categoryResponse.StatusCode);
+        Assert.NotNull(category);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/categories/{category.Id}")).StatusCode);
+        var categoryUpdateResponse = await client.PutAsJsonAsync(
+            $"/api/categories/{category.Id}",
+            new UpdateCategoryRequest("Categoría ficticia actualizada", category.Description, category.Version));
+        category = await categoryUpdateResponse.Content.ReadFromJsonAsync<CategoryDto>();
+        Assert.Equal(HttpStatusCode.OK, categoryUpdateResponse.StatusCode);
+        Assert.NotNull(category);
+
+        var unitsResponse = await client.GetAsync("/api/measurement-units");
+        var units = await unitsResponse.Content.ReadFromJsonAsync<MeasurementUnitDto[]>();
+        Assert.Equal(HttpStatusCode.OK, unitsResponse.StatusCode);
+        Assert.NotNull(units);
+        Assert.Equal(3, units.Length);
+        var unit = Assert.Single(units, x => x.Code == "UNIDAD");
+
+        var supervisorRoleId = await GetRoleIdAsync(client, RoleCodes.Supervisor);
+        var supervisorResponse = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "catalog.supervisor.test", "Supervisor ficticio", "Supervisor-Test-Password-2026!", [supervisorRoleId]));
+        var supervisor = await supervisorResponse.Content.ReadFromJsonAsync<UserDto>();
+        Assert.Equal(HttpStatusCode.Created, supervisorResponse.StatusCode);
+        Assert.NotNull(supervisor);
+
+        var supervisorSession = await LoginAsync(client, supervisor.UserName, "Supervisor-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", supervisorSession.AccessToken);
+        var createRequest = new CreateProductRequest(
+            category.Id,
+            unit.Id,
+            null,
+            "TEST-001",
+            null,
+            null,
+            true,
+            "Producto ficticio",
+            "Sin datos reales",
+            1000,
+            900,
+            19,
+            2);
+        var productResponse = await client.PostAsJsonAsync("/api/products", createRequest);
+        var product = await productResponse.Content.ReadFromJsonAsync<ProductDto>();
+        Assert.Equal(HttpStatusCode.Created, productResponse.StatusCode);
+        Assert.NotNull(product);
+        Assert.NotNull(product.Barcode);
+        Assert.Equal("CODE128", product.BarcodeFormat);
+        Assert.True(product.IsOutOfStock);
+        Assert.False(product.CanViewCost);
+        Assert.Null(product.AverageCost);
+
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            (await client.PostAsJsonAsync("/api/products", createRequest)).StatusCode);
+
+        var normalListResponse = await client.GetAsync("/api/products");
+        Assert.Equal(HttpStatusCode.OK, normalListResponse.StatusCode);
+        using (var normalList = JsonDocument.Parse(await normalListResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(0, normalList.RootElement.GetProperty("items").GetArrayLength());
+        }
+
+        var searchResponse = await client.GetAsync("/api/products?search=TEST-001");
+        Assert.Equal(HttpStatusCode.OK, searchResponse.StatusCode);
+        using (var search = JsonDocument.Parse(await searchResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(1, search.RootElement.GetProperty("items").GetArrayLength());
+        }
+        var barcodeSearchResponse = await client.GetAsync($"/api/products?search={product.Barcode}");
+        Assert.Equal(HttpStatusCode.OK, barcodeSearchResponse.StatusCode);
+        using (var barcodeSearch = JsonDocument.Parse(await barcodeSearchResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(1, barcodeSearch.RootElement.GetProperty("items").GetArrayLength());
+        }
+        var nameSearchResponse = await client.GetAsync("/api/products?search=Producto%20ficticio");
+        Assert.Equal(HttpStatusCode.OK, nameSearchResponse.StatusCode);
+        using (var nameSearch = JsonDocument.Parse(await nameSearchResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(1, nameSearch.RootElement.GetProperty("items").GetArrayLength());
+        }
+
+        var update = new UpdateProductRequest(
+            category.Id,
+            unit.Id,
+            null,
+            product.InternalCode,
+            product.Barcode,
+            product.BarcodeFormat,
+            true,
+            "Producto ficticio actualizado",
+            product.Description,
+            1200,
+            product.WholesalePrice,
+            product.TaxPercentage,
+            product.MinimumStock,
+            product.Version);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await client.PutAsJsonAsync($"/api/products/{product.Id}", update)).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        var updateResponse = await client.PutAsJsonAsync($"/api/products/{product.Id}", update);
+        var updated = await updateResponse.Content.ReadFromJsonAsync<ProductDto>();
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        Assert.NotNull(updated);
+        Assert.Equal(1200, updated.RetailPrice);
+        Assert.True(updated.CanViewCost);
+
+        var sensitiveUpdatePermissionId = await GetPermissionIdAsync(
+            client, administrator.AccessToken, PermissionCodes.ProductsSensitiveUpdate);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{supervisor.Id}/permissions/{sensitiveUpdatePermissionId}",
+            new SetUserPermissionRequest(true))).StatusCode);
+        var supervisorWithIndividualGrant = await LoginAsync(
+            client, supervisor.UserName, "Supervisor-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer", supervisorWithIndividualGrant.AccessToken);
+        var hybridUpdateResponse = await client.PutAsJsonAsync(
+            $"/api/products/{product.Id}",
+            update with
+            {
+                Name = "Producto actualizado por permiso individual",
+                RetailPrice = 1300,
+                Version = updated.Version
+            });
+        var hybridUpdated = await hybridUpdateResponse.Content.ReadFromJsonAsync<ProductDto>();
+        Assert.Equal(HttpStatusCode.OK, hybridUpdateResponse.StatusCode);
+        Assert.NotNull(hybridUpdated);
+        Assert.False(hybridUpdated.CanViewCost);
+        Assert.Null(hybridUpdated.AverageCost);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            (await client.PutAsync($"/api/categories/{category.Id}/deactivate", null)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.PutAsync($"/api/products/{product.Id}/deactivate", null)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.PutAsync($"/api/categories/{category.Id}/deactivate", null)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (await client.PutAsync($"/api/products/{product.Id}/activate", null)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.PutAsync($"/api/categories/{category.Id}/activate", null)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.PutAsync($"/api/products/{product.Id}/activate", null)).StatusCode);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var actions = await context.EventoAuditoria.AsNoTracking().Select(x => x.Accion).ToArrayAsync();
+        Assert.Contains("PRODUCTCREATED", actions);
+        Assert.Contains("PRODUCTUPDATED", actions);
+        Assert.Contains("PRODUCTDEACTIVATED", actions);
+        Assert.Contains("PRODUCTACTIVATED", actions);
+        Assert.Contains("CATEGORYDEACTIVATED", actions);
+        Assert.Contains("CATEGORYACTIVATED", actions);
+        Assert.Contains("CATEGORYUPDATED", actions);
+    }
+
+    [Fact]
+    public async Task Catalog_RequiresCategorySupportsManualBarcodeAndReadsOfficialPurchaseCostHistory()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+
+        var categoryResponse = await client.PostAsJsonAsync(
+            "/api/categories",
+            new CreateCategoryRequest("Categoría para costos", null));
+        var category = await categoryResponse.Content.ReadFromJsonAsync<CategoryDto>();
+        Assert.Equal(HttpStatusCode.Created, categoryResponse.StatusCode);
+        Assert.NotNull(category);
+        var units = await client.GetFromJsonAsync<MeasurementUnitDto[]>("/api/measurement-units");
+        Assert.NotNull(units);
+        var unit = Assert.Single(units, x => x.Code == "UNIDAD");
+
+        var supervisorRoleId = await GetRoleIdAsync(client, RoleCodes.Supervisor);
+        var supervisorResponse = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "catalog.cost.supervisor.test", "Supervisor de costos ficticio", "Supervisor-Cost-Test-Password-2026!", [supervisorRoleId]));
+        var supervisor = await supervisorResponse.Content.ReadFromJsonAsync<UserDto>();
+        Assert.Equal(HttpStatusCode.Created, supervisorResponse.StatusCode);
+        Assert.NotNull(supervisor);
+        var supervisorSession = await LoginAsync(client, supervisor.UserName, "Supervisor-Cost-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", supervisorSession.AccessToken);
+
+        var missingCategory = new CreateProductRequest(
+            Guid.Empty, unit.Id, null, "MANUAL-NO-CATEGORY", "7700000000001", "EAN13", false,
+            "Producto sin categoría", null, 1000, 900, null, 3);
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            (await client.PostAsJsonAsync("/api/products", missingCategory)).StatusCode);
+
+        var manualBarcode = new CreateProductRequest(
+            category.Id, unit.Id, null, "MANUAL-001", "7700000000001", "EAN13", false,
+            "Producto con etiqueta existente", null, 1000, 900, null, 3);
+        var productResponse = await client.PostAsJsonAsync("/api/products", manualBarcode);
+        var product = await productResponse.Content.ReadFromJsonAsync<ProductDto>();
+        Assert.Equal(HttpStatusCode.Created, productResponse.StatusCode);
+        Assert.NotNull(product);
+        Assert.Equal("7700000000001", product.Barcode);
+        Assert.Equal("EAN13", product.BarcodeFormat);
+        Assert.False(product.BarcodeGenerated);
+        Assert.Equal(1000, product.RetailPrice);
+        Assert.Equal(900, product.WholesalePrice);
+        Assert.Equal(3, product.MinimumStock);
+
+        Assert.Equal(
+            HttpStatusCode.Conflict,
+            (await client.PostAsJsonAsync("/api/products", manualBarcode with { InternalCode = "MANUAL-002" })).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await client.GetAsync($"/api/products/{product.Id}/purchase-cost-history")).StatusCode);
+
+        var now = DateTime.UtcNow;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            var installationId = await context.Instalacion.AsNoTracking().Select(x => x.Id).SingleAsync();
+            var supplier = new Proveedor
+            {
+                Id = Guid.CreateVersion7(),
+                NombreRazonSocial = "Proveedor ficticio para pruebas",
+                Activo = true,
+                UsuarioCreacionId = administrator.User.Id,
+                FechaCreacion = now,
+                Version = 1
+            };
+            var purchase = new Compra
+            {
+                Id = Guid.CreateVersion7(),
+                InstalacionId = installationId,
+                ProveedorId = supplier.Id,
+                UsuarioId = administrator.User.Id,
+                NumeroDocumentoProveedor = "DOC-COST-001",
+                FechaDocumento = DateOnly.FromDateTime(now),
+                FechaHoraRegistro = now,
+                ModoIva = "NO_DISCRIMINADO",
+                SubtotalBruto = 4750,
+                ImpuestoTotal = null,
+                Total = 4750,
+                Estado = "BORRADOR",
+                Version = 1
+            };
+            var detail = new DetalleCompra
+            {
+                Id = Guid.CreateVersion7(),
+                CompraId = purchase.Id,
+                ProductoId = product.Id,
+                Cantidad = 5,
+                ModoIva = "NO_DISCRIMINADO",
+                CostoUnitarioDocumento = 950,
+                PorcentajeIva = null,
+                SubtotalBruto = 4750,
+                BaseGravable = null,
+                ValorIva = null,
+                TotalLinea = 4750,
+                CostoPromedioAnterior = null,
+                CostoPromedioResultante = 950,
+                PrecioVentaAnterior = 1000,
+                PrecioVentaNuevo = 1000,
+                EsSustituto = false
+            };
+            context.Proveedor.Add(supplier);
+            context.Compra.Add(purchase);
+            context.DetalleCompra.Add(detail);
+            await context.SaveChangesAsync();
+
+            purchase.Prefijo = "TEST";
+            purchase.Serie = "COST";
+            purchase.Consecutivo = 1;
+            purchase.FechaHoraConfirmacion = now;
+            purchase.Estado = "CONFIRMADA";
+            purchase.Version++;
+            var storedProduct = await context.Producto.SingleAsync(x => x.Id == product.Id);
+            storedProduct.CostoPromedio = 950;
+            await context.SaveChangesAsync();
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        var historyResponse = await client.GetAsync($"/api/products/{product.Id}/purchase-cost-history");
+        var history = await historyResponse.Content.ReadFromJsonAsync<ProductPurchaseCostHistoryDto>();
+        Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
+        Assert.NotNull(history);
+        Assert.Equal(950, history.CurrentAverageCost);
+        Assert.Equal(950, history.LastConfirmedPurchaseCost);
+        var item = Assert.Single(history.History.Items);
+        Assert.Equal("CONFIRMADA", item.State);
+        Assert.Equal(950, item.DocumentUnitCost);
+        Assert.Equal(950, item.ResultingAverageCost);
     }
 
     private async Task SetupInitialAdministratorAsync(HttpClient client, string password)

@@ -122,7 +122,7 @@ Implementar en este orden, salvo instrucción expresa:
 - Mantener historial de precio de compra; el último es referencia.
 - Precio minorista predeterminado y precio mayorista seleccionable.
 - Stock mínimo por producto.
-- Unidades: unidad, paquete y metro. Venta por metros hasta 3 decimales; no se vende por peso.
+- Unidades: unidad, paquete y metro. Todas las cantidades, incluidos los metros, se venden en unidades enteras; no se vende por peso.
 - Productos agotados se ocultan de listados normales; al buscarlos se indican como agotados.
 - Todo cambio de existencias genera un MovimientoInventario.
 
@@ -202,7 +202,7 @@ Preservar historial y consistencia referencial. No reemplazar una relación nece
 
 ## 11. Punto actual de la Fase 5
 
-La base técnica y el primer módulo funcional están implementados:
+La base técnica y los dos primeros módulos funcionales están implementados:
 
 - Solución `ControlPlus.Backend` en .NET 10 con Domain, Application e Infrastructure como bibliotecas de clases y dependencias unidireccionales.
 - Docker Compose ejecuta la API y PostgreSQL 17 con volumen persistente, healthcheck y variables sensibles fuera del control de versiones.
@@ -213,11 +213,14 @@ La base técnica y el primer módulo funcional están implementados:
 - Existe una recuperación excepcional del Administrador inicial protegida por Master Key. Solo se habilita cuando no existe ningún Administrador activo y no bloqueado; restablece la contraseña, limpia el bloqueo, rota los sellos de seguridad para invalidar sesiones y registra auditoría sin datos sensibles.
 - El esquema oficial admite exactamente un rol primario por usuario. La decisión V1 posterior define plantillas para los tres roles y excepciones individuales con precedencia `REVOCAR` sobre `CONCEDER` y rol.
 - La migración posterior de permisos híbridos conserva intacta la línea base de Fase 4, agrega `seguridad.usuario_permiso` y ajusta el límite del Administrador a 80 %.
+- El módulo de Productos y Categorías implementa altas, consultas, ediciones e inactivación sin borrado físico; búsqueda por código interno, código de barras o nombre; generación de código de barras; control de duplicados; ocultamiento normal de agotados; historial oficial de costos de compra; autorización sensible y auditoría.
+- La migración `20260913010000_SeedMeasurementUnitsV1` registra idempotentemente Unidad, Paquete y Metro y está aplicada en la base persistente de desarrollo. Todas las cantidades, incluidos los metros, son exclusivamente enteras.
+- El inicio de sesión real y las consultas autenticadas de Categorías y Productos fueron verificados con HTTP 200 después de desplegar el módulo.
 - OpenAPI está disponible de forma anónima solo en Development y existe un archivo `.http` sin secretos para pruebas manuales.
 - Las pruebas de dominio y las integraciones de esquema/API usan PostgreSQL aislado con Testcontainers y no alteran la base persistente de desarrollo.
-- Este bloque no modifica la base persistente de desarrollo, sus usuarios ni sus secretos; las migraciones se verifican solo en PostgreSQL aislado.
+- La aplicación controlada del bloque sobre la base persistente solo agregó el catálogo de unidades y su registro de migración; no creó datos ficticios, no alteró usuarios ni secretos y preservó el volumen.
 
-La matriz aprobada se documenta en `docs/permissions-matrix.md`. Después de verificar este bloque, el siguiente módulo es Productos y Categorías. Los secretos permanecen exclusivamente en el entorno local no versionado.
+La matriz aprobada se documenta en `docs/permissions-matrix.md` y el catálogo funcional en `docs/catalog.md`. El siguiente módulo es Caja: turnos, apertura, movimientos, arqueo y cierre. Los secretos permanecen exclusivamente en el entorno local no versionado.
 
 ## 12. Documentación que conviene conservar en el repositorio
 

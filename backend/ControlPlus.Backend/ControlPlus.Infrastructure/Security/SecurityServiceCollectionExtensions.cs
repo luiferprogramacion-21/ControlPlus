@@ -1,5 +1,6 @@
 using ControlPlus.Application.Security.Ports;
 using ControlPlus.Infrastructure.Persistence.Repositories;
+using ControlPlus.Application.Catalog.Ports;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,6 +22,7 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<IRoleRepository, EfRoleRepository>();
         services.AddScoped<IPermissionRepository, EfPermissionRepository>();
         services.AddScoped<IAuditRepository, EfAuditRepository>();
+        services.AddScoped<ICatalogRepository, EfCatalogRepository>();
         services.AddScoped<SecurityCatalogSeeder>();
         services.AddScoped<InstallationBootstrapper>();
 
