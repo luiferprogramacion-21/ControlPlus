@@ -6,6 +6,7 @@ using ControlPlus.Application.Security.Services;
 using ControlPlus.Infrastructure.Persistence;
 using ControlPlus.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,7 +15,24 @@ StartupSecurityConfiguration.EnsureRequiredSecrets(
     builder.Configuration,
     builder.Environment.EnvironmentName);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var details = new ValidationProblemDetails(context.ModelState)
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Uno o más campos de la solicitud son inválidos.",
+            Type = "https://controlplus.local/problems/validation.failed",
+            Instance = context.HttpContext.Request.Path
+        };
+        details.Extensions["code"] = "validation.failed";
+
+        var response = new BadRequestObjectResult(details);
+        response.ContentTypes.Add("application/problem+json");
+        return response;
+    };
+});
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 

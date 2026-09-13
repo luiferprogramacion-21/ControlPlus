@@ -9,6 +9,8 @@ public interface IUserRepository
 {
     Task<bool> HasAnyUsersAsync(CancellationToken cancellationToken = default);
 
+    Task<bool> HasAvailableAdministratorAsync(CancellationToken cancellationToken = default);
+
     Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
     Task<User?> GetByUserNameAsync(string userName, CancellationToken cancellationToken = default);

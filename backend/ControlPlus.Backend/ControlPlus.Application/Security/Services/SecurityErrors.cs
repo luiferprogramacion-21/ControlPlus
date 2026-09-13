@@ -19,6 +19,12 @@ internal static class SecurityErrors
     public static readonly ApplicationError AdministratorRoleMissing =
         new("security.bootstrap_role_missing", "No se encontró el rol Administrador requerido para la configuración inicial.");
 
+    public static readonly ApplicationError AdministratorRecoveryUnavailable =
+        ApplicationError.Conflict("La recuperación no está disponible mientras exista un Administrador activo y no bloqueado.");
+
+    public static readonly ApplicationError InitialAdministratorRecoveryTargetInvalid =
+        ApplicationError.Conflict("El usuario indicado no es el Administrador inicial recuperable.");
+
     public static readonly ApplicationError UserNameAlreadyExists =
         new("user.user_name_already_exists", "El nombre de usuario ya está en uso.");
 

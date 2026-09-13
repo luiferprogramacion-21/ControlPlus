@@ -205,12 +205,14 @@ La base técnica y el primer módulo funcional están implementados:
 - Las migraciones controladas aplican el script PostgreSQL oficial de Fase 4 y el seed aprobado de Administrador, Supervisor y Cajero con sus límites.
 - Los repositorios funcionales usan `OfficialControlPlusDbContext` y el modelo database-first oficial.
 - El módulo de seguridad incluye instalación inicial mediante Master Key, primer Administrador de un solo uso, login, JWT HS512, bloqueo al quinto intento, `/me`, autorización vigente desde base de datos, gestión de usuarios/roles/permisos y auditoría.
+- La instalación inicial y el primer inicio de sesión ya fueron verificados en el entorno persistente de desarrollo.
+- Existe una recuperación excepcional del Administrador inicial protegida por Master Key. Solo se habilita cuando no existe ningún Administrador activo y no bloqueado; restablece la contraseña, limpia el bloqueo, rota los sellos de seguridad para invalidar sesiones y registra auditoría sin datos sensibles.
 - El esquema oficial admite exactamente un rol primario por usuario. El paquete no define una matriz de permisos para Supervisor o Cajero; no asignarla por inferencia.
 - OpenAPI está disponible de forma anónima solo en Development y existe un archivo `.http` sin secretos para pruebas manuales.
 - Las pruebas de dominio y las integraciones de esquema/API usan PostgreSQL aislado con Testcontainers y no alteran la base persistente de desarrollo.
 - La base persistente de desarrollo conserva los tres roles y sus límites aprobados; todavía no contiene ningún usuario real.
 
-Siguiente paso: configurar `CONTROLPLUS_MASTER_KEY`, `JWT_SIGNING_KEY` y los demás secretos exclusivamente en el entorno local no versionado; ejecutar la instalación inicial con datos reales y crear el primer Administrador. Después continuar con el módulo de Productos y Categorías, sin inventar una matriz de permisos no aprobada.
+Siguiente paso: continuar con el módulo de Productos y Categorías, sin inventar una matriz de permisos no aprobada. Los secretos permanecen exclusivamente en el entorno local no versionado.
 
 ## 12. Documentación que conviene conservar en el repositorio
 

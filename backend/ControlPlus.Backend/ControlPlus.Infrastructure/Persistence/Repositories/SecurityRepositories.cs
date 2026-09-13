@@ -23,6 +23,15 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
     public Task<bool> HasAnyUsersAsync(CancellationToken cancellationToken = default) =>
         dbContext.Usuario.AnyAsync(cancellationToken);
 
+    public Task<bool> HasAvailableAdministratorAsync(CancellationToken cancellationToken = default) =>
+        dbContext.Usuario.AnyAsync(
+            user => user.Activo &&
+                    user.BloqueoHasta == null &&
+                    user.UsuarioRolUsuario != null &&
+                    user.UsuarioRolUsuario.Rol.Activo &&
+                    user.UsuarioRolUsuario.Rol.Codigo == RoleCodes.Administrator,
+            cancellationToken);
+
     public Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
         DetailedUsers.SingleOrDefaultAsync(user => user.Id == userId, cancellationToken);
 

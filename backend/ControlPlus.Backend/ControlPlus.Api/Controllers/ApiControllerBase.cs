@@ -40,6 +40,25 @@ public abstract class ApiControllerBase(CurrentActorContextResolver actorContext
 
     private ObjectResult ToProblem(ApplicationError error)
     {
+        if (error.Code.StartsWith("validation.", StringComparison.Ordinal))
+        {
+            var validationDetails = new ValidationProblemDetails(
+                new Dictionary<string, string[]>
+                {
+                    ["request"] = [error.Message]
+                })
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Uno o más campos de la solicitud son inválidos.",
+                Type = $"https://controlplus.local/problems/{error.Code}"
+            };
+            validationDetails.Extensions["code"] = error.Code;
+
+            var validationResponse = new BadRequestObjectResult(validationDetails);
+            validationResponse.ContentTypes.Add("application/problem+json");
+            return validationResponse;
+        }
+
         var statusCode = error.Code switch
         {
             "resource.not_found" => StatusCodes.Status404NotFound,
@@ -47,7 +66,6 @@ public abstract class ApiControllerBase(CurrentActorContextResolver actorContext
             "authorization.forbidden" or "authorization.insufficient_role_level" => StatusCodes.Status403Forbidden,
             "authentication.invalid_credentials" or "authentication.unauthorized" => StatusCodes.Status401Unauthorized,
             "security.bootstrap_role_missing" => StatusCodes.Status503ServiceUnavailable,
-            _ when error.Code.StartsWith("validation.", StringComparison.Ordinal) => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status400BadRequest
         };
 

@@ -24,7 +24,7 @@ public sealed class AuthenticationController(
     [AllowAnonymous]
     [EnableRateLimiting("installation")]
     [ProducesResponseType<UserDto>(StatusCodes.Status201Created)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> SetupFirstAdministrator(
         [FromBody] SetupFirstAdministratorRequest request,
@@ -85,6 +85,50 @@ public sealed class AuthenticationController(
     {
         var result = await authenticationService.LoginAsync(request, cancellationToken);
         return FromResult(result, Ok);
+    }
+
+    [HttpPost("recover-initial-administrator")]
+    [AllowAnonymous]
+    [EnableRateLimiting("installation")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> RecoverInitialAdministrator(
+        [FromBody] RecoverInitialAdministratorRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!bootstrapAccessValidator.IsConfigured)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "La recuperación requiere Installation:MasterKey.",
+                type: "https://controlplus.local/problems/bootstrap-not-configured");
+        }
+
+        if (!bootstrapAccessValidator.IsValid(Request.Headers["X-ControlPlus-Master-Key"].ToString()))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "No está autorizado para recuperar el Administrador inicial.",
+                type: "https://controlplus.local/problems/bootstrap-forbidden");
+        }
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "SELECT pg_advisory_xact_lock(2026091202)",
+            [],
+            cancellationToken);
+
+        var result = await authenticationService.RecoverInitialAdministratorAsync(request, cancellationToken);
+        if (result.IsSuccess)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        return FromResult(result);
     }
 
     [HttpGet("me")]

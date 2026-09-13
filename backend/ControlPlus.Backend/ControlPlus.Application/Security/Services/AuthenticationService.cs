@@ -213,6 +213,61 @@ public sealed class AuthenticationService : IAuthenticationService
                 authorization.UserName,
                 authorization.DisplayName,
                 authorization.RoleCodes,
-                authorization.PermissionCodes)));
+            authorization.PermissionCodes)));
+    }
+
+    public async Task<Result> RecoverInitialAdministratorAsync(
+        RecoverInitialAdministratorRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var userName = SecurityInput.RequiredText(request.UserName, "nombre de usuario");
+        if (userName.IsFailure)
+        {
+            return Result.Failure(userName.Error!);
+        }
+
+        var newPassword = SecurityInput.RequiredPassword(request.NewPassword, "nueva contraseña");
+        if (newPassword.IsFailure)
+        {
+            return Result.Failure(newPassword.Error!);
+        }
+
+        if (await _userRepository.HasAvailableAdministratorAsync(cancellationToken))
+        {
+            return Result.Failure(SecurityErrors.AdministratorRecoveryUnavailable);
+        }
+
+        var user = await _userRepository.GetByUserNameAsync(userName.Value!, cancellationToken);
+        if (user is null ||
+            user.UserRoles.SingleOrDefault()?.Role is not { IsActive: true } role ||
+            role.Code != RoleCodes.Administrator)
+        {
+            return Result.Failure(SecurityErrors.InitialAdministratorRecoveryTargetInvalid);
+        }
+
+        var now = _clock.UtcNow;
+        user.RecoverInitialAdministrator(_passwordHasher.Hash(newPassword.Value!), now);
+        await _userRepository.UpdateAsync(user, cancellationToken);
+        await AuditWriter.WriteAsync(
+            _auditRepository,
+            _clock,
+            actorUserId: null,
+            AuditAction.InitialAdministratorRecovered,
+            nameof(User),
+            user.Id,
+            new
+            {
+                user.UserName,
+                RecoveryMethod = "installation_master_key",
+                PasswordReset = true,
+                LockCleared = true,
+                SessionsInvalidated = true
+            },
+            cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result.Success();
     }
 }

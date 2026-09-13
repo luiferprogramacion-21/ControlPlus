@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Infrastructure.Persistence;
@@ -180,6 +181,224 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         Assert.Contains("USERLOCKED", actions);
         Assert.Contains("PERMISSIONGRANTED", actions);
         Assert.Contains("PERMISSIONREVOKED", actions);
+    }
+
+    [Fact]
+    public async Task SetupWithRawJsonStringFields_IsAccepted()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/setup")
+        {
+            Content = new StringContent(
+                """
+                {
+                  "establishmentName": "Comercio ficticio",
+                  "establishmentIdentification": "900000000-1",
+                  "installationCode": "INSTALL-TEST",
+                  "installationSerial": "SER0000001",
+                  "terminalCode": "TERM-TEST",
+                  "terminalName": "Terminal ficticia",
+                  "userName": "admin.raw.test",
+                  "displayName": "Administrador ficticio",
+                  "password": "isolated-test-password"
+                }
+                """,
+                Encoding.UTF8,
+                "application/json")
+        };
+        request.Headers.Add("X-ControlPlus-Master-Key", _masterKey);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task SetupWithNumericIdentification_ReturnsFieldValidationProblemDetails()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/setup")
+        {
+            Content = new StringContent(
+                """
+                {
+                  "establishmentName": "Comercio ficticio",
+                  "establishmentIdentification": 900000001,
+                  "installationCode": "INSTALL-TEST",
+                  "installationSerial": "SER0000001",
+                  "terminalCode": "TERM-TEST",
+                  "terminalName": "Terminal ficticia",
+                  "userName": "admin.raw.test",
+                  "displayName": "Administrador ficticio",
+                  "password": "isolated-test-password"
+                }
+                """,
+                Encoding.UTF8,
+                "application/json")
+        };
+        request.Headers.Add("X-ControlPlus-Master-Key", _masterKey);
+
+        var response = await client.SendAsync(request);
+        var responseBody = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var json = JsonDocument.Parse(responseBody);
+        var errors = json.RootElement.GetProperty("errors");
+        Assert.True(errors.TryGetProperty("$.establishmentIdentification", out _), responseBody);
+    }
+
+    [Fact]
+    public async Task InitialAdministratorRecovery_WithInvalidMasterKey_IsForbidden()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var request = RecoveryRequest("invalid-test-master-key", "Recovery-Test-Password-2026!");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InitialAdministratorRecovery_WhenAdministratorIsAvailable_IsRejected()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        using var request = RecoveryRequest(_masterKey, "Recovery-Test-Password-2026!");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task InitialAdministratorRecovery_WhenLocked_ResetsPasswordAndInvalidatesSessions()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        const string originalPassword = "Initial-Test-Password-2026!";
+        const string recoveredPassword = "Recovery-Test-Password-2026!";
+        await SetupInitialAdministratorAsync(client, originalPassword);
+
+        var initialLogin = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest("initial.admin.test", originalPassword));
+        var initialAuthentication = await initialLogin.Content.ReadFromJsonAsync<AuthenticationResult>();
+        Assert.Equal(HttpStatusCode.OK, initialLogin.StatusCode);
+        Assert.NotNull(initialAuthentication);
+
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            var failed = await client.PostAsJsonAsync(
+                "/api/auth/login",
+                new LoginRequest("initial.admin.test", "Incorrect-Test-Password"));
+            Assert.Equal(HttpStatusCode.Unauthorized, failed.StatusCode);
+        }
+
+        string stampBeforeRecovery;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            stampBeforeRecovery = await context.Usuario
+                .AsNoTracking()
+                .Where(user => user.NombreUsuarioNormalizado == "INITIAL.ADMIN.TEST")
+                .Select(user => user.SelloSeguridad)
+                .SingleAsync();
+        }
+
+        using var request = RecoveryRequest(_masterKey, recoveredPassword);
+        var recovery = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.NoContent, recovery.StatusCode);
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            var recovered = await context.Usuario
+                .AsNoTracking()
+                .SingleAsync(user => user.NombreUsuarioNormalizado == "INITIAL.ADMIN.TEST");
+            Assert.True(recovered.Activo);
+            Assert.Equal(0, recovered.IntentosFallidos);
+            Assert.Null(recovered.BloqueoHasta);
+            Assert.NotEqual(stampBeforeRecovery, recovered.SelloSeguridad);
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            initialAuthentication.AccessToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = null;
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await client.PostAsJsonAsync(
+                "/api/auth/login",
+                new LoginRequest("initial.admin.test", originalPassword))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.PostAsJsonAsync(
+                "/api/auth/login",
+                new LoginRequest("initial.admin.test", recoveredPassword))).StatusCode);
+    }
+
+    [Fact]
+    public async Task InitialAdministratorRecovery_WritesExplicitAuditEvent()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            await client.PostAsJsonAsync(
+                "/api/auth/login",
+                new LoginRequest("initial.admin.test", "Incorrect-Test-Password"));
+        }
+
+        using var request = RecoveryRequest(_masterKey, "Recovery-Test-Password-2026!");
+        Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(request)).StatusCode);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var audit = await context.EventoAuditoria
+            .AsNoTracking()
+            .SingleAsync(record => record.Accion == "INITIALADMINISTRATORRECOVERED");
+        Assert.Equal("EXITOSO", audit.Resultado);
+        Assert.Equal("User", audit.Entidad);
+        Assert.Null(audit.UsuarioId);
+        using var details = JsonDocument.Parse(audit.DatosNuevos!);
+        Assert.Equal(
+            "installation_master_key",
+            details.RootElement.GetProperty("RecoveryMethod").GetString());
+        Assert.True(details.RootElement.GetProperty("SessionsInvalidated").GetBoolean());
+        Assert.DoesNotContain("PasswordHash", audit.DatosNuevos, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("NewPassword", audit.DatosNuevos, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task SetupInitialAdministratorAsync(HttpClient client, string password)
+    {
+        var setup = new SetupFirstAdministratorRequest(
+            "Comercio ficticio",
+            "TEST-ONLY",
+            "TEST-INSTALLATION",
+            "TESTSERIAL",
+            "TEST-TERMINAL",
+            "Terminal ficticia",
+            "initial.admin.test",
+            "Administrador ficticio",
+            password);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/setup")
+        {
+            Content = JsonContent.Create(setup)
+        };
+        request.Headers.Add("X-ControlPlus-Master-Key", _masterKey);
+        Assert.Equal(HttpStatusCode.Created, (await client.SendAsync(request)).StatusCode);
+    }
+
+    private static HttpRequestMessage RecoveryRequest(string masterKey, string newPassword)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/recover-initial-administrator")
+        {
+            Content = JsonContent.Create(new RecoverInitialAdministratorRequest("initial.admin.test", newPassword))
+        };
+        request.Headers.Add("X-ControlPlus-Master-Key", masterKey);
+        return request;
     }
 
     private static async Task<Guid> GetRoleIdAsync(HttpClient client, string code)

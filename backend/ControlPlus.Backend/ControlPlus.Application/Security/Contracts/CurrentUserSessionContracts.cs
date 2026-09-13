@@ -29,4 +29,8 @@ public interface IAuthenticationService
     Task<Result<AuthenticationResult>> LoginAsync(
         LoginRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<Result> RecoverInitialAdministratorAsync(
+        RecoverInitialAdministratorRequest request,
+        CancellationToken cancellationToken = default);
 }

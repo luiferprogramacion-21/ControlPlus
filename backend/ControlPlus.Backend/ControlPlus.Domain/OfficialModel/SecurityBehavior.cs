@@ -72,6 +72,16 @@ public partial class Usuario
         RotateSecurityStamp();
     }
 
+    public void RecoverInitialAdministrator(string passwordHash, DateTimeOffset changedAtUtc)
+    {
+        PasswordHash = DomainGuard.RequiredText(passwordHash, nameof(passwordHash));
+        Activo = true;
+        IntentosFallidos = 0;
+        BloqueoHasta = null;
+        Touch(changedAtUtc);
+        RotateSecurityStamp();
+    }
+
     public void UpdateDisplayName(string displayName, DateTimeOffset updatedAtUtc)
     {
         NombreCompleto = DomainGuard.RequiredText(displayName, nameof(displayName));

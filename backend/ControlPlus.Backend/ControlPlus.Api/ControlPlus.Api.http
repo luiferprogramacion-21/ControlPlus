@@ -30,6 +30,17 @@ Content-Type: application/json
   "password": "{{adminPassword}}"
 }
 
+### Recuperación excepcional del Administrador inicial
+# Solo cuando no exista ningún Administrador activo y no bloqueado.
+POST {{host}}/api/auth/recover-initial-administrator
+Content-Type: application/json
+X-ControlPlus-Master-Key: {{masterKey}}
+
+{
+  "userName": "{{adminUser}}",
+  "newPassword": "{{adminPassword}}"
+}
+
 ### Usuario autenticado
 GET {{host}}/api/auth/me
 Authorization: Bearer {{token}}

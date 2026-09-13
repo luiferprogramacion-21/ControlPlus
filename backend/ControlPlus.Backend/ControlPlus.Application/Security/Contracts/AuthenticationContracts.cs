@@ -15,6 +15,10 @@ public sealed record SetupFirstAdministratorRequest(
 
 public sealed record LoginRequest(string UserName, string Password);
 
+public sealed record RecoverInitialAdministratorRequest(
+    [Required, MaxLength(100)] string UserName,
+    [Required] string NewPassword);
+
 public sealed record AuthenticationResult(
     string AccessToken,
     DateTimeOffset ExpiresAtUtc,

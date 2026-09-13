@@ -20,6 +20,16 @@ Variables requeridas en desarrollo/local:
 En Docker Compose se usan las equivalentes `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_SIGNING_KEY`, `JWT_ACCESS_TOKEN_MINUTES`, `JWT_CLOCK_SKEW_SECONDS` y `CONTROLPLUS_MASTER_KEY` desde `.env`, que no se versiona.
 Después de crear el primer administrador, `CONTROLPLUS_MASTER_KEY` debe conservarse en almacenamiento local seguro o rotarse. El endpoint vuelve a comprobar la existencia de usuarios dentro de una transacción serializable con bloqueo asesor y rechaza cualquier reutilización.
 
+## Recuperación excepcional del Administrador inicial
+
+`POST /api/auth/recover-initial-administrator` es un mecanismo de emergencia protegido mediante `CONTROLPLUS_MASTER_KEY`, enviada en el encabezado `X-ControlPlus-Master-Key`. No sustituye el flujo normal de administración de usuarios.
+
+La operación solo puede ejecutarse cuando la base de datos no contiene ningún usuario con rol Administrador activo y no bloqueado. El usuario objetivo también debe conservar un rol Administrador activo. La comprobación y la recuperación se ejecutan dentro de una transacción serializable con bloqueo asesor para evitar ejecuciones concurrentes.
+
+Una recuperación correcta reemplaza el hash de la contraseña, limpia los intentos fallidos y el bloqueo, conserva activa la cuenta y rota los sellos de seguridad y concurrencia. La rotación invalida los JWT y sesiones emitidos previamente. Se registra el evento `INITIALADMINISTRATORRECOVERED` con el método de recuperación y los efectos aplicados, pero nunca con contraseñas, hashes, claves o tokens.
+
+El endpoint responde `403` si la Master Key no es válida, `409` si todavía existe un Administrador disponible o si el usuario objetivo no es recuperable, y `204` cuando finaliza correctamente. Debe mantenerse sujeto a limitación de solicitudes y utilizarse exclusivamente desde el entorno local autorizado.
+
 ## Autorización
 
 Los endpoints protegidos exigen autenticación y permisos explícitos. Los permisos se consultan con los roles activos del usuario en vez de confiar solamente en permisos escritos dentro del JWT. Por ello, una revocación de rol o permiso surte efecto sin esperar a que el token expire.
