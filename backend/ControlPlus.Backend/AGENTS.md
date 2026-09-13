@@ -95,9 +95,13 @@ Implementar en este orden, salvo instrucción expresa:
 - Respuestas de error uniformes.
 - Registrar auditoría de acciones críticas: usuarios/roles, productos, caja, ventas, inventario, créditos y apartados.
 - Controlar duplicados y operaciones transaccionales, especialmente ventas, pagos, inventario y caja.
-- Roles base: Cajero, Supervisor y Administrador. Los permisos por rol pueden ajustarse.
+- Los únicos roles de V1 son Cajero, Supervisor y Administrador; no se crean roles adicionales.
+- Cada usuario tiene un solo rol base y permisos efectivos híbridos: plantilla del rol más concesiones o revocaciones individuales. La revocación individual tiene precedencia.
+- Solo Administrador gestiona plantillas de rol, catálogo y excepciones individuales. Todo cambio invalida las sesiones afectadas y se audita.
 - Bloquear usuario después de 5 intentos fallidos; reactivación por un rol superior.
 - Las autorizaciones sensibles requieren credenciales de supervisor o administrador.
+- Ejecutor y autorizador deben ser usuarios distintos en créditos, cambios posteriores y otras autorizaciones sensibles.
+- El descuento máximo absoluto es 80 %; por rol es Administrador 80 %, Supervisor 20 % y Cajero 5 %. Nunca se vende bajo costo ni se acumula precio mayorista con descuento manual.
 - Separar logs técnicos de la auditoría de negocio.
 - Objetivo de respuesta normal: hasta 1 segundo.
 - Implementar pruebas por niveles: dominio/aplicación, integración y flujo principal.
@@ -207,12 +211,13 @@ La base técnica y el primer módulo funcional están implementados:
 - El módulo de seguridad incluye instalación inicial mediante Master Key, primer Administrador de un solo uso, login, JWT HS512, bloqueo al quinto intento, `/me`, autorización vigente desde base de datos, gestión de usuarios/roles/permisos y auditoría.
 - La instalación inicial y el primer inicio de sesión ya fueron verificados en el entorno persistente de desarrollo.
 - Existe una recuperación excepcional del Administrador inicial protegida por Master Key. Solo se habilita cuando no existe ningún Administrador activo y no bloqueado; restablece la contraseña, limpia el bloqueo, rota los sellos de seguridad para invalidar sesiones y registra auditoría sin datos sensibles.
-- El esquema oficial admite exactamente un rol primario por usuario. El paquete no define una matriz de permisos para Supervisor o Cajero; no asignarla por inferencia.
+- El esquema oficial admite exactamente un rol primario por usuario. La decisión V1 posterior define plantillas para los tres roles y excepciones individuales con precedencia `REVOCAR` sobre `CONCEDER` y rol.
+- La migración posterior de permisos híbridos conserva intacta la línea base de Fase 4, agrega `seguridad.usuario_permiso` y ajusta el límite del Administrador a 80 %.
 - OpenAPI está disponible de forma anónima solo en Development y existe un archivo `.http` sin secretos para pruebas manuales.
 - Las pruebas de dominio y las integraciones de esquema/API usan PostgreSQL aislado con Testcontainers y no alteran la base persistente de desarrollo.
-- La base persistente de desarrollo conserva los tres roles y sus límites aprobados; todavía no contiene ningún usuario real.
+- Este bloque no modifica la base persistente de desarrollo, sus usuarios ni sus secretos; las migraciones se verifican solo en PostgreSQL aislado.
 
-Siguiente paso: continuar con el módulo de Productos y Categorías, sin inventar una matriz de permisos no aprobada. Los secretos permanecen exclusivamente en el entorno local no versionado.
+La matriz aprobada se documenta en `docs/permissions-matrix.md`. Después de verificar este bloque, el siguiente módulo es Productos y Categorías. Los secretos permanecen exclusivamente en el entorno local no versionado.
 
 ## 12. Documentación que conviene conservar en el repositorio
 

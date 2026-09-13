@@ -8,6 +8,7 @@ La fuente de verdad es `docs/ControlPlus_Fase4_Documento_y_Complementos.zip`. El
 
 - `20260912010000_OfficialPhase4Baseline`: crea los siete esquemas, 58 tablas, claves, restricciones, índices, vistas y funciones aprobados.
 - `20260912011000_SeedApprovedSecurityCatalog`: crea idempotentemente Administrador, Supervisor y Cajero y sus límites de descuento 100, 20 y 5.
+- `20260912012000_HybridPermissionsV1`: agrega las excepciones individuales de permisos, crea las plantillas V1 y ajusta el límite de Administrador a 80 %, sin modificar la migración base.
 
 Configure la cadena fuera del repositorio y aplique las migraciones con la herramienta local:
 

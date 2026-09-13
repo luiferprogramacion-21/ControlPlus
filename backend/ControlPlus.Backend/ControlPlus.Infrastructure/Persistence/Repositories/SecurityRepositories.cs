@@ -18,7 +18,9 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
         .Include(user => user.UsuarioRolUsuario)
         .ThenInclude(userRole => userRole!.Rol)
         .ThenInclude(role => role.RolPermiso)
-        .ThenInclude(rolePermission => rolePermission.Permiso);
+        .ThenInclude(rolePermission => rolePermission.Permiso)
+        .Include(user => user.UsuarioPermiso)
+        .ThenInclude(userPermission => userPermission.Permiso);
 
     public Task<bool> HasAnyUsersAsync(CancellationToken cancellationToken = default) =>
         dbContext.Usuario.AnyAsync(cancellationToken);
@@ -67,12 +69,26 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
             .Select(role => new RoleClaim(role.Id, role.Code, role.Name, role.Level))
             .ToArray();
 
-        var permissions = activeRoles
+        var permissionsById = activeRoles
             .SelectMany(role => role.RolePermissions)
             .Select(rolePermission => rolePermission.Permission)
             .Where(permission => permission.Activo)
             .GroupBy(permission => permission.Id)
-            .Select(group => group.First())
+            .ToDictionary(group => group.Key, group => group.First());
+
+        foreach (var userPermission in user.UsuarioPermiso.Where(x => x.Permiso.Activo))
+        {
+            if (userPermission.IsRevoked)
+            {
+                permissionsById.Remove(userPermission.PermisoId);
+            }
+            else if (userPermission.IsGranted)
+            {
+                permissionsById[userPermission.PermisoId] = userPermission.Permiso;
+            }
+        }
+
+        var permissions = permissionsById.Values
             .OrderBy(permission => permission.Code, StringComparer.Ordinal)
             .Select(permission => new PermissionClaim(permission.Id, permission.Code, permission.Name))
             .ToArray();
@@ -96,6 +112,13 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
         CancellationToken cancellationToken = default) =>
         await DetailedUsers
             .Where(user => user.UsuarioRolUsuario != null && user.UsuarioRolUsuario.RolId == roleId)
+            .ToArrayAsync(cancellationToken);
+
+    public async Task<IReadOnlyCollection<User>> GetByPermissionOverrideIdAsync(
+        Guid permissionId,
+        CancellationToken cancellationToken = default) =>
+        await DetailedUsers
+            .Where(user => user.UsuarioPermiso.Any(userPermission => userPermission.PermisoId == permissionId))
             .ToArrayAsync(cancellationToken);
 
     public async Task<PagedResult<User>> ListAsync(
@@ -140,6 +163,43 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
         dbContext.Usuario.AddAsync(user, cancellationToken).AsTask();
 
     public Task UpdateAsync(User user, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public async Task SetPermissionOverrideAsync(
+        User user,
+        Guid permissionId,
+        bool granted,
+        Guid assignedByUserId,
+        DateTimeOffset assignedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var existing = user.UsuarioPermiso.SingleOrDefault(x => x.PermisoId == permissionId);
+        if (existing is not null)
+        {
+            existing.Efecto = granted ? UserPermissionEffects.Grant : UserPermissionEffects.Revoke;
+            existing.FechaAsignacion = assignedAtUtc.UtcDateTime;
+            existing.AsignadoPorId = assignedByUserId;
+            return;
+        }
+
+        var permissionOverride = new UsuarioPermiso
+        {
+            UsuarioId = user.Id,
+            PermisoId = permissionId,
+            Efecto = granted ? UserPermissionEffects.Grant : UserPermissionEffects.Revoke,
+            FechaAsignacion = assignedAtUtc.UtcDateTime,
+            AsignadoPorId = assignedByUserId,
+            Usuario = user
+        };
+        user.UsuarioPermiso.Add(permissionOverride);
+        await dbContext.UsuarioPermiso.AddAsync(permissionOverride, cancellationToken);
+    }
+
+    public Task ClearPermissionOverridesAsync(User user, CancellationToken cancellationToken = default)
+    {
+        dbContext.UsuarioPermiso.RemoveRange(user.UsuarioPermiso);
+        user.UsuarioPermiso.Clear();
+        return Task.CompletedTask;
+    }
 
     public async Task ReplaceRoleAsync(
         User user,

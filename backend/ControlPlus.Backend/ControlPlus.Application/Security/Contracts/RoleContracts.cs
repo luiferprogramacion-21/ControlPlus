@@ -51,6 +51,8 @@ public interface IRoleManagementService
 
     Task<Result<RoleDto>> RevokePermissionAsync(ActorContext actor, Guid roleId, Guid permissionId, CancellationToken cancellationToken = default);
 
+    Task<Result<RoleDto>> ResetPermissionsAsync(ActorContext actor, Guid roleId, CancellationToken cancellationToken = default);
+
     Task<Result<PermissionDto>> CreatePermissionAsync(ActorContext actor, CreatePermissionRequest request, CancellationToken cancellationToken = default);
 
     Task<Result<PermissionDto>> UpdatePermissionAsync(ActorContext actor, Guid permissionId, UpdatePermissionRequest request, CancellationToken cancellationToken = default);

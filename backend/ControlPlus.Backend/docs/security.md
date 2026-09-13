@@ -34,9 +34,9 @@ El endpoint responde `403` si la Master Key no es válida, `409` si todavía exi
 
 Los endpoints protegidos exigen autenticación y permisos explícitos. Los permisos se consultan con los roles activos del usuario en vez de confiar solamente en permisos escritos dentro del JWT. Por ello, una revocación de rol o permiso surte efecto sin esperar a que el token expire.
 
-Los roles base son Cajero, Supervisor y Administrador. El modelo oficial admite exactamente un rol primario por usuario. Las reactivaciones de cuentas bloqueadas requieren un rol estrictamente superior al rol de la cuenta objetivo.
+Los únicos roles de V1 son Cajero, Supervisor y Administrador. El modelo oficial admite exactamente un rol primario por usuario. Los permisos efectivos combinan la plantilla editable del rol con excepciones individuales `CONCEDER` o `REVOCAR`; una revocación individual siempre prevalece. Las reactivaciones de cuentas bloqueadas requieren un rol estrictamente superior al rol de la cuenta objetivo.
 
-Durante la configuración inicial se conserva únicamente el catálogo técnico ya definido por los endpoints (`USERS.READ`, `USERS.MANAGE`, `ROLES.READ`, `ROLES.MANAGE`, `PERMISSIONS.READ`, `PERMISSIONS.MANAGE` y `AUDIT.READ`). Administrador recibe esos permisos para poder gestionar el módulo. Supervisor y Cajero no reciben permisos por defecto porque el paquete oficial no define una matriz; no se crean permisos de negocio por inferencia.
+La matriz funcional aprobada y sus códigos estables están en `docs/permissions-matrix.md`. Los cambios de plantilla invalidan las sesiones del rol; los cambios individuales invalidan solo las del usuario. Restaurar un rol repone su plantilla V1 y restaurar un usuario elimina sus excepciones. Solo Administrador puede ejecutar estas operaciones.
 
 ## Auditoría
 
@@ -51,4 +51,4 @@ El esquema oficial se toma de `docs/ControlPlus_Fase4_Documento_y_Complementos.z
 - Campos canónicos de Usuario, incluida la credencial de lector de código de barras si fue definida.
 - Política de recuperación de una cuenta Administrador bloqueada.
 
-El paquete aprueba como seed Administrador, Supervisor y Cajero, junto con límites de descuento 100, 20 y 5. No define una matriz inicial concreta de permisos ni valores obligatorios del establecimiento o instalación, por lo que esos datos no se inventan en el seed. Los repositorios funcionales de seguridad usan `OfficialControlPlusDbContext`; el contexto anterior se mantiene solo como contexto de las migraciones controladas que ejecutan el script oficial.
+La línea base de Fase 4 conserva el seed original de Administrador, Supervisor y Cajero. La decisión V1 posterior establece la matriz definitiva y cambia el límite del Administrador de 100 % a 80 % mediante una migración adicional; Supervisor permanece en 20 % y Cajero en 5 %. Los valores del establecimiento o instalación no se inventan. Los repositorios funcionales de seguridad usan `OfficialControlPlusDbContext`; el contexto anterior se mantiene como ejecutor de las migraciones controladas.

@@ -24,6 +24,6 @@ public sealed class CurrentActorContextResolver(IUserRepository userRepository)
         var snapshot = await userRepository.GetAuthorizationSnapshotAsync(userId, cancellationToken);
         return snapshot is null
             ? null
-            : new ActorContext(snapshot.UserId, snapshot.HighestRoleLevel);
+            : new ActorContext(snapshot.UserId, snapshot.HighestRoleLevel, snapshot.PermissionCodes);
     }
 }

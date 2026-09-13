@@ -27,7 +27,7 @@ public sealed class OfficialSchemaIntegrationTests
         await context.Database.MigrateAsync();
         await context.Database.OpenConnectionAsync();
 
-        Assert.Equal(58L, await ScalarAsync(context.Database.GetDbConnection(),
+        Assert.Equal(59L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*)
             FROM information_schema.tables
@@ -35,7 +35,7 @@ public sealed class OfficialSchemaIntegrationTests
               AND table_schema IN ('seguridad','configuracion','catalogo','caja','ventas','compras','auditoria')
             """));
 
-        Assert.Equal(58L, await ScalarAsync(context.Database.GetDbConnection(),
+        Assert.Equal(59L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*)
             FROM information_schema.table_constraints
@@ -62,9 +62,30 @@ public sealed class OfficialSchemaIntegrationTests
               AND r.es_predefinido = true
               AND r.permisos_editables = true
               AND l.codigo_operacion = 'DESCUENTO_PORCENTAJE'
-              AND ((r.codigo = 'ADMINISTRADOR' AND l.valor_maximo = 100)
+              AND ((r.codigo = 'ADMINISTRADOR' AND l.valor_maximo = 80)
                 OR (r.codigo = 'SUPERVISOR' AND l.valor_maximo = 20)
                 OR (r.codigo = 'CAJERO' AND l.valor_maximo = 5))
+            """));
+
+        Assert.Equal(1L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM information_schema.tables
+            WHERE table_schema = 'seguridad' AND table_name = 'usuario_permiso'
+            """));
+
+        Assert.Equal(1L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM information_schema.table_constraints
+            WHERE table_schema = 'seguridad' AND table_name = 'usuario_permiso'
+              AND constraint_type = 'CHECK'
+              AND constraint_name = 'ck_usuario_permiso_efecto'
+            """));
+
+        Assert.Equal(58L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*) FROM seguridad.permiso
             """));
     }
 

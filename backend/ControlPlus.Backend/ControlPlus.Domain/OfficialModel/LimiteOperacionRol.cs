@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace ControlPlus.Domain.OfficialModel;
 
 /// <summary>
-/// Limites configurables por rol. Para DESCUENTO_PORCENTAJE los valores iniciales son 100, 20 y 5 para Administrador, Supervisor y Cajero.
+/// Límites configurables por rol. En V1 el descuento máximo es 80, 20 y 5 para Administrador, Supervisor y Cajero.
 /// </summary>
 public partial class LimiteOperacionRol
 {

@@ -22,4 +22,6 @@ public partial class Permiso
     public virtual ICollection<AutorizacionOperacion> AutorizacionOperacion { get; set; } = new List<AutorizacionOperacion>();
 
     public virtual ICollection<RolPermiso> RolPermiso { get; set; } = new List<RolPermiso>();
+
+    public virtual ICollection<UsuarioPermiso> UsuarioPermiso { get; set; } = new List<UsuarioPermiso>();
 }

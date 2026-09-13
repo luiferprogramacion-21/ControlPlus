@@ -17,37 +17,22 @@ public sealed class SecurityCatalogSeeder(
     IUnitOfWork unitOfWork,
     IClock clock)
 {
-    private static readonly PermissionDefinition[] PermissionDefinitions =
-    [
-        new(PermissionCodes.UsersRead, "Consultar usuarios", "Permite consultar usuarios y sus roles.", "SEGURIDAD"),
-        new(PermissionCodes.UsersManage, "Gestionar usuarios", "Permite crear, modificar, activar, desactivar y reactivar usuarios.", "SEGURIDAD"),
-        new(PermissionCodes.RolesRead, "Consultar roles", "Permite consultar roles y sus permisos.", "SEGURIDAD"),
-        new(PermissionCodes.RolesManage, "Gestionar roles", "Permite crear, modificar y asignar permisos a roles.", "SEGURIDAD"),
-        new(PermissionCodes.PermissionsRead, "Consultar permisos", "Permite consultar el catálogo de permisos.", "SEGURIDAD"),
-        new(PermissionCodes.PermissionsManage, "Gestionar permisos", "Permite crear, modificar y cambiar el estado de permisos.", "SEGURIDAD"),
-        new(PermissionCodes.AuditRead, "Consultar auditoría", "Permite consultar los eventos de auditoría de seguridad.", "SEGURIDAD")
-    ];
-
     private static readonly RoleDefinition[] RoleDefinitions =
     [
-        new(RoleCodes.Cashier, "Cajero", RoleLevel.Cajero, []),
-        new(RoleCodes.Supervisor, "Supervisor", RoleLevel.Supervisor, []),
-        new(
-            RoleCodes.Administrator,
-            "Administrador",
-            RoleLevel.Administrador,
-            PermissionDefinitions.Select(permission => permission.Code).ToArray())
+        new(RoleCodes.Cashier, "Cajero", RoleLevel.Cajero),
+        new(RoleCodes.Supervisor, "Supervisor", RoleLevel.Supervisor),
+        new(RoleCodes.Administrator, "Administrador", RoleLevel.Administrador)
     ];
 
     public async Task EnsureSeededAsync(CancellationToken cancellationToken = default)
     {
         var permissionsByCode = new Dictionary<string, Permission>(StringComparer.OrdinalIgnoreCase);
-        foreach (var definition in PermissionDefinitions)
+        foreach (var definition in DefaultPermissionCatalog.Permissions)
         {
             var permission = await permissionRepository.GetByCodeAsync(definition.Code, cancellationToken);
             if (permission is null)
             {
-                permission = Permission.Create(definition.Code, definition.Name, definition.Description, definition.Module, clock.UtcNow);
+                permission = Permission.Create(definition.Code, definition.Name, "Permiso estable de ControlPlus V1.", definition.Module, clock.UtcNow);
                 await permissionRepository.AddAsync(permission, cancellationToken);
             }
 
@@ -74,7 +59,7 @@ public sealed class SecurityCatalogSeeder(
         foreach (var definition in RoleDefinitions)
         {
             var role = rolesByCode[definition.Code];
-            foreach (var permissionCode in definition.PermissionCodes)
+            foreach (var permissionCode in DefaultPermissionCatalog.ForRole(definition.Code))
             {
                 var permission = permissionsByCode[permissionCode];
                 role.GrantPermission(permission, clock.UtcNow);
@@ -84,11 +69,5 @@ public sealed class SecurityCatalogSeeder(
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
-    private sealed record PermissionDefinition(string Code, string Name, string Description, string Module);
-
-    private sealed record RoleDefinition(
-        string Code,
-        string Name,
-        RoleLevel Level,
-        IReadOnlyCollection<string> PermissionCodes);
+    private sealed record RoleDefinition(string Code, string Name, RoleLevel Level);
 }

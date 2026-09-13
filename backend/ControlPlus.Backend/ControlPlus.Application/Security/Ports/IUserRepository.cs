@@ -23,11 +23,25 @@ public interface IUserRepository
 
     Task<IReadOnlyCollection<User>> GetByRoleIdAsync(Guid roleId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyCollection<User>> GetByPermissionOverrideIdAsync(
+        Guid permissionId,
+        CancellationToken cancellationToken = default);
+
     Task<PagedResult<User>> ListAsync(UserListQuery query, CancellationToken cancellationToken = default);
 
     Task AddAsync(User user, CancellationToken cancellationToken = default);
 
     Task UpdateAsync(User user, CancellationToken cancellationToken = default);
+
+    Task SetPermissionOverrideAsync(
+        User user,
+        Guid permissionId,
+        bool granted,
+        Guid assignedByUserId,
+        DateTimeOffset assignedAtUtc,
+        CancellationToken cancellationToken = default);
+
+    Task ClearPermissionOverridesAsync(User user, CancellationToken cancellationToken = default);
 
     Task ReplaceRoleAsync(
         User user,

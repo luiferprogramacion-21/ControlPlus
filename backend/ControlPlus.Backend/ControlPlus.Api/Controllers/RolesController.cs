@@ -132,4 +132,14 @@ public sealed class RolesController(
         var result = await roleManagementService.RevokePermissionAsync(actor, roleId, permissionId, cancellationToken);
         return FromResult(result, Ok);
     }
+
+    [HttpPost("{roleId:guid}/permissions/reset")]
+    [PermissionAuthorize(PermissionCodes.RolesManage)]
+    public async Task<IActionResult> ResetPermissions(Guid roleId, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        if (actor is null) return MissingActor();
+        var result = await roleManagementService.ResetPermissionsAsync(actor, roleId, cancellationToken);
+        return FromResult(result, Ok);
+    }
 }

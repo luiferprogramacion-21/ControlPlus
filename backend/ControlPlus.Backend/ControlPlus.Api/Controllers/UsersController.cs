@@ -173,4 +173,37 @@ public sealed class UsersController(
         var result = await userManagementService.RemoveRoleAsync(actor, userId, roleId, cancellationToken);
         return FromResult(result, Ok);
     }
+
+    [HttpGet("{userId:guid}/permissions/effective")]
+    [PermissionAuthorize(PermissionCodes.UserPermissionsManage)]
+    public async Task<IActionResult> GetEffectivePermissions(Guid userId, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        if (actor is null) return MissingActor();
+        var result = await userManagementService.GetEffectivePermissionsAsync(actor, userId, cancellationToken);
+        return FromResult(result, Ok);
+    }
+
+    [HttpPut("{userId:guid}/permissions/{permissionId:guid}")]
+    [PermissionAuthorize(PermissionCodes.UserPermissionsManage)]
+    public async Task<IActionResult> SetPermissionOverride(
+        Guid userId,
+        Guid permissionId,
+        [FromBody] SetUserPermissionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        if (actor is null) return MissingActor();
+        return FromResult(await userManagementService.SetPermissionOverrideAsync(
+            actor, userId, permissionId, request, cancellationToken));
+    }
+
+    [HttpDelete("{userId:guid}/permissions")]
+    [PermissionAuthorize(PermissionCodes.UserPermissionsManage)]
+    public async Task<IActionResult> ResetPermissionOverrides(Guid userId, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        if (actor is null) return MissingActor();
+        return FromResult(await userManagementService.ResetPermissionOverridesAsync(actor, userId, cancellationToken));
+    }
 }

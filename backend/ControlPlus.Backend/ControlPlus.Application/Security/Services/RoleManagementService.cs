@@ -74,6 +74,14 @@ public sealed class RoleManagementService : IRoleManagementService
         }
 
         var normalizedCode = SecurityInput.NormalizeRoleCode(code.Value!);
+        if (normalizedCode is not (RoleCodes.Administrator or RoleCodes.Supervisor or RoleCodes.Cashier))
+        {
+            return Result.Failure<RoleDto>(SecurityErrors.FixedRolesOnly);
+        }
+        if (request.Level != ExpectedRoleLevel(normalizedCode))
+        {
+            return Result.Failure<RoleDto>(SecurityErrors.FixedRolesOnly);
+        }
         if (await _roleRepository.GetByCodeAsync(normalizedCode, cancellationToken) is not null)
         {
             return Result.Failure<RoleDto>(SecurityErrors.RoleCodeAlreadyExists);
@@ -130,6 +138,10 @@ public sealed class RoleManagementService : IRoleManagementService
         if (!CanManageRole(actor, role) || !CanManageRoleLevel(actor, request.Level))
         {
             return Result.Failure<RoleDto>(SecurityErrors.CannotManageSameOrHigherRole);
+        }
+        if (request.Level != ExpectedRoleLevel(role.Code))
+        {
+            return Result.Failure<RoleDto>(SecurityErrors.FixedRolesOnly);
         }
 
         role.Update(name.Value!, request.Level, _clock.UtcNow);
@@ -212,6 +224,11 @@ public sealed class RoleManagementService : IRoleManagementService
         if (!CanManageRole(actor, role))
         {
             return Result.Failure<RoleDto>(SecurityErrors.CannotManageSameOrHigherRole);
+        }
+
+        if (role.Code == RoleCodes.Administrator)
+        {
+            return Result.Failure<RoleDto>(SecurityErrors.LastSecurityAdministratorRequired);
         }
 
         role.Deactivate(_clock.UtcNow);
@@ -319,6 +336,11 @@ public sealed class RoleManagementService : IRoleManagementService
             return Result.Failure<RoleDto>(SecurityErrors.PermissionNotGranted);
         }
 
+        if (role.Code == RoleCodes.Administrator && SecurityAdministratorPermissionCodes.Contains(rolePermission.Permission.Code))
+        {
+            return Result.Failure<RoleDto>(SecurityErrors.LastSecurityAdministratorRequired);
+        }
+
         role.RevokePermission(permissionId, _clock.UtcNow);
         await _roleRepository.UpdateAsync(role, cancellationToken);
         await InvalidateUsersForRolesAsync(new[] { role }, cancellationToken);
@@ -333,6 +355,39 @@ public sealed class RoleManagementService : IRoleManagementService
             cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        return Result.Success(SecurityMappings.ToDto(role));
+    }
+
+    public async Task<Result<RoleDto>> ResetPermissionsAsync(
+        ActorContext actor,
+        Guid roleId,
+        CancellationToken cancellationToken = default)
+    {
+        var authorizationError = await RequireRolesManageAsync(actor, cancellationToken);
+        if (authorizationError is not null) return Result.Failure<RoleDto>(authorizationError);
+        var role = await _roleRepository.GetByIdAsync(roleId, cancellationToken);
+        if (role is null) return Result.Failure<RoleDto>(ApplicationError.NotFound("el rol"));
+
+        var desiredCodes = DefaultPermissionCatalog.ForRole(role.Code);
+        if (desiredCodes.Count == 0) return Result.Failure<RoleDto>(SecurityErrors.FixedRolesOnly);
+        var catalog = await _permissionRepository.ListAsync(new PermissionListQuery(PageSize: 200), cancellationToken);
+        var desiredById = catalog.Items.Where(x => x.IsActive && desiredCodes.Contains(x.Code)).ToDictionary(x => x.Id);
+
+        foreach (var current in role.RolePermissions.ToArray())
+        {
+            if (!desiredById.ContainsKey(current.PermissionId)) role.RevokePermission(current.PermissionId, _clock.UtcNow);
+        }
+        foreach (var permission in desiredById.Values)
+        {
+            role.GrantPermission(permission, _clock.UtcNow, actor.UserId);
+        }
+
+        await _roleRepository.UpdateAsync(role, cancellationToken);
+        await InvalidateUsersForRolesAsync([role], cancellationToken);
+        await AuditWriter.WriteAsync(
+            _auditRepository, _clock, actor.UserId, AuditAction.RolePermissionsReset,
+            nameof(Role), role.Id, new { role.Code, PermissionCount = desiredById.Count }, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success(SecurityMappings.ToDto(role));
     }
 
@@ -363,6 +418,10 @@ public sealed class RoleManagementService : IRoleManagementService
         }
 
         var normalizedCode = SecurityInput.NormalizePermissionCode(code.Value!);
+        if (ReservedNonAssignablePermissionCodes.Contains(normalizedCode))
+        {
+            return Result.Failure<PermissionDto>(SecurityErrors.NonAssignableSecurityCapability);
+        }
         if (await _permissionRepository.GetByCodeAsync(normalizedCode, cancellationToken) is not null)
         {
             return Result.Failure<PermissionDto>(SecurityErrors.PermissionCodeAlreadyExists);
@@ -488,6 +547,11 @@ public sealed class RoleManagementService : IRoleManagementService
             return Result.Failure<PermissionDto>(ApplicationError.NotFound("el permiso"));
         }
 
+        if (SecurityAdministratorPermissionCodes.Contains(permission.Code))
+        {
+            return Result.Failure<PermissionDto>(SecurityErrors.LastSecurityAdministratorRequired);
+        }
+
         permission.Deactivate(_clock.UtcNow);
         await _permissionRepository.UpdateAsync(permission, cancellationToken);
         await InvalidateUsersForPermissionAsync(permission.Id, cancellationToken);
@@ -608,14 +672,18 @@ public sealed class RoleManagementService : IRoleManagementService
     }
 
     private async Task<ApplicationError?> RequireRolesManageAsync(ActorContext actor, CancellationToken cancellationToken) =>
-        await AuthorizationGuard.RequirePermissionAsync(
+        actor.HighestRoleLevel != RoleLevel.Administrador
+            ? SecurityErrors.AdministratorOnly
+            : await AuthorizationGuard.RequirePermissionAsync(
             _permissionChecker,
             actor,
             PermissionCodes.RolesManage,
             cancellationToken);
 
     private async Task<ApplicationError?> RequirePermissionsManageAsync(ActorContext actor, CancellationToken cancellationToken) =>
-        await AuthorizationGuard.RequirePermissionAsync(
+        actor.HighestRoleLevel != RoleLevel.Administrador
+            ? SecurityErrors.AdministratorOnly
+            : await AuthorizationGuard.RequirePermissionAsync(
             _permissionChecker,
             actor,
             PermissionCodes.PermissionsManage,
@@ -624,7 +692,20 @@ public sealed class RoleManagementService : IRoleManagementService
     private async Task InvalidateUsersForPermissionAsync(Guid permissionId, CancellationToken cancellationToken)
     {
         var roles = await _roleRepository.GetByPermissionIdAsync(permissionId, cancellationToken);
-        await InvalidateUsersForRolesAsync(roles, cancellationToken);
+        var usersById = (await _userRepository.GetByPermissionOverrideIdAsync(permissionId, cancellationToken))
+            .ToDictionary(user => user.Id);
+        foreach (var role in roles)
+        {
+            foreach (var user in await _userRepository.GetByRoleIdAsync(role.Id, cancellationToken))
+            {
+                usersById[user.Id] = user;
+            }
+        }
+        foreach (var user in usersById.Values)
+        {
+            user.RotateSecurityStamp();
+            await _userRepository.UpdateAsync(user, cancellationToken);
+        }
     }
 
     private async Task InvalidateUsersForRolesAsync(
@@ -649,10 +730,26 @@ public sealed class RoleManagementService : IRoleManagementService
     }
 
     private static bool CanManageRole(ActorContext actor, Role role) =>
-        CanManageRoleLevel(actor, role.Level);
+        actor.HighestRoleLevel == RoleLevel.Administrador;
 
     private static bool CanManageRoleLevel(ActorContext actor, RoleLevel roleLevel) =>
         actor.HighestRoleLevel == RoleLevel.Administrador ||
         (RoleHierarchy.IsDefined(actor.HighestRoleLevel) &&
          RoleHierarchy.IsHigherThan(actor.HighestRoleLevel, roleLevel));
+
+    private static RoleLevel ExpectedRoleLevel(string roleCode) => roleCode switch
+    {
+        RoleCodes.Administrator => RoleLevel.Administrador,
+        RoleCodes.Supervisor => RoleLevel.Supervisor,
+        RoleCodes.Cashier => RoleLevel.Cajero,
+        _ => RoleLevel.None
+    };
+
+    private static readonly IReadOnlySet<string> ReservedNonAssignablePermissionCodes = new HashSet<string>(
+        ["MASTER_KEY", "MASTER.KEY", "CONTROLPLUS_MASTER_KEY", "INSTALLATION.MASTER_KEY", "AUTH.RECOVER_INITIAL_ADMINISTRATOR"],
+        StringComparer.OrdinalIgnoreCase);
+
+    private static readonly IReadOnlySet<string> SecurityAdministratorPermissionCodes = new HashSet<string>(
+        [PermissionCodes.UsersManage, PermissionCodes.RolesManage, PermissionCodes.PermissionsManage, PermissionCodes.UserPermissionsManage],
+        StringComparer.OrdinalIgnoreCase);
 }

@@ -63,4 +63,16 @@ internal static class SecurityErrors
 
     public static readonly ApplicationError CannotManageSameOrHigherRole =
         new("authorization.insufficient_role_level", "No puede administrar un rol del mismo o mayor nivel.");
+
+    public static readonly ApplicationError AdministratorOnly =
+        ApplicationError.Forbidden("Esta operación es exclusiva del Administrador.");
+
+    public static readonly ApplicationError FixedRolesOnly =
+        ApplicationError.Conflict("ControlPlus V1 solo permite los roles fijos Administrador, Supervisor y Cajero.");
+
+    public static readonly ApplicationError LastSecurityAdministratorRequired =
+        ApplicationError.Conflict("La operación dejaría el sistema sin un Administrador activo con permisos de seguridad.");
+
+    public static readonly ApplicationError NonAssignableSecurityCapability =
+        ApplicationError.Conflict("Master Key y la recuperación inicial son capacidades excepcionales y no permisos asignables.");
 }

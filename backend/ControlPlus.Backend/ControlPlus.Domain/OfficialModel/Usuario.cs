@@ -143,5 +143,9 @@ public partial class Usuario
 
     public virtual ICollection<UsuarioToken> UsuarioToken { get; set; } = new List<UsuarioToken>();
 
+    public virtual ICollection<UsuarioPermiso> UsuarioPermiso { get; set; } = new List<UsuarioPermiso>();
+
+    public virtual ICollection<UsuarioPermiso> UsuarioPermisoAsignadoPor { get; set; } = new List<UsuarioPermiso>();
+
     public virtual ICollection<Venta> Venta { get; set; } = new List<Venta>();
 }

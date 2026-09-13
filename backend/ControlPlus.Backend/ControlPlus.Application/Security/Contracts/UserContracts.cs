@@ -15,6 +15,16 @@ public sealed record ChangePasswordRequest(string CurrentPassword, string NewPas
 
 public sealed record AssignRoleRequest(Guid RoleId);
 
+public sealed record SetUserPermissionRequest(bool Granted);
+
+public sealed record EffectiveUserPermissionDto(
+    Guid Id,
+    string Code,
+    string Name,
+    bool Granted,
+    string Source,
+    string? IndividualEffect);
+
 public sealed record UserDto(
     Guid Id,
     string UserName,
@@ -56,4 +66,10 @@ public interface IUserManagementService
     Task<Result<UserDto>> GetByIdAsync(ActorContext actor, Guid userId, CancellationToken cancellationToken = default);
 
     Task<Result<PagedResult<UserDto>>> ListAsync(ActorContext actor, UserListQuery query, CancellationToken cancellationToken = default);
+
+    Task<Result<IReadOnlyCollection<EffectiveUserPermissionDto>>> GetEffectivePermissionsAsync(ActorContext actor, Guid userId, CancellationToken cancellationToken = default);
+
+    Task<Result> SetPermissionOverrideAsync(ActorContext actor, Guid userId, Guid permissionId, SetUserPermissionRequest request, CancellationToken cancellationToken = default);
+
+    Task<Result> ResetPermissionOverridesAsync(ActorContext actor, Guid userId, CancellationToken cancellationToken = default);
 }

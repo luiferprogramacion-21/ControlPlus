@@ -371,6 +371,120 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         Assert.DoesNotContain("NewPassword", audit.DatosNuevos, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task HybridPermissions_ApplyIndividualPrecedenceAndResetToRole()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+
+        var cashierRoleId = await GetRoleIdAsync(client, RoleCodes.Cashier);
+        var created = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "hybrid.cashier.test", "Cajero híbrido", "Cashier-Test-Password-2026!", [cashierRoleId]));
+        var cashier = await created.Content.ReadFromJsonAsync<UserDto>();
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.NotNull(cashier);
+
+        var cashierSession = await LoginAsync(client, "hybrid.cashier.test", "Cashier-Test-Password-2026!");
+        var productsReadId = await GetPermissionIdAsync(client, administrator.AccessToken, PermissionCodes.ProductsRead);
+        var costsReadId = await GetPermissionIdAsync(client, administrator.AccessToken, PermissionCodes.ProductCostsRead);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{cashier.Id}/permissions/{costsReadId}", new SetUserPermissionRequest(true))).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cashierSession.AccessToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{cashier.Id}/permissions/{costsReadId}", new SetUserPermissionRequest(false))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{cashier.Id}/permissions/{costsReadId}", new SetUserPermissionRequest(true))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{cashier.Id}/permissions/{productsReadId}", new SetUserPermissionRequest(false))).StatusCode);
+
+        var effective = await GetEffectivePermissionsAsync(client, cashier.Id);
+        AssertPermission(effective, PermissionCodes.ProductCostsRead, true, "INDIVIDUAL", "CONCEDER");
+        AssertPermission(effective, PermissionCodes.ProductsRead, false, "INDIVIDUAL", "REVOCAR");
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/users/{cashier.Id}/permissions")).StatusCode);
+        effective = await GetEffectivePermissionsAsync(client, cashier.Id);
+        AssertPermission(effective, PermissionCodes.ProductCostsRead, false, "ROL", null);
+        AssertPermission(effective, PermissionCodes.ProductsRead, true, "ROL", null);
+    }
+
+    [Fact]
+    public async Task RoleTemplate_CanBeRestoredAndLastSecurityAdministratorIsProtected()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+
+        var cashierRoleId = await GetRoleIdAsync(client, RoleCodes.Cashier);
+        var productsReadId = await GetPermissionIdAsync(client, administrator.AccessToken, PermissionCodes.ProductsRead);
+        Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync(
+            $"/api/roles/{cashierRoleId}/permissions/{productsReadId}")).StatusCode);
+
+        var reset = await client.PostAsync($"/api/roles/{cashierRoleId}/permissions/reset", null);
+        var restoredRole = await reset.Content.ReadFromJsonAsync<RoleDto>();
+        Assert.Equal(HttpStatusCode.OK, reset.StatusCode);
+        Assert.NotNull(restoredRole);
+        Assert.Contains(restoredRole.Permissions, x => x.Code == PermissionCodes.ProductsRead);
+
+        var administratorRoleId = await GetRoleIdAsync(client, RoleCodes.Administrator);
+        var usersManageId = await GetPermissionIdAsync(client, administrator.AccessToken, PermissionCodes.UsersManage);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync(
+            $"/api/roles/{administratorRoleId}/permissions/{usersManageId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsync(
+            $"/api/permissions/{usersManageId}/deactivate", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsync(
+            $"/api/users/{administrator.User.Id}/deactivate", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Supervisor_CanResetCashierPasswordButNotAnotherSupervisorPassword()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+
+        var supervisorRoleId = await GetRoleIdAsync(client, RoleCodes.Supervisor);
+        var cashierRoleId = await GetRoleIdAsync(client, RoleCodes.Cashier);
+        var supervisorResponse = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "password.supervisor.test", "Supervisor ficticio", "Supervisor-Test-Password-2026!", [supervisorRoleId]));
+        var supervisor = await supervisorResponse.Content.ReadFromJsonAsync<UserDto>();
+        Assert.Equal(HttpStatusCode.Created, supervisorResponse.StatusCode);
+        Assert.NotNull(supervisor);
+
+        var otherSupervisorResponse = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "password.supervisor.two.test", "Segundo supervisor ficticio", "Supervisor-Two-Test-Password-2026!", [supervisorRoleId]));
+        var otherSupervisor = await otherSupervisorResponse.Content.ReadFromJsonAsync<UserDto>();
+        Assert.Equal(HttpStatusCode.Created, otherSupervisorResponse.StatusCode);
+        Assert.NotNull(otherSupervisor);
+
+        var cashierResponse = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "password.cashier.test", "Cajero ficticio", "Cashier-Old-Test-Password-2026!", [cashierRoleId]));
+        var cashier = await cashierResponse.Content.ReadFromJsonAsync<UserDto>();
+        Assert.Equal(HttpStatusCode.Created, cashierResponse.StatusCode);
+        Assert.NotNull(cashier);
+
+        var supervisorSession = await LoginAsync(client, supervisor.UserName, "Supervisor-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", supervisorSession.AccessToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{cashier.Id}/password",
+            new ChangePasswordRequest(string.Empty, "Cashier-New-Test-Password-2026!"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync(
+            $"/api/users/{otherSupervisor.Id}/password",
+            new ChangePasswordRequest(string.Empty, "Forbidden-Test-Password-2026!"))).StatusCode);
+
+        var cashierSession = await LoginAsync(client, cashier.UserName, "Cashier-New-Test-Password-2026!");
+        Assert.Equal(cashier.Id, cashierSession.User.Id);
+    }
+
     private async Task SetupInitialAdministratorAsync(HttpClient client, string password)
     {
         var setup = new SetupFirstAdministratorRequest(
@@ -401,6 +515,36 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         return request;
     }
 
+    private static async Task<AuthenticationResult> LoginAsync(HttpClient client, string userName, string password)
+    {
+        client.DefaultRequestHeaders.Authorization = null;
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(userName, password));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<AuthenticationResult>())!;
+    }
+
+    private static async Task<IReadOnlyCollection<EffectiveUserPermissionDto>> GetEffectivePermissionsAsync(
+        HttpClient client,
+        Guid userId)
+    {
+        var response = await client.GetAsync($"/api/users/{userId}/permissions/effective");
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<EffectiveUserPermissionDto[]>())!;
+    }
+
+    private static void AssertPermission(
+        IReadOnlyCollection<EffectiveUserPermissionDto> permissions,
+        string code,
+        bool granted,
+        string source,
+        string? effect)
+    {
+        var permission = Assert.Single(permissions, x => x.Code == code);
+        Assert.Equal(granted, permission.Granted);
+        Assert.Equal(source, permission.Source);
+        Assert.Equal(effect, permission.IndividualEffect);
+    }
+
     private static async Task<Guid> GetRoleIdAsync(HttpClient client, string code)
     {
         var response = await client.GetAsync("/api/roles?page=1&pageSize=20");
@@ -414,7 +558,7 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
     private static async Task<Guid> GetPermissionIdAsync(HttpClient client, string administratorToken, string code)
     {
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administratorToken);
-        var response = await client.GetAsync("/api/permissions?page=1&pageSize=50");
+        var response = await client.GetAsync("/api/permissions?page=1&pageSize=100");
         response.EnsureSuccessStatusCode();
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var item = json.RootElement.GetProperty("items").EnumerateArray()

@@ -27,5 +27,9 @@ public enum AuditAction
     RoleRemoved = 19,
     PermissionGranted = 20,
     PermissionRevoked = 21,
-    InitialAdministratorRecovered = 22
+    InitialAdministratorRecovered = 22,
+    UserPermissionGranted = 23,
+    UserPermissionRevoked = 24,
+    UserPermissionsReset = 25,
+    RolePermissionsReset = 26
 }
