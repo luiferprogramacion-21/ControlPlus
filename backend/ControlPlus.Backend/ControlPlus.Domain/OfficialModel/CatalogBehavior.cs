@@ -38,7 +38,6 @@ public partial class Categoria
     {
         UsuarioModificacionId = actorUserId;
         FechaModificacion = changedAtUtc.UtcDateTime;
-        Version++;
     }
 
     private static string? NormalizeOptional(string? value) =>
@@ -139,7 +138,6 @@ public partial class Producto
     {
         UsuarioModificacionId = actorUserId;
         FechaModificacion = changedAtUtc.UtcDateTime;
-        Version++;
     }
 
     private static string? NormalizeOptional(string? value) =>

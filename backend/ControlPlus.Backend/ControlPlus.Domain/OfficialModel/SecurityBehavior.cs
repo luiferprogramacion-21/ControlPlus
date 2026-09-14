@@ -49,7 +49,6 @@ public partial class Usuario
         if (!IsActive) return false;
         IntentosFallidos++;
         FechaModificacion = UtcDateTime(occurredAtUtc);
-        Version++;
         if (IntentosFallidos < MaximumFailedLoginAttempts) return false;
         BloqueoHasta = UtcDateTime(occurredAtUtc);
         RotateSecurityStamp();
@@ -62,7 +61,6 @@ public partial class Usuario
         IntentosFallidos = 0;
         UltimoAcceso = UtcDateTime(occurredAtUtc);
         FechaModificacion = UtcDateTime(occurredAtUtc);
-        Version++;
     }
 
     public void ChangePasswordHash(string passwordHash, DateTimeOffset changedAtUtc)
@@ -139,13 +137,26 @@ public partial class Usuario
         return true;
     }
 
-    public bool RemoveRole(Guid roleId, DateTimeOffset changedAtUtc)
+    /// <summary>
+    /// Replaces the single official primary role as one aggregate transition.
+    /// There is deliberately no transition that leaves a persisted user without a role.
+    /// </summary>
+    public void ReplaceRole(Rol role, DateTimeOffset assignedAtUtc, Guid assignedByUserId)
     {
-        if (UsuarioRolUsuario?.RolId != roleId) return false;
-        UsuarioRolUsuario = null;
-        Touch(changedAtUtc);
+        ArgumentNullException.ThrowIfNull(role);
+        if (!role.IsActive) throw new DomainRuleViolationException("An inactive role cannot be assigned.");
+
+        UsuarioRolUsuario = new UsuarioRol
+        {
+            UsuarioId = Id,
+            RolId = role.Id,
+            AsignadoPorId = assignedByUserId,
+            FechaAsignacion = UtcDateTime(assignedAtUtc),
+            Usuario = this,
+            Rol = role
+        };
+        Touch(assignedAtUtc);
         RotateSecurityStamp();
-        return true;
     }
 
     public string RotateSecurityStamp()
@@ -158,7 +169,6 @@ public partial class Usuario
     private void Touch(DateTimeOffset at)
     {
         FechaModificacion = UtcDateTime(at);
-        Version++;
     }
 
     private static DateTime UtcDateTime(DateTimeOffset value) => value.UtcDateTime;
@@ -217,7 +227,7 @@ public partial class Rol
         var link = RolPermiso.SingleOrDefault(x => x.PermisoId == permissionId); if (link is null) return false;
         RolPermiso.Remove(link); Touch(at); return true;
     }
-    private void Touch(DateTimeOffset at) { FechaModificacion = at.UtcDateTime; Version++; }
+    private void Touch(DateTimeOffset at) { FechaModificacion = at.UtcDateTime; }
 }
 
 public partial class Permiso

@@ -9,8 +9,8 @@ ControlPlus es un sistema POS (punto de venta) para la tienda local **Baratísim
 **Responsables académicos y de negocio**
 
 - Proyecto formativo: Tecnólogo en Análisis y Desarrollo de Software (SENA, Ocaña).
-- Líder/desarrollador: Luifer Álvarez.
-- Patrocinador/propietario del negocio: Numael Álvarez.
+- Desarrollador.
+- Propietario del negocio.
 - Inicio: 2026-07-14. Fin estimado: 2026-11-30.
 
 ## 2. Estado y línea base
@@ -95,6 +95,7 @@ Implementar en este orden, salvo instrucción expresa:
 - Respuestas de error uniformes.
 - Registrar auditoría de acciones críticas: usuarios/roles, productos, caja, ventas, inventario, créditos y apartados.
 - Controlar duplicados y operaciones transaccionales, especialmente ventas, pagos, inventario y caja.
+- Las entidades oficiales con `version` definido como token de concurrencia deben configurarse como `IsConcurrencyToken()`. La versión se incrementa de forma centralizada al guardar; un conflicto se expone como `409` uniforme, sin detalles internos.
 - Los únicos roles de V1 son Cajero, Supervisor y Administrador; no se crean roles adicionales.
 - Cada usuario tiene un solo rol base y permisos efectivos híbridos: plantilla del rol más concesiones o revocaciones individuales. La revocación individual tiene precedencia.
 - Solo Administrador gestiona plantillas de rol, catálogo y excepciones individuales. Todo cambio invalida las sesiones afectadas y se audita.
@@ -195,7 +196,7 @@ Preservar historial y consistencia referencial. No reemplazar una relación nece
 2. No borrar ni sobrescribir trabajo ajeno, archivos de diseño o scripts oficiales sin autorización explícita.
 3. Hacer cambios pequeños, coherentes y verificables.
 4. Compilar y ejecutar pruebas pertinentes después de cada cambio. Informar los resultados reales.
-5. Para cambios de esquema, crear migraciones y actualizar el script/documentación correspondiente; nunca depender de cambios manuales no documentados en PostgreSQL.
+5. Para cambios de esquema, crear migraciones y actualizar el script/documentación correspondiente; nunca depender de cambios manuales no documentados en PostgreSQL. Las migraciones publicadas son inmutables: cualquier corrección posterior se realiza con una migración compensatoria.
 6. No exponer contraseñas, tokens, claves JWT ni cadenas de conexión en commits, respuestas o archivos versionados.
 7. Actualizar este `AGENTS.md` cuando una decisión funcional o técnica quede oficialmente aprobada.
 8. Si una decisión no está definida o contradice este archivo, detenerse y pedir confirmación en vez de inventar una regla.
@@ -205,29 +206,33 @@ Preservar historial y consistencia referencial. No reemplazar una relación nece
 La base técnica y los dos primeros módulos funcionales están implementados:
 
 - Solución `ControlPlus.Backend` en .NET 10 con Domain, Application e Infrastructure como bibliotecas de clases y dependencias unidireccionales.
-- Docker Compose ejecuta la API y PostgreSQL 17 con volumen persistente, healthcheck y variables sensibles fuera del control de versiones.
+- Docker Compose ejecuta la API y PostgreSQL 17 con volumen persistente, healthchecks y variables sensibles fuera del control de versiones. El healthcheck de la API usa su propia ejecución `dotnet` contra `GET /api/health`, sin herramientas adicionales en la imagen final.
 - Las migraciones controladas aplican el script PostgreSQL oficial de Fase 4 y el seed aprobado de Administrador, Supervisor y Cajero con sus límites.
-- Los repositorios funcionales usan `OfficialControlPlusDbContext` y el modelo database-first oficial.
-- El módulo de seguridad incluye instalación inicial mediante Master Key, primer Administrador de un solo uso, login, JWT HS512, bloqueo al quinto intento, `/me`, autorización vigente desde base de datos, gestión de usuarios/roles/permisos y auditoría.
+- Los repositorios funcionales usan `OfficialControlPlusDbContext` y el modelo database-first oficial. `ControlPlusDbContext` se conserva exclusivamente como portador del historial de migraciones publicadas y de las pruebas que aplican ese historial; no se registra para la ejecución normal ni compite con el modelo oficial.
+- El módulo de seguridad incluye instalación inicial mediante Master Key, primer Administrador de un solo uso, login, JWT HS512, bloqueo al quinto intento, `/me`, autorización vigente desde base de datos, gestión de usuarios/roles/permisos y auditoría. La Master Key debe tener al menos 32 bytes UTF-8; fuera de `Testing` la API rechaza el inicio si falta o no cumple ese mínimo.
 - La instalación inicial y el primer inicio de sesión ya fueron verificados en el entorno persistente de desarrollo.
 - Existe una recuperación excepcional del Administrador inicial protegida por Master Key. Solo se habilita cuando no existe ningún Administrador activo y no bloqueado; restablece la contraseña, limpia el bloqueo, rota los sellos de seguridad para invalidar sesiones y registra auditoría sin datos sensibles.
 - El esquema oficial admite exactamente un rol primario por usuario. La decisión V1 posterior define plantillas para los tres roles y excepciones individuales con precedencia `REVOCAR` sobre `CONCEDER` y rol.
+- La reasignación válida del rol principal se realiza mediante `POST /api/users/{userId}/roles`; invalida las sesiones afectadas y genera auditoría. No existe una operación válida para retirar el único rol del usuario.
 - La migración posterior de permisos híbridos conserva intacta la línea base de Fase 4, agrega `seguridad.usuario_permiso` y ajusta el límite del Administrador a 80 %.
 - El módulo de Productos y Categorías implementa altas, consultas, ediciones e inactivación sin borrado físico; búsqueda por código interno, código de barras o nombre; generación de código de barras; control de duplicados; ocultamiento normal de agotados; historial oficial de costos de compra; autorización sensible y auditoría.
+- La edición marcada como código de barras generado exige código y formato válidos. El listado completo de agotados exige `INVENTORY.READ`; el de inactivos exige `PRODUCTS.SENSITIVE_UPDATE`. La búsqueda directa de un agotado continúa disponible con `PRODUCTS.READ` y lo identifica como agotado.
 - La migración `20260913010000_SeedMeasurementUnitsV1` registra idempotentemente Unidad, Paquete y Metro y está aplicada en la base persistente de desarrollo. Todas las cantidades, incluidos los metros, son exclusivamente enteras.
+- Las 27 entidades oficiales que disponen de `version` se configuran como tokens de concurrencia. `OfficialControlPlusDbContext` incrementa una única vez la versión desde el valor original al guardar, y EF Core incluye la versión original en la actualización. Un `DbUpdateConcurrencyException` se convierte en `409` con el código estable `concurrency.conflict`.
+- Las cuatro migraciones publicadas (`20260912010000_OfficialPhase4Baseline`, `20260912011000_SeedApprovedSecurityCatalog`, `20260912012000_HybridPermissionsV1` y `20260913010000_SeedMeasurementUnitsV1`) son inmutables. `HybridPermissionsV1.Down` no constituye una reversión completa y segura; las correcciones posteriores requieren migraciones compensatorias y respaldo verificado antes de cualquier reversión persistente.
 - El inicio de sesión real y las consultas autenticadas de Categorías y Productos fueron verificados con HTTP 200 después de desplegar el módulo.
-- OpenAPI está disponible de forma anónima solo en Development y existe un archivo `.http` sin secretos para pruebas manuales.
+- OpenAPI está disponible de forma anónima solo en Development y Testing, publica el esquema Bearer JWT para los endpoints protegidos y conserva públicos únicamente salud, login, instalación inicial y recuperación inicial. Existe un archivo `.http` sin secretos para pruebas manuales.
 - Las pruebas de dominio y las integraciones de esquema/API usan PostgreSQL aislado con Testcontainers y no alteran la base persistente de desarrollo.
 - La aplicación controlada del bloque sobre la base persistente solo agregó el catálogo de unidades y su registro de migración; no creó datos ficticios, no alteró usuarios ni secretos y preservó el volumen.
 
-La matriz aprobada se documenta en `docs/permissions-matrix.md` y el catálogo funcional en `docs/catalog.md`. El siguiente módulo es Caja: turnos, apertura, movimientos, arqueo y cierre. Los secretos permanecen exclusivamente en el entorno local no versionado.
+La matriz aprobada se documenta en `docs/permissions-matrix.md` y el catálogo funcional en `docs/catalog.md`. Las pruebas aisladas usan PostgreSQL con Testcontainers y no alteran la base persistente de desarrollo. El siguiente módulo, una vez verificado este bloque de estabilización, es Caja: turnos, apertura, movimientos, arqueo y cierre. Los secretos permanecen exclusivamente en el entorno local no versionado.
 
-## 12. Documentación que conviene conservar en el repositorio
+## 12. Documentación versionada
 
 - `README.md`: instrucciones para instalar, ejecutar, probar y levantar Docker Compose.
 - `.env.example`: nombres de variables sin valores sensibles.
 - `docs/architecture.md`: arquitectura, dependencias y decisiones técnicas actuales.
-- `docs/api.md` o exportación OpenAPI: guía de endpoints y autenticación.
+- `docs/api.md`: guía de endpoints, autenticación y respuestas.
 - `docs/database.md`: migraciones, restauración y esquema de alto nivel.
-- `docs/decisions/`: registro breve de decisiones nuevas de Fase 5.
+- `docs/decisions/`: registro breve de decisiones nuevas de Fase 5, incluida persistencia, concurrencia y migraciones.
 - `docs/testing.md`: cómo ejecutar pruebas y evidencia mínima esperada.

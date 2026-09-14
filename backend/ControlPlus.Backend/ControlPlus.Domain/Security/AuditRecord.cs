@@ -4,7 +4,7 @@ using ControlPlus.Domain.Security.Enums;
 namespace ControlPlus.Domain.Security;
 
 /// <summary>
-/// Immutable business-audit event. Details may hold a serialized, non-secret payload.
+/// Immutable business-audit event transported by the application layer and persisted through the official model.
 /// </summary>
 public sealed class AuditRecord
 {

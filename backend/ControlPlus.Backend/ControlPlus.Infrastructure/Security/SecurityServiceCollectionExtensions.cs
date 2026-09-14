@@ -17,6 +17,7 @@ public static class SecurityServiceCollectionExtensions
         services.AddSingleton<IPasswordHasher, AspNetPasswordHasher>();
         services.AddScoped<ITokenIssuer, JwtTokenIssuer>();
         services.AddScoped<IClock, SystemClock>();
+        services.AddScoped<ILoginAttemptCoordinator, PostgreSqlLoginAttemptCoordinator>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IUserRepository, EfUserRepository>();
         services.AddScoped<IRoleRepository, EfRoleRepository>();

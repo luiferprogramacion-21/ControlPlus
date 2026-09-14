@@ -16,6 +16,7 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly IAuditRepository _auditRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
+    private readonly ILoginAttemptCoordinator _loginAttemptCoordinator;
 
     public AuthenticationService(
         IUserRepository userRepository,
@@ -24,7 +25,8 @@ public sealed class AuthenticationService : IAuthenticationService
         ITokenIssuer tokenIssuer,
         IAuditRepository auditRepository,
         IUnitOfWork unitOfWork,
-        IClock clock)
+        IClock clock,
+        ILoginAttemptCoordinator loginAttemptCoordinator)
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
@@ -33,6 +35,7 @@ public sealed class AuthenticationService : IAuthenticationService
         _auditRepository = auditRepository;
         _unitOfWork = unitOfWork;
         _clock = clock;
+        _loginAttemptCoordinator = loginAttemptCoordinator;
     }
 
     public async Task<Result<UserDto>> SetupFirstAdministratorAsync(
@@ -114,8 +117,22 @@ public sealed class AuthenticationService : IAuthenticationService
             return Result.Failure<AuthenticationResult>(SecurityErrors.InvalidCredentials);
         }
 
+        return await _loginAttemptCoordinator.ExecuteAsync(
+            userName.Value!.ToUpperInvariant(),
+            attemptCancellationToken => LoginWithinAttemptLockAsync(
+                userName.Value!,
+                password.Value!,
+                attemptCancellationToken),
+            cancellationToken);
+    }
+
+    private async Task<Result<AuthenticationResult>> LoginWithinAttemptLockAsync(
+        string userName,
+        string password,
+        CancellationToken cancellationToken)
+    {
         var now = _clock.UtcNow;
-        var user = await _userRepository.GetByUserNameAsync(userName.Value!, cancellationToken);
+        var user = await _userRepository.GetByUserNameAsync(userName, cancellationToken);
         if (user is null)
         {
             await AuditWriter.WriteAsync(
@@ -125,7 +142,7 @@ public sealed class AuthenticationService : IAuthenticationService
                 AuditAction.LoginFailed,
                 nameof(User),
                 entityId: null,
-                new { UserName = userName.Value, Reason = "invalid_credentials" },
+                new { UserName = userName, Reason = "invalid_credentials" },
                 cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -148,7 +165,7 @@ public sealed class AuthenticationService : IAuthenticationService
             return Result.Failure<AuthenticationResult>(SecurityErrors.InvalidCredentials);
         }
 
-        if (!_passwordHasher.Verify(password.Value!, user.PasswordHash))
+        if (!_passwordHasher.Verify(password, user.PasswordHash))
         {
             var wasLocked = user.RegisterFailedLogin(now);
             await _userRepository.UpdateAsync(user, cancellationToken);

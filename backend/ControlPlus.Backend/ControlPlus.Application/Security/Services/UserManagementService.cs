@@ -465,58 +465,6 @@ public sealed class UserManagementService : IUserManagementService
         return Result.Success(SecurityMappings.ToDto(user));
     }
 
-    public async Task<Result<UserDto>> RemoveRoleAsync(
-        ActorContext actor,
-        Guid userId,
-        Guid roleId,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(actor);
-
-        var authorizationError = await RequireUsersManageAsync(actor, cancellationToken);
-        if (authorizationError is not null)
-        {
-            return Result.Failure<UserDto>(authorizationError);
-        }
-
-        var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
-        if (user is null)
-        {
-            return Result.Failure<UserDto>(ApplicationError.NotFound("el usuario"));
-        }
-
-        var userRole = user.UserRoles.SingleOrDefault(candidate => candidate.RoleId == roleId);
-        if (userRole is null)
-        {
-            return Result.Failure<UserDto>(SecurityErrors.RoleNotAssigned);
-        }
-
-        if (!CanManageUser(actor, user) || !CanManageRole(actor, userRole.Role))
-        {
-            return Result.Failure<UserDto>(SecurityErrors.CannotManageSameOrHigherRole);
-        }
-
-        if (user.UserRoles.Count <= 1)
-        {
-            return Result.Failure<UserDto>(SecurityErrors.AtLeastOneRoleRequired);
-        }
-
-        user.RemoveRole(roleId, _clock.UtcNow);
-        await _userRepository.UpdateAsync(user, cancellationToken);
-        await AuditWriter.WriteAsync(
-            _auditRepository,
-            _clock,
-            actor.UserId,
-            AuditAction.RoleRemoved,
-            nameof(User),
-            user.Id,
-            new { RoleId = userRole.RoleId, userRole.Role.Code },
-            cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        return Result.Success(SecurityMappings.ToDto(user));
-    }
-
     public async Task<Result<UserDto>> GetByIdAsync(
         ActorContext actor,
         Guid userId,

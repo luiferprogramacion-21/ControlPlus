@@ -156,24 +156,6 @@ public sealed class UsersController(
         return FromResult(result, Ok);
     }
 
-    [HttpDelete("{userId:guid}/roles/{roleId:guid}")]
-    [PermissionAuthorize(PermissionCodes.UsersManage)]
-    [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
-    public async Task<IActionResult> RemoveRole(
-        Guid userId,
-        Guid roleId,
-        CancellationToken cancellationToken)
-    {
-        var actor = await GetActorAsync(cancellationToken);
-        if (actor is null)
-        {
-            return MissingActor();
-        }
-
-        var result = await userManagementService.RemoveRoleAsync(actor, userId, roleId, cancellationToken);
-        return FromResult(result, Ok);
-    }
-
     [HttpGet("{userId:guid}/permissions/effective")]
     [PermissionAuthorize(PermissionCodes.UserPermissionsManage)]
     public async Task<IActionResult> GetEffectivePermissions(Guid userId, CancellationToken cancellationToken)

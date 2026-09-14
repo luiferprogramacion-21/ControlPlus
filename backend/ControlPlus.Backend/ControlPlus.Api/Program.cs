@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using ControlPlus.Api.Authorization;
+using ControlPlus.Api.OpenApi;
 using ControlPlus.Api.Security;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Application.Security.Services;
@@ -10,6 +11,26 @@ using ControlPlus.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+
+if (args.Contains("--health-check", StringComparer.Ordinal))
+{
+    using var healthClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+    try
+    {
+        using var response = await healthClient.GetAsync("http://127.0.0.1:8080/api/health");
+        Environment.ExitCode = response.IsSuccessStatusCode ? 0 : 1;
+    }
+    catch (HttpRequestException)
+    {
+        Environment.ExitCode = 1;
+    }
+    catch (TaskCanceledException)
+    {
+        Environment.ExitCode = 1;
+    }
+
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,8 +56,10 @@ builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
         return response;
     };
 });
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+    options.AddDocumentTransformer<ControlPlusOpenApiSecurityTransformer>());
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ConcurrencyExceptionHandler>();
 
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddSecurityInfrastructure(builder.Configuration);
@@ -81,7 +104,7 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.MapOpenApi().AllowAnonymous();
 }

@@ -211,10 +211,9 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
         if (user.UsuarioRolUsuario is { } currentRole)
         {
             dbContext.UsuarioRol.Remove(currentRole);
-            user.RemoveRole(currentRole.RolId, assignedAtUtc);
         }
 
-        user.AddRole(role, assignedAtUtc, assignedByUserId);
+        user.ReplaceRole(role, assignedAtUtc, assignedByUserId);
         await dbContext.UsuarioRol.AddAsync(user.UsuarioRolUsuario!, cancellationToken);
     }
 

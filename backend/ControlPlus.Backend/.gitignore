@@ -2,6 +2,12 @@
 .env
 appsettings.Local.json
 
+# Local database backups
+*.backup
+*.dump
+*.bak
+*.sql.gz
+
 # Build and IDE artifacts
 **/bin/
 **/obj/

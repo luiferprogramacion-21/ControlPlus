@@ -116,6 +116,21 @@ public sealed class CatalogService(
         if (error is not null) return Result.Failure<PagedResult<ProductDto>>(error);
         var paging = ValidatePaging(query.Page, query.PageSize);
         if (paging is not null) return Result.Failure<PagedResult<ProductDto>>(paging);
+
+        if (query.IncludeOutOfStock &&
+            !await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.InventoryRead, cancellationToken))
+        {
+            return Result.Failure<PagedResult<ProductDto>>(ApplicationError.Forbidden(
+                "El listado completo de productos agotados requiere INVENTORY.READ."));
+        }
+
+        if (query.IncludeInactive &&
+            !await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.ProductsSensitiveUpdate, cancellationToken))
+        {
+            return Result.Failure<PagedResult<ProductDto>>(ApplicationError.Forbidden(
+                "El listado de productos inactivos requiere PRODUCTS.SENSITIVE_UPDATE."));
+        }
+
         var canViewCost = await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.ProductCostsRead, cancellationToken);
         var result = await repository.ListProductsAsync(query, cancellationToken);
         return Result.Success(new PagedResult<ProductDto>(result.Items.Select(x => Map(x, canViewCost)).ToArray(), result.Page, result.PageSize, result.TotalCount));
@@ -166,7 +181,7 @@ public sealed class CatalogService(
         if (error is not null) return Result.Failure<ProductDto>(error);
         var validation = ValidateProduct(request.InternalCode, request.Name, request.Description, request.Barcode,
             request.BarcodeFormat, request.GenerateBarcode, request.RetailPrice, request.WholesalePrice,
-            request.TaxPercentage, request.MinimumStock);
+            request.TaxPercentage, request.MinimumStock, allowGeneratedBarcodeWithoutValue: true);
         if (validation is not null) return Result.Failure<ProductDto>(validation);
         var related = await ValidateRelationsAsync(request.CategoryId, request.MeasurementUnitId, request.SupplierId, cancellationToken);
         if (related.Error is not null) return Result.Failure<ProductDto>(related.Error);
@@ -199,7 +214,7 @@ public sealed class CatalogService(
         if (error is not null) return Result.Failure<ProductDto>(error);
         var validation = ValidateProduct(request.InternalCode, request.Name, request.Description, request.Barcode,
             request.BarcodeFormat, request.BarcodeGenerated, request.RetailPrice, request.WholesalePrice,
-            request.TaxPercentage, request.MinimumStock);
+            request.TaxPercentage, request.MinimumStock, allowGeneratedBarcodeWithoutValue: false);
         if (validation is not null) return Result.Failure<ProductDto>(validation);
         var product = await repository.GetProductAsync(productId, cancellationToken);
         if (product is null) return Result.Failure<ProductDto>(ApplicationError.NotFound("el producto"));
@@ -282,7 +297,8 @@ public sealed class CatalogService(
 
     private static ApplicationError? ValidateProduct(
         string? internalCode, string? name, string? description, string? barcode, string? barcodeFormat,
-        bool barcodeGenerated, decimal retailPrice, decimal? wholesalePrice, decimal? taxPercentage, int minimumStock)
+        bool barcodeGenerated, decimal retailPrice, decimal? wholesalePrice, decimal? taxPercentage, int minimumStock,
+        bool allowGeneratedBarcodeWithoutValue)
     {
         if (string.IsNullOrWhiteSpace(internalCode) || internalCode.Trim().Length > 50)
             return ApplicationError.Validation("El código interno es obligatorio y no puede superar 50 caracteres.");
@@ -296,7 +312,9 @@ public sealed class CatalogService(
         if (minimumStock < 0) return ApplicationError.Validation("El stock mínimo no puede ser negativo.");
         var normalizedBarcode = NormalizeOptional(barcode);
         var normalizedFormat = NormalizeOptional(barcodeFormat)?.ToUpperInvariant();
-        if (!(barcodeGenerated && normalizedBarcode is null))
+        if (barcodeGenerated && normalizedBarcode is null && !allowGeneratedBarcodeWithoutValue)
+            return ApplicationError.Validation("Un código de barras marcado como generado requiere el código y un formato válido.");
+        if (!(allowGeneratedBarcodeWithoutValue && barcodeGenerated && normalizedBarcode is null))
         {
             if (normalizedBarcode?.Length > 100) return ApplicationError.Validation("El código de barras no puede superar 100 caracteres.");
             if ((normalizedBarcode is null) != (normalizedFormat is null))
@@ -335,5 +353,5 @@ public sealed class CatalogService(
         x.PrecioVentaNuevo);
 
     private static readonly ApplicationError VersionConflict =
-        ApplicationError.Conflict("El registro fue modificado por otro usuario. Recargue los datos e intente nuevamente.");
+        ApplicationError.ConcurrencyConflict("El registro fue modificado por otro usuario. Recargue los datos e intente nuevamente.");
 }

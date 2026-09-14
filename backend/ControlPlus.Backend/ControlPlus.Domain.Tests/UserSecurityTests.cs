@@ -1,6 +1,7 @@
 using ControlPlus.Domain.Common;
-using ControlPlus.Domain.Security;
 using ControlPlus.Domain.Security.Enums;
+using User = ControlPlus.Domain.OfficialModel.Usuario;
+using Role = ControlPlus.Domain.OfficialModel.Rol;
 
 namespace ControlPlus.Domain.Tests;
 

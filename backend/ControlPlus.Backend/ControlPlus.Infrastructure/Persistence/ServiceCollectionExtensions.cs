@@ -14,9 +14,6 @@ public static class ServiceCollectionExtensions
         var connectionString = configuration.GetConnectionString("ControlPlusDb")
             ?? throw new InvalidOperationException("The ControlPlusDb connection string is required.");
 
-        services.AddDbContext<ControlPlusDbContext>(options =>
-            options.UseNpgsql(connectionString));
-
         services.AddDbContext<OfficialControlPlusDbContext>(options =>
             options.UseNpgsql(connectionString));
 

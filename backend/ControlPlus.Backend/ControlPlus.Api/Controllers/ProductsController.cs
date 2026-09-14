@@ -1,6 +1,7 @@
 using ControlPlus.Api.Authorization;
 using ControlPlus.Api.Security;
 using ControlPlus.Application.Catalog.Contracts;
+using ControlPlus.Application.Common;
 using ControlPlus.Application.Security.Contracts;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,6 +14,8 @@ public sealed class ProductsController(
 {
     [HttpGet]
     [PermissionAuthorize(PermissionCodes.ProductsRead)]
+    [ProducesResponseType<PagedResult<ProductDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> List([FromQuery] ProductListQuery query, CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
@@ -21,6 +24,8 @@ public sealed class ProductsController(
 
     [HttpGet("{productId:guid}")]
     [PermissionAuthorize(PermissionCodes.ProductsRead)]
+    [ProducesResponseType<ProductDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get(Guid productId, CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
@@ -29,6 +34,9 @@ public sealed class ProductsController(
 
     [HttpGet("{productId:guid}/purchase-cost-history")]
     [PermissionAuthorize(PermissionCodes.ProductCostsRead)]
+    [ProducesResponseType<ProductPurchaseCostHistoryDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPurchaseCostHistory(
         Guid productId,
         [FromQuery] ProductPurchaseCostHistoryQuery query,
@@ -42,6 +50,9 @@ public sealed class ProductsController(
 
     [HttpPost]
     [PermissionAuthorize(PermissionCodes.ProductsCreate)]
+    [ProducesResponseType<ProductDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateProductRequest request, CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
@@ -52,6 +63,10 @@ public sealed class ProductsController(
 
     [HttpPut("{productId:guid}")]
     [PermissionAuthorize(PermissionCodes.ProductsSensitiveUpdate)]
+    [ProducesResponseType<ProductDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update(Guid productId, [FromBody] UpdateProductRequest request, CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
@@ -60,6 +75,9 @@ public sealed class ProductsController(
 
     [HttpPut("{productId:guid}/activate")]
     [PermissionAuthorize(PermissionCodes.ProductsSensitiveUpdate)]
+    [ProducesResponseType<ProductDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Activate(Guid productId, CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
@@ -68,6 +86,8 @@ public sealed class ProductsController(
 
     [HttpPut("{productId:guid}/deactivate")]
     [PermissionAuthorize(PermissionCodes.ProductsSensitiveUpdate)]
+    [ProducesResponseType<ProductDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Deactivate(Guid productId, CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
@@ -82,6 +102,7 @@ public sealed class MeasurementUnitsController(
 {
     [HttpGet]
     [PermissionAuthorize(PermissionCodes.ProductsRead)]
+    [ProducesResponseType<IReadOnlyCollection<MeasurementUnitDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> List(CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);

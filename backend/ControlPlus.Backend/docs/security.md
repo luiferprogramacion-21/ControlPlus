@@ -15,10 +15,18 @@ Variables requeridas en desarrollo/local:
 - `Jwt__SigningKey` — valor aleatorio de al menos 64 bytes para HS512, solo local o mediante secretos.
 - `Jwt__AccessTokenMinutes`
 - `Jwt__ClockSkewSeconds`
-- `Installation__MasterKey` — Master Key local para habilitar `POST /api/auth/setup` mediante el encabezado `X-ControlPlus-Master-Key`.
+- `Installation__MasterKey` — Master Key local de al menos 32 bytes UTF-8 para habilitar `POST /api/auth/setup` mediante el encabezado `X-ControlPlus-Master-Key`.
 
 En Docker Compose se usan las equivalentes `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_SIGNING_KEY`, `JWT_ACCESS_TOKEN_MINUTES`, `JWT_CLOCK_SKEW_SECONDS` y `CONTROLPLUS_MASTER_KEY` desde `.env`, que no se versiona.
-Después de crear el primer administrador, `CONTROLPLUS_MASTER_KEY` debe conservarse en almacenamiento local seguro o rotarse. El endpoint vuelve a comprobar la existencia de usuarios dentro de una transacción serializable con bloqueo asesor y rechaza cualquier reutilización.
+Fuera de `Testing`, la API falla al iniciar si `CONTROLPLUS_MASTER_KEY` falta o no alcanza 32 bytes UTF-8, o si falta `JWT_SIGNING_KEY`. Después de crear el primer administrador, `CONTROLPLUS_MASTER_KEY` debe conservarse en almacenamiento local seguro o rotarse. El endpoint vuelve a comprobar la existencia de usuarios dentro de una transacción serializable con bloqueo asesor y rechaza cualquier reutilización.
+
+La Master Key se compara en tiempo constante. Nunca se registra, se incluye en respuestas ni se reemplaza por un valor predeterminado en archivos versionados.
+
+## Concurrencia optimista
+
+Las entidades oficiales cuyo diccionario de Fase 4 define `version` como token de concurrencia se configuran con `IsConcurrencyToken()`. `OfficialControlPlusDbContext` aplica una única estrategia: antes de guardar una entidad modificada, incrementa `version` desde el valor original. EF Core incorpora ese valor original en la actualización, por lo que una modificación concurrente no puede sobrescribirse silenciosamente.
+
+Cuando no hay filas afectadas, `DbUpdateConcurrencyException` se convierte en `409 Conflict` con `application/problem+json`, tipo `https://controlplus.local/problems/concurrency-conflict` y código `concurrency.conflict`. La respuesta no expone SQL, proveedores, cadenas de conexión ni valores internos. Esta regla cubre, entre otros, usuarios, roles, categorías y productos.
 
 ## Recuperación excepcional del Administrador inicial
 
@@ -36,6 +44,8 @@ Los endpoints protegidos exigen autenticación y permisos explícitos. Los permi
 
 Los únicos roles de V1 son Cajero, Supervisor y Administrador. El modelo oficial admite exactamente un rol primario por usuario. Los permisos efectivos combinan la plantilla editable del rol con excepciones individuales `CONCEDER` o `REVOCAR`; una revocación individual siempre prevalece. Las reactivaciones de cuentas bloqueadas requieren un rol estrictamente superior al rol de la cuenta objetivo.
 
+El rol principal se reemplaza mediante `POST /api/users/{userId}/roles`. La operación conserva la cardinalidad oficial de un solo rol, genera auditoría e invalida el sello de seguridad de la cuenta afectada; no existe un endpoint para retirar el único rol.
+
 La matriz funcional aprobada y sus códigos estables están en `docs/permissions-matrix.md`. Los cambios de plantilla invalidan las sesiones del rol; los cambios individuales invalidan solo las del usuario. Restaurar un rol repone su plantilla V1 y restaurar un usuario elimina sus excepciones. Solo Administrador puede ejecutar estas operaciones.
 
 ## Auditoría
@@ -44,11 +54,11 @@ Se registran como mínimo inicios de sesión correctos y fallidos, bloqueos, rea
 
 ## Validación con Fase 4
 
-El esquema oficial se toma de `docs/ControlPlus_Fase4_Documento_y_Complementos.zip`, en particular del script PostgreSQL V3, el diccionario de datos y el MER V3. La migración base ejecuta ese script sin modificarlo y el modelo database-first representa sus 58 tablas y la vista de reposición.
+El esquema oficial se toma de `docs/ControlPlus_Fase4_Documento_y_Complementos.zip` desde la raíz del repositorio, en particular del script PostgreSQL V3, el diccionario de datos y el MER V3. La migración base ejecuta ese script sin modificarlo y el modelo database-first representa sus 58 tablas y la vista de reposición.
 
 - Cardinalidades aprobadas entre usuarios, roles y permisos.
 - Nombres de tablas, campos, PK, FK, UQ e índices definidos en el MER y script PostgreSQL.
 - Campos canónicos de Usuario, incluida la credencial de lector de código de barras si fue definida.
 - Política de recuperación de una cuenta Administrador bloqueada.
 
-La línea base de Fase 4 conserva el seed original de Administrador, Supervisor y Cajero. La decisión V1 posterior establece la matriz definitiva y cambia el límite del Administrador de 100 % a 80 % mediante una migración adicional; Supervisor permanece en 20 % y Cajero en 5 %. Los valores del establecimiento o instalación no se inventan. Los repositorios funcionales de seguridad usan `OfficialControlPlusDbContext`; el contexto anterior se mantiene como ejecutor de las migraciones controladas.
+La línea base de Fase 4 conserva el seed original de Administrador, Supervisor y Cajero. La decisión V1 posterior establece la matriz definitiva y cambia el límite del Administrador de 100 % a 80 % mediante una migración adicional; Supervisor permanece en 20 % y Cajero en 5 %. Los valores del establecimiento o instalación no se inventan. Los repositorios funcionales de seguridad usan `OfficialControlPlusDbContext`; `ControlPlusDbContext` se mantiene solamente como portador del historial de migraciones controladas.

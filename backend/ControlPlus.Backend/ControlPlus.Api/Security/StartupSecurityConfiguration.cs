@@ -14,9 +14,15 @@ public static class StartupSecurityConfiguration
         }
 
         var missingVariables = new List<string>();
-        if (string.IsNullOrWhiteSpace(configuration["Installation:MasterKey"]))
+        var masterKey = configuration["Installation:MasterKey"];
+        if (string.IsNullOrWhiteSpace(masterKey))
         {
             missingVariables.Add("CONTROLPLUS_MASTER_KEY");
+        }
+        else if (!BootstrapAccessValidator.IsSecureLength(masterKey))
+        {
+            throw new InvalidOperationException(
+                $"CONTROLPLUS_MASTER_KEY must contain at least {BootstrapOptions.MinimumMasterKeyByteLength} UTF-8 bytes.");
         }
 
         if (string.IsNullOrWhiteSpace(configuration["Jwt:SigningKey"]))

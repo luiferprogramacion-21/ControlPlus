@@ -30,5 +30,40 @@ public partial class OfficialControlPlusDbContext
                 .HasForeignKey(x => x.AsignadoPorId).OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_usuario_permiso_asignado_por");
         });
+
+        OfficialConcurrencyConfiguration.Apply(modelBuilder);
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        PrepareConcurrencyVersions();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        PrepareConcurrencyVersions();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void PrepareConcurrencyVersions()
+    {
+        ChangeTracker.DetectChanges();
+
+        foreach (var entry in ChangeTracker.Entries().Where(candidate => candidate.State == EntityState.Modified))
+        {
+            var metadata = entry.Metadata.FindProperty("Version");
+            if (metadata is not { IsConcurrencyToken: true } || metadata.ClrType != typeof(long))
+            {
+                continue;
+            }
+
+            var version = entry.Property("Version");
+            var original = (long)(version.OriginalValue ?? 0L);
+            version.CurrentValue = checked(original + 1);
+            version.IsModified = true;
+        }
     }
 }

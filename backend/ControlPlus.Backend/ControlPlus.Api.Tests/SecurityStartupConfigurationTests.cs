@@ -19,17 +19,18 @@ public sealed class SecurityStartupConfigurationTests
     }
 
     [Theory]
-    [InlineData("Installation:MasterKey", "configured-locally", "JWT_SIGNING_KEY")]
-    [InlineData("Jwt:SigningKey", "configured-locally", "CONTROLPLUS_MASTER_KEY")]
+    [InlineData("Installation:MasterKey", "JWT_SIGNING_KEY")]
+    [InlineData("Jwt:SigningKey", "CONTROLPLUS_MASTER_KEY")]
     public void DevelopmentWithOneMissingSecret_NamesTheMissingEnvironmentVariable(
         string configuredKey,
-        string configuredValue,
         string expectedMissingVariable)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                [configuredKey] = configuredValue
+                [configuredKey] = configuredKey == "Installation:MasterKey"
+                    ? new string('m', BootstrapOptions.MinimumMasterKeyByteLength)
+                    : "configured-locally"
             })
             .Build();
 
@@ -45,6 +46,38 @@ public sealed class SecurityStartupConfigurationTests
         var configuration = new ConfigurationBuilder().Build();
 
         StartupSecurityConfiguration.EnsureRequiredSecrets(configuration, "Testing");
+    }
+
+    [Fact]
+    public void DevelopmentWithShortMasterKey_FailsWithTheMinimumLength()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Installation:MasterKey"] = "too-short",
+                ["Jwt:SigningKey"] = new string('j', 64)
+            })
+            .Build();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            StartupSecurityConfiguration.EnsureRequiredSecrets(configuration, "Development"));
+
+        Assert.Contains("CONTROLPLUS_MASTER_KEY", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(BootstrapOptions.MinimumMasterKeyByteLength.ToString(), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DevelopmentWithSecureMasterKeyAndSigningKey_Passes()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Installation:MasterKey"] = new string('m', BootstrapOptions.MinimumMasterKeyByteLength),
+                ["Jwt:SigningKey"] = new string('j', 64)
+            })
+            .Build();
+
+        StartupSecurityConfiguration.EnsureRequiredSecrets(configuration, "Development");
     }
 
     [Fact]

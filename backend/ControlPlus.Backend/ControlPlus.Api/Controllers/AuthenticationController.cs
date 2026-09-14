@@ -25,7 +25,10 @@ public sealed class AuthenticationController(
     [EnableRateLimiting("installation")]
     [ProducesResponseType<UserDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> SetupFirstAdministrator(
         [FromBody] SetupFirstAdministratorRequest request,
         CancellationToken cancellationToken)
@@ -77,6 +80,7 @@ public sealed class AuthenticationController(
     [AllowAnonymous]
     [EnableRateLimiting("login")]
     [ProducesResponseType<AuthenticationResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Login(
@@ -94,6 +98,8 @@ public sealed class AuthenticationController(
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> RecoverInitialAdministrator(
         [FromBody] RecoverInitialAdministratorRequest request,
         CancellationToken cancellationToken)

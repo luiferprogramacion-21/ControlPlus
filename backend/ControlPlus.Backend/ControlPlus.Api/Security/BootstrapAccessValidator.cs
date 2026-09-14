@@ -7,6 +7,7 @@ namespace ControlPlus.Api.Security;
 public sealed class BootstrapOptions
 {
     public const string SectionName = "Installation";
+    public const int MinimumMasterKeyByteLength = 32;
 
     public string MasterKey { get; init; } = string.Empty;
 }
@@ -17,7 +18,7 @@ public sealed class BootstrapOptions
 /// </summary>
 public sealed class BootstrapAccessValidator(IOptions<BootstrapOptions> options)
 {
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(options.Value.MasterKey);
+    public bool IsConfigured => IsSecureLength(options.Value.MasterKey);
 
     public bool IsValid(string? suppliedKey)
     {
@@ -30,4 +31,8 @@ public sealed class BootstrapAccessValidator(IOptions<BootstrapOptions> options)
         var supplied = Encoding.UTF8.GetBytes(suppliedKey);
         return CryptographicOperations.FixedTimeEquals(expected, supplied);
     }
+
+    public static bool IsSecureLength(string? value) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        Encoding.UTF8.GetByteCount(value) >= BootstrapOptions.MinimumMasterKeyByteLength;
 }

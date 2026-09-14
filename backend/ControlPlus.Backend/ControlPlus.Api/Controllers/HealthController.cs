@@ -1,4 +1,4 @@
-using ControlPlus.Infrastructure.Persistence;
+using ControlPlus.Infrastructure.Persistence.Official;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +26,7 @@ public sealed class HealthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> GetDatabaseStatus(
-        [FromServices] ControlPlusDbContext dbContext,
+        [FromServices] OfficialControlPlusDbContext dbContext,
         CancellationToken cancellationToken)
     {
         try

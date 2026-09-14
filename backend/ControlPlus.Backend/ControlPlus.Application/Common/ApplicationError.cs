@@ -11,6 +11,8 @@ public sealed record ApplicationError(string Code, string Message)
 
     public static ApplicationError Conflict(string message) => new("resource.conflict", message);
 
+    public static ApplicationError ConcurrencyConflict(string message) => new("concurrency.conflict", message);
+
     public static ApplicationError Forbidden(string message = "No tiene permiso para realizar esta acción.") =>
         new("authorization.forbidden", message);
 

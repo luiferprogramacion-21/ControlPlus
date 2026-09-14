@@ -108,6 +108,9 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         var cashier = await createUser.Content.ReadFromJsonAsync<UserDto>();
         Assert.NotNull(cashier);
 
+        var cashierBeforeReassignment = await LoginAsync(client, "cashier.test", "Valid-Cashier-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authentication.AccessToken);
+
         var supervisorRoleId = await GetRoleIdAsync(client, "SUPERVISOR");
         var replaceRole = await client.PostAsJsonAsync(
             $"/api/users/{cashier.Id}/roles",
@@ -116,6 +119,12 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         var reassignedCashier = await replaceRole.Content.ReadFromJsonAsync<UserDto>();
         Assert.NotNull(reassignedCashier);
         Assert.Collection(reassignedCashier.Roles, role => Assert.Equal("SUPERVISOR", role.Code));
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await client.DeleteAsync($"/api/users/{cashier.Id}/roles/{cashierRoleId}")).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cashierBeforeReassignment.AccessToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
 
         client.DefaultRequestHeaders.Authorization = null;
         var cashierLogin = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("cashier.test", "Valid-Cashier-Password-2026!"));
@@ -166,8 +175,6 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
             var failed = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("cashier.test", "incorrect-password"));
             Assert.Equal(HttpStatusCode.Unauthorized, failed.StatusCode);
         }
-        var locked = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest("cashier.test", "Valid-Cashier-Password-2026!"));
-        Assert.Equal(HttpStatusCode.Unauthorized, locked.StatusCode);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authentication.AccessToken);
         var audit = await client.GetAsync("/api/audit-records?page=1&pageSize=100");
@@ -181,6 +188,11 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
             .ToArrayAsync();
         Assert.Contains("LOGINFAILED", actions);
         Assert.Contains("USERLOCKED", actions);
+        var lockedCashier = await officialContext.Usuario.SingleAsync(user => user.Id == cashier.Id);
+        Assert.Equal(5, lockedCashier.IntentosFallidos);
+        Assert.NotNull(lockedCashier.BloqueoHasta);
+        Assert.True(await officialContext.EventoAuditoria.AnyAsync(
+            record => record.Accion == "ROLEASSIGNED" && record.EntidadId == cashier.Id));
         Assert.Contains("PERMISSIONGRANTED", actions);
         Assert.Contains("PERMISSIONREVOKED", actions);
     }
@@ -213,6 +225,48 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConcurrentFailedLogins_AreSerializedAndLockOnTheFifthAttempt()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync(
+                "/api/auth/login",
+                new LoginRequest("initial.admin.test", "Wrong-Password-Test-2026!"))).StatusCode);
+        }
+
+        using var firstClient = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var secondClient = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var releaseAttempts = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        async Task<HttpResponseMessage> FailedAttemptAsync(HttpClient attemptClient)
+        {
+            await releaseAttempts.Task;
+            return await attemptClient.PostAsJsonAsync(
+                "/api/auth/login",
+                new LoginRequest("initial.admin.test", "Wrong-Password-Test-2026!"));
+        }
+
+        var firstAttempt = FailedAttemptAsync(firstClient);
+        var secondAttempt = FailedAttemptAsync(secondClient);
+        releaseAttempts.SetResult();
+        var responses = await Task.WhenAll(firstAttempt, secondAttempt);
+        foreach (var response in responses)
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            response.Dispose();
+        }
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var user = await context.Usuario.SingleAsync(candidate => candidate.NombreUsuarioNormalizado == "INITIAL.ADMIN.TEST");
+        Assert.Equal(5, user.IntentosFallidos);
+        Assert.NotNull(user.BloqueoHasta);
+        Assert.Equal(1, await context.EventoAuditoria.CountAsync(entry => entry.Accion == "USERLOCKED"));
     }
 
     [Fact]
@@ -501,13 +555,24 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         var category = await categoryResponse.Content.ReadFromJsonAsync<CategoryDto>();
         Assert.Equal(HttpStatusCode.Created, categoryResponse.StatusCode);
         Assert.NotNull(category);
+
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/categories/{category.Id}")).StatusCode);
+        var categoryUpdate = new UpdateCategoryRequest(
+            "Categoría ficticia actualizada", category.Description, category.Version);
         var categoryUpdateResponse = await client.PutAsJsonAsync(
             $"/api/categories/{category.Id}",
-            new UpdateCategoryRequest("Categoría ficticia actualizada", category.Description, category.Version));
-        category = await categoryUpdateResponse.Content.ReadFromJsonAsync<CategoryDto>();
+            categoryUpdate);
+        var updatedCategory = await categoryUpdateResponse.Content.ReadFromJsonAsync<CategoryDto>();
         Assert.Equal(HttpStatusCode.OK, categoryUpdateResponse.StatusCode);
-        Assert.NotNull(category);
+        Assert.NotNull(updatedCategory);
+        Assert.Equal(category.Version + 1, updatedCategory.Version);
+        var staleCategoryResponse = await client.PutAsJsonAsync(
+            $"/api/categories/{category.Id}",
+            categoryUpdate with { Name = "Categoría obsoleta" });
+        Assert.Equal(HttpStatusCode.Conflict, staleCategoryResponse.StatusCode);
+        Assert.Equal("application/problem+json", staleCategoryResponse.Content.Headers.ContentType?.MediaType);
+        await AssertProblemCodeAsync(staleCategoryResponse, "concurrency.conflict");
+        category = updatedCategory;
 
         var unitsResponse = await client.GetAsync("/api/measurement-units");
         var units = await unitsResponse.Content.ReadFromJsonAsync<MeasurementUnitDto[]>();
@@ -775,7 +840,6 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
             purchase.Consecutivo = 1;
             purchase.FechaHoraConfirmacion = now;
             purchase.Estado = "CONFIRMADA";
-            purchase.Version++;
             var storedProduct = await context.Producto.SingleAsync(x => x.Id == product.Id);
             storedProduct.CostoPromedio = 950;
             await context.SaveChangesAsync();
@@ -792,6 +856,167 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         Assert.Equal("CONFIRMADA", item.State);
         Assert.Equal(950, item.DocumentUnitCost);
         Assert.Equal(950, item.ResultingAverageCost);
+    }
+
+    [Fact]
+    public async Task Catalog_ProductVisibilityFiltersAndGeneratedBarcodeUpdateUseEffectivePermissions()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+
+        var categoryResponse = await client.PostAsJsonAsync(
+            "/api/categories",
+            new CreateCategoryRequest("Categoría de visibilidad", null));
+        var category = await categoryResponse.Content.ReadFromJsonAsync<CategoryDto>();
+        Assert.Equal(HttpStatusCode.Created, categoryResponse.StatusCode);
+        Assert.NotNull(category);
+
+        var units = await client.GetFromJsonAsync<MeasurementUnitDto[]>("/api/measurement-units");
+        Assert.NotNull(units);
+        var unit = Assert.Single(units, item => item.Code == "UNIDAD");
+        var productResponse = await client.PostAsJsonAsync(
+            "/api/products",
+            new CreateProductRequest(
+                category.Id, unit.Id, null, "FILTER-001", null, null, true,
+                "Producto agotado de visibilidad", null, 1000, null, null, 1));
+        var product = await productResponse.Content.ReadFromJsonAsync<ProductDto>();
+        Assert.Equal(HttpStatusCode.Created, productResponse.StatusCode);
+        Assert.NotNull(product);
+        Assert.True(product.IsOutOfStock);
+
+        var malformedBarcodeUpdate = new UpdateProductRequest(
+            category.Id, unit.Id, null, product.InternalCode, null, null, true,
+            product.Name, product.Description, product.RetailPrice, product.WholesalePrice,
+            product.TaxPercentage, product.MinimumStock, product.Version);
+        var malformedResponse = await client.PutAsJsonAsync($"/api/products/{product.Id}", malformedBarcodeUpdate);
+        Assert.Equal(HttpStatusCode.BadRequest, malformedResponse.StatusCode);
+        using (var malformedJson = JsonDocument.Parse(await malformedResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.True(malformedJson.RootElement.TryGetProperty("errors", out _));
+        }
+
+        var missingFormatResponse = await client.PutAsJsonAsync(
+            $"/api/products/{product.Id}",
+            malformedBarcodeUpdate with { Barcode = "7700000000001", BarcodeFormat = null });
+        Assert.Equal(HttpStatusCode.BadRequest, missingFormatResponse.StatusCode);
+        Assert.Equal("application/problem+json", missingFormatResponse.Content.Headers.ContentType?.MediaType);
+        using (var missingFormatJson = JsonDocument.Parse(await missingFormatResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.True(missingFormatJson.RootElement.TryGetProperty("errors", out _));
+        }
+
+        var unsupportedFormatResponse = await client.PutAsJsonAsync(
+            $"/api/products/{product.Id}",
+            malformedBarcodeUpdate with { Barcode = "7700000000001", BarcodeFormat = "UNSUPPORTED" });
+        Assert.Equal(HttpStatusCode.BadRequest, unsupportedFormatResponse.StatusCode);
+        Assert.Equal("application/problem+json", unsupportedFormatResponse.Content.Headers.ContentType?.MediaType);
+        using (var unsupportedFormatJson = JsonDocument.Parse(await unsupportedFormatResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.True(unsupportedFormatJson.RootElement.TryGetProperty("errors", out _));
+        }
+
+        var firstUpdate = malformedBarcodeUpdate with
+        {
+            Barcode = product.Barcode,
+            BarcodeFormat = product.BarcodeFormat,
+            Name = "Producto agotado actualizado",
+            Version = product.Version
+        };
+        var firstUpdateResponse = await client.PutAsJsonAsync($"/api/products/{product.Id}", firstUpdate);
+        var updatedProduct = await firstUpdateResponse.Content.ReadFromJsonAsync<ProductDto>();
+        Assert.Equal(HttpStatusCode.OK, firstUpdateResponse.StatusCode);
+        Assert.NotNull(updatedProduct);
+        Assert.Equal(product.Version + 1, updatedProduct.Version);
+        var staleUpdateResponse = await client.PutAsJsonAsync(
+            $"/api/products/{product.Id}", firstUpdate with { Name = "Actualización obsoleta" });
+        Assert.Equal(HttpStatusCode.Conflict, staleUpdateResponse.StatusCode);
+        Assert.Equal("application/problem+json", staleUpdateResponse.Content.Headers.ContentType?.MediaType);
+        await AssertProblemCodeAsync(staleUpdateResponse, "concurrency.conflict");
+
+        var inactiveProductResponse = await client.PostAsJsonAsync(
+            "/api/products",
+            new CreateProductRequest(
+                category.Id, unit.Id, null, "FILTER-002", null, null, true,
+                "Producto inactivo de visibilidad", null, 1000, null, null, 1));
+        var inactiveProduct = await inactiveProductResponse.Content.ReadFromJsonAsync<ProductDto>();
+        Assert.Equal(HttpStatusCode.Created, inactiveProductResponse.StatusCode);
+        Assert.NotNull(inactiveProduct);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.PutAsync($"/api/products/{inactiveProduct.Id}/deactivate", null)).StatusCode);
+
+        var normalInactiveSearch = await client.GetAsync("/api/products?search=FILTER-002");
+        Assert.Equal(HttpStatusCode.OK, normalInactiveSearch.StatusCode);
+        using (var normalInactiveJson = JsonDocument.Parse(await normalInactiveSearch.Content.ReadAsStringAsync()))
+        {
+            Assert.Empty(normalInactiveJson.RootElement.GetProperty("items").EnumerateArray());
+        }
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/products?includeOutOfStock=true")).StatusCode);
+        var administratorInactiveList = await client.GetAsync("/api/products?includeInactive=true&includeOutOfStock=true");
+        Assert.Equal(HttpStatusCode.OK, administratorInactiveList.StatusCode);
+        using (var administratorInactiveJson = JsonDocument.Parse(await administratorInactiveList.Content.ReadAsStringAsync()))
+        {
+            Assert.Contains(
+                administratorInactiveJson.RootElement.GetProperty("items").EnumerateArray(),
+                item => item.GetProperty("id").GetGuid() == inactiveProduct.Id && !item.GetProperty("isActive").GetBoolean());
+        }
+
+        var supervisorRoleId = await GetRoleIdAsync(client, RoleCodes.Supervisor);
+        var cashierRoleId = await GetRoleIdAsync(client, RoleCodes.Cashier);
+        var supervisorResponse = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "filters.supervisor.test", "Supervisor de filtros", "Supervisor-Filters-Test-2026!", [supervisorRoleId]));
+        var supervisor = await supervisorResponse.Content.ReadFromJsonAsync<UserDto>();
+        Assert.Equal(HttpStatusCode.Created, supervisorResponse.StatusCode);
+        Assert.NotNull(supervisor);
+        var cashierResponse = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "filters.cashier.test", "Cajero de filtros", "Cashier-Filters-Test-2026!", [cashierRoleId]));
+        var cashier = await cashierResponse.Content.ReadFromJsonAsync<UserDto>();
+        Assert.Equal(HttpStatusCode.Created, cashierResponse.StatusCode);
+        Assert.NotNull(cashier);
+
+        var supervisorSession = await LoginAsync(client, supervisor.UserName, "Supervisor-Filters-Test-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", supervisorSession.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/products?includeOutOfStock=true")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/products?includeInactive=true")).StatusCode);
+
+        var cashierSession = await LoginAsync(client, cashier.UserName, "Cashier-Filters-Test-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cashierSession.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/products?includeOutOfStock=true")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/products?includeInactive=true")).StatusCode);
+        var directSearch = await client.GetAsync("/api/products?search=FILTER-001");
+        Assert.Equal(HttpStatusCode.OK, directSearch.StatusCode);
+        using (var searchJson = JsonDocument.Parse(await directSearch.Content.ReadAsStringAsync()))
+        {
+            var item = Assert.Single(searchJson.RootElement.GetProperty("items").EnumerateArray());
+            Assert.True(item.GetProperty("isOutOfStock").GetBoolean());
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        var inventoryReadId = await GetPermissionIdAsync(client, administrator.AccessToken, PermissionCodes.InventoryRead);
+        var sensitiveUpdateId = await GetPermissionIdAsync(client, administrator.AccessToken, PermissionCodes.ProductsSensitiveUpdate);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{cashier.Id}/permissions/{inventoryReadId}", new SetUserPermissionRequest(true))).StatusCode);
+        var cashierWithInventoryRead = await LoginAsync(client, cashier.UserName, "Cashier-Filters-Test-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cashierWithInventoryRead.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/products?includeOutOfStock=true")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/products?includeInactive=true")).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{cashier.Id}/permissions/{sensitiveUpdateId}", new SetUserPermissionRequest(true))).StatusCode);
+        var cashierWithBothGrants = await LoginAsync(client, cashier.UserName, "Cashier-Filters-Test-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cashierWithBothGrants.AccessToken);
+        var cashierInactiveList = await client.GetAsync("/api/products?includeInactive=true&includeOutOfStock=true");
+        Assert.Equal(HttpStatusCode.OK, cashierInactiveList.StatusCode);
+        using (var cashierInactiveJson = JsonDocument.Parse(await cashierInactiveList.Content.ReadAsStringAsync()))
+        {
+            Assert.Contains(
+                cashierInactiveJson.RootElement.GetProperty("items").EnumerateArray(),
+                item => item.GetProperty("id").GetGuid() == inactiveProduct.Id && !item.GetProperty("isActive").GetBoolean());
+        }
     }
 
     private async Task SetupInitialAdministratorAsync(HttpClient client, string password)
@@ -830,6 +1055,12 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(userName, password));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AuthenticationResult>())!;
+    }
+
+    private static async Task AssertProblemCodeAsync(HttpResponseMessage response, string expectedCode)
+    {
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(expectedCode, json.RootElement.GetProperty("code").GetString());
     }
 
     private static async Task<IReadOnlyCollection<EffectiveUserPermissionDto>> GetEffectivePermissionsAsync(

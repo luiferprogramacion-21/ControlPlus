@@ -1,5 +1,7 @@
 using System.Data.Common;
+using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Infrastructure.Persistence;
+using ControlPlus.Infrastructure.Persistence.Official;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -8,6 +10,23 @@ namespace ControlPlus.Infrastructure.Tests;
 
 public sealed class OfficialSchemaIntegrationTests
 {
+    private static readonly (string Schema, string Table)[] OfficialVersionedTables =
+    [
+        ("configuracion", "establecimiento"), ("configuracion", "instalacion"),
+        ("configuracion", "terminal"), ("configuracion", "motivo_operacion"),
+        ("seguridad", "usuario"), ("seguridad", "rol"),
+        ("seguridad", "limite_operacion_rol"), ("seguridad", "credencial_usuario"),
+        ("configuracion", "consecutivo_documento"), ("configuracion", "destino_respaldo"),
+        ("configuracion", "perfil_impresora"), ("configuracion", "plantilla_impresion"),
+        ("catalogo", "metodo_pago"), ("catalogo", "categoria"),
+        ("catalogo", "producto"), ("catalogo", "cliente"), ("catalogo", "proveedor"),
+        ("caja", "caja"), ("caja", "turno_caja"),
+        ("ventas", "borrador_venta"), ("ventas", "detalle_borrador_venta"),
+        ("ventas", "venta"), ("ventas", "credito"), ("ventas", "apartado"),
+        ("compras", "pedido_compra"), ("compras", "detalle_pedido_compra"),
+        ("compras", "compra")
+    ];
+
     [Fact]
     [Trait("Category", "Integration")]
     public async Task Migrations_CreateTheApprovedPhase4SchemaAndSecuritySeed()
@@ -128,10 +147,94 @@ public sealed class OfficialSchemaIntegrationTests
             """));
     }
 
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task OfficialModel_UsesVersionForOptimisticConcurrencyAndIncrementsItOnce()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+            .WithDatabase("controlplus_concurrency_test")
+            .WithUsername("controlplus_test")
+            .WithPassword("integration-password-not-for-production")
+            .Build();
+        await postgres.StartAsync();
+
+        var migrationOptions = new DbContextOptionsBuilder<ControlPlusDbContext>()
+            .UseNpgsql(postgres.GetConnectionString())
+            .Options;
+        await using (var migrationContext = new ControlPlusDbContext(migrationOptions))
+        {
+            await migrationContext.Database.MigrateAsync();
+        }
+
+        var options = new DbContextOptionsBuilder<OfficialControlPlusDbContext>()
+            .UseNpgsql(postgres.GetConnectionString())
+            .Options;
+
+        await using var firstContext = new OfficialControlPlusDbContext(options);
+        await using var secondContext = new OfficialControlPlusDbContext(options);
+
+        var concurrencyTables = firstContext.Model.GetEntityTypes()
+            .Where(entity => entity.FindProperty("Version")?.IsConcurrencyToken == true)
+            .Select(entity => (Schema: entity.GetSchema()!, Table: entity.GetTableName()!))
+            .OrderBy(entity => entity.Schema)
+            .ThenBy(entity => entity.Table)
+            .ToArray();
+        Assert.Equal(
+            OfficialVersionedTables.OrderBy(entity => entity.Schema).ThenBy(entity => entity.Table).ToArray(),
+            concurrencyTables);
+
+        await using (var schemaContext = new OfficialControlPlusDbContext(options))
+        {
+            await schemaContext.Database.OpenConnectionAsync();
+            var physicalVersionedTables = await VersionedTablesAsync(schemaContext.Database.GetDbConnection());
+            Assert.Equal(
+                OfficialVersionedTables.OrderBy(entity => entity.Schema).ThenBy(entity => entity.Table).ToArray(),
+                physicalVersionedTables.OrderBy(entity => entity.Schema).ThenBy(entity => entity.Table).ToArray());
+        }
+
+        var firstRole = await firstContext.Rol.SingleAsync(role => role.Codigo == "SUPERVISOR");
+        var secondRole = await secondContext.Rol.SingleAsync(role => role.Codigo == "SUPERVISOR");
+        var originalVersion = firstRole.Version;
+
+        firstRole.Update("Supervisor concurrencia A", firstRole.Level, DateTimeOffset.UtcNow);
+        await firstContext.SaveChangesAsync();
+        Assert.Equal(originalVersion + 1, firstRole.Version);
+
+        secondRole.Update("Supervisor concurrencia B", secondRole.Level, DateTimeOffset.UtcNow);
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => secondContext.SaveChangesAsync());
+
+        await using var verificationContext = new OfficialControlPlusDbContext(options);
+        var persistedRole = await verificationContext.Rol.SingleAsync(role => role.Codigo == "SUPERVISOR");
+        Assert.Equal(originalVersion + 1, persistedRole.Version);
+    }
+
     private static async Task<long> ScalarAsync(DbConnection connection, string sql)
     {
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
         return Convert.ToInt64(await command.ExecuteScalarAsync());
+    }
+
+    private static async Task<IReadOnlyCollection<(string Schema, string Table)>> VersionedTablesAsync(
+        DbConnection connection)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT table_schema, table_name
+            FROM information_schema.columns
+            WHERE column_name = 'version'
+              AND data_type = 'bigint'
+              AND table_schema IN ('configuracion', 'seguridad', 'catalogo', 'caja', 'ventas', 'compras')
+            """;
+
+        var tables = new List<(string Schema, string Table)>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            tables.Add((reader.GetString(0), reader.GetString(1)));
+        }
+
+        return tables;
     }
 }

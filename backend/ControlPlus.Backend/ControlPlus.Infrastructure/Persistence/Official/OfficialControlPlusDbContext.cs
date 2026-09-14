@@ -1881,7 +1881,7 @@ public partial class OfficialControlPlusDbContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("pk_limite_operacion_rol");
 
-            entity.ToTable("limite_operacion_rol", "seguridad", tb => tb.HasComment("Limites configurables por rol. Para DESCUENTO_PORCENTAJE los valores iniciales son 100, 20 y 5 para Administrador, Supervisor y Cajero."));
+            entity.ToTable("limite_operacion_rol", "seguridad", tb => tb.HasComment("Limites configurables por rol. Para DESCUENTO_PORCENTAJE los valores aprobados son 80, 20 y 5 para Administrador, Supervisor y Cajero."));
 
             entity.HasIndex(e => new { e.RolId, e.Activo }, "ix_limite_operacion_rol_activo");
 

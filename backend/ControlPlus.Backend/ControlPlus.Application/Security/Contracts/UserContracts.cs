@@ -61,8 +61,6 @@ public interface IUserManagementService
 
     Task<Result<UserDto>> AssignRoleAsync(ActorContext actor, Guid userId, AssignRoleRequest request, CancellationToken cancellationToken = default);
 
-    Task<Result<UserDto>> RemoveRoleAsync(ActorContext actor, Guid userId, Guid roleId, CancellationToken cancellationToken = default);
-
     Task<Result<UserDto>> GetByIdAsync(ActorContext actor, Guid userId, CancellationToken cancellationToken = default);
 
     Task<Result<PagedResult<UserDto>>> ListAsync(ActorContext actor, UserListQuery query, CancellationToken cancellationToken = default);
