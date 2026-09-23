@@ -21,6 +21,7 @@ public partial class TurnoCaja
 
     public Guid? MotivoDiferenciaId { get; set; }
 
+
     public DateOnly FechaOperativa { get; set; }
 
     public DateTime FechaHoraApertura { get; set; }
@@ -35,6 +36,8 @@ public partial class TurnoCaja
 
     public decimal? Diferencia { get; set; }
 
+    public decimal? DiferenciaTotal { get; set; }
+
     public string Estado { get; set; } = null!;
 
     public string? Observaciones { get; set; }
@@ -48,6 +51,10 @@ public partial class TurnoCaja
     public virtual ICollection<BorradorVenta> BorradorVenta { get; set; } = new List<BorradorVenta>();
 
     public virtual Caja Caja { get; set; } = null!;
+
+    public virtual AutorizacionCierreTurno? AutorizacionCierre { get; set; }
+
+    public virtual ICollection<DetalleArqueoMedioPago> DetalleArqueoMedioPago { get; set; } = new List<DetalleArqueoMedioPago>();
 
     public virtual ICollection<CambioVenta> CambioVenta { get; set; } = new List<CambioVenta>();
 

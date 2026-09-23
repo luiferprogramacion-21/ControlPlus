@@ -37,6 +37,7 @@ Los únicos endpoints anónimos son los de salud y los flujos de autenticación 
 | Auditoría | `GET /api/audit-records` | `AUDIT.READ` |
 | Categorías | `/api/categories` | `CATEGORIES.READ` o `CATEGORIES.MANAGE` |
 | Productos | `/api/products`, historial de costos y unidades de medida | `PRODUCTS.*` e `INVENTORY.READ` según operación |
+| Caja | `/api/cash` | `CASH.*`, `CONFIGURATION.MANAGE` o `USERS.MANAGE` según operación |
 
 Cada usuario tiene exactamente un rol principal. La reasignación se realiza con `POST /api/users/{userId}/roles`; no existe `DELETE /api/users/{userId}/roles/{roleId}` porque no sería válido retirar el único rol.
 
@@ -48,6 +49,34 @@ Cada usuario tiene exactamente un rol principal. La reasignación se realiza con
 - `includeOutOfStock=true` requiere `INVENTORY.READ` para listar todos los agotados.
 - `includeInactive=true` requiere `PRODUCTS.SENSITIVE_UPDATE` para listar todos los inactivos.
 - Crear Categorías o Productos responde `201 Created` y entrega la ubicación del recurso creado.
+
+## Caja
+
+Todos los endpoints de Caja requieren JWT y permisos efectivos resueltos desde PostgreSQL:
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| `GET` | `/api/cash/state` | `CASH.OWN_READ` |
+| `POST` | `/api/cash/register` | `CONFIGURATION.MANAGE` |
+| `PUT` | `/api/cash/shift-mode` | `CASH.SHIFT_MODE_MANAGE` |
+| `POST` | `/api/cash/shifts` | `CASH.SHIFT_MANAGE` |
+| `GET` | `/api/cash/movements` | `CASH.OWN_READ` |
+| `POST` | `/api/cash/movements/incomes` | `CASH.MOVEMENTS_MANAGE` |
+| `POST` | `/api/cash/movements/expenses` | `CASH.MOVEMENTS_MANAGE` |
+| `POST` | `/api/cash/movements/cash-drops` | `CASH.MOVEMENTS_MANAGE` |
+| `GET` | `/api/cash/reconciliation` | `CASH.SHIFT_MANAGE` |
+| `POST` | `/api/cash/shifts/{shiftId}/close` | `CASH.SHIFT_MANAGE` |
+| `POST` | `/api/cash/operator-credentials/{userId}` | `USERS.MANAGE` |
+| `POST` | `/api/cash/operator-sessions` | `CASH.OWN_READ` |
+| `POST` | `/api/cash/operator-sessions/{sessionId}/close` | `CASH.OWN_READ` |
+
+La caja se registra una sola vez. El estado indica si existe un turno abierto de una fecha anterior y orienta a cerrarlo. En modalidad compartida, los movimientos exigen una sesión de operador activa iniciada con una credencial Code128; el token de la credencial solo se devuelve al emitirla y la respuesta usa `no-store`.
+
+Con solo `CASH.OWN_READ`, `/state` expone `isConfigured`, `hasOpenShift`, `requiresOperatorSession` y la sesión propia autorizada. No expone configuración ni datos financieros/responsable/observaciones de un turno individual ajeno: `currentShift`, `cashRegister`, `defaultShiftMode` y `configurationVersion` quedan nulos. El responsable individual ve su turno; Administrador, Supervisor o un gestor efectivo de Caja reciben el estado completo. La pertenencia se obtiene del usuario autenticado, nunca de parámetros del cliente.
+
+El cierre recibe la versión del turno y el valor contado de cada medio de pago activo. No existe cierre ciego: el servidor devuelve y persiste esperado, contado y diferencia. Si la diferencia total no es cero también exige motivo y las credenciales de otro Supervisor o Administrador con permiso efectivo vigente; puede adjuntar una observación de diferencia. El fallo de esa autorización conserva abierto el turno.
+
+Las respuestas separan `cashDifference` (contado de efectivo menos esperado de efectivo), `paymentMethods[].difference` y `totalDifference` (total contado menos total esperado). Las diferencias entre medios pueden compensarse sin autorización adicional. Los medios electrónicos admiten netos negativos; el contado físico no. Importes y acumulados excediendo `999999999999999999` o con fracciones responden `400`. El cierre no acepta IDs de autorizaciones anteriores ni campos desconocidos en su solicitud de autorización; crea y consume un vínculo exclusivo al turno y la correlación. Los detalles confirmados son inmutables y cada sesión cerrada automáticamente genera su auditoría en la misma transacción.
 
 ## Respuestas de error
 

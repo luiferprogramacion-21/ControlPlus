@@ -73,7 +73,7 @@ public partial class Usuario
 
     public virtual ICollection<CredencialUsuario> CredencialUsuarioRevocadaPor { get; set; } = new List<CredencialUsuario>();
 
-    public virtual CredencialUsuario? CredencialUsuarioUsuario { get; set; }
+    public virtual ICollection<CredencialUsuario> CredencialUsuarioUsuario { get; set; } = new List<CredencialUsuario>();
 
     public virtual ICollection<DocumentoEmitido> DocumentoEmitido { get; set; } = new List<DocumentoEmitido>();
 

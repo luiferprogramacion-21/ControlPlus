@@ -23,5 +23,5 @@ public partial class Caja
 
     public virtual Instalacion Instalacion { get; set; } = null!;
 
-    public virtual TurnoCaja? TurnoCaja { get; set; }
+    public virtual ICollection<TurnoCaja> TurnoCaja { get; set; } = new List<TurnoCaja>();
 }

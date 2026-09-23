@@ -33,7 +33,7 @@ public partial class Terminal
 
     public virtual ICollection<PerfilImpresora> PerfilImpresora { get; set; } = new List<PerfilImpresora>();
 
-    public virtual SesionOperador? SesionOperador { get; set; }
+    public virtual ICollection<SesionOperador> SesionOperador { get; set; } = new List<SesionOperador>();
 
     public virtual ICollection<TrabajoImpresion> TrabajoImpresion { get; set; } = new List<TrabajoImpresion>();
 

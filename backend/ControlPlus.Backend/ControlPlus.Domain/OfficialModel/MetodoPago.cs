@@ -25,6 +25,8 @@ public partial class MetodoPago
 
     public virtual ICollection<PagoApartado> PagoApartado { get; set; } = new List<PagoApartado>();
 
+    public virtual ICollection<DetalleArqueoMedioPago> DetalleArqueoMedioPago { get; set; } = new List<DetalleArqueoMedioPago>();
+
     public virtual ICollection<PagoCambioVenta> PagoCambioVenta { get; set; } = new List<PagoCambioVenta>();
 
     public virtual ICollection<PagoCredito> PagoCredito { get; set; } = new List<PagoCredito>();

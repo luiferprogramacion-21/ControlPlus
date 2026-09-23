@@ -39,5 +39,15 @@ public enum AuditAction
     ProductCreated = 31,
     ProductUpdated = 32,
     ProductActivated = 33,
-    ProductDeactivated = 34
+    ProductDeactivated = 34,
+    CashRegisterConfigured = 35,
+    CashShiftModeUpdated = 36,
+    CashShiftOpened = 37,
+    CashMovementRegistered = 38,
+    CashReconciled = 39,
+    CashShiftClosed = 40,
+    OperatorCredentialIssued = 41,
+    OperatorSessionStarted = 42,
+    OperatorSessionClosed = 43,
+    CashCloseAuthorizationRejected = 44
 }

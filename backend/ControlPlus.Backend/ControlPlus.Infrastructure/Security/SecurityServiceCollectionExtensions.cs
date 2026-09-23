@@ -1,6 +1,7 @@
 using ControlPlus.Application.Security.Ports;
 using ControlPlus.Infrastructure.Persistence.Repositories;
 using ControlPlus.Application.Catalog.Ports;
+using ControlPlus.Application.Cash.Ports;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,6 +25,9 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<IPermissionRepository, EfPermissionRepository>();
         services.AddScoped<IAuditRepository, EfAuditRepository>();
         services.AddScoped<ICatalogRepository, EfCatalogRepository>();
+        services.AddScoped<ICashRepository, EfCashRepository>();
+        services.AddScoped<ICashTransactionManager, EfCashTransactionManager>();
+        services.AddSingleton<ICredentialTokenGenerator, Code128CredentialTokenGenerator>();
         services.AddScoped<SecurityCatalogSeeder>();
         services.AddScoped<InstallationBootstrapper>();
 

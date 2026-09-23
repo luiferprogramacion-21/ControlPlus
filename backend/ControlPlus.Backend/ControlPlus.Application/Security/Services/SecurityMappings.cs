@@ -52,7 +52,12 @@ internal static class SecurityMappings
             auditRecord.EntityType,
             auditRecord.EntityId,
             auditRecord.Details,
-            auditRecord.CorrelationId);
+            auditRecord.CorrelationId,
+            auditRecord.AuthorizerUserId,
+            auditRecord.OperatorSessionId,
+            auditRecord.TerminalId,
+            auditRecord.Reason,
+            auditRecord.Result);
 
     public static PagedResult<TDestination> Map<TSource, TDestination>(
         PagedResult<TSource> source,

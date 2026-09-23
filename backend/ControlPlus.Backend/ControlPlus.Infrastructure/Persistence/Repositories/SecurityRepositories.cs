@@ -346,7 +346,11 @@ public sealed class EfAuditRepository(OfficialControlPlusDbContext dbContext) : 
             Accion = auditRecord.Action.ToString().ToUpperInvariant(),
             Entidad = auditRecord.EntityType,
             EntidadId = auditRecord.EntityId,
-            Resultado = "EXITOSO",
+            Resultado = auditRecord.Result,
+            UsuarioAutorizadorId = auditRecord.AuthorizerUserId,
+            SesionOperadorId = auditRecord.OperatorSessionId,
+            TerminalId = auditRecord.TerminalId,
+            Motivo = auditRecord.Reason,
             DatosNuevos = auditRecord.Details,
             CorrelacionId = correlationId
         }, cancellationToken);
@@ -406,7 +410,12 @@ public sealed class EfAuditRepository(OfficialControlPlusDbContext dbContext) : 
                 record.EntidadId,
                 record.DatosNuevos,
                 new DateTimeOffset(DateTime.SpecifyKind(record.FechaHora, DateTimeKind.Utc)),
-                record.CorrelacionId.ToString()))
+                record.CorrelacionId.ToString(),
+                record.UsuarioAutorizadorId,
+                record.SesionOperadorId,
+                record.TerminalId,
+                record.Motivo,
+                record.Resultado))
             .ToArray();
 
         return new PagedResult<AuditRecord>(items, query.Page, query.PageSize, totalCount);

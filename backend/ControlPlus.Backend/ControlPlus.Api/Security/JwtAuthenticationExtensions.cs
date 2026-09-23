@@ -58,6 +58,34 @@ public static class JwtAuthenticationExtensions
                         {
                             context.Fail("The user session is no longer valid.");
                         }
+                    },
+                    OnChallenge = async context =>
+                    {
+                        if (context.Response.HasStarted)
+                        {
+                            return;
+                        }
+
+                        context.HandleResponse();
+                        context.Response.Headers.WWWAuthenticate = JwtBearerDefaults.AuthenticationScheme;
+                        await WriteAuthenticationProblemAsync(
+                            context.HttpContext,
+                            StatusCodes.Status401Unauthorized,
+                            "authentication.unauthorized",
+                            "La autenticación es obligatoria para acceder a este recurso.");
+                    },
+                    OnForbidden = async context =>
+                    {
+                        if (context.Response.HasStarted)
+                        {
+                            return;
+                        }
+
+                        await WriteAuthenticationProblemAsync(
+                            context.HttpContext,
+                            StatusCodes.Status403Forbidden,
+                            "authorization.forbidden",
+                            "No tiene permiso para realizar esta acción.");
                     }
                 };
             });
@@ -69,4 +97,20 @@ public static class JwtAuthenticationExtensions
 
         return services;
     }
+
+    private static Task WriteAuthenticationProblemAsync(
+        HttpContext httpContext,
+        int statusCode,
+        string code,
+        string title) =>
+        Results.Problem(
+                statusCode: statusCode,
+                title: title,
+                type: $"https://controlplus.local/problems/{code.Replace('.', '-')}",
+                instance: httpContext.Request.Path,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = code
+                })
+            .ExecuteAsync(httpContext);
 }

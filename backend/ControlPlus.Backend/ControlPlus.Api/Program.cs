@@ -1,7 +1,10 @@
 using System.Threading.RateLimiting;
 using ControlPlus.Api.Authorization;
+using ControlPlus.Api.Migrations;
 using ControlPlus.Api.OpenApi;
 using ControlPlus.Api.Security;
+using ControlPlus.Application.Cash.Contracts;
+using ControlPlus.Application.Cash.Services;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Application.Security.Services;
 using ControlPlus.Application.Catalog.Contracts;
@@ -12,7 +15,20 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
-if (args.Contains("--health-check", StringComparer.Ordinal))
+var migrationCommand = ControlledMigrationCommand.Parse(
+    args,
+    Environment.GetEnvironmentVariable(ControlledMigrationCommand.EnabledEnvironmentVariable));
+var healthCheckRequested = args.Contains("--health-check", StringComparer.Ordinal);
+var migrationTargetRequested = args.Contains(ControlledMigrationCommand.TargetArgument, StringComparer.Ordinal);
+
+if (healthCheckRequested && migrationTargetRequested)
+{
+    Console.Error.WriteLine("Los modos --health-check y --migrate-to no se pueden combinar.");
+    Environment.ExitCode = ControlledMigrationRunner.RejectedExitCode;
+    return;
+}
+
+if (healthCheckRequested)
 {
     using var healthClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
     try
@@ -29,6 +45,26 @@ if (args.Contains("--health-check", StringComparer.Ordinal))
         Environment.ExitCode = 1;
     }
 
+    return;
+}
+
+if (migrationCommand.IsMigrationMode)
+{
+    if (!migrationCommand.IsValid)
+    {
+        Console.Error.WriteLine(migrationCommand.Message);
+        Environment.ExitCode = ControlledMigrationRunner.RejectedExitCode;
+        return;
+    }
+
+    var migrationBuilder = WebApplication.CreateBuilder(args);
+    var migrationResult = await ControlledMigrationRunner.RunAsync(
+        migrationBuilder.Configuration,
+        migrationCommand.TargetMigration!);
+
+    var migrationOutput = migrationResult.ExitCode == 0 ? Console.Out : Console.Error;
+    migrationOutput.WriteLine(migrationResult.Message);
+    Environment.ExitCode = migrationResult.ExitCode;
     return;
 }
 
@@ -60,6 +96,7 @@ builder.Services.AddOpenApi(options =>
     options.AddDocumentTransformer<ControlPlusOpenApiSecurityTransformer>());
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ConcurrencyExceptionHandler>();
+builder.Services.AddExceptionHandler<CashMoneyExceptionHandler>();
 
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddSecurityInfrastructure(builder.Configuration);
@@ -70,6 +107,7 @@ builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();
 builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
 builder.Services.AddScoped<ICatalogService, CatalogService>();
+builder.Services.AddScoped<ICashService, CashService>();
 builder.Services.AddScoped<ICurrentUserSessionValidator, CurrentUserSessionValidator>();
 builder.Services.AddScoped<IPermissionChecker, PermissionChecker>();
 builder.Services.AddScoped<CurrentActorContextResolver>();

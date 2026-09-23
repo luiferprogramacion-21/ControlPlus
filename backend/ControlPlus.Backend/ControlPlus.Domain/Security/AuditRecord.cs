@@ -20,7 +20,12 @@ public sealed class AuditRecord
         Guid? entityId,
         string? details,
         DateTimeOffset occurredAtUtc,
-        string? correlationId)
+        string? correlationId,
+        Guid? authorizerUserId,
+        Guid? operatorSessionId,
+        Guid? terminalId,
+        string? reason,
+        string result)
     {
         if (!Enum.IsDefined(action))
         {
@@ -35,6 +40,13 @@ public sealed class AuditRecord
         Details = NormalizeOptionalText(details);
         OccurredAtUtc = DomainGuard.Utc(occurredAtUtc, nameof(occurredAtUtc));
         CorrelationId = NormalizeOptionalText(correlationId);
+        AuthorizerUserId = DomainGuard.OptionalId(authorizerUserId, nameof(authorizerUserId));
+        OperatorSessionId = DomainGuard.OptionalId(operatorSessionId, nameof(operatorSessionId));
+        TerminalId = DomainGuard.OptionalId(terminalId, nameof(terminalId));
+        Reason = NormalizeOptionalText(reason);
+        Result = result is "EXITOSO" or "FALLIDO"
+            ? result
+            : throw new ArgumentOutOfRangeException(nameof(result), result, "Audit result must be EXITOSO or FALLIDO.");
     }
 
     public Guid Id { get; private set; }
@@ -53,6 +65,16 @@ public sealed class AuditRecord
 
     public string? CorrelationId { get; private set; }
 
+    public Guid? AuthorizerUserId { get; private set; }
+
+    public Guid? OperatorSessionId { get; private set; }
+
+    public Guid? TerminalId { get; private set; }
+
+    public string? Reason { get; private set; }
+
+    public string Result { get; private set; } = "EXITOSO";
+
     public static AuditRecord Create(
         Guid? actorUserId,
         AuditAction action,
@@ -60,7 +82,12 @@ public sealed class AuditRecord
         Guid? entityId,
         string? details,
         DateTimeOffset occurredAtUtc,
-        string? correlationId = null) =>
+        string? correlationId = null,
+        Guid? authorizerUserId = null,
+        Guid? operatorSessionId = null,
+        Guid? terminalId = null,
+        string? reason = null,
+        string result = "EXITOSO") =>
         new(
             Guid.CreateVersion7(),
             actorUserId,
@@ -69,7 +96,12 @@ public sealed class AuditRecord
             entityId,
             details,
             occurredAtUtc,
-            correlationId);
+            correlationId,
+            authorizerUserId,
+            operatorSessionId,
+            terminalId,
+            reason,
+            result);
 
     public static AuditRecord Restore(
         Guid id,
@@ -79,8 +111,14 @@ public sealed class AuditRecord
         Guid? entityId,
         string? details,
         DateTimeOffset occurredAtUtc,
-        string? correlationId) =>
-        new(id, actorUserId, action, entityType, entityId, details, occurredAtUtc, correlationId);
+        string? correlationId,
+        Guid? authorizerUserId = null,
+        Guid? operatorSessionId = null,
+        Guid? terminalId = null,
+        string? reason = null,
+        string result = "EXITOSO") =>
+        new(id, actorUserId, action, entityType, entityId, details, occurredAtUtc, correlationId,
+            authorizerUserId, operatorSessionId, terminalId, reason, result);
 
     private static string? NormalizeOptionalText(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

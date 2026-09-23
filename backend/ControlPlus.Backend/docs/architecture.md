@@ -19,6 +19,8 @@ Docker Compose ejecuta la API y PostgreSQL 17. PostgreSQL conserva los datos en 
 
 El paquete oficial de Fase 4 sigue siendo la fuente de verdad del esquema. `OfficialControlPlusDbContext` es el modelo database-first y el único contexto registrado para los repositorios de ejecución. `ControlPlusDbContext` no representa una segunda fuente de verdad: conserva exclusivamente la asociación con las migraciones históricas publicadas y se usa para aplicar esa cadena en pruebas aisladas y comandos de migración.
 
+El ejecutable tiene tres rutas mutuamente excluyentes antes de construir la aplicación: healthcheck, migración controlada y servidor normal. La ruta de migración requiere `CONTROLPLUS_MIGRATIONS_ENABLED=true` exacto y `--migrate-to <MigrationId>`, crea solamente el `ControlPlusDbContext` en memoria, valida catálogo/historial/secuencia, ejecuta hasta el destino exacto y termina. Nunca construye ni inicia el servidor HTTP. La ruta normal no registra el contexto de migraciones ni ejecuta operaciones de creación o actualización de esquema.
+
 ## Concurrencia optimista
 
 El diccionario de Fase 4 define `version` como token de concurrencia en 27 tablas oficiales. La configuración central aplica `IsConcurrencyToken()` a estas tablas:
@@ -34,7 +36,13 @@ El diccionario de Fase 4 define `version` como token de concurrencia en 27 tabla
 
 ## Migraciones
 
-La línea de migraciones publicadas se conserva inmutable. El baseline ejecuta el SQL oficial sobre una base vacía y las extensiones posteriores agregan el catálogo de seguridad híbrido y las unidades de medida. Los cambios futuros deben ser migraciones compensatorias nuevas, revisadas desde una base limpia de Testcontainers antes de aplicarse a un entorno persistente.
+La línea de migraciones publicadas se conserva inmutable. El baseline ejecuta el SQL oficial sobre una base vacía y las extensiones posteriores agregan el catálogo de seguridad híbrido y las unidades de medida. Caja se incorpora mediante la nueva migración independiente `20260913020000_CashRegisterModuleV1`, probada desde una base limpia y todavía no aplicada al entorno persistente. Los cambios futuros deben ser migraciones compensatorias nuevas, revisadas desde una base limpia de Testcontainers antes de aplicarse a un entorno persistente.
+
+La imagen API es reutilizable como contenedor temporal porque su `ENTRYPOINT` recibe los argumentos de Compose. No hay un servicio migrador permanente y no se modifica la dependencia normal entre `api` y `postgres`. El gate y el destino explícito evitan que una configuración o un despliegue normal apliquen migraciones por accidente; los errores de proveedor se reducen a un resultado sanitizado y nunca desencadenan rollback manual automático.
+
+El módulo de Caja mantiene un solo turno abierto y el historial Caja 1:N Turnos. Usa transacciones serializables y tokens oficiales; la reautorización comparte con login un bloqueo PostgreSQL por cuenta en `ReadCommitted`, además de bloquear turno y usuario. Solo reintenta abortos `40001`, hasta tres veces y con EF fresco, nunca un resultado de COMMIT ambiguo. Detalles, vínculo, consumo de autorización, cierre de sesiones y auditorías se guardan en una transacción.
+
+`turno_caja.diferencia` conserva la diferencia oficial de efectivo. `diferencia_total` es la suma del desglose, contado menos esperado, y determina la autorización. Triggers diferibles comprueban los totales y el vínculo uno a uno de autorización; guardas inmediatas hacen inmutables identidad y datos confirmados. Los pagos distribuyen importes por método y excluyen sus movimientos del cálculo manual. La migración exige ausencia de turnos previos y `Down` conserva el catálogo de métodos. No se implementan operaciones de Ventas.
 
 No existe un `ModelSnapshot` parcial creado para aparentar cobertura del modelo. Si se adopta una estrategia de snapshot o generación asistida por EF Core, deberá representar el modelo oficial completo y demostrarlo mediante una creación limpia de la base. La decisión y sus consecuencias se detallan en [0001-persistencia-concurrencia-y-migraciones.md](decisions/0001-persistencia-concurrencia-y-migraciones.md).
 

@@ -34,15 +34,17 @@ Compose mantiene PostgreSQL en el volumen `controlplus_postgres_data`; no use `d
 
 ## Migraciones
 
-La API no aplica migraciones al iniciar. Configure la cadena de conexión fuera del repositorio y ejecute la cadena histórica de forma explícita:
+La API no aplica migraciones al iniciar. La imagen dispone de un modo controlado que usa la misma configuración de Compose y exige simultáneamente el gate exacto `CONTROLPLUS_MIGRATIONS_ENABLED=true` y un destino explícito. Para una ejecución futura autorizada:
 
 ```powershell
-$env:ConnectionStrings__ControlPlusDb = '<cadena-local-no-versionada>'
-dotnet tool restore
-dotnet tool run dotnet-ef database update --context ControlPlusDbContext --project ControlPlus.Infrastructure --startup-project ControlPlus.Api
+docker compose run --rm --no-deps `
+  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
+  api --migrate-to 20260913020000_CashRegisterModuleV1
 ```
 
-Las migraciones publicadas son inmutables. Antes de aplicar una migración nueva o una reversión sobre PostgreSQL persistente, cree y verifique un respaldo fuera del repositorio. Consulte [docs/database.md](docs/database.md).
+El contenedor temporal valida que el historial sea un prefijo coherente, que el destino exista, esté pendiente y solo requiera una secuencia ascendente que termine exactamente en él. No inicia HTTP ni acepta “todo lo pendiente”; un error termina con código distinto de cero y sin rollback manual automático. Las migraciones publicadas son inmutables.
+
+Antes de cualquier uso persistente se debe contar con autorización explícita, ventana de mantenimiento, respaldo verificado y confirmación independiente del identificador objetivo. El comando no debe automatizarse en el arranque ni ejecutarse contra producción sin autorización expresa. Después se debe confirmar el código 0, una sola fila del objetivo en `__EFMigrationsHistory`, salud de API y ausencia de errores sanitizados. Consulte [docs/database.md](docs/database.md).
 
 ## Pruebas
 
@@ -64,5 +66,7 @@ Más detalles:
 - [API](docs/api.md)
 - [Seguridad](docs/security.md)
 - [Catálogo](docs/catalog.md)
+- [Caja](docs/cash.md)
+- Caja conserva la diferencia oficial de efectivo y separa el total; su migración pendiente exige ausencia de turnos previos y conserva métodos de pago al revertir. La validación de estas correcciones usa únicamente Testcontainers; no despliega servicios ni migra PostgreSQL persistente.
 - [Base de datos](docs/database.md)
 - [Decisión de persistencia y concurrencia](docs/decisions/0001-persistencia-concurrencia-y-migraciones.md)

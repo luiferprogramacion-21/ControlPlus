@@ -46,7 +46,7 @@ public sealed class OfficialSchemaIntegrationTests
         await context.Database.MigrateAsync();
         await context.Database.OpenConnectionAsync();
 
-        Assert.Equal(59L, await ScalarAsync(context.Database.GetDbConnection(),
+        Assert.Equal(61L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*)
             FROM information_schema.tables
@@ -54,7 +54,7 @@ public sealed class OfficialSchemaIntegrationTests
               AND table_schema IN ('seguridad','configuracion','catalogo','caja','ventas','compras','auditoria')
             """));
 
-        Assert.Equal(59L, await ScalarAsync(context.Database.GetDbConnection(),
+        Assert.Equal(61L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*)
             FROM information_schema.table_constraints
@@ -93,6 +93,14 @@ public sealed class OfficialSchemaIntegrationTests
             WHERE table_schema = 'seguridad' AND table_name = 'usuario_permiso'
             """));
 
+        Assert.Equal(3L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM catalogo.metodo_pago
+            WHERE (codigo = 'EFECTIVO' AND afecta_efectivo = true AND requiere_referencia = false)
+               OR (codigo IN ('TRANSFERENCIA', 'NEQUI') AND afecta_efectivo = false AND requiere_referencia = true)
+            """));
+
         Assert.Equal(1L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*)
@@ -119,6 +127,88 @@ public sealed class OfficialSchemaIntegrationTests
             SELECT count(*)
             FROM catalogo.unidad_medida
             WHERE codigo IN ('UNIDAD', 'PAQUETE', 'METRO') AND activo = true
+            """));
+
+        Assert.Equal(1L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM "__EFMigrationsHistory"
+            WHERE "MigrationId" = '20260913020000_CashRegisterModuleV1'
+            """));
+
+        Assert.Equal(1L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM information_schema.tables
+            WHERE table_schema = 'caja' AND table_name = 'detalle_arqueo_medio_pago'
+            """));
+
+        Assert.Equal(3L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM information_schema.columns
+            WHERE table_schema = 'caja'
+              AND table_name = 'detalle_arqueo_medio_pago'
+              AND column_name IN ('valor_esperado', 'valor_contado', 'diferencia')
+              AND data_type = 'numeric'
+              AND numeric_precision = 18
+              AND numeric_scale = 0
+            """));
+
+        Assert.Equal(0L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM information_schema.columns
+            WHERE table_schema = 'caja'
+              AND table_name = 'turno_caja'
+              AND column_name = 'autorizacion_cierre_id'
+              AND is_nullable = 'YES'
+            """));
+
+        Assert.Equal(1L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*) FROM information_schema.columns
+            WHERE table_schema = 'caja' AND table_name = 'turno_caja'
+              AND column_name = 'diferencia_total' AND data_type = 'numeric'
+              AND numeric_precision = 18 AND numeric_scale = 0
+            """));
+
+        Assert.Equal(1L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*) FROM information_schema.tables
+            WHERE table_schema = 'caja' AND table_name = 'autorizacion_cierre_turno'
+            """));
+
+        Assert.Equal(1L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM information_schema.table_constraints
+            WHERE table_schema = 'caja'
+              AND table_name = 'detalle_arqueo_medio_pago'
+              AND constraint_name = 'uq_detalle_arqueo_turno_metodo'
+              AND constraint_type = 'UNIQUE'
+            """));
+
+        Assert.Equal(2L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM information_schema.table_constraints
+            WHERE table_schema = 'caja'
+              AND table_name = 'detalle_arqueo_medio_pago'
+              AND constraint_name IN ('fk_detalle_arqueo_turno', 'fk_detalle_arqueo_metodo_pago')
+              AND constraint_type = 'FOREIGN KEY'
+            """));
+
+        Assert.Equal(0L, await ScalarAsync(context.Database.GetDbConnection(),
+            """
+            SELECT count(*)
+            FROM pg_constraint c
+            JOIN pg_class t ON t.oid = c.conrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            WHERE n.nspname = 'caja'
+              AND t.relname = 'turno_caja'
+              AND c.conname = 'fk_turno_caja_autorizacion_cierre'
+              AND c.confdeltype = 'r'
             """));
 
         Assert.Equal(11L, await ScalarAsync(context.Database.GetDbConnection(),

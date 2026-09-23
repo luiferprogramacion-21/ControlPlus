@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using ControlPlus.Domain.OfficialModel;
 using Microsoft.EntityFrameworkCore;
@@ -1072,8 +1072,8 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_credencial_usuario_revocador");
 
-            entity.HasOne(d => d.Usuario).WithOne(p => p.CredencialUsuarioUsuario)
-                .HasForeignKey<CredencialUsuario>(d => d.UsuarioId)
+            entity.HasOne(d => d.Usuario).WithMany(p => p.CredencialUsuarioUsuario)
+                .HasForeignKey(d => d.UsuarioId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_credencial_usuario_usuario");
         });
@@ -2265,7 +2265,7 @@ public partial class OfficialControlPlusDbContext : DbContext
 
             entity.HasIndex(e => new { e.InstalacionId, e.Serie, e.Consecutivo }, "uq_pago_apartado_inst_serie_numero").IsUnique();
 
-            entity.HasIndex(e => e.MovimientoCajaId, "uq_pago_apartado_movimiento_caja").IsUnique();
+            entity.HasIndex(e => e.MovimientoCajaId, "ix_pago_apartado_movimiento_caja");
 
             entity.Property(e => e.Id)
                 .ValueGeneratedNever()
@@ -2334,8 +2334,8 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pago_apartado_motivo_anulacion");
 
-            entity.HasOne(d => d.MovimientoCaja).WithOne(p => p.PagoApartado)
-                .HasForeignKey<PagoApartado>(d => d.MovimientoCajaId)
+            entity.HasOne(d => d.MovimientoCaja).WithMany(p => p.PagoApartado)
+                .HasForeignKey(d => d.MovimientoCajaId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pago_apartado_movimiento_caja");
 
@@ -2376,7 +2376,7 @@ public partial class OfficialControlPlusDbContext : DbContext
 
             entity.HasIndex(e => e.UsuarioId, "ix_pago_cambio_usuario");
 
-            entity.HasIndex(e => e.MovimientoCajaId, "uq_pago_cambio_movimiento_caja").IsUnique();
+            entity.HasIndex(e => e.MovimientoCajaId, "ix_pago_cambio_movimiento_caja");
 
             entity.Property(e => e.Id)
                 .ValueGeneratedNever()
@@ -2435,8 +2435,8 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pago_cambio_motivo_anulacion");
 
-            entity.HasOne(d => d.MovimientoCaja).WithOne(p => p.PagoCambioVenta)
-                .HasForeignKey<PagoCambioVenta>(d => d.MovimientoCajaId)
+            entity.HasOne(d => d.MovimientoCaja).WithMany(p => p.PagoCambioVenta)
+                .HasForeignKey(d => d.MovimientoCajaId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pago_cambio_movimiento_caja");
 
@@ -2483,7 +2483,7 @@ public partial class OfficialControlPlusDbContext : DbContext
 
             entity.HasIndex(e => new { e.InstalacionId, e.Serie, e.Consecutivo }, "uq_pago_credito_inst_serie_numero").IsUnique();
 
-            entity.HasIndex(e => e.MovimientoCajaId, "uq_pago_credito_movimiento_caja").IsUnique();
+            entity.HasIndex(e => e.MovimientoCajaId, "ix_pago_credito_movimiento_caja");
 
             entity.Property(e => e.Id)
                 .ValueGeneratedNever()
@@ -2552,8 +2552,8 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pago_credito_motivo_anulacion");
 
-            entity.HasOne(d => d.MovimientoCaja).WithOne(p => p.PagoCredito)
-                .HasForeignKey<PagoCredito>(d => d.MovimientoCajaId)
+            entity.HasOne(d => d.MovimientoCaja).WithMany(p => p.PagoCredito)
+                .HasForeignKey(d => d.MovimientoCajaId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pago_credito_movimiento_caja");
 
@@ -2596,7 +2596,7 @@ public partial class OfficialControlPlusDbContext : DbContext
 
             entity.HasIndex(e => e.VentaId, "ix_pago_venta_venta");
 
-            entity.HasIndex(e => e.MovimientoCajaId, "uq_pago_venta_movimiento_caja").IsUnique();
+            entity.HasIndex(e => e.MovimientoCajaId, "ix_pago_venta_movimiento_caja");
 
             entity.Property(e => e.Id)
                 .ValueGeneratedNever()
@@ -2646,8 +2646,8 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pago_venta_motivo_anulacion");
 
-            entity.HasOne(d => d.MovimientoCaja).WithOne(p => p.PagoVenta)
-                .HasForeignKey<PagoVenta>(d => d.MovimientoCajaId)
+            entity.HasOne(d => d.MovimientoCaja).WithMany(p => p.PagoVenta)
+                .HasForeignKey(d => d.MovimientoCajaId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_pago_venta_movimiento_caja");
 
@@ -3128,7 +3128,7 @@ public partial class OfficialControlPlusDbContext : DbContext
 
             entity.HasIndex(e => e.TurnoCajaId, "ix_reembolso_apartado_turno");
 
-            entity.HasIndex(e => e.MovimientoCajaId, "uq_reembolso_apartado_movimiento").IsUnique();
+            entity.HasIndex(e => e.MovimientoCajaId, "ix_reembolso_apartado_movimiento");
 
             entity.Property(e => e.Id)
                 .ValueGeneratedNever()
@@ -3160,8 +3160,8 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_reembolso_apartado_metodo");
 
-            entity.HasOne(d => d.MovimientoCaja).WithOne(p => p.ReembolsoApartado)
-                .HasForeignKey<ReembolsoApartado>(d => d.MovimientoCajaId)
+            entity.HasOne(d => d.MovimientoCaja).WithMany(p => p.ReembolsoApartado)
+                .HasForeignKey(d => d.MovimientoCajaId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_reembolso_apartado_movimiento");
 
@@ -3311,8 +3311,8 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_sesion_operador_credencial");
 
-            entity.HasOne(d => d.Terminal).WithOne(p => p.SesionOperador)
-                .HasForeignKey<SesionOperador>(d => d.TerminalId)
+            entity.HasOne(d => d.Terminal).WithMany(p => p.SesionOperador)
+                .HasForeignKey(d => d.TerminalId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_sesion_operador_terminal");
 
@@ -3495,8 +3495,8 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .HasDefaultValue(1L)
                 .HasColumnName("version");
 
-            entity.HasOne(d => d.Caja).WithOne(p => p.TurnoCaja)
-                .HasForeignKey<TurnoCaja>(d => d.CajaId)
+            entity.HasOne(d => d.Caja).WithMany(p => p.TurnoCaja)
+                .HasForeignKey(d => d.CajaId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_turno_caja_caja");
 

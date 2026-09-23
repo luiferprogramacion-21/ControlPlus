@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace ControlPlus.Domain.OfficialModel;
@@ -31,15 +31,15 @@ public partial class MovimientoCaja
 
     public virtual MovimientoCaja? MovimientoRevertido { get; set; }
 
-    public virtual PagoApartado? PagoApartado { get; set; }
+    public virtual ICollection<PagoApartado> PagoApartado { get; set; } = new List<PagoApartado>();
 
-    public virtual PagoCambioVenta? PagoCambioVenta { get; set; }
+    public virtual ICollection<PagoCambioVenta> PagoCambioVenta { get; set; } = new List<PagoCambioVenta>();
 
-    public virtual PagoCredito? PagoCredito { get; set; }
+    public virtual ICollection<PagoCredito> PagoCredito { get; set; } = new List<PagoCredito>();
 
-    public virtual PagoVenta? PagoVenta { get; set; }
+    public virtual ICollection<PagoVenta> PagoVenta { get; set; } = new List<PagoVenta>();
 
-    public virtual ReembolsoApartado? ReembolsoApartado { get; set; }
+    public virtual ICollection<ReembolsoApartado> ReembolsoApartado { get; set; } = new List<ReembolsoApartado>();
 
     public virtual SesionOperador? SesionOperador { get; set; }
 

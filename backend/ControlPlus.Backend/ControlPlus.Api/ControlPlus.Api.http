@@ -6,6 +6,16 @@
 @categoryId = paste-a-category-id-returned-by-the-api
 @measurementUnitId = paste-a-measurement-unit-id-returned-by-the-api
 @productId = paste-a-product-id-returned-by-the-api
+@cashShiftId = paste-the-open-shift-id-returned-by-the-api
+@cashConfigurationVersion = paste-the-configuration-version-returned-by-cash-state
+@cashShiftVersion = paste-the-shift-version-returned-by-reconciliation
+@cashPaymentMethodId = paste-a-payment-method-id-returned-by-reconciliation
+@cashDifferenceReasonId = paste-an-active-cash-difference-reason-id
+@operatorUserId = paste-an-operator-user-id
+@operatorCredentialToken = paste-the-token-returned-once-when-issued
+@operatorSessionId = paste-the-operator-session-id
+@authorizerUser = paste-a-different-supervisor-or-administrator-user-name
+@authorizerPassword = paste-the-authorizer-password-locally
 
 ### Instalación inicial (solo funciona mientras no exista ningún usuario)
 POST {{host}}/api/auth/setup
@@ -118,3 +128,148 @@ Authorization: Bearer {{token}}
 ### Historial oficial de costos de compra (requiere PRODUCTS.COSTS_READ)
 GET {{host}}/api/products/{{productId}}/purchase-cost-history?page=1&pageSize=20
 Authorization: Bearer {{token}}
+
+### Estado de la caja
+# CASH.OWN_READ solo expone estado general y datos propios; un turno ajeno queda oculto.
+GET {{host}}/api/cash/state
+Authorization: Bearer {{token}}
+
+### Configurar la caja (una sola vez; requiere CONFIGURATION.MANAGE)
+POST {{host}}/api/cash/register
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "code": "CODIGO-REAL-LOCAL",
+  "name": "NOMBRE-REAL-LOCAL"
+}
+
+### Configurar modalidad (INDIVIDUAL o COMPARTIDO; no puede haber turno abierto)
+PUT {{host}}/api/cash/shift-mode
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "mode": "INDIVIDUAL",
+  "version": {{cashConfigurationVersion}}
+}
+
+### Abrir turno
+POST {{host}}/api/cash/shifts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "initialAmount": 0,
+  "observations": null
+}
+
+### Consultar movimientos del turno abierto
+GET {{host}}/api/cash/movements?page=1&pageSize=50
+Authorization: Bearer {{token}}
+
+### Registrar ingreso manual
+POST {{host}}/api/cash/movements/incomes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "amount": 1000,
+  "concept": "Reemplace localmente por el concepto real",
+  "operatorSessionId": null
+}
+
+### Registrar gasto
+POST {{host}}/api/cash/movements/expenses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "amount": 1000,
+  "concept": "Reemplace localmente por el concepto real",
+  "operatorSessionId": null
+}
+
+### Registrar sangría
+POST {{host}}/api/cash/movements/cash-drops
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "amount": 1000,
+  "concept": "Reemplace localmente por el concepto real",
+  "operatorSessionId": null
+}
+
+### Consultar arqueo esperado
+# cashDifference = efectivo contado - esperado; totalDifference = total contado - total esperado.
+# Los pagos distribuyen el esperado por medio; sus movimientos vinculados no se suman otra vez.
+GET {{host}}/api/cash/reconciliation
+Authorization: Bearer {{token}}
+
+### Cerrar turno (incluya exactamente todos los medios devueltos por reconciliation)
+# Conteos enteros dentro de numeric(18,0); electrónicos admiten netos negativos, efectivo no.
+# La autorización depende de totalDifference != 0. No envíe IDs de autorizaciones anteriores.
+# El detalle confirmado es inmutable; las diferencias compensadas no requieren autorización.
+POST {{host}}/api/cash/shifts/{{cashShiftId}}/close
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "version": {{cashShiftVersion}},
+  "paymentMethods": [
+    {
+      "paymentMethodId": "{{cashPaymentMethodId}}",
+      "countedAmount": 0
+    }
+  ],
+  "differenceReasonId": null,
+  "differenceObservation": null,
+  "authorization": null
+}
+
+### Emitir credencial Code128 para turno compartido
+# El token solo se entrega en esta respuesta y no debe guardarse en el repositorio.
+POST {{host}}/api/cash/operator-credentials/{{operatorUserId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "expiresAtUtc": null
+}
+
+### Iniciar sesión de operador compartido
+POST {{host}}/api/cash/operator-sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "credentialToken": "{{operatorCredentialToken}}"
+}
+
+### Finalizar sesión de operador compartido
+POST {{host}}/api/cash/operator-sessions/{{operatorSessionId}}/close
+Authorization: Bearer {{token}}
+
+### Ejemplo estructural de cierre con diferencia
+# diferencia conserva solo efectivo; diferencia_total conserva el total. Signo: contado menos esperado.
+# Use únicamente identificadores, valores y credenciales reales de su entorno local.
+POST {{host}}/api/cash/shifts/{{cashShiftId}}/close
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "version": {{cashShiftVersion}},
+  "paymentMethods": [
+    {
+      "paymentMethodId": "{{cashPaymentMethodId}}",
+      "countedAmount": 0
+    }
+  ],
+  "differenceReasonId": "{{cashDifferenceReasonId}}",
+  "differenceObservation": "Reemplace localmente por la observación real",
+  "authorization": {
+    "userName": "{{authorizerUser}}",
+    "password": "{{authorizerPassword}}"
+  }
+}

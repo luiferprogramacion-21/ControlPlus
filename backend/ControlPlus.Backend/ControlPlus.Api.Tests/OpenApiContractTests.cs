@@ -38,6 +38,19 @@ public sealed class OpenApiContractTests
         AssertProtected(paths, "/api/roles", "get");
         AssertProtected(paths, "/api/permissions", "get");
         AssertProtected(paths, "/api/audit-records", "get");
+        AssertProtected(paths, "/api/cash/state", "get");
+        AssertProtected(paths, "/api/cash/register", "post");
+        AssertProtected(paths, "/api/cash/shift-mode", "put");
+        AssertProtected(paths, "/api/cash/shifts", "post");
+        AssertProtected(paths, "/api/cash/movements", "get");
+        AssertProtected(paths, "/api/cash/movements/incomes", "post");
+        AssertProtected(paths, "/api/cash/movements/expenses", "post");
+        AssertProtected(paths, "/api/cash/movements/cash-drops", "post");
+        AssertProtected(paths, "/api/cash/reconciliation", "get");
+        AssertProtected(paths, "/api/cash/shifts/{shiftId}/close", "post");
+        AssertProtected(paths, "/api/cash/operator-credentials/{userId}", "post");
+        AssertProtected(paths, "/api/cash/operator-sessions", "post");
+        AssertProtected(paths, "/api/cash/operator-sessions/{sessionId}/close", "post");
 
         AssertAnonymous(paths, "/api/health", "get");
         AssertAnonymous(paths, "/api/auth/login", "post");
@@ -49,6 +62,25 @@ public sealed class OpenApiContractTests
         AssertResponses(paths, "/api/products", "post", "201", "400", "401", "403", "409");
         AssertResponses(paths, "/api/categories/{categoryId}", "get", "200", "401", "403", "404");
         AssertResponses(paths, "/api/products/{productId}", "get", "200", "401", "403", "404");
+        AssertResponses(paths, "/api/cash/register", "post", "201", "400", "401", "403", "404", "409");
+        AssertResponses(paths, "/api/cash/shifts", "post", "201", "400", "401", "403", "404", "409");
+        AssertResponses(paths, "/api/cash/movements/incomes", "post", "201", "400", "401", "403", "404", "409");
+        AssertResponses(paths, "/api/cash/shifts/{shiftId}/close", "post", "200", "400", "401", "403", "404", "409");
+        AssertResponses(paths, "/api/cash/operator-sessions", "post", "201", "400", "401", "403", "404", "409");
+
+        var schemas = root.GetProperty("components").GetProperty("schemas");
+        foreach (var name in new[] { "CashShiftDto", "CashReconciliationDto" })
+        {
+            var properties = schemas.GetProperty(name).GetProperty("properties");
+            Assert.True(properties.TryGetProperty("cashDifference", out _));
+            Assert.True(properties.TryGetProperty("totalDifference", out _));
+        }
+        var stateProperties = schemas.GetProperty("CashStateDto").GetProperty("properties");
+        Assert.True(stateProperties.TryGetProperty("isConfigured", out _));
+        Assert.True(stateProperties.TryGetProperty("hasOpenShift", out _));
+        Assert.True(stateProperties.TryGetProperty("ownOperatorSession", out _));
+        var authorizationProperties = schemas.GetProperty("CashCloseAuthorizationRequest").GetProperty("properties");
+        Assert.False(authorizationProperties.TryGetProperty("authorizationId", out _));
 
         var healthResponse = await client.GetAsync("/api/health");
         Assert.Equal(HttpStatusCode.OK, healthResponse.StatusCode);

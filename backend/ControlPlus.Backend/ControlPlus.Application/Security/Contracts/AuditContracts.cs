@@ -21,7 +21,12 @@ public sealed record AuditRecordDto(
     string EntityType,
     Guid? EntityId,
     string? Details,
-    string? CorrelationId);
+    string? CorrelationId,
+    Guid? AuthorizerUserId,
+    Guid? OperatorSessionId,
+    Guid? TerminalId,
+    string? Reason,
+    string Result);
 
 public interface IAuditQueryService
 {
