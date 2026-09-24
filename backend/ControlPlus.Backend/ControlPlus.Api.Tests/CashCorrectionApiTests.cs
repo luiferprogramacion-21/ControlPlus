@@ -445,7 +445,7 @@ public sealed partial class CashApiFlowTests
         var close = DifferenceClose(scenario, await ReconcileAsync(client), -1m);
         await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
         await connection.OpenAsync();
-        var failCondition = alwaysFail ? "true" : "attempt = 1";
+        var failCondition = alwaysFail ? "true" : "attempt < 3";
         await using (var install = new NpgsqlCommand($$"""
             CREATE SEQUENCE caja.test_serialization_attempt;
             CREATE FUNCTION caja.test_serialization_abort() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -464,11 +464,14 @@ public sealed partial class CashApiFlowTests
               FOR EACH ROW EXECUTE FUNCTION caja.test_serialization_abort();
             """, connection))
             await install.ExecuteNonQueryAsync();
+        // Setup and login share one controlled instant. Make the successful
+        // reauthorization observable as a real user update on every retry.
+        _clock.Advance(TimeSpan.FromSeconds(1));
         var before = await ReadAuthenticationStateAsync(scenario.Users.Supervisor.Id);
         var response = await client.PostAsJsonAsync($"/api/cash/shifts/{scenario.Shift.Id}/close", close);
         Assert.Equal(alwaysFail ? HttpStatusCode.Conflict : HttpStatusCode.OK, response.StatusCode);
         await using var attempts = new NpgsqlCommand("SELECT last_value FROM caja.test_serialization_attempt", connection);
-        Assert.Equal(alwaysFail ? 3L : 2L, await attempts.ExecuteScalarAsync());
+        Assert.Equal(3L, await attempts.ExecuteScalarAsync());
         await using var scope = _factory!.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         Assert.Equal(alwaysFail ? "ABIERTA" : "CERRADA", await context.TurnoCaja.Select(x => x.Estado).SingleAsync());

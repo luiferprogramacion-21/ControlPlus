@@ -38,11 +38,23 @@ La concurrencia optimista no requiere columnas nuevas: las 27 entidades oficiale
 
 ## Migrador controlado de la imagen API
 
-`ControlPlusDbContext` es el contexto responsable de la cadena y de `__EFMigrationsHistory`; `OfficialControlPlusDbContext` sigue reservado para la operación normal. El ejecutable de la API selecciona el modo migración antes de construir el servidor HTTP. Solo entra en ese modo cuando recibe `--migrate-to <MigrationId>` y el entorno contiene exactamente `CONTROLPLUS_MIGRATIONS_ENABLED=true`.
+`ControlPlusDbContext` es el contexto responsable de la cadena y de `__EFMigrationsHistory`; `OfficialControlPlusDbContext` sigue reservado para la operación normal. Un parser único selecciona servidor normal, healthcheck, preflight o migración antes de construir configuración o servidor HTTP. Solo admite cero argumentos, `--health-check`, `--migrate-to <MigrationId>` o `--preflight-to <MigrationId>`. El identificador tiene longitud de 1 a 200 y solo acepta ASCII alfanumérico o `_`; nunca puede estar vacío ni comenzar por `--`. Cualquier otra forma devuelve código 2 y `Command line rejected` sin conexión ni escucha. Los dos modos de base de datos exigen que el entorno contenga exactamente `CONTROLPLUS_MIGRATIONS_ENABLED=true`.
+
+`--preflight-to 20260913020000_CashRegisterModuleV1` admite exclusivamente ese objetivo. Abre mediante Npgsql una transacción `REPEATABLE READ`, la establece `READ ONLY` antes de leer y confirma `transaction_read_only=on` al inicio y al final. Un manifiesto tipado compartido define las dos tablas, la columna, los seis índices con tabla/columnas, las nueve funciones con firma/retorno, los once triggers con tabla y las siete restricciones base con nombre, tabla, tipo, validación y columnas. El runner verifica además la cadena EF exacta, las cuatro filas anteriores de `__EFMigrationsHistory`, objetivo pendiente y ausencia de turnos. Las consultas son estáticas y parametrizadas, no usan `psql`, shell, SQL dinámico, agregaciones/comparaciones de arrays ni concatenación de tipos PostgreSQL.
+
+El comando futuro de preflight desde Compose es:
+
+```powershell
+docker compose run --rm --no-deps `
+  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
+  api --preflight-to 20260913020000_CashRegisterModuleV1
+```
+
+El código `0` certifica todas las precondiciones, `2` indica que al menos una no se cumple o que gate/objetivo son inválidos y `1` indica un fallo técnico sanitizado. El preflight no aplica migraciones, no crea respaldos, no modifica datos, no hace commit y no intenta rollback de esquema.
 
 El runner rechaza destinos vacíos, inexistentes, ya aplicados o anteriores al último aplicado. También rechaza historiales que no sean un prefijo exacto del catálogo y secuencias pendientes incoherentes. La única operación permitida es aplicar la secuencia ascendente pendiente cuyo último elemento sea exactamente el destino solicitado. No existe una opción para aplicar genéricamente todo lo pendiente.
 
-El `ENTRYPOINT` de la imagen es `dotnet ControlPlus.Api.dll`; por eso Compose adjunta los argumentos escritos después de `api`. El comando futuro para el objetivo de Caja es:
+El `ENTRYPOINT` de la imagen es `dotnet ControlPlus.Api.dll`; por eso Compose adjunta los argumentos escritos después de `api`. Tras certificación, respaldo y autorización, el comando futuro de aplicación para el objetivo de Caja es:
 
 ```powershell
 docker compose run --rm --no-deps `
@@ -67,7 +79,7 @@ La API normal no llama `Migrate`, `MigrateAsync`, `EnsureCreated` ni equivalente
 
 `OfficialSchemaIntegrationTests` inicia PostgreSQL 17 con Testcontainers, aplica la cadena completa y verifica las 61 tablas resultantes, sus PK/FK restrictivas, catálogos, importes `numeric(18,0)`, cantidades enteras y concurrencia entre EF Core y PostgreSQL. Las pruebas específicas de Caja ejercitan transición, reversión, inmutabilidad, consumo de autorizaciones y rollback.
 
-`ControlledMigrationTests` ejecuta el DLL real contra PostgreSQL 17 efímero y demuestra gates, destino obligatorio, rechazo de destinos inexistentes/aplicados/reversos, aplicación exacta y única, ausencia de servidor HTTP, no migración durante el arranque normal y sanitización de secretos.
+`ControlledMigrationTests` ejecuta el DLL real contra PostgreSQL 17 efímero y demuestra gates, destino obligatorio, rechazo de destinos inexistentes/aplicados/reversos, aplicación exacta y única, ausencia de servidor HTTP, no migración durante el arranque normal y sanitización de secretos. `ControlledPreflightTests` recorre individualmente todos los elementos del manifiesto, elimina cada restricción base y comprueba también tipo, columnas y estado de validación incorrectos. `ControlledMigrationCommandLineTests` ejecuta el DLL real sin cadena de conexión para toda la matriz rechazada y confirma código 2, ausencia de conexión y ausencia de escucha HTTP.
 
 ```powershell
 dotnet test ControlPlus.Infrastructure.Tests

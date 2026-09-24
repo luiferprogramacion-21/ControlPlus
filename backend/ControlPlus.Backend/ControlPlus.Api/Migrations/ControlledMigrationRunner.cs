@@ -5,59 +5,6 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ControlPlus.Api.Migrations;
 
-public sealed record ControlledMigrationCommand(
-    bool IsMigrationMode,
-    bool IsValid,
-    string? TargetMigration,
-    string Message)
-{
-    public const string EnabledEnvironmentVariable = "CONTROLPLUS_MIGRATIONS_ENABLED";
-    public const string TargetArgument = "--migrate-to";
-
-    public static ControlledMigrationCommand Parse(IReadOnlyList<string> arguments, string? enabledValue)
-    {
-        var targetIndexes = arguments
-            .Select((argument, index) => (argument, index))
-            .Where(item => string.Equals(item.argument, TargetArgument, StringComparison.Ordinal))
-            .Select(item => item.index)
-            .ToArray();
-        var enabled = string.Equals(enabledValue, "true", StringComparison.Ordinal);
-        var migrationModeRequested = targetIndexes.Length > 0 || enabled;
-
-        if (!migrationModeRequested)
-        {
-            return new ControlledMigrationCommand(false, true, null, string.Empty);
-        }
-
-        if (!enabled)
-        {
-            return Rejected("Migration mode rejected: CONTROLPLUS_MIGRATIONS_ENABLED must be exactly true.");
-        }
-
-        if (targetIndexes.Length != 1)
-        {
-            return Rejected("Migration mode rejected: exactly one --migrate-to target is required.");
-        }
-
-        var targetIndex = targetIndexes[0];
-        if (targetIndex + 1 >= arguments.Count ||
-            string.IsNullOrWhiteSpace(arguments[targetIndex + 1]) ||
-            arguments[targetIndex + 1].StartsWith("--", StringComparison.Ordinal))
-        {
-            return Rejected("Migration mode rejected: --migrate-to requires an explicit migration identifier.");
-        }
-
-        return new ControlledMigrationCommand(
-            true,
-            true,
-            arguments[targetIndex + 1],
-            string.Empty);
-    }
-
-    private static ControlledMigrationCommand Rejected(string message) =>
-        new(true, false, null, message);
-}
-
 public sealed record ControlledMigrationResult(int ExitCode, string Message);
 
 public static class ControlledMigrationRunner
@@ -70,11 +17,12 @@ public static class ControlledMigrationRunner
         string targetMigration,
         CancellationToken cancellationToken = default)
     {
-        var safeTarget = SanitizeTarget(targetMigration);
-        if (!string.Equals(safeTarget, targetMigration, StringComparison.Ordinal))
+        if (!ControlledExecutionCommand.IsValidMigrationId(targetMigration))
         {
-            return Rejected(safeTarget, "the target identifier is invalid");
+            return Rejected("invalid-target", "the target identifier is invalid");
         }
+
+        var safeTarget = targetMigration;
 
         var connectionString = configuration.GetConnectionString("ControlPlusDb");
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -170,18 +118,6 @@ public static class ControlledMigrationRunner
         }
 
         return true;
-    }
-
-    private static string SanitizeTarget(string target)
-    {
-        if (string.IsNullOrWhiteSpace(target) || target.Length > 200)
-        {
-            return "invalid-target";
-        }
-
-        return target.All(character => char.IsAsciiLetterOrDigit(character) || character == '_')
-            ? target
-            : "invalid-target";
     }
 
     private static ControlledMigrationResult Rejected(string target, string reason) =>

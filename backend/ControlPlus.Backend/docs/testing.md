@@ -24,10 +24,12 @@ Las pruebas de migración parten de las cuatro históricas: sin turnos, con turn
 
 `ControlledMigrationTests` crea bases independientes dentro de PostgreSQL 17 efímero e invoca el DLL de API como proceso real. Cubre arranque normal sin migración, gate ausente o distinto de `true`, argumento ausente, destino inexistente, destino ya aplicado, intento de reversión, aplicación exacta de `20260913020000_CashRegisterModuleV1`, una sola fila de historial, ausencia de escucha HTTP y no exposición de una contraseña centinela. El caso normal comprueba además health y OpenAPI.
 
+`ControlledPreflightTests` prepara exclusivamente la cadena de cuatro migraciones anteriores e invoca el DLL con `--preflight-to`. Recorre el manifiesto completo: dos tablas, `diferencia_total`, seis índices, nueve funciones, once triggers y siete restricciones base; para estas últimas comprueba además tipo, columnas y validación. También cubre éxito sin cambios, gate/objetivo inválidos, objetivo aplicado, turno existente, ausencia de escucha HTTP y fallo sanitizado. `ControlledMigrationCommandLineTests` ejecuta el DLL sin cadena de conexión y cubre argumentos sobrantes, opciones desconocidas, objetivos ausentes/duplicados, sintaxis con `=`, combinaciones de modos y la gramática léxica de `MigrationId` para ambos comandos: vacío, prefijo `--`, `=`, `;`, espacios, no ASCII y más de 200 caracteres. Cada caso debe devolver 2 con `Command line rejected` antes de configuración, conexión o HTTP.
+
 Ejecución focalizada:
 
 ```powershell
-dotnet test ControlPlus.Api.Tests --filter FullyQualifiedName~ControlledMigrationTests
+dotnet test ControlPlus.Api.Tests --filter "FullyQualifiedName~ControlledMigrationTests|FullyQualifiedName~ControlledPreflightTests|FullyQualifiedName~ControlledMigrationCommandLineTests"
 ```
 
 Estas pruebas no usan Compose ni una cadena externa: la fixture suministra la conexión Testcontainers directamente al proceso hijo y destruye el contenedor al finalizar.

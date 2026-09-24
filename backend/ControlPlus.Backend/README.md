@@ -34,7 +34,19 @@ Compose mantiene PostgreSQL en el volumen `controlplus_postgres_data`; no use `d
 
 ## Migraciones
 
-La API no aplica migraciones al iniciar. La imagen dispone de un modo controlado que usa la misma configuración de Compose y exige simultáneamente el gate exacto `CONTROLPLUS_MIGRATIONS_ENABLED=true` y un destino explícito. Para una ejecución futura autorizada:
+La API no aplica migraciones al iniciar. La línea de comandos acepta exclusivamente: cero argumentos para el servidor normal, `--health-check`, `--migrate-to <MigrationId>` o `--preflight-to <MigrationId>`. `MigrationId` debe tener entre 1 y 200 caracteres y contener únicamente letras o dígitos ASCII y `_`; no puede estar vacío ni comenzar por `--`. Cualquier opción, argumento, identificador inválido, sintaxis con `=` o combinación adicional devuelve código 2 con `Command line rejected` antes de construir configuración, abrir una conexión o iniciar HTTP. Los dos modos de base de datos exigen además el gate exacto `CONTROLPLUS_MIGRATIONS_ENABLED=true`.
+
+Antes de autorizar la migración de Caja, el preflight futuro se ejecuta así:
+
+```powershell
+docker compose run --rm --no-deps `
+  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
+  api --preflight-to 20260913020000_CashRegisterModuleV1
+```
+
+El preflight no aplica migraciones ni inicia HTTP. Usa `ControlPlusDbContext` y Npgsql dentro de una transacción PostgreSQL `REPEATABLE READ, READ ONLY`; certifica con código `0`, devuelve `2` si una precondición no se cumple y `1` ante un fallo técnico. Valida la cadena exacta de cuatro migraciones anteriores, el objetivo pendiente, ausencia de turnos y de estructura parcial de Caja, y presencia exacta de las siete restricciones base.
+
+Solo después de un preflight exitoso, respaldo verificado y autorización independiente, el comando de aplicación futura es:
 
 ```powershell
 docker compose run --rm --no-deps `
@@ -42,7 +54,7 @@ docker compose run --rm --no-deps `
   api --migrate-to 20260913020000_CashRegisterModuleV1
 ```
 
-El contenedor temporal valida que el historial sea un prefijo coherente, que el destino exista, esté pendiente y solo requiera una secuencia ascendente que termine exactamente en él. No inicia HTTP ni acepta “todo lo pendiente”; un error termina con código distinto de cero y sin rollback manual automático. Las migraciones publicadas son inmutables.
+El contenedor temporal de aplicación valida que el historial sea un prefijo coherente, que el destino exista, esté pendiente y solo requiera una secuencia ascendente que termine exactamente en él. No inicia HTTP ni acepta “todo lo pendiente”; un error termina con código distinto de cero y sin rollback manual automático. Las migraciones publicadas son inmutables.
 
 Antes de cualquier uso persistente se debe contar con autorización explícita, ventana de mantenimiento, respaldo verificado y confirmación independiente del identificador objetivo. El comando no debe automatizarse en el arranque ni ejecutarse contra producción sin autorización expresa. Después se debe confirmar el código 0, una sola fila del objetivo en `__EFMigrationsHistory`, salud de API y ausencia de errores sanitizados. Consulte [docs/database.md](docs/database.md).
 

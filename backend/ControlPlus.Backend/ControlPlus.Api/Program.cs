@@ -15,20 +15,20 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
-var migrationCommand = ControlledMigrationCommand.Parse(
-    args,
-    Environment.GetEnvironmentVariable(ControlledMigrationCommand.EnabledEnvironmentVariable));
-var healthCheckRequested = args.Contains("--health-check", StringComparer.Ordinal);
-var migrationTargetRequested = args.Contains(ControlledMigrationCommand.TargetArgument, StringComparer.Ordinal);
-
-if (healthCheckRequested && migrationTargetRequested)
+var executableArguments = System.Reflection.Assembly.GetEntryAssembly() == typeof(Program).Assembly
+    ? args
+    : [];
+var controlledCommand = ControlledExecutionCommand.Parse(
+    executableArguments,
+    Environment.GetEnvironmentVariable(ControlledExecutionCommand.EnabledEnvironmentVariable));
+if (!controlledCommand.IsValid)
 {
-    Console.Error.WriteLine("Los modos --health-check y --migrate-to no se pueden combinar.");
+    Console.Error.WriteLine(controlledCommand.Message);
     Environment.ExitCode = ControlledMigrationRunner.RejectedExitCode;
     return;
 }
 
-if (healthCheckRequested)
+if (controlledCommand.Mode == ControlledExecutionMode.HealthCheck)
 {
     using var healthClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
     try
@@ -48,19 +48,25 @@ if (healthCheckRequested)
     return;
 }
 
-if (migrationCommand.IsMigrationMode)
+if (controlledCommand.Mode == ControlledExecutionMode.Preflight)
 {
-    if (!migrationCommand.IsValid)
-    {
-        Console.Error.WriteLine(migrationCommand.Message);
-        Environment.ExitCode = ControlledMigrationRunner.RejectedExitCode;
-        return;
-    }
+    var preflightBuilder = WebApplication.CreateBuilder(args);
+    var preflightResult = await ControlledPreflightRunner.RunAsync(
+        preflightBuilder.Configuration,
+        controlledCommand.TargetMigration!);
 
+    var preflightOutput = preflightResult.ExitCode == 0 ? Console.Out : Console.Error;
+    preflightOutput.WriteLine(preflightResult.Message);
+    Environment.ExitCode = preflightResult.ExitCode;
+    return;
+}
+
+if (controlledCommand.Mode == ControlledExecutionMode.Migration)
+{
     var migrationBuilder = WebApplication.CreateBuilder(args);
     var migrationResult = await ControlledMigrationRunner.RunAsync(
         migrationBuilder.Configuration,
-        migrationCommand.TargetMigration!);
+        controlledCommand.TargetMigration!);
 
     var migrationOutput = migrationResult.ExitCode == 0 ? Console.Out : Console.Error;
     migrationOutput.WriteLine(migrationResult.Message);
