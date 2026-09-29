@@ -38,6 +38,7 @@ Los únicos endpoints anónimos son los de salud y los flujos de autenticación 
 | Categorías | `/api/categories` | `CATEGORIES.READ` o `CATEGORIES.MANAGE` |
 | Productos | `/api/products`, historial de costos y unidades de medida | `PRODUCTS.*` e `INVENTORY.READ` según operación |
 | Caja | `/api/cash` | `CASH.*`, `CONFIGURATION.MANAGE` o `USERS.MANAGE` según operación |
+| Ventas | `/api/sales` | `SALES.CREATE`, `SALES.OWN_READ` o `SALES.ALL_READ` según operación |
 
 Cada usuario tiene exactamente un rol principal. La reasignación se realiza con `POST /api/users/{userId}/roles`; no existe `DELETE /api/users/{userId}/roles/{roleId}` porque no sería válido retirar el único rol.
 
@@ -77,6 +78,19 @@ Con solo `CASH.OWN_READ`, `/state` expone `isConfigured`, `hasOpenShift`, `requi
 El cierre recibe la versión del turno y el valor contado de cada medio de pago activo. No existe cierre ciego: el servidor devuelve y persiste esperado, contado y diferencia. Si la diferencia total no es cero también exige motivo y las credenciales de otro Supervisor o Administrador con permiso efectivo vigente; puede adjuntar una observación de diferencia. El fallo de esa autorización conserva abierto el turno.
 
 Las respuestas separan `cashDifference` (contado de efectivo menos esperado de efectivo), `paymentMethods[].difference` y `totalDifference` (total contado menos total esperado). Las diferencias entre medios pueden compensarse sin autorización adicional. Los medios electrónicos admiten netos negativos; el contado físico no. Importes y acumulados excediendo `999999999999999999` o con fracciones responden `400`. El cierre no acepta IDs de autorizaciones anteriores ni campos desconocidos en su solicitud de autorización; crea y consume un vínculo exclusivo al turno y la correlación. Los detalles confirmados son inmutables y cada sesión cerrada automáticamente genera su auditoría en la misma transacción.
+
+## Ventas
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| `POST` | `/api/sales` | `SALES.CREATE` |
+| `GET` | `/api/sales/own` | `SALES.OWN_READ` |
+| `GET` | `/api/sales` | `SALES.ALL_READ` |
+| `GET` | `/api/sales/{saleId}` | `SALES.ALL_READ`, o venta propia con `SALES.OWN_READ` |
+
+La confirmación crea únicamente ventas `CONTADO` y exige `Idempotency-Key`. Una repetición con el mismo usuario y contenido devuelve la venta original; una reutilización incompatible responde `409`. Efectivo es el único método con `receivedAmount` y cambio. Transferencia y Nequi no usan `receivedAmount`, se aplican exactamente y exigen referencia. En modalidad compartida cada venta queda vinculada a una sesión breve activa y la consume de forma atómica; el siguiente cobro debe iniciar una sesión nueva, aunque pertenezca al mismo operador. Este consumo no declara un cambio real de usuario.
+
+La respuesta `201` incluye la venta, líneas y pagos, sin exponer el costo histórico. Los listados son paginados y respetan permisos efectivos híbridos vigentes. Las respuestas documentadas son `400`, `401`, `403`, `404` y `409` según validación, autenticación, autorización, ausencia o conflicto. El contrato funcional completo está en [sales.md](sales.md).
 
 ## Respuestas de error
 

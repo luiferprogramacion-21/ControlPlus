@@ -51,6 +51,10 @@ public sealed class OpenApiContractTests
         AssertProtected(paths, "/api/cash/operator-credentials/{userId}", "post");
         AssertProtected(paths, "/api/cash/operator-sessions", "post");
         AssertProtected(paths, "/api/cash/operator-sessions/{sessionId}/close", "post");
+        AssertProtected(paths, "/api/sales", "post");
+        AssertProtected(paths, "/api/sales", "get");
+        AssertProtected(paths, "/api/sales/own", "get");
+        AssertProtected(paths, "/api/sales/{saleId}", "get");
 
         AssertAnonymous(paths, "/api/health", "get");
         AssertAnonymous(paths, "/api/auth/login", "post");
@@ -67,6 +71,16 @@ public sealed class OpenApiContractTests
         AssertResponses(paths, "/api/cash/movements/incomes", "post", "201", "400", "401", "403", "404", "409");
         AssertResponses(paths, "/api/cash/shifts/{shiftId}/close", "post", "200", "400", "401", "403", "404", "409");
         AssertResponses(paths, "/api/cash/operator-sessions", "post", "201", "400", "401", "403", "404", "409");
+        AssertResponses(paths, "/api/sales", "post", "201", "400", "401", "403", "404", "409");
+        AssertResponses(paths, "/api/sales", "get", "200", "400", "401", "403");
+        AssertResponses(paths, "/api/sales/own", "get", "200", "400", "401", "403");
+        AssertResponses(paths, "/api/sales/{saleId}", "get", "200", "401", "403", "404");
+
+        var saleParameters = paths.GetProperty("/api/sales").GetProperty("post").GetProperty("parameters");
+        var idempotency = Assert.Single(saleParameters.EnumerateArray(), parameter =>
+            parameter.GetProperty("name").GetString() == "Idempotency-Key");
+        Assert.Equal("header", idempotency.GetProperty("in").GetString());
+        Assert.True(idempotency.GetProperty("required").GetBoolean());
 
         var schemas = root.GetProperty("components").GetProperty("schemas");
         foreach (var name in new[] { "CashShiftDto", "CashReconciliationDto" })

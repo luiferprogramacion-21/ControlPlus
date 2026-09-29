@@ -89,4 +89,29 @@ internal static class AuditWriter
 
         return auditRepository.AddAsync(auditRecord, cancellationToken);
     }
+
+    public static Task WriteSaleAsync(
+        IAuditRepository auditRepository,
+        IClock clock,
+        Guid actorUserId,
+        Guid saleId,
+        object details,
+        Guid correlationId,
+        Guid? operatorSessionId,
+        Guid terminalId,
+        CancellationToken cancellationToken)
+    {
+        var serializedDetails = JsonSerializer.Serialize(details);
+        var auditRecord = AuditRecord.Create(
+            actorUserId,
+            AuditAction.SaleConfirmed,
+            "Venta",
+            saleId,
+            serializedDetails,
+            clock.UtcNow,
+            correlationId.ToString(),
+            operatorSessionId: operatorSessionId,
+            terminalId: terminalId);
+        return auditRepository.AddAsync(auditRecord, cancellationToken);
+    }
 }

@@ -204,7 +204,7 @@ Preservar historial y consistencia referencial. No reemplazar una relación nece
 
 ## 11. Punto actual de la Fase 5
 
-La base técnica y los tres primeros módulos funcionales están implementados:
+La base técnica y el primer corte de los módulos de Seguridad, Productos, Caja y Ventas están implementados:
 
 - Solución `ControlPlus.Backend` en .NET 10 con Domain, Application e Infrastructure como bibliotecas de clases y dependencias unidireccionales.
 - Docker Compose ejecuta la API y PostgreSQL 17 con volumen persistente, healthchecks y variables sensibles fuera del control de versiones. El healthcheck de la API usa su propia ejecución `dotnet` contra `GET /api/health`, sin herramientas adicionales en la imagen final.
@@ -247,5 +247,6 @@ La matriz aprobada se documenta en `docs/permissions-matrix.md`, el catálogo fu
 - `docs/api.md`: guía de endpoints, autenticación y respuestas.
 - `docs/database.md`: migraciones, restauración y esquema de alto nivel.
 - `docs/cash.md`: reglas, contratos, concurrencia y seguridad del módulo de Caja.
+- `docs/sales.md`: alcance, transacción, pagos, idempotencia, seguridad e impresión diferida del primer corte de Ventas.
 - `docs/decisions/`: registro breve de decisiones nuevas de Fase 5, incluida persistencia, concurrencia y migraciones.
 - `docs/testing.md`: cómo ejecutar pruebas y evidencia mínima esperada.

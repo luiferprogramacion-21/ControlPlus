@@ -67,4 +67,4 @@ Los códigos estables se agrupan por módulo: `USERS.*`, `ROLES.*`, `PERMISSIONS
 - Solo Administrador decide el monto devuelto al cancelar un apartado, cambia datos sensibles de producto, ajusta inventario, cancela pedidos o compras y autoriza excepciones de recepción.
 - Toda operación crítica y todo cambio de permisos se audita.
 
-Cuando un descuento general se implemente en Ventas, debe distribuirse por detalle antes de confirmar la operación para comprobar el costo de cada producto. La auditoría deberá conservar precio original, porcentaje o valor aplicado, precio final, motivo, ejecutor y autorizador cuando corresponda.
+El primer corte de Ventas distribuye el descuento general por detalle antes de confirmar la operación para comprobar el costo de cada producto. La venta histórica y su auditoría conservan precio original, porcentaje o valor aplicado, precio final, motivo y ejecutor. Este corte no admite descuentos que requieran autorizador: superar el límite efectivo o vender bajo costo se rechaza.

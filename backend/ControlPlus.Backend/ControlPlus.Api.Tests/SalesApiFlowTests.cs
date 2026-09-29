@@ -1,0 +1,1090 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using ControlPlus.Application.Cash.Contracts;
+using ControlPlus.Application.Catalog.Contracts;
+using ControlPlus.Application.Common;
+using ControlPlus.Application.Sales.Contracts;
+using ControlPlus.Application.Security.Contracts;
+using ControlPlus.Domain.OfficialModel;
+using ControlPlus.Infrastructure.Persistence;
+using ControlPlus.Infrastructure.Persistence.Official;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Npgsql;
+using Testcontainers.PostgreSql;
+using Xunit;
+
+namespace ControlPlus.Api.Tests;
+
+public sealed class SalesApiFlowTests : IAsyncLifetime
+{
+    private const string AdminUser = "sales.admin.test";
+    private const string AdminPassword = "Sales-Administrator-Test-2026!";
+    private const string SupervisorUser = "sales.supervisor.test";
+    private const string SupervisorPassword = "Sales-Supervisor-Test-2026!";
+    private const string CashierUser = "sales.cashier.test";
+    private const string CashierPassword = "Sales-Cashier-Test-2026!";
+    private const string SecondCashierUser = "sales.cashier.two.test";
+    private const string SecondCashierPassword = "Sales-Cashier-Two-Test-2026!";
+
+    private static readonly string[] PublishedMigrations =
+    [
+        "20260912010000_OfficialPhase4Baseline",
+        "20260912011000_SeedApprovedSecurityCatalog",
+        "20260912012000_HybridPermissionsV1",
+        "20260913010000_SeedMeasurementUnitsV1",
+        "20260913020000_CashRegisterModuleV1"
+    ];
+
+    private readonly string _masterKey = RandomSecret(48);
+    private readonly string _jwtKey = RandomSecret(64);
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
+        .WithDatabase("controlplus_sales_api_test")
+        .WithUsername("controlplus_test")
+        .WithPassword(RandomSecret(32))
+        .Build();
+    private WebApplicationFactory<Program>? _factory;
+
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+        await using (var context = new ControlPlusDbContext(
+                         new DbContextOptionsBuilder<ControlPlusDbContext>()
+                             .UseNpgsql(_postgres.GetConnectionString()).Options))
+        {
+            await context.Database.MigrateAsync();
+        }
+
+        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureLogging(logging => logging.ClearProviders());
+            builder.UseSetting("ConnectionStrings:ControlPlusDb", _postgres.GetConnectionString());
+            builder.UseSetting("Installation:MasterKey", _masterKey);
+            builder.UseSetting("Jwt:Issuer", "controlplus-sales-tests");
+            builder.UseSetting("Jwt:Audience", "controlplus-sales-client");
+            builder.UseSetting("Jwt:SigningKey", _jwtKey);
+            builder.UseSetting("Jwt:AccessTokenMinutes", "240");
+            builder.UseSetting("Jwt:ClockSkewSeconds", "0");
+        });
+    }
+
+    public async Task DisposeAsync()
+    {
+        if (_factory is not null) await _factory.DisposeAsync();
+        await _postgres.DisposeAsync();
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task SharedSale_ConsumesAndClosesItsSession_AndAuditsConsumptionWithoutOperatorChange()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var credential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
+        var session = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(
+            client, "session-consumed-sale", CashRequest(scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Created);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var persistedSale = await context.Venta.AsNoTracking().SingleAsync(x => x.Id == sale.Id);
+        var persistedSession = await context.SesionOperador.AsNoTracking().SingleAsync(x => x.Id == session.Id);
+        Assert.Equal(session.Id, persistedSale.SesionOperadorId);
+        Assert.Equal("CERRADA", persistedSession.Estado);
+        Assert.NotNull(persistedSession.FechaFin);
+        Assert.Equal("CAMBIO_OPERADOR", persistedSession.MotivoCierre);
+
+        var audit = await context.EventoAuditoria.AsNoTracking().SingleAsync(x =>
+            x.EntidadId == session.Id && x.Accion == "OPERATORSESSIONCLOSED");
+        Assert.Null(audit.Motivo);
+        Assert.Contains("SessionConsumedBySale", audit.DatosNuevos ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("true", audit.DatosNuevos ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CAMBIO_OPERADOR", audit.DatosNuevos ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("cambio de operador", audit.DatosNuevos ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, await context.EventoAuditoria.CountAsync(x =>
+            x.EntidadId == sale.Id && x.Accion == "SALECONFIRMED"));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task SharedSession_CannotBeReused_ButSameOperatorCanStartNewSessionAndSellAgain()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var credential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
+        var firstSession = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(
+            client, "first-session-sale", CashRequest(scenario.Products.Standard, 1, 1_000m))).StatusCode);
+        await AssertProblemAsync(await PostSaleAsync(
+            client, "reused-session-sale", CashRequest(scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Conflict);
+
+        var secondSession = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
+        Assert.NotEqual(firstSession.Id, secondSession.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(
+            client, "second-session-sale", CashRequest(scenario.Products.Standard, 1, 1_000m))).StatusCode);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(2, await context.Venta.CountAsync(x => x.UsuarioId == scenario.Users.Cashier.Id));
+        Assert.Equal(2, await context.SesionOperador.CountAsync(x =>
+            x.UsuarioId == scenario.Users.Cashier.Id && x.Estado == "CERRADA"));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task SharedSale_RejectsMissingClosedAndOtherOperatorsSession()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(
+            client, "missing-session", CashRequest(scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Conflict);
+
+        var cashierCredential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
+        var closedSession = await StartSessionAsync(client, scenario.Cashier.AccessToken, cashierCredential);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsync(
+            $"/api/cash/operator-sessions/{closedSession.Id}/close", null)).StatusCode);
+        await AssertProblemAsync(await PostSaleAsync(
+            client, "closed-session", CashRequest(scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Conflict);
+
+        var otherCredential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.SecondCashier.Id);
+        _ = await StartSessionAsync(client, scenario.SecondCashier.AccessToken, otherCredential);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(
+            client, "other-operator-session", CashRequest(scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task CashAndCombinedPayments_CalculateChange_AndPersistOneCanonicalCashMovement()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var combined = await ReadAsync<SaleDto>(await PostSaleAsync(client, "combined-payment", new ConfirmSaleRequest(
+            null,
+            [new(scenario.Products.Standard, 1, "MINORISTA")],
+            null,
+            null,
+            [new("EFECTIVO", 400m, 450m, null), new("TRANSFERENCIA", 600m, null, "TRANSFER-COMBINED-REFERENCE")])),
+            HttpStatusCode.Created);
+        Assert.Equal(50m, combined.Change);
+        Assert.Equal(2, combined.Payments.Count);
+        await AssertCombinedPersistenceAsync(combined.Id, scenario.Products.Standard, expectedStock: 99);
+
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var cash = await ReadAsync<SaleDto>(await PostSaleAsync(
+            client, "cash-payment", CashRequest(scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Created);
+        Assert.Equal("EFECTIVO", Assert.Single(cash.Payments).MethodCode);
+        Assert.Equal(0m, cash.Change);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task ElectronicPayments_RequireReferences_AndCannotDeclareReceivedAmountOrChange()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+
+        await AssertProblemAsync(await PostSaleAsync(client, "transfer-change", new ConfirmSaleRequest(
+            null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
+            [new("TRANSFERENCIA", 1_000m, 1_050m, "TRANSFER-CHANGE-REJECTED")])), HttpStatusCode.BadRequest);
+        await AssertProblemAsync(await PostSaleAsync(client, "transfer-no-reference", new ConfirmSaleRequest(
+            null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
+            [new("TRANSFERENCIA", 1_000m, null, null)])), HttpStatusCode.BadRequest);
+        await AssertProblemAsync(await PostSaleAsync(client, "nequi-no-reference", new ConfirmSaleRequest(
+            null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
+            [new("NEQUI", 1_000m, null, " ")])), HttpStatusCode.BadRequest);
+        await AssertProblemAsync(await PostSaleAsync(client, "cash-no-received", new ConfirmSaleRequest(
+            null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
+            [new("EFECTIVO", 1_000m, null, null)])), HttpStatusCode.BadRequest);
+
+        var nequi = await ReadAsync<SaleDto>(await PostSaleAsync(client, "valid-nequi", new ConfirmSaleRequest(
+            null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
+            [new("NEQUI", 1_000m, null, "NEQUI-TEST-REFERENCE")])), HttpStatusCode.Created);
+        Assert.Equal("NEQUI", Assert.Single(nequi.Payments).MethodCode);
+        Assert.Equal(0m, nequi.Change);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task ProductStockAndCostGuards_RejectInvalidSales_AndConsolidateRepeatedScans()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+
+        await AssertProblemAsync(await PostSaleAsync(client, "unknown-cost", CashRequest(
+            scenario.Products.UnknownCost, 1, 500m)), HttpStatusCode.BadRequest);
+        await AssertProblemAsync(await PostSaleAsync(client, "insufficient-stock", CashRequest(
+            scenario.Products.LowStock, 2, 1_000m)), HttpStatusCode.BadRequest);
+        SetBearer(client, scenario.Admin.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsync(
+            $"/api/products/{scenario.Products.Inactive}/deactivate", null)).StatusCode);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(client, "inactive-product", CashRequest(
+            scenario.Products.Inactive, 1, 500m)), HttpStatusCode.BadRequest);
+
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "repeated-scan", new ConfirmSaleRequest(
+            null,
+            [new(scenario.Products.Standard, 1, "MINORISTA"), new(scenario.Products.Standard, 2, "MINORISTA")],
+            null,
+            null,
+            [new("EFECTIVO", 3_000m, 3_000m, null)])), HttpStatusCode.Created);
+        Assert.Single(sale.Lines);
+        Assert.Equal(3, sale.Lines.Single().Quantity);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task Discounts_RespectRoleLimitsCostFloorWholesaleRulesAndDeterministicDistribution()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+
+        await AssertProblemAsync(await PostSaleAsync(client, "cashier-over-limit", DiscountRequest(
+            scenario.Products.RoleDiscount, 6m, 940m)), HttpStatusCode.BadRequest);
+        await AssertProblemAsync(await PostSaleAsync(client, "under-cost", DiscountRequest(
+            scenario.Products.UnderCost, 5m, 95m)), HttpStatusCode.BadRequest);
+        await AssertProblemAsync(await PostSaleAsync(client, "wholesale-discount", new ConfirmSaleRequest(
+            null, [new(scenario.Products.Standard, 1, "MAYORISTA", new("PORCENTAJE", 5m))], null, "No permitido",
+            [new("EFECTIVO", 855m, 855m, null)])), HttpStatusCode.BadRequest);
+
+        var distributed = await ReadAsync<SaleDto>(await PostSaleAsync(client, "general-discount", new ConfirmSaleRequest(
+            null,
+            [new(scenario.Products.ResidueA, 1, "MINORISTA"), new(scenario.Products.ResidueB, 1, "MINORISTA"),
+                new(scenario.Products.ResidueC, 1, "MINORISTA")],
+            new("PORCENTAJE", 5m),
+            "Promoción controlada",
+            [new("EFECTIVO", 304m, 304m, null)])), HttpStatusCode.Created);
+        Assert.Equal(16m, distributed.DiscountTotal);
+        Assert.Equal(6m, distributed.Lines.Single(x => x.ProductId == scenario.Products.ResidueC).DiscountAmount);
+        Assert.Equal(5m, distributed.Lines.Single(x => x.ProductId == scenario.Products.ResidueA).DiscountAmount);
+        Assert.Equal(5m, distributed.Lines.Single(x => x.ProductId == scenario.Products.ResidueB).DiscountAmount);
+
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Supervisor.AccessToken, scenario.Users.Supervisor.Id);
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(client, "supervisor-over-limit", DiscountRequest(
+            scenario.Products.RoleDiscount, 21m, 790m)), HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(client, "supervisor-limit", DiscountRequest(
+            scenario.Products.RoleDiscount, 20m, 800m))).StatusCode);
+
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Admin.AccessToken, scenario.Admin.User.Id);
+        SetBearer(client, scenario.Admin.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(client, "admin-over-limit", DiscountRequest(
+            scenario.Products.RoleDiscount, 81m, 190m)), HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(client, "admin-limit", DiscountRequest(
+            scenario.Products.RoleDiscount, 80m, 200m))).StatusCode);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task ShiftAndSessionRules_RejectMissingClosedAndForeignIndividualTurns()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(client, "no-shift", CashRequest(
+            scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Conflict);
+
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        await CloseCurrentShiftAsync(client, scenario.Admin.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(client, "closed-shift", CashRequest(
+            scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Conflict);
+
+        SetBearer(client, scenario.Admin.AccessToken);
+        var state = await ReadAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
+        await ReadAsync<CashStateDto>(await client.PutAsJsonAsync(
+            "/api/cash/shift-mode", new UpdateCashShiftModeRequest(CashConstants.IndividualMode, state.ConfigurationVersion!.Value)), HttpStatusCode.OK);
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        await ReadAsync<CashShiftDto>(await client.PostAsJsonAsync(
+            "/api/cash/shifts", new OpenCashShiftRequest(0m, "Turno individual para pertenencia")), HttpStatusCode.Created);
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(client, "foreign-individual-shift", CashRequest(
+            scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Forbidden);
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(client, "own-individual-shift", CashRequest(
+            scenario.Products.Standard, 1, 1_000m))).StatusCode);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task IdempotencyAndConcurrency_DoNotDuplicateSalesFinancialEffectsOrStock()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Admin.AccessToken, scenario.Admin.User.Id);
+
+        using var idempotentA = CreateClient(scenario.Admin.AccessToken);
+        using var idempotentB = CreateClient(scenario.Admin.AccessToken);
+        var sameKeyResponses = await Task.WhenAll(
+            PostSaleAsync(idempotentA, "concurrent-idempotent", CashRequest(scenario.Products.RoleDiscount, 1, 1_000m)),
+            PostSaleAsync(idempotentB, "concurrent-idempotent", CashRequest(scenario.Products.RoleDiscount, 1, 1_000m)));
+        Assert.All(sameKeyResponses, response => Assert.Equal(HttpStatusCode.Created, response.StatusCode));
+        var sameKeySales = await Task.WhenAll(sameKeyResponses.Select(x => x.Content.ReadFromJsonAsync<SaleDto>()));
+        var saleId = Assert.Single(sameKeySales.Select(x => x!.Id).Distinct());
+        await AssertIdempotencyInventoryAndAuditAsync(
+            saleId, scenario.Products.RoleDiscount, "REFERENCE-NOT-PRESENT", "concurrent-idempotent");
+
+        await CloseCurrentShiftAsync(client, scenario.Admin.AccessToken);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var state = await ReadAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
+        await ReadAsync<CashStateDto>(await client.PutAsJsonAsync(
+            "/api/cash/shift-mode", new UpdateCashShiftModeRequest(CashConstants.IndividualMode, state.ConfigurationVersion!.Value)), HttpStatusCode.OK);
+        await ReadAsync<CashShiftDto>(await client.PostAsJsonAsync(
+            "/api/cash/shifts", new OpenCashShiftRequest(0m, "Turno para concurrencia de stock")), HttpStatusCode.Created);
+
+        using var stockA = CreateClient(scenario.Admin.AccessToken);
+        using var stockB = CreateClient(scenario.Admin.AccessToken);
+        var stockResponses = await Task.WhenAll(
+            PostSaleAsync(stockA, "stock-race-a", CashRequest(scenario.Products.LowStock, 1, 500m)),
+            PostSaleAsync(stockB, "stock-race-b", CashRequest(scenario.Products.LowStock, 1, 500m)));
+        Assert.Single(stockResponses, x => x.StatusCode == HttpStatusCode.Created);
+        Assert.Single(stockResponses, x => x.StatusCode == HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task SalesVisibility_UsesCurrentHybridOwnAndAllPermissions()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "visibility-sale", CashRequest(
+            scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/sales/own?page=1&pageSize=20")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/sales?page=1&pageSize=20")).StatusCode);
+
+        SetBearer(client, scenario.SecondCashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"/api/sales/{sale.Id}")).StatusCode);
+        SetBearer(client, scenario.Admin.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/sales?page=1&pageSize=20")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/sales/{sale.Id}")).StatusCode);
+
+        var ownReadPermission = await GetPermissionIdAsync(client, PermissionCodes.SalesOwnRead);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{scenario.Users.Cashier.Id}/permissions/{ownReadPermission}",
+            new SetUserPermissionRequest(false))).StatusCode);
+        var refreshedCashier = await LoginAsync(client, CashierUser, CashierPassword);
+        SetBearer(client, refreshedCashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/sales/own")).StatusCode);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task ConfirmSaleJson_RejectsUnknownRootLineDiscountAndPaymentPropertiesWithoutWrites()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var session = await StartSessionAsync(
+            client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        var before = await CaptureSalesStateAsync(scenario.Products.Standard, session.Id);
+
+        var payloads = new[]
+        {
+            (Json: JsonSerializer.Serialize(new
+                {
+                    customerId = (Guid?)null,
+                    lines = new[] { new { productId = scenario.Products.Standard, quantity = 1, priceType = "MINORISTA" } },
+                    generalDiscount = (object?)null,
+                    discountReason = (string?)null,
+                    payments = new[] { new { methodCode = "EFECTIVO", appliedAmount = 1_000m, receivedAmount = (decimal?)1_000m, reference = (string?)null } },
+                    unknownRoot = true
+                }), InvalidProperty: "unknownRoot"),
+            (Json: JsonSerializer.Serialize(new
+                {
+                    customerId = (Guid?)null,
+                    lines = new[] { new { productId = scenario.Products.Standard, quantity = 1, priceType = "MINORISTA", unknownLine = true } },
+                    generalDiscount = (object?)null,
+                    discountReason = (string?)null,
+                    payments = new[] { new { methodCode = "EFECTIVO", appliedAmount = 1_000m, receivedAmount = (decimal?)1_000m, reference = (string?)null } }
+                }), InvalidProperty: "unknownLine"),
+            (Json: JsonSerializer.Serialize(new
+                {
+                    customerId = (Guid?)null,
+                    lines = new[] { new { productId = scenario.Products.Standard, quantity = 1, priceType = "MINORISTA" } },
+                    generalDiscount = new { type = "PORCENTAJE", value = 5m, unknownDiscount = true },
+                    discountReason = "Prueba estricta",
+                    payments = new[] { new { methodCode = "EFECTIVO", appliedAmount = 950m, receivedAmount = (decimal?)950m, reference = (string?)null } }
+                }), InvalidProperty: "unknownDiscount"),
+            (Json: JsonSerializer.Serialize(new
+                {
+                    customerId = (Guid?)null,
+                    lines = new[] { new { productId = scenario.Products.Standard, quantity = 1, priceType = "MINORISTA" } },
+                    generalDiscount = (object?)null,
+                    discountReason = (string?)null,
+                    payments = new[] { new { methodCode = "EFECTIVO", appliedAmount = 1_000m, receivedAmount = (decimal?)1_000m, reference = (string?)null, unknownPayment = true } }
+                }), InvalidProperty: "unknownPayment")
+        };
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        for (var index = 0; index < payloads.Length; index++)
+        {
+            var response = await PostRawSaleAsync(client, $"strict-json-{index}", payloads[index].Json);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+            var body = await response.Content.ReadAsStringAsync();
+            using var problem = JsonDocument.Parse(body);
+            Assert.True(problem.RootElement.TryGetProperty("errors", out var errors), body);
+            Assert.True(errors.EnumerateObject().Any(), body);
+            Assert.Contains(payloads[index].InvalidProperty, errors.GetRawText(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.Equal(before, await CaptureSalesStateAsync(scenario.Products.Standard, session.Id));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Category", "Integration")]
+    public async Task RepeatedProduct_InvalidDiscountIsRejectedRegardlessOfLineOrder(bool invalidDiscountFirst)
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var session = await StartSessionAsync(
+            client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        var before = await CaptureSalesStateAsync(scenario.Products.Standard, session.Id);
+        var valid = new SaleLineRequest(scenario.Products.Standard, 1, "MINORISTA");
+        var invalid = new SaleLineRequest(
+            scenario.Products.Standard, 1, "MINORISTA", new SaleDiscountRequest("NO_EXISTE", 5m));
+        var lines = invalidDiscountFirst ? new[] { invalid, valid } : new[] { valid, invalid };
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(client, $"invalid-repeat-{invalidDiscountFirst}", new ConfirmSaleRequest(
+            null, lines, null, null, [new("EFECTIVO", 2_000m, 2_000m, null)])), HttpStatusCode.BadRequest);
+
+        Assert.Equal(before, await CaptureSalesStateAsync(scenario.Products.Standard, session.Id));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task DeferredCommitFailure_RollsBackEntireSaleAndPreservesStockSequenceAndSession()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var session = await StartSessionAsync(
+            client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        await InstallDeferredSaleFailureAsync();
+        var before = await CaptureSalesStateAsync(scenario.Products.Standard, session.Id);
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var response = await PostSaleAsync(
+            client, "forced-commit-rollback", CashRequest(scenario.Products.Standard, 1, 1_000m));
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.True(await DeferredSaleFailureObservedAsync());
+        Assert.Equal(before, await CaptureSalesStateAsync(scenario.Products.Standard, session.Id));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task CustomerValidation_RejectsMissingAndInactive_AndPersistsActiveCustomer()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        var inactiveCustomer = await CreateCustomerAsync(scenario.Admin.User.Id, false, "INACTIVE");
+        var activeCustomer = await CreateCustomerAsync(scenario.Admin.User.Id, true, "ACTIVE");
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var session = await StartSessionAsync(
+            client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        var before = await CaptureSalesStateAsync(scenario.Products.Standard, session.Id);
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(client, "missing-customer", CashRequest(
+            scenario.Products.Standard, 1, 1_000m, Guid.CreateVersion7())), HttpStatusCode.NotFound);
+        await AssertProblemAsync(await PostSaleAsync(client, "inactive-customer", CashRequest(
+            scenario.Products.Standard, 1, 1_000m, inactiveCustomer)), HttpStatusCode.NotFound);
+        Assert.Equal(before, await CaptureSalesStateAsync(scenario.Products.Standard, session.Id));
+
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "active-customer", CashRequest(
+            scenario.Products.Standard, 1, 1_000m, activeCustomer)), HttpStatusCode.Created);
+        Assert.Equal(activeCustomer, sale.CustomerId);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(activeCustomer, await context.Venta.Where(x => x.Id == sale.Id).Select(x => x.ClienteId).SingleAsync());
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task PricingEdges_RejectZeroAndMixedDiscountScopes_AndAcceptFixedAndWholesaleSales()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+
+        await AssertProblemAsync(await PostSaleAsync(client, "zero-total", CashRequest(
+            scenario.Products.ZeroTotal, 1, 0m)), HttpStatusCode.BadRequest);
+        await AssertProblemAsync(await PostSaleAsync(client, "mixed-discount-scopes", new ConfirmSaleRequest(
+            null,
+            [new(scenario.Products.Standard, 1, "MINORISTA", new("PORCENTAJE", 1m))],
+            new("PORCENTAJE", 1m),
+            "Ámbitos incompatibles",
+            [new("EFECTIVO", 980m, 980m, null)])), HttpStatusCode.BadRequest);
+
+        var fixedDiscount = await ReadAsync<SaleDto>(await PostSaleAsync(client, "fixed-discount", new ConfirmSaleRequest(
+            null,
+            [new(scenario.Products.Standard, 1, "MINORISTA", new("VALOR_FIJO", 50m))],
+            null,
+            "Descuento fijo válido",
+            [new("EFECTIVO", 950m, 950m, null)])), HttpStatusCode.Created);
+        Assert.Equal(50m, fixedDiscount.DiscountTotal);
+        Assert.Equal("VALOR_FIJO", Assert.Single(fixedDiscount.Lines).DiscountType);
+
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var wholesale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "valid-wholesale", new ConfirmSaleRequest(
+            null,
+            [new(scenario.Products.Standard, 1, "MAYORISTA")],
+            null,
+            null,
+            [new("EFECTIVO", 900m, 900m, null)])), HttpStatusCode.Created);
+        var wholesaleLine = Assert.Single(wholesale.Lines);
+        Assert.Equal("MAYORISTA", wholesaleLine.PriceType);
+        Assert.Equal(900m, wholesaleLine.UnitPrice);
+        Assert.Equal(0m, wholesaleLine.DiscountAmount);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task IdempotencyKey_RejectsDifferentContentAndDifferentUserWithoutAdditionalWrites()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var session = await StartSessionAsync(
+            client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        const string key = "idempotency-conflicts";
+        SetBearer(client, scenario.Cashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(
+            client, key, CashRequest(scenario.Products.Standard, 1, 1_000m))).StatusCode);
+        var afterOriginal = await CaptureSalesStateAsync(scenario.Products.Standard, session.Id);
+
+        await AssertProblemAsync(await PostSaleAsync(
+            client, key, CashRequest(scenario.Products.Standard, 2, 2_000m)), HttpStatusCode.Conflict);
+        SetBearer(client, scenario.SecondCashier.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(
+            client, key, CashRequest(scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Conflict);
+        Assert.Equal(afterOriginal, await CaptureSalesStateAsync(scenario.Products.Standard, session.Id));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task ConfirmedCombinedSale_ReconciliationUsesPaymentsWithoutDoubleCountingCashMovement()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(client, "reconciliation-sale", new ConfirmSaleRequest(
+            null,
+            [new(scenario.Products.Standard, 1, "MINORISTA")],
+            null,
+            null,
+            [new("EFECTIVO", 400m, 450m, null), new("TRANSFERENCIA", 600m, null, "TRANSFER-RECONCILIATION")])))
+            .StatusCode);
+
+        SetBearer(client, scenario.Admin.AccessToken);
+        var reconciliation = await ReadAsync<CashReconciliationDto>(
+            await client.GetAsync("/api/cash/reconciliation"), HttpStatusCode.OK);
+        Assert.Equal(1_000m, reconciliation.TotalExpected);
+        Assert.Equal(400m, reconciliation.PaymentMethods.Single(x => x.Code == "EFECTIVO").ExpectedAmount);
+        Assert.Equal(600m, reconciliation.PaymentMethods.Single(x => x.Code == "TRANSFERENCIA").ExpectedAmount);
+        Assert.Equal(0m, reconciliation.PaymentMethods.Single(x => x.Code == "NEQUI").ExpectedAmount);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task OfficialSharedSessionSchemaAndEfModel_RemainUnchanged()
+    {
+        await using var migrationContext = new ControlPlusDbContext(
+            new DbContextOptionsBuilder<ControlPlusDbContext>()
+                .UseNpgsql(_postgres.GetConnectionString()).Options);
+        Assert.Equal(PublishedMigrations, await migrationContext.Database.GetAppliedMigrationsAsync());
+
+        await using var officialContext = new OfficialControlPlusDbContext(
+            new DbContextOptionsBuilder<OfficialControlPlusDbContext>()
+                .UseNpgsql(_postgres.GetConnectionString()).Options);
+        var saleType = officialContext.Model.FindEntityType(typeof(Venta));
+        Assert.NotNull(saleType);
+        var sessionIndex = Assert.Single(saleType.GetIndexes(), x =>
+            x.GetDatabaseName() == "uq_venta_sesion_operador");
+        Assert.True(sessionIndex.IsUnique);
+        Assert.Equal("uq_venta_sesion_operador", sessionIndex.GetDatabaseName());
+        var sessionForeignKey = Assert.Single(saleType.GetForeignKeys(), x =>
+            x.Properties.Count == 1 && x.Properties[0].Name == nameof(Venta.SesionOperadorId));
+        Assert.True(sessionForeignKey.IsUnique);
+
+        await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT
+                EXISTS (
+                    SELECT 1
+                    FROM pg_indexes
+                    WHERE schemaname = 'ventas'
+                      AND indexname = 'uq_venta_sesion_operador'
+                      AND indexdef ILIKE '%UNIQUE%'
+                )
+                AND EXISTS (
+                    SELECT 1
+                    FROM pg_proc p
+                    JOIN pg_namespace n ON n.oid = p.pronamespace
+                    WHERE n.nspname = 'ventas'
+                      AND p.proname = 'validar_cierre_sesion_venta'
+                )
+                AND EXISTS (
+                    SELECT 1
+                    FROM pg_trigger t
+                    JOIN pg_class c ON c.oid = t.tgrelid
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE n.nspname = 'ventas'
+                      AND c.relname = 'venta'
+                      AND NOT t.tgisinternal
+                      AND t.tgdeferrable
+                      AND pg_get_triggerdef(t.oid) ILIKE '%validar_cierre_sesion_venta%'
+                );
+            """;
+        Assert.True((bool)(await command.ExecuteScalarAsync())!);
+    }
+
+    private HttpClient CreateClient(string? accessToken = null)
+    {
+        var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        if (accessToken is not null) SetBearer(client, accessToken);
+        return client;
+    }
+
+    private async Task<Scenario> BootstrapAsync(HttpClient client)
+    {
+        await SetupAsync(client);
+        var admin = await LoginAsync(client, AdminUser, AdminPassword);
+        SetBearer(client, admin.AccessToken);
+        var users = await CreateUsersAsync(client);
+        var products = await CreateSalesCatalogAsync(client);
+        var cashier = await LoginAsync(client, CashierUser, CashierPassword);
+        var supervisor = await LoginAsync(client, SupervisorUser, SupervisorPassword);
+        var secondCashier = await LoginAsync(client, SecondCashierUser, SecondCashierPassword);
+        return new(admin, users, products, cashier, supervisor, secondCashier);
+    }
+
+    private async Task SetupAsync(HttpClient client)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/setup")
+        {
+            Content = JsonContent.Create(new SetupFirstAdministratorRequest(
+                "Comercio ficticio de Ventas", "SALES-TEST", "SALES-INSTALLATION", "SALESTEST1",
+                "SALES-TERMINAL", "Terminal ficticia de Ventas", AdminUser,
+                "Administrador ficticio de Ventas", AdminPassword))
+        };
+        request.Headers.Add("X-ControlPlus-Master-Key", _masterKey);
+        Assert.Equal(HttpStatusCode.Created, (await client.SendAsync(request)).StatusCode);
+    }
+
+    private async Task OpenSharedShiftAsync(HttpClient client, string adminToken)
+    {
+        SetBearer(client, adminToken);
+        await ReadAsync<CashRegisterDto>(await client.PostAsJsonAsync(
+            "/api/cash/register", new ConfigureCashRegisterRequest("SALES-CASH", "Caja aislada de Ventas")), HttpStatusCode.Created);
+        var state = await ReadAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
+        await ReadAsync<CashStateDto>(await client.PutAsJsonAsync(
+            "/api/cash/shift-mode", new UpdateCashShiftModeRequest(CashConstants.SharedMode, state.ConfigurationVersion!.Value)), HttpStatusCode.OK);
+        await ReadAsync<CashShiftDto>(await client.PostAsJsonAsync(
+            "/api/cash/shifts", new OpenCashShiftRequest(0m, "Turno compartido para Ventas")), HttpStatusCode.Created);
+    }
+
+    private static async Task CloseCurrentShiftAsync(HttpClient client, string adminToken)
+    {
+        SetBearer(client, adminToken);
+        var reconciliation = await ReadAsync<CashReconciliationDto>(
+            await client.GetAsync("/api/cash/reconciliation"), HttpStatusCode.OK);
+        var counts = reconciliation.PaymentMethods
+            .Select(x => new CountedPaymentMethodRequest(x.PaymentMethodId, x.ExpectedAmount)).ToArray();
+        await ReadAsync<CashReconciliationDto>(await client.PostAsJsonAsync(
+            $"/api/cash/shifts/{reconciliation.ShiftId}/close",
+            new CloseCashShiftRequest(reconciliation.ShiftVersion, counts, null, null, null)), HttpStatusCode.OK);
+    }
+
+    private async Task<Users> CreateUsersAsync(HttpClient client)
+    {
+        var supervisorRole = await GetRoleIdAsync(client, RoleCodes.Supervisor);
+        var cashierRole = await GetRoleIdAsync(client, RoleCodes.Cashier);
+        var supervisor = await ReadAsync<UserDto>(await client.PostAsJsonAsync("/api/users",
+            new CreateUserRequest(SupervisorUser, "Supervisor ficticio de Ventas", SupervisorPassword, [supervisorRole])), HttpStatusCode.Created);
+        var cashier = await ReadAsync<UserDto>(await client.PostAsJsonAsync("/api/users",
+            new CreateUserRequest(CashierUser, "Cajero ficticio de Ventas", CashierPassword, [cashierRole])), HttpStatusCode.Created);
+        var second = await ReadAsync<UserDto>(await client.PostAsJsonAsync("/api/users",
+            new CreateUserRequest(SecondCashierUser, "Segundo cajero ficticio", SecondCashierPassword, [cashierRole])), HttpStatusCode.Created);
+        return new(supervisor, cashier, second);
+    }
+
+    private async Task<Products> CreateSalesCatalogAsync(HttpClient client)
+    {
+        var category = await ReadAsync<CategoryDto>(await client.PostAsJsonAsync(
+            "/api/categories", new CreateCategoryRequest("Categoría aislada de Ventas", null)), HttpStatusCode.Created);
+        var units = await ReadAsync<IReadOnlyCollection<MeasurementUnitDto>>(
+            await client.GetAsync("/api/measurement-units"), HttpStatusCode.OK);
+        var unit = units.Single(x => x.Code == "UNIDAD");
+
+        async Task<Guid> Create(string code, decimal retail, decimal? wholesale = null)
+        {
+            var value = await ReadAsync<ProductDto>(await client.PostAsJsonAsync("/api/products",
+                new CreateProductRequest(category.Id, unit.Id, null, code, null, null, true,
+                    $"Producto {code}", null, retail, wholesale, null, 0)), HttpStatusCode.Created);
+            return value.Id;
+        }
+
+        var products = new Products(
+            await Create("SALE-STANDARD", 1_000m, 900m),
+            await Create("SALE-RES-A", 101m),
+            await Create("SALE-RES-B", 102m),
+            await Create("SALE-RES-C", 117m),
+            await Create("SALE-NO-COST", 500m),
+            await Create("SALE-LOW-STOCK", 500m),
+            await Create("SALE-INACTIVE", 500m),
+            await Create("SALE-UNDER-COST", 100m),
+            await Create("SALE-ROLE", 1_000m),
+            await Create("SALE-ZERO", 0m));
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var installation = await context.Instalacion.SingleAsync();
+        context.ConsecutivoDocumento.Add(new ConsecutivoDocumento
+        {
+            Id = Guid.CreateVersion7(), InstalacionId = installation.Id, TipoDocumento = "VENTA",
+            Prefijo = "VTA", Serie = installation.Serie, UltimoNumero = 0, Version = 1
+        });
+        var rows = await context.Producto.Where(x => new[]
+        {
+            products.Standard, products.ResidueA, products.ResidueB, products.ResidueC, products.UnknownCost,
+            products.LowStock, products.Inactive, products.UnderCost, products.RoleDiscount, products.ZeroTotal
+        }.Contains(x.Id)).ToArrayAsync();
+        foreach (var product in rows)
+        {
+            product.StockActual = product.Id == products.LowStock ? 1 : 100;
+            product.CostoPromedio = product.Id switch
+            {
+                var id when id == products.UnknownCost => null,
+                var id when id == products.UnderCost => 98m,
+                var id when id == products.RoleDiscount => 100m,
+                var id when id == products.Standard => 500m,
+                var id when id == products.ZeroTotal => 0m,
+                _ => 10m
+            };
+        }
+        await context.SaveChangesAsync();
+        return products;
+    }
+
+    private static async Task<string> IssueCredentialAsync(HttpClient client, string adminToken, Guid userId)
+    {
+        SetBearer(client, adminToken);
+        var credential = await ReadAsync<IssuedOperatorCredentialDto>(await client.PostAsJsonAsync(
+            $"/api/cash/operator-credentials/{userId}", new IssueOperatorCredentialRequest(null)), HttpStatusCode.Created);
+        return credential.CredentialToken;
+    }
+
+    private static async Task<OperatorSessionDto> StartSessionAsync(
+        HttpClient client, string userToken, string credentialToken)
+    {
+        SetBearer(client, userToken);
+        return await ReadAsync<OperatorSessionDto>(await client.PostAsJsonAsync(
+            "/api/cash/operator-sessions", new StartOperatorSessionRequest(credentialToken)), HttpStatusCode.Created);
+    }
+
+    private static async Task<OperatorSessionDto> StartSessionAsync(
+        HttpClient client, string adminToken, string userToken, Guid userId)
+    {
+        var credential = await IssueCredentialAsync(client, adminToken, userId);
+        return await StartSessionAsync(client, userToken, credential);
+    }
+
+    private async Task AssertCombinedPersistenceAsync(Guid saleId, Guid productId, int expectedStock)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var payments = await context.PagoVenta.Where(x => x.VentaId == saleId).ToArrayAsync();
+        Assert.Equal(2, payments.Length);
+        Assert.Single(payments.Select(x => x.MovimientoCajaId).Distinct());
+        var movementId = payments[0].MovimientoCajaId!.Value;
+        var movement = await context.MovimientoCaja.SingleAsync(x => x.Id == movementId);
+        Assert.Equal("VENTA", movement.CategoriaMovimiento);
+        Assert.Equal(1_000m, movement.Valor);
+        Assert.Equal(expectedStock, await context.Producto.Where(x => x.Id == productId)
+            .Select(x => x.StockActual).SingleAsync());
+        Assert.True(await context.MovimientoInventario.AnyAsync(x => x.VentaId == saleId && x.CantidadStock == -1));
+    }
+
+    private async Task AssertIdempotencyInventoryAndAuditAsync(
+        Guid saleId, Guid productId, string paymentReference, string idempotencyKey)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(1, await context.Venta.CountAsync(x => x.Id == saleId));
+        Assert.Equal(1, await context.OperacionIdempotente.CountAsync(x => x.EntidadId == saleId));
+        Assert.Equal(1, await context.MovimientoInventario.CountAsync(x => x.VentaId == saleId && x.ProductoId == productId));
+        Assert.Equal(1, await context.EventoAuditoria.CountAsync(x => x.EntidadId == saleId && x.Accion == "SALECONFIRMED"));
+        var payment = await context.PagoVenta.SingleAsync(x => x.VentaId == saleId);
+        Assert.NotNull(payment.MovimientoCajaId);
+        Assert.Equal(1, await context.MovimientoCaja.CountAsync(x => x.Id == payment.MovimientoCajaId));
+        var auditRows = await context.EventoAuditoria.AsNoTracking()
+            .Select(x => new { x.DatosAnteriores, x.DatosNuevos, x.Motivo })
+            .ToArrayAsync();
+        var auditText = string.Join('|', auditRows.Select(x =>
+            (x.DatosAnteriores ?? string.Empty) + (x.DatosNuevos ?? string.Empty) + (x.Motivo ?? string.Empty)));
+        Assert.DoesNotContain(paymentReference, auditText, StringComparison.Ordinal);
+        Assert.DoesNotContain(idempotencyKey, auditText, StringComparison.Ordinal);
+        Assert.DoesNotContain(AdminPassword, auditText, StringComparison.Ordinal);
+        Assert.DoesNotContain(CashierPassword, auditText, StringComparison.Ordinal);
+    }
+
+    private async Task<Guid> CreateCustomerAsync(Guid creatorId, bool active, string suffix)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var customer = new Cliente
+        {
+            Id = Guid.CreateVersion7(),
+            TipoDocumento = "CC",
+            NumeroDocumento = $"SALE-{suffix}-{Guid.NewGuid():N}"[..40],
+            NombreCompleto = $"Cliente ficticio {suffix}",
+            Direccion = "Dirección ficticia de prueba",
+            Activo = active,
+            UsuarioCreacionId = creatorId,
+            FechaCreacion = DateTime.UtcNow,
+            Version = 1
+        };
+        context.Cliente.Add(customer);
+        await context.SaveChangesAsync();
+        return customer.Id;
+    }
+
+    private async Task<SalesPersistenceState> CaptureSalesStateAsync(Guid productId, Guid sessionId)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var session = await context.SesionOperador.AsNoTracking().SingleAsync(x => x.Id == sessionId);
+        return new SalesPersistenceState(
+            await context.Venta.CountAsync(),
+            await context.DetalleVenta.CountAsync(),
+            await context.PagoVenta.CountAsync(),
+            await context.MovimientoCaja.CountAsync(),
+            await context.MovimientoInventario.CountAsync(),
+            await context.EventoAuditoria.CountAsync(),
+            await context.OperacionIdempotente.CountAsync(),
+            await context.Producto.Where(x => x.Id == productId).Select(x => x.StockActual).SingleAsync(),
+            await context.ConsecutivoDocumento.Where(x => x.TipoDocumento == "VENTA")
+                .Select(x => x.UltimoNumero).SingleAsync(),
+            session.Estado,
+            session.FechaUltimoUso,
+            session.FechaFin,
+            session.MotivoCierre);
+    }
+
+    private async Task InstallDeferredSaleFailureAsync()
+    {
+        await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("""
+            CREATE SEQUENCE ventas.test_sale_commit_observed;
+            CREATE FUNCTION ventas.test_fail_sale_commit() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN
+              IF (SELECT count(*) FROM ventas.detalle_venta WHERE venta_id = NEW.id) = 1
+                AND (SELECT count(*) FROM ventas.pago_venta WHERE venta_id = NEW.id) = 1
+                AND EXISTS (
+                  SELECT 1
+                  FROM caja.movimiento_caja m
+                  JOIN ventas.pago_venta p ON p.movimiento_caja_id = m.id
+                  WHERE p.venta_id = NEW.id AND m.categoria_movimiento = 'VENTA'
+                )
+                AND EXISTS (SELECT 1 FROM compras.movimiento_inventario WHERE venta_id = NEW.id)
+                AND EXISTS (SELECT 1 FROM auditoria.operacion_idempotente WHERE entidad_id = NEW.id)
+                AND EXISTS (
+                  SELECT 1 FROM auditoria.evento_auditoria
+                  WHERE accion = 'SALECONFIRMED' AND entidad_id = NEW.id
+                )
+                AND EXISTS (
+                  SELECT 1 FROM auditoria.evento_auditoria
+                  WHERE accion = 'OPERATORSESSIONCLOSED' AND entidad_id = NEW.sesion_operador_id
+                )
+                AND EXISTS (
+                  SELECT 1 FROM caja.sesion_operador
+                  WHERE id = NEW.sesion_operador_id AND estado = 'CERRADA'
+                )
+                AND EXISTS (
+                  SELECT 1
+                  FROM catalogo.producto p
+                  JOIN ventas.detalle_venta d ON d.producto_id = p.id
+                  WHERE d.venta_id = NEW.id AND p.stock_actual = 99
+                )
+              THEN
+                PERFORM nextval('ventas.test_sale_commit_observed');
+              END IF;
+              RAISE EXCEPTION 'Forced isolated sale commit failure' USING ERRCODE = '23514';
+            END $$;
+            CREATE CONSTRAINT TRIGGER zz_test_fail_sale_commit
+              AFTER INSERT ON ventas.venta DEFERRABLE INITIALLY DEFERRED
+              FOR EACH ROW EXECUTE FUNCTION ventas.test_fail_sale_commit();
+            """, connection);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private async Task<bool> DeferredSaleFailureObservedAsync()
+    {
+        await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT is_called FROM ventas.test_sale_commit_observed", connection);
+        return (bool)(await command.ExecuteScalarAsync())!;
+    }
+
+    private static ConfirmSaleRequest CashRequest(
+        Guid productId, int quantity, decimal total, Guid? customerId = null) => new(
+        customerId, [new(productId, quantity, "MINORISTA")], null, null,
+        [new("EFECTIVO", total, total, null)]);
+
+    private static ConfirmSaleRequest DiscountRequest(Guid productId, decimal percentage, decimal total) => new(
+        null, [new(productId, 1, "MINORISTA", new("PORCENTAJE", percentage))], null,
+        "Descuento de prueba", [new("EFECTIVO", total, total, null)]);
+
+    private static async Task<HttpResponseMessage> PostSaleAsync(
+        HttpClient client, string idempotencyKey, ConfirmSaleRequest request)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, "/api/sales")
+        {
+            Content = JsonContent.Create(request)
+        };
+        message.Headers.Add("Idempotency-Key", idempotencyKey);
+        return await client.SendAsync(message);
+    }
+
+    private static async Task<HttpResponseMessage> PostRawSaleAsync(
+        HttpClient client, string idempotencyKey, string json)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, "/api/sales")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        message.Headers.Add("Idempotency-Key", idempotencyKey);
+        return await client.SendAsync(message);
+    }
+
+    private static async Task<AuthenticationResult> LoginAsync(HttpClient client, string userName, string password)
+    {
+        client.DefaultRequestHeaders.Authorization = null;
+        return await ReadAsync<AuthenticationResult>(await client.PostAsJsonAsync(
+            "/api/auth/login", new LoginRequest(userName, password)), HttpStatusCode.OK);
+    }
+
+    private static async Task<Guid> GetRoleIdAsync(HttpClient client, string code)
+    {
+        var roles = await ReadAsync<PagedResult<RoleDto>>(
+            await client.GetAsync("/api/roles?page=1&pageSize=20"), HttpStatusCode.OK);
+        return roles.Items.Single(x => x.Code == code).Id;
+    }
+
+    private static async Task<Guid> GetPermissionIdAsync(HttpClient client, string code)
+    {
+        var permissions = await ReadAsync<PagedResult<PermissionDto>>(
+            await client.GetAsync("/api/permissions?page=1&pageSize=100"), HttpStatusCode.OK);
+        return permissions.Items.Single(x => x.Code == code).Id;
+    }
+
+    private static async Task<T> ReadAsync<T>(HttpResponseMessage response, HttpStatusCode expected)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.True(response.StatusCode == expected,
+            $"Expected {(int)expected} ({expected}) but received {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
+        var value = JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.NotNull(value);
+        return value;
+    }
+
+    private static Task AssertProblemAsync(HttpResponseMessage response, HttpStatusCode expected)
+    {
+        Assert.Equal(expected, response.StatusCode);
+        return Task.CompletedTask;
+    }
+
+    private static void SetBearer(HttpClient client, string accessToken) =>
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+    private static string RandomSecret(int bytes) => Convert.ToBase64String(RandomNumberGenerator.GetBytes(bytes));
+
+    private sealed record Scenario(
+        AuthenticationResult Admin,
+        Users Users,
+        Products Products,
+        AuthenticationResult Cashier,
+        AuthenticationResult Supervisor,
+        AuthenticationResult SecondCashier);
+
+    private sealed record Users(UserDto Supervisor, UserDto Cashier, UserDto SecondCashier);
+
+    private sealed record SalesPersistenceState(
+        int Sales,
+        int Details,
+        int Payments,
+        int CashMovements,
+        int InventoryMovements,
+        int Audits,
+        int IdempotencyOperations,
+        int Stock,
+        long Sequence,
+        string SessionState,
+        DateTime SessionLastUsed,
+        DateTime? SessionEnded,
+        string? SessionCloseReason);
+
+    private sealed record Products(
+        Guid Standard,
+        Guid ResidueA,
+        Guid ResidueB,
+        Guid ResidueC,
+        Guid UnknownCost,
+        Guid LowStock,
+        Guid Inactive,
+        Guid UnderCost,
+        Guid RoleDiscount,
+        Guid ZeroTotal);
+}

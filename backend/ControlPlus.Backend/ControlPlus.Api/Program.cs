@@ -9,6 +9,8 @@ using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Application.Security.Services;
 using ControlPlus.Application.Catalog.Contracts;
 using ControlPlus.Application.Catalog.Services;
+using ControlPlus.Application.Sales.Contracts;
+using ControlPlus.Application.Sales.Services;
 using ControlPlus.Infrastructure.Persistence;
 using ControlPlus.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -93,9 +95,11 @@ builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
         };
         details.Extensions["code"] = "validation.failed";
 
-        var response = new BadRequestObjectResult(details);
-        response.ContentTypes.Add("application/problem+json");
-        return response;
+        return new JsonResult(details)
+        {
+            StatusCode = StatusCodes.Status400BadRequest,
+            ContentType = "application/problem+json"
+        };
     };
 });
 builder.Services.AddOpenApi(options =>
@@ -114,6 +118,7 @@ builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();
 builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
 builder.Services.AddScoped<ICatalogService, CatalogService>();
 builder.Services.AddScoped<ICashService, CashService>();
+builder.Services.AddScoped<ISalesService, SalesService>();
 builder.Services.AddScoped<ICurrentUserSessionValidator, CurrentUserSessionValidator>();
 builder.Services.AddScoped<IPermissionChecker, PermissionChecker>();
 builder.Services.AddScoped<CurrentActorContextResolver>();
