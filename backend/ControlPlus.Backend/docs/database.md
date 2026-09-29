@@ -10,19 +10,19 @@ La fuente de verdad es `docs/ControlPlus_Fase4_Documento_y_Complementos.zip` des
 - `20260912011000_SeedApprovedSecurityCatalog`: crea idempotentemente Administrador, Supervisor y Cajero y sus límites de descuento 100, 20 y 5.
 - `20260912012000_HybridPermissionsV1`: agrega las excepciones individuales de permisos, crea las plantillas V1 y ajusta el límite de Administrador a 80 %, sin modificar la migración base.
 - `20260913010000_SeedMeasurementUnitsV1`: registra idempotentemente las unidades V1 Unidad, Paquete y Metro requeridas para crear productos.
-- `20260913020000_CashRegisterModuleV1`: migración no publicada de Caja; agrega `diferencia_total`, detalle inmutable de arqueo y `autorizacion_cierre_turno`, restricciones diferibles y los medios iniciales. Conserva `turno_caja.diferencia = efectivo_contado - efectivo_esperado` y permite varios pagos por movimiento para pagos combinados.
+- `20260913020000_CashRegisterModuleV1`: migración publicada y aplicada una vez a la base PostgreSQL persistente local/de desarrollo; agrega `diferencia_total`, detalle inmutable de arqueo y `autorizacion_cierre_turno`, restricciones diferibles y los medios iniciales. Conserva `turno_caja.diferencia = efectivo_contado - efectivo_esperado` y permite varios pagos por movimiento para pagos combinados.
 
 Las cantidades de producto, venta, compra e inventario permanecen enteras, incluidos los metros, de acuerdo con el documento principal y el script PostgreSQL V3 aprobados.
 
-La migración de unidades está aplicada y registrada en la base persistente de desarrollo. No modifica `20260912010000_OfficialPhase4Baseline` ni convierte columnas `integer` a tipos decimales.
+Las migraciones de unidades y Caja están aplicadas y registradas en la base PostgreSQL persistente local/de desarrollo. No modifican `20260912010000_OfficialPhase4Baseline` ni convierten columnas `integer` a tipos decimales.
 
-La migración de Caja usa `numeric(18,0)` para los importes nuevos y no modifica ninguna migración publicada. Antes de DDL comprueba, bajo bloqueo, que `caja.turno_caja` esté vacía. Si hay un turno abierto o cerrado, requiere una migración de transición específica y aborta sin adaptar ni borrar datos históricos. Se prueba exclusivamente en PostgreSQL 17 aislado; no se aplica a la base persistente en este bloque.
+La migración de Caja usa `numeric(18,0)` para los importes nuevos y no modifica ninguna migración anterior. Antes de DDL comprueba, bajo bloqueo, que `caja.turno_caja` esté vacía. Fue validada en PostgreSQL 17 aislado y aplicada una vez de forma controlada a la base PostgreSQL persistente local/de desarrollo; no debe ejecutarse otra vez ni revertirse en esa instalación. Cualquier operación persistente futura de esquema o datos requiere evaluación, respaldo y autorización específica.
 
 La diferencia por medio y el total tienen signo contado menos esperado. `diferencia` representa exclusivamente efectivo; `diferencia_total` coincide con la suma del desglose y decide la autorización. Los negativos electrónicos son válidos; el efectivo físico no puede ser negativo. Los detalles, el vínculo y la autorización consumida quedan protegidos contra alteraciones posteriores. Los importes por método proceden de pagos; sus movimientos vinculados no se cuentan otra vez.
 
 ## Inmutabilidad y reversión
 
-Las cuatro primeras migraciones están publicadas y son inmutables. No se modifican, regeneran ni reemplazan, aunque una corrección posterior afecte su resultado. Las correcciones de esquema o de datos aprobados se realizan mediante una nueva migración compensatoria, revisada y documentada. `20260913020000_CashRegisterModuleV1` permanece pendiente de revisión y autorización antes de cualquier aplicación persistente.
+Las cinco migraciones enumeradas están publicadas y son inmutables. No se modifican, regeneran ni reemplazan, aunque una corrección posterior afecte su resultado. Las correcciones de esquema o de datos aprobados se realizan mediante una nueva migración compensatoria, revisada y documentada. `20260913020000_CashRegisterModuleV1` ya está aplicada una vez a la base PostgreSQL persistente local/de desarrollo; cualquier operación persistente futura de esquema o datos requiere evaluación, respaldo y autorización específica.
 
 `20260912012000_HybridPermissionsV1.Down` no es una reversión completa ni segura de la migración híbrida: no deshace todas las inserciones ni asignaciones de permisos introducidas en `Up`. No debe utilizarse como mecanismo de reversión de una base persistente. Toda reversión persistente exige un respaldo local verificado antes de cualquier operación y una revisión explícita de sus efectos.
 
@@ -42,7 +42,7 @@ La concurrencia optimista no requiere columnas nuevas: las 27 entidades oficiale
 
 `--preflight-to 20260913020000_CashRegisterModuleV1` admite exclusivamente ese objetivo. Abre mediante Npgsql una transacción `REPEATABLE READ`, la establece `READ ONLY` antes de leer y confirma `transaction_read_only=on` al inicio y al final. Un manifiesto tipado compartido define las dos tablas, la columna, los seis índices con tabla/columnas, las nueve funciones con firma/retorno, los once triggers con tabla y las siete restricciones base con nombre, tabla, tipo, validación y columnas. El runner verifica además la cadena EF exacta, las cuatro filas anteriores de `__EFMigrationsHistory`, objetivo pendiente y ausencia de turnos. Las consultas son estáticas y parametrizadas, no usan `psql`, shell, SQL dinámico, agregaciones/comparaciones de arrays ni concatenación de tipos PostgreSQL.
 
-El comando futuro de preflight desde Compose es:
+El comando de preflight correspondiente era:
 
 ```powershell
 docker compose run --rm --no-deps `
@@ -50,11 +50,11 @@ docker compose run --rm --no-deps `
   api --preflight-to 20260913020000_CashRegisterModuleV1
 ```
 
-El código `0` certifica todas las precondiciones, `2` indica que al menos una no se cumple o que gate/objetivo son inválidos y `1` indica un fallo técnico sanitizado. El preflight no aplica migraciones, no crea respaldos, no modifica datos, no hace commit y no intenta rollback de esquema.
+El código `0` certifica todas las precondiciones, `2` indica que al menos una no se cumple o que gate/objetivo son inválidos y `1` indica un fallo técnico sanitizado. El preflight no aplica migraciones, no crea respaldos, no modifica datos, no hace commit y no intenta rollback de esquema. Como el objetivo ya está aplicado en la base PostgreSQL persistente local/de desarrollo, no corresponde repetir ese preflight allí.
 
 El runner rechaza destinos vacíos, inexistentes, ya aplicados o anteriores al último aplicado. También rechaza historiales que no sean un prefijo exacto del catálogo y secuencias pendientes incoherentes. La única operación permitida es aplicar la secuencia ascendente pendiente cuyo último elemento sea exactamente el destino solicitado. No existe una opción para aplicar genéricamente todo lo pendiente.
 
-El `ENTRYPOINT` de la imagen es `dotnet ControlPlus.Api.dll`; por eso Compose adjunta los argumentos escritos después de `api`. Tras certificación, respaldo y autorización, el comando futuro de aplicación para el objetivo de Caja es:
+El `ENTRYPOINT` de la imagen es `dotnet ControlPlus.Api.dll`; por eso Compose adjunta los argumentos escritos después de `api`. El comando controlado que se utilizó para el objetivo de Caja fue:
 
 ```powershell
 docker compose run --rm --no-deps `
@@ -62,7 +62,7 @@ docker compose run --rm --no-deps `
   api --migrate-to 20260913020000_CashRegisterModuleV1
 ```
 
-`--no-deps` impide que este comando cree o reinicie PostgreSQL; el destino autorizado debe estar disponible previamente mediante la configuración normal de Compose. El runner conserva la cadena de conexión solo en memoria y nunca registra configuración, credenciales, tokens, JWT, Master Key ni contenido de `.env`. Solo informa el identificador objetivo, resultado y mensajes sanitizados. En caso de fallo devuelve un código distinto de cero y no intenta una reversión manual.
+`--no-deps` impide que este comando cree o reinicie PostgreSQL; el destino autorizado debe estar disponible previamente mediante la configuración normal de Compose. El runner conserva la cadena de conexión solo en memoria y nunca registra configuración, credenciales, tokens, JWT, Master Key ni contenido de `.env`. Solo informa el identificador objetivo, resultado y mensajes sanitizados. El objetivo de Caja ya está aplicado en la base PostgreSQL persistente local/de desarrollo y el runner debe rechazar un segundo intento allí.
 
 Procedimiento obligatorio para una aplicación persistente futura:
 
