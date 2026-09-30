@@ -50,5 +50,7 @@ public enum AuditAction
     OperatorSessionStarted = 42,
     OperatorSessionClosed = 43,
     CashCloseAuthorizationRejected = 44,
-    SaleConfirmed = 45
+    SaleConfirmed = 45,
+    SalesDocumentNumberingCreated = 46,
+    SalesDocumentNumberingUpdated = 47
 }

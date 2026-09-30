@@ -94,6 +94,9 @@ public sealed class SalesService(
         var sequence = await repository.GetSaleSequenceForUpdateAsync(installation.Id, installation.Serie, cancellationToken);
         if (sequence is null)
             return Result.Failure<SaleDto>(ApplicationError.Conflict("Debe configurar el consecutivo VENTA para la serie activa antes de vender."));
+        if (sequence.UltimoNumero == long.MaxValue)
+            return Result.Failure<SaleDto>(ApplicationError.NumberingExhausted(
+                "El consecutivo de VENTAS alcanzó el número máximo admitido."));
 
         var normalizedLines = input.Lines!;
         var products = await repository.GetProductsForUpdateAsync(normalizedLines.Select(x => x.ProductId).ToArray(), cancellationToken);
@@ -152,7 +155,7 @@ public sealed class SalesService(
 
         var now = clock.UtcNow;
         var correlationId = Guid.CreateVersion7();
-        sequence.UltimoNumero = checked(sequence.UltimoNumero + 1);
+        sequence.UltimoNumero++;
         var sale = new Venta
         {
             Id = Guid.CreateVersion7(),

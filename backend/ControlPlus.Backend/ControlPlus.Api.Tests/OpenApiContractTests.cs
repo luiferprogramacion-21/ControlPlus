@@ -55,6 +55,10 @@ public sealed class OpenApiContractTests
         AssertProtected(paths, "/api/sales", "get");
         AssertProtected(paths, "/api/sales/own", "get");
         AssertProtected(paths, "/api/sales/{saleId}", "get");
+        AssertProtected(paths, "/api/document-numbering/sales", "get");
+        AssertProtected(paths, "/api/document-numbering/sales", "post");
+        AssertProtected(paths, "/api/document-numbering/sales", "put");
+        Assert.False(paths.GetProperty("/api/document-numbering/sales").TryGetProperty("delete", out _));
 
         AssertAnonymous(paths, "/api/health", "get");
         AssertAnonymous(paths, "/api/auth/login", "post");
@@ -75,6 +79,17 @@ public sealed class OpenApiContractTests
         AssertResponses(paths, "/api/sales", "get", "200", "400", "401", "403");
         AssertResponses(paths, "/api/sales/own", "get", "200", "400", "401", "403");
         AssertResponses(paths, "/api/sales/{saleId}", "get", "200", "401", "403", "404");
+        AssertResponses(paths, "/api/document-numbering/sales", "get", "200", "400", "401", "403", "404", "409");
+        AssertResponses(paths, "/api/document-numbering/sales", "post", "201", "400", "401", "403", "404", "409");
+        AssertResponses(paths, "/api/document-numbering/sales", "put", "200", "400", "401", "403", "404", "409");
+        AssertResponseContentType(paths, "/api/sales", "post", "201", "application/json");
+        AssertResponseContentType(paths, "/api/sales", "post", "409", "application/problem+json");
+        AssertResponseContentType(paths, "/api/document-numbering/sales", "get", "200", "application/json");
+        AssertResponseContentType(paths, "/api/document-numbering/sales", "get", "409", "application/problem+json");
+        AssertResponseContentType(paths, "/api/document-numbering/sales", "post", "201", "application/json");
+        AssertResponseContentType(paths, "/api/document-numbering/sales", "post", "409", "application/problem+json");
+        AssertResponseContentType(paths, "/api/document-numbering/sales", "put", "200", "application/json");
+        AssertResponseContentType(paths, "/api/document-numbering/sales", "put", "409", "application/problem+json");
 
         var saleParameters = paths.GetProperty("/api/sales").GetProperty("post").GetProperty("parameters");
         var idempotency = Assert.Single(saleParameters.EnumerateArray(), parameter =>
@@ -98,6 +113,8 @@ public sealed class OpenApiContractTests
 
         var healthResponse = await client.GetAsync("/api/health");
         Assert.Equal(HttpStatusCode.OK, healthResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.DeleteAsync("/api/document-numbering/sales")).StatusCode);
     }
 
     private static WebApplicationFactory<Program> CreateFactory() =>
@@ -131,5 +148,18 @@ public sealed class OpenApiContractTests
         {
             Assert.True(responses.TryGetProperty(code, out _), $"Missing OpenAPI response {code} for {method.ToUpperInvariant()} {path}.");
         }
+    }
+
+    private static void AssertResponseContentType(
+        JsonElement paths,
+        string path,
+        string method,
+        string statusCode,
+        string contentType)
+    {
+        var content = paths.GetProperty(path).GetProperty(method).GetProperty("responses")
+            .GetProperty(statusCode).GetProperty("content");
+        Assert.True(content.TryGetProperty(contentType, out _),
+            $"Missing OpenAPI content type {contentType} for {statusCode} {method.ToUpperInvariant()} {path}.");
     }
 }

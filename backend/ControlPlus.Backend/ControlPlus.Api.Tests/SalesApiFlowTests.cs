@@ -7,6 +7,7 @@ using System.Text.Json;
 using ControlPlus.Application.Cash.Contracts;
 using ControlPlus.Application.Catalog.Contracts;
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Numbering.Contracts;
 using ControlPlus.Application.Sales.Contracts;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Domain.OfficialModel;
@@ -80,6 +81,156 @@ public sealed class SalesApiFlowTests : IAsyncLifetime
     {
         if (_factory is not null) await _factory.DisposeAsync();
         await _postgres.DisposeAsync();
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task Sale_StillReturnsConflict_WhenSalesNumberingDoesNotExist()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await using (var scope = _factory!.Services.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            context.ConsecutivoDocumento.Remove(await context.ConsecutivoDocumento.SingleAsync(x =>
+                x.TipoDocumento == "VENTA"));
+            await context.SaveChangesAsync();
+        }
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var credential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
+        _ = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var conflict = await PostSaleAsync(
+            client, "missing-sales-numbering", CashRequest(scenario.Products.Standard, 1, 1_000m));
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        Assert.Equal("application/problem+json", conflict.Content.Headers.ContentType?.MediaType);
+        using var problem = JsonDocument.Parse(await conflict.Content.ReadAsStringAsync());
+        Assert.Equal("resource.conflict", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task SalesNumberingUpdate_IsRejected_AfterFirstConfirmedSale()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var credential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
+        _ = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(
+            client, "numbering-update-after-sale", CashRequest(scenario.Products.Standard, 1, 1_000m))).StatusCode);
+
+        SetBearer(client, scenario.Admin.AccessToken);
+        var numbering = await ReadAsync<SalesDocumentNumberingDto>(
+            await client.GetAsync("/api/document-numbering/sales"), HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync(
+            "/api/document-numbering/sales",
+            new UpdateSalesDocumentNumberingRequest("ALT", 10, numbering.Version))).StatusCode);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task ExhaustedNumbering_AllowsLongMaxValueOnce_ThenReturnsStableConflictWithoutAnyWrite()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var numbering = await ReadAsync<SalesDocumentNumberingDto>(
+            await client.GetAsync("/api/document-numbering/sales"), HttpStatusCode.OK);
+        var boundary = await ReadAsync<SalesDocumentNumberingDto>(await client.PutAsJsonAsync(
+            "/api/document-numbering/sales",
+            new UpdateSalesDocumentNumberingRequest("VTA", long.MaxValue, numbering.Version)),
+            HttpStatusCode.OK);
+        Assert.Equal(long.MaxValue - 1, boundary.LastNumber);
+
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var credential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
+        _ = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var lastSaleResponse = await PostSaleAsync(
+            client, "last-available-number", CashRequest(scenario.Products.Standard, 1, 1_000m));
+        Assert.Equal("application/json", lastSaleResponse.Content.Headers.ContentType?.MediaType);
+        var lastSale = await ReadAsync<SaleDto>(lastSaleResponse, HttpStatusCode.Created);
+        Assert.Equal($"VTA-SALESTEST1-{long.MaxValue}", lastSale.VisibleNumber);
+
+        var secondSession = await StartSessionAsync(client, scenario.Admin.AccessToken,
+            scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        var before = await CaptureSalesStateAsync(scenario.Products.Standard, secondSession.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var rejected = await PostSaleAsync(
+            client, "exhausted-numbering", CashRequest(scenario.Products.Standard, 1, 1_000m));
+        Assert.Equal(HttpStatusCode.Conflict, rejected.StatusCode);
+        Assert.Equal("application/problem+json", rejected.Content.Headers.ContentType?.MediaType);
+        var problemJson = await rejected.Content.ReadAsStringAsync();
+        using (var problem = JsonDocument.Parse(problemJson))
+        {
+            Assert.Equal("numbering.exhausted", problem.RootElement.GetProperty("code").GetString());
+            Assert.False(problem.RootElement.TryGetProperty("detail", out _));
+        }
+        Assert.DoesNotContain("OverflowException", problemJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Npgsql", problemJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("stackTrace", problemJson, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(before, await CaptureSalesStateAsync(scenario.Products.Standard, secondSession.Id));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task NumberingUpdateConcurrentWithSale_NeverChangesSequenceAfterSaleConfirmation()
+    {
+        using var setupClient = CreateClient();
+        using var updateClient = CreateClient();
+        using var saleClient = CreateClient();
+        var scenario = await BootstrapAsync(setupClient);
+        await OpenSharedShiftAsync(setupClient, scenario.Admin.AccessToken);
+        var credential = await IssueCredentialAsync(setupClient, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
+        _ = await StartSessionAsync(setupClient, scenario.Cashier.AccessToken, credential);
+        SetBearer(setupClient, scenario.Admin.AccessToken);
+        var numbering = await ReadAsync<SalesDocumentNumberingDto>(
+            await setupClient.GetAsync("/api/document-numbering/sales"), HttpStatusCode.OK);
+        SetBearer(updateClient, scenario.Admin.AccessToken);
+        SetBearer(saleClient, scenario.Cashier.AccessToken);
+
+        await using var blocker = new NpgsqlConnection(_postgres.GetConnectionString());
+        await blocker.OpenAsync();
+        await using var blockerTransaction = await blocker.BeginTransactionAsync();
+        await LockActiveInstallationAsync(blocker, blockerTransaction);
+
+        var updateTask = updateClient.PutAsJsonAsync(
+            "/api/document-numbering/sales",
+            new UpdateSalesDocumentNumberingRequest("RACE", 100, numbering.Version));
+        var saleTask = PostSaleAsync(
+            saleClient, "numbering-update-sale-race", CashRequest(scenario.Products.Standard, 1, 1_000m));
+        await WaitForInstallationLockWaitersAsync(2);
+        await blockerTransaction.CommitAsync();
+
+        var updateResponse = await updateTask;
+        var saleResponse = await saleTask;
+        Assert.Equal(HttpStatusCode.Created, saleResponse.StatusCode);
+        Assert.Contains(updateResponse.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict });
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var persistedSale = await context.Venta.AsNoTracking().SingleAsync();
+        var persistedNumbering = await context.ConsecutivoDocumento.AsNoTracking().SingleAsync(x =>
+            x.TipoDocumento == "VENTA");
+        Assert.Equal(persistedSale.Consecutivo, persistedNumbering.UltimoNumero);
+        Assert.Equal(persistedSale.Prefijo, persistedNumbering.Prefijo);
+        if (updateResponse.StatusCode == HttpStatusCode.OK)
+        {
+            Assert.Equal(100, persistedSale.Consecutivo);
+            Assert.Equal("RACE", persistedSale.Prefijo);
+            Assert.Equal(1, await context.EventoAuditoria.CountAsync(x =>
+                x.Accion == "SALESDOCUMENTNUMBERINGUPDATED"));
+        }
+        else
+        {
+            Assert.Equal(1, persistedSale.Consecutivo);
+            Assert.Equal("VTA", persistedSale.Prefijo);
+            Assert.Equal(0, await context.EventoAuditoria.CountAsync(x =>
+                x.Accion == "SALESDOCUMENTNUMBERINGUPDATED"));
+        }
     }
 
     [Fact]
@@ -976,6 +1127,44 @@ public sealed class SalesApiFlowTests : IAsyncLifetime
         await using var command = new NpgsqlCommand(
             "SELECT is_called FROM ventas.test_sale_commit_observed", connection);
         return (bool)(await command.ExecuteScalarAsync())!;
+    }
+
+    private static async Task LockActiveInstallationAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT id
+            FROM configuracion.instalacion
+            WHERE activo
+            ORDER BY fecha_instalacion, id
+            LIMIT 1
+            FOR UPDATE
+            """, connection, transaction);
+        Assert.NotNull(await command.ExecuteScalarAsync());
+    }
+
+    private async Task WaitForInstallationLockWaitersAsync(int expectedCount)
+    {
+        await using var observer = new NpgsqlConnection(_postgres.GetConnectionString());
+        await observer.OpenAsync();
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            await using var command = new NpgsqlCommand(
+                """
+                SELECT count(*)
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+                  AND wait_event_type = 'Lock'
+                  AND query LIKE '%FROM configuracion.instalacion AS i%'
+                  AND query LIKE '%FOR UPDATE%'
+                """, observer);
+            if ((long)(await command.ExecuteScalarAsync())! >= expectedCount) return;
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"No se observaron {expectedCount} conexiones esperando el bloqueo de instalación.");
     }
 
     private static ConfirmSaleRequest CashRequest(

@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Mvc;
 namespace ControlPlus.Api.Controllers;
 
 [Route("api/sales")]
-[Produces("application/json", "application/problem+json")]
 public sealed class SalesController(
     CurrentActorContextResolver actorContextResolver,
     ISalesService salesService) : ApiControllerBase(actorContextResolver)
@@ -19,12 +18,12 @@ public sealed class SalesController(
     [HttpPost]
     [PermissionAuthorize(PermissionCodes.SalesCreate)]
     [Consumes("application/json")]
-    [ProducesResponseType<SaleDto>(StatusCodes.Status201Created)]
-    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<SaleDto>(StatusCodes.Status201Created, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
     public async Task<IActionResult> Confirm(
         [FromHeader(Name = "Idempotency-Key"), Required] string idempotencyKey,
         [FromBody] ConfirmSaleRequest request,
@@ -39,10 +38,10 @@ public sealed class SalesController(
     /// <summary>Consulta las ventas del usuario autenticado.</summary>
     [HttpGet("own")]
     [PermissionAuthorize(PermissionCodes.SalesOwnRead)]
-    [ProducesResponseType<PagedResult<SaleSummaryDto>>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<PagedResult<SaleSummaryDto>>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
     public async Task<IActionResult> ListOwn([FromQuery] SaleListQuery query, CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
@@ -52,10 +51,10 @@ public sealed class SalesController(
     /// <summary>Consulta el historial general de ventas.</summary>
     [HttpGet]
     [PermissionAuthorize(PermissionCodes.SalesAllRead)]
-    [ProducesResponseType<PagedResult<SaleSummaryDto>>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<PagedResult<SaleSummaryDto>>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
     public async Task<IActionResult> ListAll([FromQuery] SaleListQuery query, CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
@@ -65,10 +64,10 @@ public sealed class SalesController(
     /// <summary>Consulta una venta si pertenece al actor o si este puede leer el historial general.</summary>
     [HttpGet("{saleId:guid}")]
     [Authorize]
-    [ProducesResponseType<SaleDto>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<SaleDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
     public async Task<IActionResult> Get(Guid saleId, CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);

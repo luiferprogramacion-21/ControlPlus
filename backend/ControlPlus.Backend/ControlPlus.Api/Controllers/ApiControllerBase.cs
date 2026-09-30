@@ -38,7 +38,7 @@ public abstract class ApiControllerBase(CurrentActorContextResolver actorContext
         Type = "https://httpstatuses.com/401"
     });
 
-    private ObjectResult ToProblem(ApplicationError error)
+    private IActionResult ToProblem(ApplicationError error)
     {
         if (error.Code.StartsWith("validation.", StringComparison.Ordinal))
         {
@@ -54,29 +54,27 @@ public abstract class ApiControllerBase(CurrentActorContextResolver actorContext
             };
             validationDetails.Extensions["code"] = error.Code;
 
-            var validationResponse = new BadRequestObjectResult(validationDetails);
-            validationResponse.ContentTypes.Add("application/problem+json");
-            return validationResponse;
+            return ValidationProblem(validationDetails);
         }
 
         var statusCode = error.Code switch
         {
             "resource.not_found" => StatusCodes.Status404NotFound,
-            "resource.conflict" or "concurrency.conflict" or "authentication.bootstrap_completed" => StatusCodes.Status409Conflict,
+            "resource.conflict" or "concurrency.conflict" or "numbering.exhausted" or
+                "authentication.bootstrap_completed" => StatusCodes.Status409Conflict,
             "authorization.forbidden" or "authorization.insufficient_role_level" => StatusCodes.Status403Forbidden,
             "authentication.invalid_credentials" or "authentication.unauthorized" => StatusCodes.Status401Unauthorized,
             "security.bootstrap_role_missing" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest
         };
 
-        var details = new ProblemDetails
-        {
-            Status = statusCode,
-            Title = error.Message,
-            Type = $"https://controlplus.local/problems/{error.Code}"
-        };
-        details.Extensions["code"] = error.Code;
-
-        return StatusCode(statusCode, details);
+        return Problem(
+            statusCode: statusCode,
+            title: error.Message,
+            type: $"https://controlplus.local/problems/{error.Code}",
+            extensions: new Dictionary<string, object?>
+            {
+                ["code"] = error.Code
+            });
     }
 }

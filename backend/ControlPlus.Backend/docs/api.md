@@ -39,6 +39,7 @@ Los únicos endpoints anónimos son los de salud y los flujos de autenticación 
 | Productos | `/api/products`, historial de costos y unidades de medida | `PRODUCTS.*` e `INVENTORY.READ` según operación |
 | Caja | `/api/cash` | `CASH.*`, `CONFIGURATION.MANAGE` o `USERS.MANAGE` según operación |
 | Ventas | `/api/sales` | `SALES.CREATE`, `SALES.OWN_READ` o `SALES.ALL_READ` según operación |
+| Numeración de Ventas | `/api/document-numbering/sales` | `NUMBERING.MANAGE` |
 
 Cada usuario tiene exactamente un rol principal. La reasignación se realiza con `POST /api/users/{userId}/roles`; no existe `DELETE /api/users/{userId}/roles/{roleId}` porque no sería válido retirar el único rol.
 
@@ -91,6 +92,16 @@ Las respuestas separan `cashDifference` (contado de efectivo menos esperado de e
 La confirmación crea únicamente ventas `CONTADO` y exige `Idempotency-Key`. Una repetición con el mismo usuario y contenido devuelve la venta original; una reutilización incompatible responde `409`. Efectivo es el único método con `receivedAmount` y cambio. Transferencia y Nequi no usan `receivedAmount`, se aplican exactamente y exigen referencia. En modalidad compartida cada venta queda vinculada a una sesión breve activa y la consume de forma atómica; el siguiente cobro debe iniciar una sesión nueva, aunque pertenezca al mismo operador. Este consumo no declara un cambio real de usuario.
 
 La respuesta `201` incluye la venta, líneas y pagos, sin exponer el costo histórico. Los listados son paginados y respetan permisos efectivos híbridos vigentes. Las respuestas documentadas son `400`, `401`, `403`, `404` y `409` según validación, autenticación, autorización, ausencia o conflicto. El contrato funcional completo está en [sales.md](sales.md).
+
+## Numeración de Ventas
+
+| Método | Ruta | Resultado |
+|---|---|---|
+| `GET` | `/api/document-numbering/sales` | Consulta la configuración `VENTA` de la instalación y serie activas; `404` si falta |
+| `POST` | `/api/document-numbering/sales` | Crea la configuración única; `firstNumber: 1` persiste `lastNumber: 0` |
+| `PUT` | `/api/document-numbering/sales` | Corrige prefijo y primer número solamente antes de la primera venta confirmada |
+
+Los tres endpoints exigen el permiso efectivo `NUMBERING.MANAGE`. Instalación, serie y tipo `VENTA` se resuelven en el servidor y no forman parte de las solicitudes. El prefijo se recorta, se normaliza a mayúsculas, no puede quedar vacío, contener caracteres de control ni superar 10 caracteres. La corrección exige `version`; una versión obsoleta o cualquier venta confirmada para la instalación y serie produce `409`. No existe endpoint de eliminación. Las respuestas solo muestran tipo, serie, prefijo, último número, próximo número y versión.
 
 ## Respuestas de error
 

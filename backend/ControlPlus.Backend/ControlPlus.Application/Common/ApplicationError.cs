@@ -13,6 +13,8 @@ public sealed record ApplicationError(string Code, string Message)
 
     public static ApplicationError ConcurrencyConflict(string message) => new("concurrency.conflict", message);
 
+    public static ApplicationError NumberingExhausted(string message) => new("numbering.exhausted", message);
+
     public static ApplicationError Forbidden(string message = "No tiene permiso para realizar esta acción.") =>
         new("authorization.forbidden", message);
 

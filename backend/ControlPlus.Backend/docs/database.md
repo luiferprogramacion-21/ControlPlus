@@ -14,6 +14,8 @@ La fuente de verdad es `docs/ControlPlus_Fase4_Documento_y_Complementos.zip` des
 
 Las cantidades de producto, venta, compra e inventario permanecen enteras, incluidos los metros, de acuerdo con el documento principal y el script PostgreSQL V3 aprobados.
 
+La administración del consecutivo de Ventas reutiliza `configuracion.consecutivo_documento` sin cambiar el esquema. El registro usa `tipo_documento = 'VENTA'`, la instalación activa y su serie; la unicidad oficial `(instalacion_id, tipo_documento, serie)` impide duplicados. El primer número visible se representa guardando `ultimo_numero = firstNumber - 1`; por ello la configuración inicial aprobada con `firstNumber = 1` guarda cero. Las altas y correcciones bloquean la instalación activa y la corrección usa además el token `version`. Una venta `CONFIRMADA` para la misma instalación y serie vuelve inmutable la configuración mediante la API.
+
 Las migraciones de unidades y Caja están aplicadas y registradas en la base PostgreSQL persistente local/de desarrollo. No modifican `20260912010000_OfficialPhase4Baseline` ni convierten columnas `integer` a tipos decimales.
 
 La migración de Caja usa `numeric(18,0)` para los importes nuevos y no modifica ninguna migración anterior. Antes de DDL comprueba, bajo bloqueo, que `caja.turno_caja` esté vacía. Fue validada en PostgreSQL 17 aislado y aplicada una vez de forma controlada a la base PostgreSQL persistente local/de desarrollo; no debe ejecutarse otra vez ni revertirse en esa instalación. Cualquier operación persistente futura de esquema o datos requiere evaluación, respaldo y autorización específica.
