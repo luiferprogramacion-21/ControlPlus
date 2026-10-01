@@ -52,5 +52,7 @@ public enum AuditAction
     CashCloseAuthorizationRejected = 44,
     SaleConfirmed = 45,
     SalesDocumentNumberingCreated = 46,
-    SalesDocumentNumberingUpdated = 47
+    SalesDocumentNumberingUpdated = 47,
+    InventoryAdjusted = 48,
+    InventoryAdjustmentAuthorizationRejected = 49
 }

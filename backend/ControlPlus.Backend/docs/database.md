@@ -11,6 +11,7 @@ La fuente de verdad es `docs/ControlPlus_Fase4_Documento_y_Complementos.zip` des
 - `20260912012000_HybridPermissionsV1`: agrega las excepciones individuales de permisos, crea las plantillas V1 y ajusta el límite de Administrador a 80 %, sin modificar la migración base.
 - `20260913010000_SeedMeasurementUnitsV1`: registra idempotentemente las unidades V1 Unidad, Paquete y Metro requeridas para crear productos.
 - `20260913020000_CashRegisterModuleV1`: migración publicada y aplicada una vez a la base PostgreSQL persistente local/de desarrollo; agrega `diferencia_total`, detalle inmutable de arqueo y `autorizacion_cierre_turno`, restricciones diferibles y los medios iniciales. Conserva `turno_caja.diferencia = efectivo_contado - efectivo_esperado` y permite varios pagos por movimiento para pagos combinados.
+- `20260930010000_SeedInventoryAdjustmentReasonsV1`: migración nueva todavía no aplicada a PostgreSQL persistente; siembra para cada establecimiento existente los cuatro motivos aprobados de tipo `AJUSTE_INVENTARIO` sin modificar el esquema. Su reversión conserva todos los datos del catálogo y sus referencias; un `Up` posterior es idempotente por establecimiento, tipo y código.
 
 Las cantidades de producto, venta, compra e inventario permanecen enteras, incluidos los metros, de acuerdo con el documento principal y el script PostgreSQL V3 aprobados.
 
@@ -24,7 +25,7 @@ La diferencia por medio y el total tienen signo contado menos esperado. `diferen
 
 ## Inmutabilidad y reversión
 
-Las cinco migraciones enumeradas están publicadas y son inmutables. No se modifican, regeneran ni reemplazan, aunque una corrección posterior afecte su resultado. Las correcciones de esquema o de datos aprobados se realizan mediante una nueva migración compensatoria, revisada y documentada. `20260913020000_CashRegisterModuleV1` ya está aplicada una vez a la base PostgreSQL persistente local/de desarrollo; cualquier operación persistente futura de esquema o datos requiere evaluación, respaldo y autorización específica.
+Las migraciones ya publicadas son inmutables: no se modifican, regeneran ni reemplazan, aunque una corrección posterior afecte su resultado. Las correcciones de esquema o de datos aprobados se realizan mediante una nueva migración compensatoria, revisada y documentada. `20260913020000_CashRegisterModuleV1` ya está aplicada una vez a la base PostgreSQL persistente local/de desarrollo; `20260930010000_SeedInventoryAdjustmentReasonsV1` forma parte del cambio de Inventario aún no publicado ni aplicado allí. Cualquier operación persistente futura de esquema o datos requiere evaluación, respaldo y autorización específica.
 
 `20260912012000_HybridPermissionsV1.Down` no es una reversión completa ni segura de la migración híbrida: no deshace todas las inserciones ni asignaciones de permisos introducidas en `Up`. No debe utilizarse como mecanismo de reversión de una base persistente. Toda reversión persistente exige un respaldo local verificado antes de cualquier operación y una revisión explícita de sus efectos.
 

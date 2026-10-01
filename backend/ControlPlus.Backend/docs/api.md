@@ -37,6 +37,7 @@ Los únicos endpoints anónimos son los de salud y los flujos de autenticación 
 | Auditoría | `GET /api/audit-records` | `AUDIT.READ` |
 | Categorías | `/api/categories` | `CATEGORIES.READ` o `CATEGORIES.MANAGE` |
 | Productos | `/api/products`, historial de costos y unidades de medida | `PRODUCTS.*` e `INVENTORY.READ` según operación |
+| Inventario | `/api/inventory` | `INVENTORY.READ` o `INVENTORY.ADJUST` según operación |
 | Caja | `/api/cash` | `CASH.*`, `CONFIGURATION.MANAGE` o `USERS.MANAGE` según operación |
 | Ventas | `/api/sales` | `SALES.CREATE`, `SALES.OWN_READ` o `SALES.ALL_READ` según operación |
 | Numeración de Ventas | `/api/document-numbering/sales` | `NUMBERING.MANAGE` |
@@ -51,6 +52,25 @@ Cada usuario tiene exactamente un rol principal. La reasignación se realiza con
 - `includeOutOfStock=true` requiere `INVENTORY.READ` para listar todos los agotados.
 - `includeInactive=true` requiere `PRODUCTS.SENSITIVE_UPDATE` para listar todos los inactivos.
 - Crear Categorías o Productos responde `201 Created` y entrega la ubicación del recurso creado.
+
+## Inventario
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| `GET` | `/api/inventory/stock` | `INVENTORY.READ` |
+| `GET` | `/api/inventory/movements` | `INVENTORY.READ` |
+| `GET` | `/api/inventory/adjustment-reasons` | `INVENTORY.ADJUST` |
+| `POST` | `/api/inventory/adjustments` | `INVENTORY.ADJUST` |
+
+El ajuste exige `Idempotency-Key`, versión esperada del producto, delta entero no
+cero, motivo oficial y credenciales de otro usuario con `INVENTORY.ADJUST`
+efectivo. Autorización, movimiento, stock, idempotencia y auditoría se confirman
+en una sola transacción. Los costos de stock y kardex se ocultan si falta
+`PRODUCTS.COSTS_READ`. Consulte [inventory.md](inventory.md) para el contrato y
+las reglas completas.
+Los intentos fallidos del autorizador usan el contador, bloqueo al quinto intento
+y coordinador por cuenta comunes a Login y Caja; los rechazos se auditan sin
+credenciales ni claves idempotentes. Inventario no introduce un rate limit propio.
 
 ## Caja
 

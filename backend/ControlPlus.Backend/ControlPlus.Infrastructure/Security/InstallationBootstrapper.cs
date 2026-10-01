@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Infrastructure.Persistence.Official;
@@ -58,9 +60,25 @@ public sealed class InstallationBootstrapper(OfficialControlPlusDbContext dbCont
             Instalacion = installation
         };
 
+        var inventoryReasons = InventoryReasons.Select((reason, index) => new MotivoOperacion
+        {
+            Id = DeterministicInventoryReasonId(establishment.Id, reason.Code),
+            EstablecimientoId = establishment.Id,
+            TipoOperacion = "AJUSTE_INVENTARIO",
+            Codigo = reason.Code,
+            Nombre = reason.Description,
+            Descripcion = reason.Description,
+            OrdenVisual = (index + 1) * 10,
+            Activo = true,
+            FechaCreacion = now,
+            Version = 1,
+            Establecimiento = establishment
+        }).ToArray();
+
         await dbContext.Establecimiento.AddAsync(establishment, cancellationToken);
         await dbContext.Instalacion.AddAsync(installation, cancellationToken);
         await dbContext.Terminal.AddAsync(terminal, cancellationToken);
+        await dbContext.MotivoOperacion.AddRangeAsync(inventoryReasons, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -68,4 +86,19 @@ public sealed class InstallationBootstrapper(OfficialControlPlusDbContext dbCont
         string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("A non-empty installation value is required.", name)
             : value.Trim();
+
+    private static Guid DeterministicInventoryReasonId(Guid establishmentId, string code)
+    {
+        var value = $"controlplus.inventory-reason.{establishmentId:D}.{code}";
+        var hexadecimal = Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(value)));
+        return Guid.ParseExact(hexadecimal, "N");
+    }
+
+    private static readonly (string Code, string Description)[] InventoryReasons =
+    [
+        ("CONTEO_FISICO", "Diferencia encontrada al contar existencias."),
+        ("MERMA_DANO", "Producto dañado o no vendible."),
+        ("PERDIDA", "Pérdida o faltante."),
+        ("CORRECCION_REGISTRO", "Corrección documentada de un registro previo.")
+    ];
 }

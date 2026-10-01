@@ -114,4 +114,57 @@ internal static class AuditWriter
             terminalId: terminalId);
         return auditRepository.AddAsync(auditRecord, cancellationToken);
     }
+
+    public static Task WriteInventoryAsync(
+        IAuditRepository auditRepository,
+        IClock clock,
+        Guid actorUserId,
+        Guid authorizerUserId,
+        Guid movementId,
+        string reason,
+        object details,
+        Guid correlationId,
+        Guid terminalId,
+        CancellationToken cancellationToken)
+    {
+        var serializedDetails = JsonSerializer.Serialize(details);
+        var auditRecord = AuditRecord.Create(
+            actorUserId,
+            AuditAction.InventoryAdjusted,
+            "MovimientoInventario",
+            movementId,
+            serializedDetails,
+            clock.UtcNow,
+            correlationId.ToString(),
+            authorizerUserId,
+            terminalId: terminalId,
+            reason: reason);
+        return auditRepository.AddAsync(auditRecord, cancellationToken);
+    }
+
+    public static Task WriteInventoryFailureAsync(
+        IAuditRepository auditRepository,
+        IClock clock,
+        Guid actorUserId,
+        Guid productId,
+        object details,
+        Guid correlationId,
+        Guid? authorizerUserId,
+        Guid terminalId,
+        CancellationToken cancellationToken)
+    {
+        var serializedDetails = JsonSerializer.Serialize(details);
+        var auditRecord = AuditRecord.Create(
+            actorUserId,
+            AuditAction.InventoryAdjustmentAuthorizationRejected,
+            "Producto",
+            productId,
+            serializedDetails,
+            clock.UtcNow,
+            correlationId.ToString(),
+            authorizerUserId,
+            terminalId: terminalId,
+            result: "FALLIDO");
+        return auditRepository.AddAsync(auditRecord, cancellationToken);
+    }
 }

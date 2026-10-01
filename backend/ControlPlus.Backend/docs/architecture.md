@@ -46,6 +46,15 @@ El módulo de Caja mantiene un solo turno abierto y el historial Caja 1:N Turnos
 
 El primer corte de Ventas implementa solamente `CONTADO`. Domain concentra límites, redondeo, distribución por mayores residuos y protección de costo; Application coordina contratos y la transacción; Infrastructure bloquea filas oficiales mediante `OfficialControlPlusDbContext`; API publica confirmación y consultas protegidas. La transacción serializa por instalación, bloquea turno, consecutivo y productos, y confirma venta, pagos, movimiento canónico `VENTA`, inventario, stock, idempotencia y auditoría. En modo compartido persiste primero con una sesión breve activa, la vincula de forma exclusiva a la venta y la consume antes del mismo commit para cumplir el trigger y el índice único oficiales. `CAMBIO_OPERADOR` se conserva solo como código técnico de cierre admitido por el esquema; la auditoría no lo presenta como un cambio real de usuario. La impresión permanece desacoplada y fuera de este corte.
 
+Inventario reutiliza el kardex oficial `compras.movimiento_inventario`. Las
+consultas trabajan sin seguimiento y ocultan costos sin `PRODUCTS.COSTS_READ`.
+Los ajustes usan primero el coordinador de credenciales compartido con Login y
+Caja; luego bloquean instalación, autorizador y producto, en ese orden; validan el
+token oficial `producto.version` y confirman autorización de doble control, stock,
+movimiento, idempotencia y auditoría en una transacción `ReadCommitted`. La
+instalación es la primera barrera compartida con Ventas, por lo que una carrera
+venta-ajuste conserva una secuencia única de saldos.
+
 La administración mínima del consecutivo de Ventas usa la entidad oficial `configuracion.consecutivo_documento`, sin migración ni tabla paralela. Application fija `tipo_documento = 'VENTA'` y deriva instalación/serie de la instalación activa. Infrastructure bloquea primero esa instalación con `FOR UPDATE`, el mismo orden inicial usado por Ventas, para serializar creaciones y correcciones; al corregir bloquea también el consecutivo y comprueba que no exista una venta `CONFIRMADA`. El token oficial `version` protege actualizaciones obsoletas. Configuración y auditoría se confirman en una sola transacción y el permiso efectivo se resuelve desde estado vigente con `NUMBERING.MANAGE`.
 
 No existe un `ModelSnapshot` parcial creado para aparentar cobertura del modelo. Si se adopta una estrategia de snapshot o generación asistida por EF Core, deberá representar el modelo oficial completo y demostrarlo mediante una creación limpia de la base. La decisión y sus consecuencias se detallan en [0001-persistencia-concurrencia-y-migraciones.md](decisions/0001-persistencia-concurrencia-y-migraciones.md).

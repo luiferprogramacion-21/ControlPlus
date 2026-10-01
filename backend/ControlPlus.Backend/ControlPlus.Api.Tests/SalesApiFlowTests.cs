@@ -41,7 +41,8 @@ public sealed class SalesApiFlowTests : IAsyncLifetime
         "20260912011000_SeedApprovedSecurityCatalog",
         "20260912012000_HybridPermissionsV1",
         "20260913010000_SeedMeasurementUnitsV1",
-        "20260913020000_CashRegisterModuleV1"
+        "20260913020000_CashRegisterModuleV1",
+        "20260930010000_SeedInventoryAdjustmentReasonsV1"
     ];
 
     private readonly string _masterKey = RandomSecret(48);

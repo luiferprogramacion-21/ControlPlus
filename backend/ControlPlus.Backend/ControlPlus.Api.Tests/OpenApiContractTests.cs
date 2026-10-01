@@ -58,7 +58,17 @@ public sealed class OpenApiContractTests
         AssertProtected(paths, "/api/document-numbering/sales", "get");
         AssertProtected(paths, "/api/document-numbering/sales", "post");
         AssertProtected(paths, "/api/document-numbering/sales", "put");
+        AssertProtected(paths, "/api/inventory/stock", "get");
+        AssertProtected(paths, "/api/inventory/movements", "get");
+        AssertProtected(paths, "/api/inventory/adjustment-reasons", "get");
+        AssertProtected(paths, "/api/inventory/adjustments", "post");
         Assert.False(paths.GetProperty("/api/document-numbering/sales").TryGetProperty("delete", out _));
+        foreach (var inventoryPath in new[]
+                 {
+                     "/api/inventory/stock", "/api/inventory/movements",
+                     "/api/inventory/adjustment-reasons", "/api/inventory/adjustments"
+                 })
+            Assert.False(paths.GetProperty(inventoryPath).TryGetProperty("delete", out _));
 
         AssertAnonymous(paths, "/api/health", "get");
         AssertAnonymous(paths, "/api/auth/login", "post");
@@ -82,6 +92,14 @@ public sealed class OpenApiContractTests
         AssertResponses(paths, "/api/document-numbering/sales", "get", "200", "400", "401", "403", "404", "409");
         AssertResponses(paths, "/api/document-numbering/sales", "post", "201", "400", "401", "403", "404", "409");
         AssertResponses(paths, "/api/document-numbering/sales", "put", "200", "400", "401", "403", "404", "409");
+        AssertResponses(paths, "/api/inventory/stock", "get", "200", "400", "401", "403");
+        AssertResponses(paths, "/api/inventory/movements", "get", "200", "400", "401", "403");
+        AssertResponses(paths, "/api/inventory/adjustment-reasons", "get", "200", "401", "403");
+        AssertResponses(paths, "/api/inventory/adjustments", "post", "201", "400", "401", "403", "404", "409");
+        AssertResponseContentType(paths, "/api/inventory/adjustments", "post", "201", "application/json");
+        AssertResponseContentType(paths, "/api/inventory/adjustments", "post", "400", "application/problem+json");
+        AssertResponseContentType(paths, "/api/inventory/adjustments", "post", "403", "application/problem+json");
+        AssertResponseContentType(paths, "/api/inventory/adjustments", "post", "409", "application/problem+json");
         AssertResponseContentType(paths, "/api/sales", "post", "201", "application/json");
         AssertResponseContentType(paths, "/api/sales", "post", "409", "application/problem+json");
         AssertResponseContentType(paths, "/api/document-numbering/sales", "get", "200", "application/json");
@@ -96,6 +114,12 @@ public sealed class OpenApiContractTests
             parameter.GetProperty("name").GetString() == "Idempotency-Key");
         Assert.Equal("header", idempotency.GetProperty("in").GetString());
         Assert.True(idempotency.GetProperty("required").GetBoolean());
+
+        var adjustmentParameters = paths.GetProperty("/api/inventory/adjustments").GetProperty("post").GetProperty("parameters");
+        var adjustmentIdempotency = Assert.Single(adjustmentParameters.EnumerateArray(), parameter =>
+            parameter.GetProperty("name").GetString() == "Idempotency-Key");
+        Assert.Equal("header", adjustmentIdempotency.GetProperty("in").GetString());
+        Assert.True(adjustmentIdempotency.GetProperty("required").GetBoolean());
 
         var schemas = root.GetProperty("components").GetProperty("schemas");
         foreach (var name in new[] { "CashShiftDto", "CashReconciliationDto" })

@@ -60,11 +60,11 @@ Los códigos estables se agrupan por módulo: `USERS.*`, `ROLES.*`, `PERMISSIONS
 - No se permite vender por debajo del costo.
 - Precio mayorista y descuento manual no se acumulan.
 - Crédito, cambios posteriores y autorizaciones sensibles requieren ejecutor y autorizador distintos.
-- El autorizador debe estar validado y tener rol base Supervisor o Administrador.
+- El autorizador debe estar validado y conservar el permiso efectivo exigido por la operación. Inventario exige `INVENTORY.ADJUST` y no agrega una restricción de rol por encima del permiso efectivo.
 - No se puede dejar el sistema sin al menos un Administrador activo con permisos de seguridad.
 - Cliente es obligatorio para crédito y apartado.
 - La anulación de venta, el cambio posterior y la cancelación de apartado requieren Supervisor o Administrador.
-- Solo Administrador decide el monto devuelto al cancelar un apartado, cambia datos sensibles de producto, ajusta inventario, cancela pedidos o compras y autoriza excepciones de recepción.
+- Solo Administrador decide el monto devuelto al cancelar un apartado, cambia datos sensibles de producto, cancela pedidos o compras y autoriza excepciones de recepción. Ajustar inventario pertenece por defecto al Administrador, pero puede delegarse o revocarse mediante excepciones individuales de `INVENTORY.ADJUST`.
 - Toda operación crítica y todo cambio de permisos se audita.
 
 El primer corte de Ventas distribuye el descuento general por detalle antes de confirmar la operación para comprobar el costo de cada producto. La venta histórica y su auditoría conservan precio original, porcentaje o valor aplicado, precio final, motivo y ejecutor. Este corte no admite descuentos que requieran autorizador: superar el límite efectivo o vender bajo costo se rechaza.

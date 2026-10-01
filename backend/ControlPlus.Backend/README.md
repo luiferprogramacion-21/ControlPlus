@@ -78,6 +78,7 @@ Más detalles:
 - [API](docs/api.md)
 - [Seguridad](docs/security.md)
 - [Catálogo](docs/catalog.md)
+- [Inventario](docs/inventory.md)
 - [Caja](docs/cash.md)
 - Caja conserva la diferencia oficial de efectivo y separa el total; su migración pendiente exige ausencia de turnos previos y conserva métodos de pago al revertir. La validación de estas correcciones usa únicamente Testcontainers; no despliega servicios ni migra PostgreSQL persistente.
 - [Base de datos](docs/database.md)

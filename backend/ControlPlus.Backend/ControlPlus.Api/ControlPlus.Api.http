@@ -16,6 +16,9 @@
 @operatorSessionId = paste-the-operator-session-id
 @authorizerUser = paste-a-different-supervisor-or-administrator-user-name
 @authorizerPassword = paste-the-authorizer-password-locally
+@inventoryReasonId = paste-an-active-inventory-adjustment-reason-id
+@productVersion = paste-the-current-product-version
+@inventoryIdempotencyKey = replace-with-a-unique-local-inventory-key
 
 ### Instalación inicial (solo funciona mientras no exista ningún usuario)
 POST {{host}}/api/auth/setup
@@ -268,6 +271,38 @@ Content-Type: application/json
   ],
   "differenceReasonId": "{{cashDifferenceReasonId}}",
   "differenceObservation": "Reemplace localmente por la observación real",
+  "authorization": {
+    "userName": "{{authorizerUser}}",
+    "password": "{{authorizerPassword}}"
+  }
+}
+
+### Consultar existencias de Inventario
+GET {{host}}/api/inventory/stock?page=1&pageSize=50
+Authorization: Bearer {{token}}
+
+### Consultar kardex de un producto
+GET {{host}}/api/inventory/movements?productId={{productId}}&page=1&pageSize=50
+Authorization: Bearer {{token}}
+
+### Consultar motivos activos de ajuste
+GET {{host}}/api/inventory/adjustment-reasons
+Authorization: Bearer {{token}}
+
+### Registrar ajuste de Inventario con doble control
+# quantityDelta positivo crea AJUSTE_ENTRADA; negativo crea AJUSTE_SALIDA.
+# El autorizador debe ser otro usuario con INVENTORY.ADJUST efectivo.
+POST {{host}}/api/inventory/adjustments
+Authorization: Bearer {{token}}
+Idempotency-Key: {{inventoryIdempotencyKey}}
+Content-Type: application/json
+
+{
+  "productId": "{{productId}}",
+  "quantityDelta": 1,
+  "reasonId": "{{inventoryReasonId}}",
+  "expectedVersion": {{productVersion}},
+  "observation": "Reemplace localmente por la observación real",
   "authorization": {
     "userName": "{{authorizerUser}}",
     "password": "{{authorizerPassword}}"

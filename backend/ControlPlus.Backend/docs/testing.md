@@ -10,6 +10,20 @@ La suite incluye dominio, infraestructura/esquema y API. Debe ejecutarse complet
 
 Las pruebas de dominio validan el quinto intento fallido, el reinicio del contador, la reactivación jerárquica, la reasignación válida del único rol principal, las reglas puras de Caja y la política de precios de Ventas: límites 5/20/80, redondeo COP, mayores residuos y costo. `OfficialSchemaIntegrationTests` aplica las migraciones en PostgreSQL 17 aislado y comprueba el esquema, permisos, unidades, cantidades enteras, tokens `version`, conflictos reales entre dos actualizaciones con la misma versión y la extensión de arqueo del módulo de Caja.
 
+`InventoryAdjustmentPolicyTests` valida entradas y salidas enteras, producto activo,
+desbordamiento, stock no negativo y la protección de cantidades reservadas.
+`InventoryApiFlowTests` usa PostgreSQL 17 efímero para comprobar permisos efectivos
+con concesión y revocación individual del ejecutor y autorizador, doble control,
+motivos, JSON estricto, límites enteros, reservas, producto inactivo, ocultamiento
+de costos también en replays, idempotencia y auditoría sanitizada. Las carreras
+reales ajuste-ajuste, venta-ajuste e inventario-login ejercitan los bloqueos
+compartidos. Un trigger diferible observa autorización, stock/versión, kardex,
+idempotencia, auditoría y reinicio del autorizador antes de forzar un error en
+`COMMIT`; luego se verifica el rollback completo y la conservación de entidades
+ajenas. `InventoryReasonMigrationTests` aplica la cadena hasta Caja, crea varios
+establecimientos y verifica `Up/Down/Up`, UUID preexistentes y motivos ya
+referenciados.
+
 `SecurityApiFlowTests` recorre la instalación inicial, Master Key, login, JWT, `/me`, seguridad híbrida, reasignación de rol e invalidación de sesión, Categorías, Productos, códigos de barras, agotados, filtros de agotados e inactivos, historial de costos y auditoría. Las pruebas verifican que una solicitud de edición con versión obsoleta reciba `409`, que una edición de código de barras inconsistente reciba `400`, y que la búsqueda directa de agotados siga permitida con `PRODUCTS.READ`.
 
 Las pruebas de configuración cubren Master Key ausente, demasiado corta, válida e inválida sin usar secretos reales. Las pruebas del manejador de concurrencia verifican el `ProblemDetails` de conflicto. Las pruebas del documento OpenAPI verifican Bearer JWT, operaciones públicas y protegidas, ausencia del endpoint residual de eliminación de rol y las respuestas principales, incluidos `201 Created` para Categorías y Productos.
