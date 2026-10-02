@@ -68,6 +68,21 @@ public static class ControlledMigrationRunner
                 return Rejected(safeTarget, "the pending migration sequence is not coherent");
             }
 
+            if (string.Equals(
+                    targetMigration,
+                    InventoryMigrationManifest.TargetMigration,
+                    StringComparison.Ordinal) &&
+                (!applied.SequenceEqual(
+                    InventoryMigrationManifest.RequiredPreviousMigrations,
+                    StringComparer.Ordinal) ||
+                 targetIndex != applied.Length ||
+                 targetIndex - applied.Length + 1 != 1))
+            {
+                return Rejected(
+                    safeTarget,
+                    "Inventory requires Caja as the fifth and last applied migration and can only apply Inventory");
+            }
+
             var requestedSequence = expectedPending.Take(targetIndex - applied.Length + 1).ToArray();
             if (requestedSequence.Length == 0 ||
                 !string.Equals(requestedSequence[^1], targetMigration, StringComparison.Ordinal))

@@ -11,7 +11,7 @@ La fuente de verdad es `docs/ControlPlus_Fase4_Documento_y_Complementos.zip` des
 - `20260912012000_HybridPermissionsV1`: agrega las excepciones individuales de permisos, crea las plantillas V1 y ajusta el límite de Administrador a 80 %, sin modificar la migración base.
 - `20260913010000_SeedMeasurementUnitsV1`: registra idempotentemente las unidades V1 Unidad, Paquete y Metro requeridas para crear productos.
 - `20260913020000_CashRegisterModuleV1`: migración publicada y aplicada una vez a la base PostgreSQL persistente local/de desarrollo; agrega `diferencia_total`, detalle inmutable de arqueo y `autorizacion_cierre_turno`, restricciones diferibles y los medios iniciales. Conserva `turno_caja.diferencia = efectivo_contado - efectivo_esperado` y permite varios pagos por movimiento para pagos combinados.
-- `20260930010000_SeedInventoryAdjustmentReasonsV1`: migración nueva todavía no aplicada a PostgreSQL persistente; siembra para cada establecimiento existente los cuatro motivos aprobados de tipo `AJUSTE_INVENTARIO` sin modificar el esquema. Su reversión conserva todos los datos del catálogo y sus referencias; un `Up` posterior es idempotente por establecimiento, tipo y código.
+- `20260930010000_SeedInventoryAdjustmentReasonsV1`: migración publicada en código y todavía pendiente de aplicación en PostgreSQL persistente local; siembra para cada establecimiento existente los cuatro motivos aprobados de tipo `AJUSTE_INVENTARIO` sin modificar el esquema. Su reversión conserva todos los datos del catálogo y sus referencias; un `Up` posterior es idempotente por establecimiento, tipo y código.
 
 Las cantidades de producto, venta, compra e inventario permanecen enteras, incluidos los metros, de acuerdo con el documento principal y el script PostgreSQL V3 aprobados.
 
@@ -25,7 +25,7 @@ La diferencia por medio y el total tienen signo contado menos esperado. `diferen
 
 ## Inmutabilidad y reversión
 
-Las migraciones ya publicadas son inmutables: no se modifican, regeneran ni reemplazan, aunque una corrección posterior afecte su resultado. Las correcciones de esquema o de datos aprobados se realizan mediante una nueva migración compensatoria, revisada y documentada. `20260913020000_CashRegisterModuleV1` ya está aplicada una vez a la base PostgreSQL persistente local/de desarrollo; `20260930010000_SeedInventoryAdjustmentReasonsV1` forma parte del cambio de Inventario aún no publicado ni aplicado allí. Cualquier operación persistente futura de esquema o datos requiere evaluación, respaldo y autorización específica.
+Las migraciones ya publicadas son inmutables: no se modifican, regeneran ni reemplazan, aunque una corrección posterior afecte su resultado. Las correcciones de esquema o de datos aprobados se realizan mediante una nueva migración compensatoria, revisada y documentada. `20260913020000_CashRegisterModuleV1` ya está aplicada una vez a la base PostgreSQL persistente local/de desarrollo; `20260930010000_SeedInventoryAdjustmentReasonsV1` está publicada en código pero aún no aplicada allí. Cualquier operación persistente futura de esquema o datos requiere evaluación, respaldo y autorización específica.
 
 `20260912012000_HybridPermissionsV1.Down` no es una reversión completa ni segura de la migración híbrida: no deshace todas las inserciones ni asignaciones de permisos introducidas en `Up`. No debe utilizarse como mecanismo de reversión de una base persistente. Toda reversión persistente exige un respaldo local verificado antes de cualquier operación y una revisión explícita de sus efectos.
 
@@ -41,7 +41,7 @@ La concurrencia optimista no requiere columnas nuevas: las 27 entidades oficiale
 
 ## Migrador controlado de la imagen API
 
-`ControlPlusDbContext` es el contexto responsable de la cadena y de `__EFMigrationsHistory`; `OfficialControlPlusDbContext` sigue reservado para la operación normal. Un parser único selecciona servidor normal, healthcheck, preflight o migración antes de construir configuración o servidor HTTP. Solo admite cero argumentos, `--health-check`, `--migrate-to <MigrationId>` o `--preflight-to <MigrationId>`. El identificador tiene longitud de 1 a 200 y solo acepta ASCII alfanumérico o `_`; nunca puede estar vacío ni comenzar por `--`. Cualquier otra forma devuelve código 2 y `Command line rejected` sin conexión ni escucha. Los dos modos de base de datos exigen que el entorno contenga exactamente `CONTROLPLUS_MIGRATIONS_ENABLED=true`.
+`ControlPlusDbContext` es el contexto responsable de la cadena y de `__EFMigrationsHistory`; `OfficialControlPlusDbContext` sigue reservado para la operación normal. Un parser único selecciona servidor normal, healthcheck, preflight, migración o postflight antes de construir configuración o servidor HTTP. Solo admite cero argumentos, `--health-check`, `--migrate-to <MigrationId>`, `--preflight-to <MigrationId>` o `--postflight-to <MigrationId> --expect-unrelated-reasons-sha256 <64-hex-sha256>`. El identificador tiene longitud de 1 a 200 y solo acepta ASCII alfanumérico o `_`; la huella acepta exactamente 64 caracteres hexadecimales ASCII. Cualquier otra forma devuelve código 2 y `Command line rejected` sin conexión ni escucha. Los tres modos controlados de base de datos exigen que el entorno contenga exactamente `CONTROLPLUS_MIGRATIONS_ENABLED=true`.
 
 `--preflight-to 20260913020000_CashRegisterModuleV1` admite exclusivamente ese objetivo. Abre mediante Npgsql una transacción `REPEATABLE READ`, la establece `READ ONLY` antes de leer y confirma `transaction_read_only=on` al inicio y al final. Un manifiesto tipado compartido define las dos tablas, la columna, los seis índices con tabla/columnas, las nueve funciones con firma/retorno, los once triggers con tabla y las siete restricciones base con nombre, tabla, tipo, validación y columnas. El runner verifica además la cadena EF exacta, las cuatro filas anteriores de `__EFMigrationsHistory`, objetivo pendiente y ausencia de turnos. Las consultas son estáticas y parametrizadas, no usan `psql`, shell, SQL dinámico, agregaciones/comparaciones de arrays ni concatenación de tipos PostgreSQL.
 
@@ -54,6 +54,37 @@ docker compose run --rm --no-deps `
 ```
 
 El código `0` certifica todas las precondiciones, `2` indica que al menos una no se cumple o que gate/objetivo son inválidos y `1` indica un fallo técnico sanitizado. El preflight no aplica migraciones, no crea respaldos, no modifica datos, no hace commit y no intenta rollback de esquema. Como el objetivo ya está aplicado en la base PostgreSQL persistente local/de desarrollo, no corresponde repetir ese preflight allí.
+
+Para Inventario, un segundo manifiesto tipado fija exactamente `20260930010000_SeedInventoryAdjustmentReasonsV1`, las cinco predecesoras terminando en Caja y los motivos `CONTEO_FISICO`, `MERMA_DANO`, `PERDIDA` y `CORRECCION_REGISTRO`, con órdenes 10/20/30/40, prefijo de UUID determinista, nombre, descripción y estado activo. También define nombre, tipo PostgreSQL, longitud cuando aplica y nulabilidad exacta para las once columnas de `configuracion.motivo_operacion`: `id`, `establecimiento_id`, `tipo_operacion`, `codigo`, `nombre`, `descripcion`, `orden_visual`, `activo`, `fecha_creacion`, `fecha_modificacion` y `version`. `--preflight-to` exige historial `5/5/0`, objetivo pendiente, esa forma de tabla, la forma de `uq_motivo_operacion_tipo_codigo`, ausencia global y por código de los motivos aprobados y ausencia de colisiones UUID. Evalúa conjuntamente el total, el desglose por código, UUID naturales incorrectos y colisiones antes de rechazar.
+
+El preflight cuenta establecimientos y motivos ajenos y calcula sobre estos últimos una huella SHA-256 canónica. Las filas se ordenan por UUID y las once columnas se serializan con longitudes, tipos binarios, UTF-8 y cultura invariantes; se excluyen únicamente las claves aprobadas de Inventario. La salida expone solo `motivos_ajenos=<conteo>` y `motivos_ajenos_sha256=<64-hex>`, además de métricas agregadas; no imprime nombres ni contenido de las filas. El valor `motivos_ajenos_sha256` debe capturarse literalmente antes de ejecutar la migración.
+
+El migrador trata Inventario como un objetivo de aplicación única: Caja debe ser exactamente la quinta y última migración aplicada. Rechaza cuatro predecesoras, objetivo ya aplicado, historial extra o incoherente; por ello nunca aplica Caja e Inventario en la misma ejecución. El comportamiento controlado existente de Caja se conserva.
+
+`--postflight-to 20260930010000_SeedInventoryAdjustmentReasonsV1 --expect-unrelated-reasons-sha256 <64-hex-sha256>` es un modo cerrado de solo lectura. Exige historial `6/6/0`, una sola fila del objetivo y, para `E` establecimientos, exactamente `4×E` filas aprobadas: una por código y establecimiento, UUID determinista, nombre, descripción, orden y estado activo exactos. Recalcula la huella excluyendo únicamente esos cuatro motivos aprobados y rechaza si difiere de la capturada en preflight, lo que detecta adición, eliminación o modificación de una fila ajena. Preflight y postflight no resuelven `IMigrator`, no ejecutan DDL, no llaman HTTP y no realizan escritura.
+
+La huella compara dos instantáneas controladas; no constituye una garantía contra escrituras simultáneas antes, durante o después de cada transacción. La aplicación persistente futura requiere una ventana de mantenimiento que bloquee cambios externos desde antes del preflight hasta después del postflight.
+
+Los comandos futuros de Inventario, documentados pero no ejecutados en esta preparación, son:
+
+```powershell
+docker compose run --rm --no-deps `
+  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
+  api --preflight-to 20260930010000_SeedInventoryAdjustmentReasonsV1
+
+$inventoryReasonsSha256 = '<valor motivos_ajenos_sha256 emitido por el preflight>'
+
+docker compose run --rm --no-deps `
+  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
+  api --migrate-to 20260930010000_SeedInventoryAdjustmentReasonsV1
+
+docker compose run --rm --no-deps `
+  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
+  api --postflight-to 20260930010000_SeedInventoryAdjustmentReasonsV1 `
+  --expect-unrelated-reasons-sha256 $inventoryReasonsSha256
+```
+
+La migración está publicada en código, pero sigue pendiente en la base PostgreSQL persistente local. Cada comando futuro requiere autorización propia y las precondiciones operativas aplicables; no deben encadenarse ni ejecutarse automáticamente.
 
 El runner rechaza destinos vacíos, inexistentes, ya aplicados o anteriores al último aplicado. También rechaza historiales que no sean un prefijo exacto del catálogo y secuencias pendientes incoherentes. La única operación permitida es aplicar la secuencia ascendente pendiente cuyo último elemento sea exactamente el destino solicitado. No existe una opción para aplicar genéricamente todo lo pendiente.
 
@@ -82,7 +113,7 @@ La API normal no llama `Migrate`, `MigrateAsync`, `EnsureCreated` ni equivalente
 
 `OfficialSchemaIntegrationTests` inicia PostgreSQL 17 con Testcontainers, aplica la cadena completa y verifica las 61 tablas resultantes, sus PK/FK restrictivas, catálogos, importes `numeric(18,0)`, cantidades enteras y concurrencia entre EF Core y PostgreSQL. Las pruebas específicas de Caja ejercitan transición, reversión, inmutabilidad, consumo de autorizaciones y rollback.
 
-`ControlledMigrationTests` ejecuta el DLL real contra PostgreSQL 17 efímero y demuestra gates, destino obligatorio, rechazo de destinos inexistentes/aplicados/reversos, aplicación exacta y única, ausencia de servidor HTTP, no migración durante el arranque normal y sanitización de secretos. `ControlledPreflightTests` recorre individualmente todos los elementos del manifiesto, elimina cada restricción base y comprueba también tipo, columnas y estado de validación incorrectos. `ControlledMigrationCommandLineTests` ejecuta el DLL real sin cadena de conexión para toda la matriz rechazada y confirma código 2, ausencia de conexión y ausencia de escucha HTTP.
+`ControlledMigrationTests` ejecuta el DLL real contra PostgreSQL 17 efímero y demuestra gates, destino obligatorio, rechazo de destinos inexistentes/aplicados/reversos, aplicación exacta y única, ausencia de servidor HTTP, no migración durante el arranque normal y sanitización de secretos. `ControlledPreflightTests` conserva la regresión completa del manifiesto de Caja. `ControlledInventoryMigrationTests` cubre las once columnas del manifiesto, incluidos rechazos individuales de `fecha_creacion`, `fecha_modificacion` y `version`; historia `5/5/0` y `6/6/0`; desglose por código y métricas UUID; aplicación única; varios establecimientos; y rechazo del postflight ante modificación, eliminación o adición de motivos ajenos. `ControlledMigrationCommandLineTests` ejecuta el DLL real sin cadena de conexión para toda la gramática cerrada, incluida la huella SHA-256 obligatoria, y confirma código 2, ausencia de conexión y ausencia de escucha HTTP.
 
 ```powershell
 dotnet test ControlPlus.Infrastructure.Tests

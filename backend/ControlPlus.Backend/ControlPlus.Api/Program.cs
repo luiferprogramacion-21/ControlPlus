@@ -67,6 +67,20 @@ if (controlledCommand.Mode == ControlledExecutionMode.Preflight)
     return;
 }
 
+if (controlledCommand.Mode == ControlledExecutionMode.Postflight)
+{
+    var postflightBuilder = WebApplication.CreateBuilder(args);
+    var postflightResult = await ControlledPostflightRunner.RunAsync(
+        postflightBuilder.Configuration,
+        controlledCommand.TargetMigration!,
+        controlledCommand.ExpectedUnrelatedReasonsSha256!);
+
+    var postflightOutput = postflightResult.ExitCode == 0 ? Console.Out : Console.Error;
+    postflightOutput.WriteLine(postflightResult.Message);
+    Environment.ExitCode = postflightResult.ExitCode;
+    return;
+}
+
 if (controlledCommand.Mode == ControlledExecutionMode.Migration)
 {
     var migrationBuilder = WebApplication.CreateBuilder(args);

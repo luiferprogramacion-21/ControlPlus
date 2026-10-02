@@ -13,6 +13,7 @@ public static class ControlledPreflightRunner
     public const int FailedExitCode = 1;
     public const int RejectedExitCode = 2;
     public const string CashMigration = CashRegisterPreflightManifest.TargetMigration;
+    public const string InventoryMigration = InventoryMigrationManifest.TargetMigration;
 
     public static async Task<ControlledPreflightResult> RunAsync(
         IConfiguration configuration,
@@ -25,6 +26,14 @@ public static class ControlledPreflightRunner
         }
 
         var safeTarget = targetMigration;
+
+        if (string.Equals(targetMigration, InventoryMigration, StringComparison.Ordinal))
+        {
+            return await InventoryPreflightRunner.RunAsync(
+                configuration,
+                targetMigration,
+                cancellationToken);
+        }
 
         if (!string.Equals(targetMigration, CashMigration, StringComparison.Ordinal))
         {

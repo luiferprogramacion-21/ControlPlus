@@ -34,7 +34,7 @@ Compose mantiene PostgreSQL en el volumen `controlplus_postgres_data`; no use `d
 
 ## Migraciones
 
-La API no aplica migraciones al iniciar. La línea de comandos acepta exclusivamente: cero argumentos para el servidor normal, `--health-check`, `--migrate-to <MigrationId>` o `--preflight-to <MigrationId>`. `MigrationId` debe tener entre 1 y 200 caracteres y contener únicamente letras o dígitos ASCII y `_`; no puede estar vacío ni comenzar por `--`. Cualquier opción, argumento, identificador inválido, sintaxis con `=` o combinación adicional devuelve código 2 con `Command line rejected` antes de construir configuración, abrir una conexión o iniciar HTTP. Los dos modos de base de datos exigen además el gate exacto `CONTROLPLUS_MIGRATIONS_ENABLED=true`.
+La API no aplica migraciones al iniciar. La línea de comandos acepta exclusivamente: cero argumentos para el servidor normal, `--health-check`, `--migrate-to <MigrationId>`, `--preflight-to <MigrationId>` o `--postflight-to <MigrationId> --expect-unrelated-reasons-sha256 <64-hex-sha256>`. `MigrationId` debe tener entre 1 y 200 caracteres y contener únicamente letras o dígitos ASCII y `_`; la huella debe contener exactamente 64 caracteres hexadecimales ASCII. Cualquier opción, argumento, identificador o huella inválidos, sintaxis con `=` o combinación adicional devuelve código 2 con `Command line rejected` antes de construir configuración, abrir una conexión o iniciar HTTP. Los tres modos controlados de base de datos exigen además el gate exacto `CONTROLPLUS_MIGRATIONS_ENABLED=true`.
 
 Antes de autorizar la migración de Caja, el preflight futuro se ejecuta así:
 
@@ -44,7 +44,7 @@ docker compose run --rm --no-deps `
   api --preflight-to 20260913020000_CashRegisterModuleV1
 ```
 
-El preflight no aplica migraciones ni inicia HTTP. Usa `ControlPlusDbContext` y Npgsql dentro de una transacción PostgreSQL `REPEATABLE READ, READ ONLY`; certifica con código `0`, devuelve `2` si una precondición no se cumple y `1` ante un fallo técnico. Valida la cadena exacta de cuatro migraciones anteriores, el objetivo pendiente, ausencia de turnos y de estructura parcial de Caja, y presencia exacta de las siete restricciones base.
+El preflight no aplica migraciones ni inicia HTTP. Usa `ControlPlusDbContext` y Npgsql dentro de una transacción PostgreSQL `REPEATABLE READ, READ ONLY`; certifica con código `0`, devuelve `2` si una precondición no se cumple y `1` ante un fallo técnico. Para Caja valida la cadena exacta de cuatro migraciones anteriores, el objetivo pendiente, ausencia de turnos y de estructura parcial, y presencia exacta de las siete restricciones base.
 
 Solo después de un preflight exitoso, respaldo verificado y autorización independiente, el comando de aplicación futura es:
 
@@ -55,6 +55,29 @@ docker compose run --rm --no-deps `
 ```
 
 El contenedor temporal de aplicación valida que el historial sea un prefijo coherente, que el destino exista, esté pendiente y solo requiera una secuencia ascendente que termine exactamente en él. No inicia HTTP ni acepta “todo lo pendiente”; un error termina con código distinto de cero y sin rollback manual automático. Las migraciones publicadas son inmutables.
+
+`20260930010000_SeedInventoryAdjustmentReasonsV1` está publicada en el código, pero continúa pendiente de aplicación en la base PostgreSQL persistente local. Sus tres comandos futuros, que no deben ejecutarse sin evaluación, respaldo verificado y autorización específica, son:
+
+```powershell
+docker compose run --rm --no-deps `
+  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
+  api --preflight-to 20260930010000_SeedInventoryAdjustmentReasonsV1
+
+$inventoryReasonsSha256 = '<valor motivos_ajenos_sha256 emitido por el preflight>'
+
+docker compose run --rm --no-deps `
+  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
+  api --migrate-to 20260930010000_SeedInventoryAdjustmentReasonsV1
+
+docker compose run --rm --no-deps `
+  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
+  api --postflight-to 20260930010000_SeedInventoryAdjustmentReasonsV1 `
+  --expect-unrelated-reasons-sha256 $inventoryReasonsSha256
+```
+
+El preflight de Inventario exige exactamente las cinco predecesoras terminando en Caja, objetivo pendiente, las once columnas de `configuracion.motivo_operacion`, el índice natural correcto y ausencia total de los cuatro motivos aprobados y de colisiones UUID. También emite `motivos_ajenos` y una huella canónica SHA-256 de las once columnas de todos los motivos ajenos, sin imprimir sus valores. Esa huella se captura literalmente antes de migrar y se suministra al postflight. La migración acepta únicamente el estado con Caja como quinta y última fila aplicada, por lo que nunca aplica Caja e Inventario juntos. El postflight es de solo lectura, exige historial `6/6/0`, valida `4×E` motivos completos y rechaza si la huella ajena cambió. Preflight y postflight confirman `READ ONLY` al inicio y al final y terminan con rollback; ninguno usa `IMigrator`, DDL, HTTP ni escritura.
+
+La comparación SHA-256 detecta adiciones, eliminaciones o modificaciones entre ambas comprobaciones, pero no es una garantía frente a escrituras simultáneas fuera de ellas. El flujo persistente futuro sigue exigiendo una ventana de mantenimiento que impida cambios externos desde el preflight hasta terminar el postflight.
 
 Antes de cualquier uso persistente se debe contar con autorización explícita, ventana de mantenimiento, respaldo verificado y confirmación independiente del identificador objetivo. El comando no debe automatizarse en el arranque ni ejecutarse contra producción sin autorización expresa. Después se debe confirmar el código 0, una sola fila del objetivo en `__EFMigrationsHistory`, salud de API y ausencia de errores sanitizados. Consulte [docs/database.md](docs/database.md).
 
@@ -80,6 +103,6 @@ Más detalles:
 - [Catálogo](docs/catalog.md)
 - [Inventario](docs/inventory.md)
 - [Caja](docs/cash.md)
-- Caja conserva la diferencia oficial de efectivo y separa el total; su migración pendiente exige ausencia de turnos previos y conserva métodos de pago al revertir. La validación de estas correcciones usa únicamente Testcontainers; no despliega servicios ni migra PostgreSQL persistente.
+- Caja conserva la diferencia oficial de efectivo y separa el total; su migración ya aplicada conserva métodos de pago al revertir. Inventario está publicado en código y pendiente en PostgreSQL persistente local. La validación usa únicamente Testcontainers; no despliega servicios ni migra PostgreSQL persistente.
 - [Base de datos](docs/database.md)
 - [Decisión de persistencia y concurrencia](docs/decisions/0001-persistencia-concurrencia-y-migraciones.md)

@@ -900,10 +900,29 @@ public sealed class ControlledMigrationCommandLineTests
         yield return ["health-check equals syntax", new[] { "--health-check=true" }];
         yield return ["migration target missing", new[] { "--migrate-to" }];
         yield return ["preflight target missing", new[] { "--preflight-to" }];
+        yield return ["postflight target missing", new[] { "--postflight-to" }];
+        yield return ["postflight hash missing", new[] { "--postflight-to", CashMigration }];
+        yield return
+        [
+            "postflight hash value missing",
+            new[]
+            {
+                "--postflight-to",
+                CashMigration,
+                ControlledExecutionCommand.ExpectedUnrelatedReasonsSha256Argument
+            }
+        ];
+        yield return
+        [
+            "postflight wrong hash option",
+            new[] { "--postflight-to", CashMigration, "--unexpected-hash", new string('0', 64) }
+        ];
         yield return ["migration target starts with option", new[] { "--migrate-to", "--unknown" }];
         yield return ["preflight target starts with option", new[] { "--preflight-to", "--unknown" }];
+        yield return ["postflight target starts with option", new[] { "--postflight-to", "--unknown" }];
         yield return ["migration equals syntax", new[] { $"--migrate-to={CashMigration}" }];
         yield return ["preflight equals syntax", new[] { $"--preflight-to={CashMigration}" }];
+        yield return ["postflight equals syntax", new[] { $"--postflight-to={CashMigration}" }];
         yield return
         [
             "health-check with migration",
@@ -921,6 +940,11 @@ public sealed class ControlledMigrationCommandLineTests
         ];
         yield return
         [
+            "preflight with postflight",
+            new[] { "--preflight-to", CashMigration, "--postflight-to", CashMigration }
+        ];
+        yield return
+        [
             "duplicate migration option",
             new[] { "--migrate-to", CashMigration, "--migrate-to", CashMigration }
         ];
@@ -928,6 +952,11 @@ public sealed class ControlledMigrationCommandLineTests
         [
             "duplicate preflight option",
             new[] { "--preflight-to", CashMigration, "--preflight-to", CashMigration }
+        ];
+        yield return
+        [
+            "duplicate postflight option",
+            new[] { "--postflight-to", CashMigration, "--postflight-to", CashMigration }
         ];
         yield return
         [
@@ -976,7 +1005,8 @@ public sealed class ControlledMigrationCommandLineTests
         var modes = new[]
         {
             ControlledExecutionCommand.MigrationTargetArgument,
-            ControlledExecutionCommand.PreflightTargetArgument
+            ControlledExecutionCommand.PreflightTargetArgument,
+            ControlledExecutionCommand.PostflightTargetArgument
         };
 
         foreach (var mode in modes)
@@ -1003,11 +1033,30 @@ public sealed class ControlledMigrationCommandLineTests
         yield return [new string('A', 200), true];
     }
 
+    public static IEnumerable<object[]> Sha256LexicalMatrix()
+    {
+        yield return [string.Empty, false];
+        yield return [new string('0', 63), false];
+        yield return [new string('0', 65), false];
+        yield return [new string('g', 64), false];
+        yield return [new string('á', 64), false];
+        yield return [new string('0', 64), true];
+        yield return [new string('A', 64), true];
+        yield return ["0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789ABCDEF", true];
+    }
+
     [Theory]
     [MemberData(nameof(MigrationIdLexicalMatrix))]
     public void IsValidMigrationId_IsTheLexicalAuthority(string migrationId, bool expected)
     {
         Assert.Equal(expected, ControlledExecutionCommand.IsValidMigrationId(migrationId));
+    }
+
+    [Theory]
+    [MemberData(nameof(Sha256LexicalMatrix))]
+    public void IsValidSha256_IsTheLexicalAuthority(string value, bool expected)
+    {
+        Assert.Equal(expected, ControlledExecutionCommand.IsValidSha256(value));
     }
 
     [Theory]
@@ -1039,10 +1088,22 @@ public sealed class ControlledMigrationCommandLineTests
         string caseName,
         string invalidMigrationId)
     {
+        var arguments = string.Equals(
+                mode,
+                ControlledExecutionCommand.PostflightTargetArgument,
+                StringComparison.Ordinal)
+            ? new[]
+            {
+                mode,
+                invalidMigrationId,
+                ControlledExecutionCommand.ExpectedUnrelatedReasonsSha256Argument,
+                new string('0', 64)
+            }
+            : new[] { mode, invalidMigrationId };
         var result = await ControlledMigrationTests.RunApiProcessAsync(
             connectionString: null,
             enabledValue: "true",
-            arguments: [mode, invalidMigrationId]);
+            arguments: arguments);
 
         Assert.True(
             result.ExitCode == ControlledMigrationRunner.RejectedExitCode,
@@ -1052,5 +1113,29 @@ public sealed class ControlledMigrationCommandLineTests
         Assert.DoesNotContain("database configuration", result.Output, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ConnectionStrings__ControlPlusDb", result.Output, StringComparison.Ordinal);
         Assert.DoesNotContain("Npgsql", result.Output, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("abc")]
+    [InlineData("gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg")]
+    public async Task InvalidPostflightSha256_IsRejectedBeforeConfigurationDatabaseOrHttp(
+        string invalidSha256)
+    {
+        var result = await ControlledMigrationTests.RunApiProcessAsync(
+            connectionString: null,
+            enabledValue: "true",
+            arguments:
+            [
+                ControlledExecutionCommand.PostflightTargetArgument,
+                InventoryMigrationManifest.TargetMigration,
+                ControlledExecutionCommand.ExpectedUnrelatedReasonsSha256Argument,
+                invalidSha256
+            ]);
+
+        Assert.Equal(ControlledMigrationRunner.RejectedExitCode, result.ExitCode);
+        Assert.Contains("Command line rejected", result.Output, StringComparison.Ordinal);
+        Assert.False(result.HttpPortObserved);
+        Assert.DoesNotContain("database configuration", result.Output, StringComparison.OrdinalIgnoreCase);
     }
 }
