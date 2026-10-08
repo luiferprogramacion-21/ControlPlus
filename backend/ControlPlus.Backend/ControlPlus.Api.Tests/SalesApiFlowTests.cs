@@ -7,6 +7,7 @@ using System.Text.Json;
 using ControlPlus.Application.Cash.Contracts;
 using ControlPlus.Application.Catalog.Contracts;
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Customers.Contracts;
 using ControlPlus.Application.Numbering.Contracts;
 using ControlPlus.Application.Sales.Contracts;
 using ControlPlus.Application.Security.Contracts;
@@ -42,7 +43,8 @@ public sealed class SalesApiFlowTests : IAsyncLifetime
         "20260912012000_HybridPermissionsV1",
         "20260913010000_SeedMeasurementUnitsV1",
         "20260913020000_CashRegisterModuleV1",
-        "20260930010000_SeedInventoryAdjustmentReasonsV1"
+        "20260930010000_SeedInventoryAdjustmentReasonsV1",
+        "20261005010000_CustomerSearchIndexesV1"
     ];
 
     private readonly string _masterKey = RandomSecret(48);
@@ -689,6 +691,14 @@ public sealed class SalesApiFlowTests : IAsyncLifetime
         Assert.Equal(activeCustomer, sale.CustomerId);
         await using var scope = _factory!.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(activeCustomer, await context.Venta.Where(x => x.Id == sale.Id).Select(x => x.ClienteId).SingleAsync());
+
+        SetBearer(client, scenario.Admin.AccessToken);
+        var status = await ReadAsync<CustomerDto>(await client.PutAsJsonAsync(
+            $"/api/customers/{activeCustomer}/status", new SetCustomerStatusRequest(false, 1)), HttpStatusCode.OK);
+        Assert.False(status.IsActive);
+        context.ChangeTracker.Clear();
+        Assert.False(await context.Cliente.Where(x => x.Id == activeCustomer).Select(x => x.Activo).SingleAsync());
         Assert.Equal(activeCustomer, await context.Venta.Where(x => x.Id == sale.Id).Select(x => x.ClienteId).SingleAsync());
     }
 

@@ -901,7 +901,22 @@ public sealed class ControlledMigrationCommandLineTests
         yield return ["migration target missing", new[] { "--migrate-to" }];
         yield return ["preflight target missing", new[] { "--preflight-to" }];
         yield return ["postflight target missing", new[] { "--postflight-to" }];
-        yield return ["postflight hash missing", new[] { "--postflight-to", CashMigration }];
+        yield return
+        [
+            "inventory postflight hash missing",
+            new[] { "--postflight-to", InventoryMigrationManifest.TargetMigration }
+        ];
+        yield return
+        [
+            "customer postflight rejects hash",
+            new[]
+            {
+                "--postflight-to",
+                CustomerSearchMigrationManifest.TargetMigration,
+                ControlledExecutionCommand.ExpectedUnrelatedReasonsSha256Argument,
+                new string('0', 64)
+            }
+        ];
         yield return
         [
             "postflight hash value missing",

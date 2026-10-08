@@ -3,10 +3,12 @@
 Docker Desktop debe estar iniciado. La suite no requiere secretos reales ni una cadena de conexión de pruebas.
 
 ```powershell
-dotnet test ControlPlus.Backend.slnx
+dotnet test ControlPlus.Domain.Tests --no-restore -m:1 /p:BuildInParallel=false
+dotnet test ControlPlus.Infrastructure.Tests --no-restore -m:1 /p:BuildInParallel=false
+dotnet test ControlPlus.Api.Tests --no-restore -m:1 /p:BuildInParallel=false
 ```
 
-La suite incluye dominio, infraestructura/esquema y API. Debe ejecutarse completa, incluidas todas las pruebas Testcontainers, sin omisiones ni fallos de inicialización. El resultado histórico de 45 pruebas precede a las correcciones de Caja y no acredita este bloque.
+La suite incluye dominio, infraestructura/esquema y API. Debe ejecutarse completa y en ese orden serial, incluidas todas las pruebas Testcontainers, sin omisiones ni fallos de inicialización. En el WSL validado, el build paralelo del archivo `.slnx` puede terminar silenciosamente con mensajes `MSB4276` de los locators de workloads aunque cada proyecto y la solución serial compilen; el mecanismo certificado es `dotnet build ControlPlus.Backend.slnx --no-restore -m:1 /p:BuildInParallel=false`. El resultado histórico de 45 pruebas precede a las correcciones de Caja y no acredita este bloque.
 
 Las pruebas de dominio validan el quinto intento fallido, el reinicio del contador, la reactivación jerárquica, la reasignación válida del único rol principal, las reglas puras de Caja y la política de precios de Ventas: límites 5/20/80, redondeo COP, mayores residuos y costo. `OfficialSchemaIntegrationTests` aplica las migraciones en PostgreSQL 17 aislado y comprueba el esquema, permisos, unidades, cantidades enteras, tokens `version`, conflictos reales entre dos actualizaciones con la misma versión y la extensión de arqueo del módulo de Caja.
 
@@ -25,6 +27,8 @@ establecimientos y verifica `Up/Down/Up`, UUID preexistentes y motivos ya
 referenciados.
 
 `SecurityApiFlowTests` recorre la instalación inicial, Master Key, login, JWT, `/me`, seguridad híbrida, reasignación de rol e invalidación de sesión, Categorías, Productos, códigos de barras, agotados, filtros de agotados e inactivos, historial de costos y auditoría. Las pruebas verifican que una solicitud de edición con versión obsoleta reciba `409`, que una edición de código de barras inconsistente reciba `400`, y que la búsqueda directa de agotados siga permitida con `PRODUCTS.READ`.
+
+`CustomersApiFlowTests` usa PostgreSQL 17 efímero para validar los contratos de Clientes: UUIDv7, normalización documental, límites, JSON estricto, unicidad y carrera real de dos altas con el mismo documento, búsqueda de prefijo sin inyección de comodines, paginación, permisos híbridos con concesión y revocación, concurrencia optimista, estado activo, auditoría sanitizada y rollback completo ante un trigger diferible de COMMIT. La integración ya cubierta por `SalesApiFlowTests` confirma que Ventas acepta clientes activos, rechaza inactivos y conserva la relación histórica.
 
 Las pruebas de configuración cubren Master Key ausente, demasiado corta, válida e inválida sin usar secretos reales. Las pruebas del manejador de concurrencia verifican el `ProblemDetails` de conflicto. Las pruebas del documento OpenAPI verifican Bearer JWT, operaciones públicas y protegidas, ausencia del endpoint residual de eliminación de rol y las respuestas principales, incluidos `201 Created` para Categorías y Productos.
 
@@ -46,12 +50,14 @@ Las pruebas de migración parten de las cuatro históricas: sin turnos, con turn
 
 `ControlledInventoryMigrationTests` invoca el DLL real para las tres rutas de Inventario. Verifica éxito de preflight con cinco predecesoras; contrato exacto de las once columnas y rechazo individual al volver incompatibles `fecha_creacion`, `fecha_modificacion` o `version`; tabla o índice incorrectos; cada código existente y catálogos parciales; UUID determinista ocupado por otra clave natural y activación observable de `uuid_incorrectos`. Comprueba que `--migrate-to` solo aplica Inventario cuando Caja ya es la quinta fila, que postflight exige `6/6/0` y valida `4×E` filas completas para varios establecimientos. La huella capturada en preflight se entrega al postflight y se prueba por separado que cualquier modificación, eliminación o adición de un motivo ajeno produce rechazo sin exponer sus datos. Todos los modos comprueban códigos de salida, errores sanitizados y ausencia de HTTP; preflight/postflight exigen evidencia de `REPEATABLE READ, READ ONLY` y rollback.
 
-`ControlledMigrationCommandLineTests` ejecuta el DLL sin cadena de conexión y cubre argumentos sobrantes, opciones desconocidas, objetivos ausentes/duplicados, sintaxis con `=`, combinaciones de modos y la gramática léxica de `MigrationId`. Para postflight exige además, en orden fijo, `--expect-unrelated-reasons-sha256` y exactamente 64 caracteres hexadecimales ASCII. Cada caso inválido devuelve 2 con `Command line rejected` antes de configuración, conexión o HTTP.
+`CustomerSearchIndexMigrationTests` aplica la cadena hasta Inventario y verifica en PostgreSQL 17 las cuatro definiciones exactas, `Up/Down/Up`, conservación total de clientes y planes controlados que eligen los índices de nombre, documento y teléfono. `ControlledCustomerSearchMigrationTests` invoca el DLL real para preflight, migración y postflight: exige las seis predecesoras exactas, tabla oficial completa, ausencia/presencia exacta de índices según la fase, aplicación única, historial coherente, solo lectura, rollback, ausencia de HTTP y errores sanitizados.
+
+`ControlledMigrationCommandLineTests` ejecuta el DLL sin cadena de conexión y cubre argumentos sobrantes, opciones desconocidas, objetivos ausentes/duplicados, sintaxis con `=`, combinaciones de modos y la gramática léxica de `MigrationId`. El postflight de Inventario exige, en orden fijo, `--expect-unrelated-reasons-sha256` y exactamente 64 caracteres hexadecimales ASCII; el de Clientes acepta únicamente su objetivo sin huella y rechaza cualquier argumento adicional. Cada caso inválido devuelve 2 con `Command line rejected` antes de configuración, conexión o HTTP.
 
 Ejecución focalizada:
 
 ```powershell
-dotnet test ControlPlus.Api.Tests --filter "FullyQualifiedName~ControlledMigrationTests|FullyQualifiedName~ControlledPreflightTests|FullyQualifiedName~ControlledInventoryMigrationTests|FullyQualifiedName~ControlledMigrationCommandLineTests"
+dotnet test ControlPlus.Api.Tests --filter "FullyQualifiedName~ControlledMigrationTests|FullyQualifiedName~ControlledPreflightTests|FullyQualifiedName~ControlledInventoryMigrationTests|FullyQualifiedName~ControlledCustomerSearchMigrationTests|FullyQualifiedName~ControlledMigrationCommandLineTests"
 ```
 
 Estas pruebas no usan Compose ni una cadena externa: la fixture suministra la conexión Testcontainers directamente al proceso hijo y destruye el contenedor al finalizar.

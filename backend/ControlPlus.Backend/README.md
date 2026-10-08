@@ -34,7 +34,7 @@ Compose mantiene PostgreSQL en el volumen `controlplus_postgres_data`; no use `d
 
 ## Migraciones
 
-La API no aplica migraciones al iniciar. La línea de comandos acepta exclusivamente: cero argumentos para el servidor normal, `--health-check`, `--migrate-to <MigrationId>`, `--preflight-to <MigrationId>` o `--postflight-to <MigrationId> --expect-unrelated-reasons-sha256 <64-hex-sha256>`. `MigrationId` debe tener entre 1 y 200 caracteres y contener únicamente letras o dígitos ASCII y `_`; la huella debe contener exactamente 64 caracteres hexadecimales ASCII. Cualquier opción, argumento, identificador o huella inválidos, sintaxis con `=` o combinación adicional devuelve código 2 con `Command line rejected` antes de construir configuración, abrir una conexión o iniciar HTTP. Los tres modos controlados de base de datos exigen además el gate exacto `CONTROLPLUS_MIGRATIONS_ENABLED=true`.
+La API no aplica migraciones al iniciar. La línea de comandos acepta exclusivamente: cero argumentos para el servidor normal, `--health-check`, `--migrate-to <MigrationId>`, `--preflight-to <MigrationId>`, el postflight de Clientes con `--postflight-to 20261005010000_CustomerSearchIndexesV1`, o el postflight de Inventario con `--postflight-to 20260930010000_SeedInventoryAdjustmentReasonsV1 --expect-unrelated-reasons-sha256 <64-hex-sha256>`. `MigrationId` debe tener entre 1 y 200 caracteres y contener únicamente letras o dígitos ASCII y `_`; la huella debe contener exactamente 64 caracteres hexadecimales ASCII. Cualquier opción, argumento, identificador o huella inválidos, sintaxis con `=` o combinación adicional devuelve código 2 con `Command line rejected` antes de construir configuración, abrir una conexión o iniciar HTTP. Los tres modos controlados de base de datos exigen además el gate exacto `CONTROLPLUS_MIGRATIONS_ENABLED=true`.
 
 Antes de autorizar la migración de Caja, el preflight futuro se ejecuta así:
 
@@ -79,6 +79,16 @@ El preflight de Inventario exige exactamente las cinco predecesoras terminando e
 
 La comparación SHA-256 detecta adiciones, eliminaciones o modificaciones entre ambas comprobaciones, pero no es una garantía frente a escrituras simultáneas fuera de ellas. El flujo persistente futuro sigue exigiendo una ventana de mantenimiento que impida cambios externos desde el preflight hasta terminar el postflight.
 
+`20261005010000_CustomerSearchIndexesV1` también está publicada en código y pendiente de aplicación persistente. Solo agrega cuatro índices de búsqueda de Clientes y requiere que Inventario sea exactamente la sexta migración ya aplicada. Sus comandos futuros, documentados pero no ejecutados en este corte, son:
+
+```bash
+CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --preflight-to 20261005010000_CustomerSearchIndexesV1
+CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --migrate-to 20261005010000_CustomerSearchIndexesV1
+CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --postflight-to 20261005010000_CustomerSearchIndexesV1
+```
+
+Preflight exige las seis predecesoras, la forma oficial de `catalogo.cliente` y ausencia de los índices reservados. Postflight exige historial `7/7/0` y las cuatro definiciones exactas. Ambos son `REPEATABLE READ, READ ONLY`, terminan con rollback y no inician HTTP. Estos comandos requieren autorización y respaldo independientes; la publicación del código no afirma que los índices existan en la base persistente local.
+
 Antes de cualquier uso persistente se debe contar con autorización explícita, ventana de mantenimiento, respaldo verificado y confirmación independiente del identificador objetivo. El comando no debe automatizarse en el arranque ni ejecutarse contra producción sin autorización expresa. Después se debe confirmar el código 0, una sola fila del objetivo en `__EFMigrationsHistory`, salud de API y ausencia de errores sanitizados. Consulte [docs/database.md](docs/database.md).
 
 ## Pruebas
@@ -86,10 +96,13 @@ Antes de cualquier uso persistente se debe contar con autorización explícita, 
 Docker Desktop debe estar iniciado para las pruebas de integración aisladas:
 
 ```powershell
-dotnet test ControlPlus.Backend.slnx
+dotnet build ControlPlus.Backend.slnx --no-restore -m:1 /p:BuildInParallel=false
+dotnet test ControlPlus.Domain.Tests --no-restore -m:1 /p:BuildInParallel=false
+dotnet test ControlPlus.Infrastructure.Tests --no-restore -m:1 /p:BuildInParallel=false
+dotnet test ControlPlus.Api.Tests --no-restore -m:1 /p:BuildInParallel=false
 ```
 
-Testcontainers crea PostgreSQL 17 aislado para las pruebas y no utiliza la base persistente de desarrollo. Consulte [docs/testing.md](docs/testing.md).
+Testcontainers crea PostgreSQL 17 aislado para las pruebas y no utiliza la base persistente de desarrollo. Los comandos se ejecutan en serie porque el empaquetado WSL validado puede fallar silenciosamente al compilar `.slnx` en paralelo con mensajes `MSB4276`, mientras la solución serial y los proyectos compilan sin errores ni advertencias. Consulte [docs/testing.md](docs/testing.md).
 
 ## API y seguridad
 
@@ -102,7 +115,8 @@ Más detalles:
 - [Seguridad](docs/security.md)
 - [Catálogo](docs/catalog.md)
 - [Inventario](docs/inventory.md)
+- [Clientes](docs/customers.md)
 - [Caja](docs/cash.md)
-- Caja conserva la diferencia oficial de efectivo y separa el total; su migración ya aplicada conserva métodos de pago al revertir. Inventario está publicado en código y pendiente en PostgreSQL persistente local. La validación usa únicamente Testcontainers; no despliega servicios ni migra PostgreSQL persistente.
+- Caja conserva la diferencia oficial de efectivo y separa el total; su migración ya aplicada conserva métodos de pago al revertir. Inventario y los índices de búsqueda de Clientes están publicados en código y pendientes en PostgreSQL persistente local. La validación usa únicamente Testcontainers; no despliega servicios ni migra PostgreSQL persistente.
 - [Base de datos](docs/database.md)
 - [Decisión de persistencia y concurrencia](docs/decisions/0001-persistencia-concurrencia-y-migraciones.md)

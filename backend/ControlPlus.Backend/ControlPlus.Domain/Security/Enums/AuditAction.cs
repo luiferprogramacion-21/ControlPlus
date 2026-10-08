@@ -54,5 +54,9 @@ public enum AuditAction
     SalesDocumentNumberingCreated = 46,
     SalesDocumentNumberingUpdated = 47,
     InventoryAdjusted = 48,
-    InventoryAdjustmentAuthorizationRejected = 49
+    InventoryAdjustmentAuthorizationRejected = 49,
+    CustomerCreated = 50,
+    CustomerUpdated = 51,
+    CustomerDeactivated = 52,
+    CustomerReactivated = 53
 }

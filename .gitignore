@@ -9,3 +9,4 @@ obj/
 
 # Local review/extraction workspace
 .review/
+TestResults/

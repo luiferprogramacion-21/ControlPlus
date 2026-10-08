@@ -41,8 +41,20 @@ Los únicos endpoints anónimos son los de salud y los flujos de autenticación 
 | Caja | `/api/cash` | `CASH.*`, `CONFIGURATION.MANAGE` o `USERS.MANAGE` según operación |
 | Ventas | `/api/sales` | `SALES.CREATE`, `SALES.OWN_READ` o `SALES.ALL_READ` según operación |
 | Numeración de Ventas | `/api/document-numbering/sales` | `NUMBERING.MANAGE` |
+| Clientes | `/api/customers` | `CUSTOMERS.BASIC_MANAGE` o `CUSTOMERS.MANAGE` según operación |
 
 Cada usuario tiene exactamente un rol principal. La reasignación se realiza con `POST /api/users/{userId}/roles`; no existe `DELETE /api/users/{userId}/roles/{roleId}` porque no sería válido retirar el único rol.
+
+## Clientes
+
+| Método | Ruta | Permiso efectivo |
+|---|---|---|
+| `GET` | `/api/customers` y `/api/customers/{customerId}` | `CUSTOMERS.BASIC_MANAGE` o `CUSTOMERS.MANAGE` |
+| `POST` | `/api/customers` | `CUSTOMERS.BASIC_MANAGE` o `CUSTOMERS.MANAGE` |
+| `PUT` | `/api/customers/{customerId}` | `CUSTOMERS.BASIC_MANAGE` o `CUSTOMERS.MANAGE`; documento y observaciones requieren `CUSTOMERS.MANAGE` |
+| `PUT` | `/api/customers/{customerId}/status` | `CUSTOMERS.MANAGE` |
+
+El listado usa `status=active` por defecto; `inactive` y `all` requieren gestión completa. Busca por prefijo de documento, nombre o teléfono, sin distinguir mayúsculas en el nombre; `%`, `_` y `\` son texto literal y no comodines. Es paginado (`page=1`, `pageSize=20`, máximo 100) y mantiene el orden por nombre completo e ID. Las actualizaciones incluyen `expectedVersion`; un valor obsoleto devuelve `409 concurrency.conflict`. No hay `DELETE` ni historial comercial en este corte. Todos los cuerpos rechazan propiedades JSON desconocidas.
 
 ## Productos y filtros
 

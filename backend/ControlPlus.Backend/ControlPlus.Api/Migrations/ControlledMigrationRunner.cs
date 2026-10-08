@@ -83,6 +83,23 @@ public static class ControlledMigrationRunner
                     "Inventory requires Caja as the fifth and last applied migration and can only apply Inventory");
             }
 
+            if (string.Equals(
+                    targetMigration,
+                    CustomerSearchMigrationManifest.TargetMigration,
+                    StringComparison.Ordinal) &&
+                (!applied.SequenceEqual(
+                    CustomerSearchMigrationManifest.RequiredPreviousMigrations,
+                    StringComparer.Ordinal) ||
+                 targetIndex != applied.Length ||
+                 targetIndex - applied.Length + 1 != 1 ||
+                 pending.Length != 1 ||
+                 !string.Equals(pending[0], targetMigration, StringComparison.Ordinal)))
+            {
+                return Rejected(
+                    safeTarget,
+                    "Customer search indexes require Inventory as the sixth and last applied migration and can only apply the customer index target");
+            }
+
             var requestedSequence = expectedPending.Take(targetIndex - applied.Length + 1).ToArray();
             if (requestedSequence.Length == 0 ||
                 !string.Equals(requestedSequence[^1], targetMigration, StringComparison.Ordinal))

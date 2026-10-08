@@ -5,6 +5,7 @@ using ControlPlus.Application.Cash.Ports;
 using ControlPlus.Application.Sales.Ports;
 using ControlPlus.Application.Numbering.Ports;
 using ControlPlus.Application.Inventory.Ports;
+using ControlPlus.Application.Customers.Ports;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -35,6 +36,7 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<IDocumentNumberingRepository, EfDocumentNumberingRepository>();
         services.AddScoped<IDocumentNumberingTransactionManager, EfDocumentNumberingTransactionManager>();
         services.AddScoped<IInventoryRepository, EfInventoryRepository>();
+        services.AddScoped<ICustomerRepository, EfCustomerRepository>();
         services.AddSingleton<ICredentialTokenGenerator, Code128CredentialTokenGenerator>();
         services.AddScoped<SecurityCatalogSeeder>();
         services.AddScoped<InstallationBootstrapper>();

@@ -16,7 +16,7 @@ public static class ControlledPostflightRunner
     public static async Task<ControlledPostflightResult> RunAsync(
         IConfiguration configuration,
         string targetMigration,
-        string expectedUnrelatedReasonsSha256,
+        string? expectedUnrelatedReasonsSha256,
         CancellationToken cancellationToken = default)
     {
         if (!ControlledExecutionCommand.IsValidMigrationId(targetMigration))
@@ -24,10 +24,23 @@ public static class ControlledPostflightRunner
             return Rejected("invalid-target", "the target identifier is invalid");
         }
 
-        if (!string.Equals(
+        if (string.Equals(
                 targetMigration,
-                InventoryMigrationManifest.TargetMigration,
+                CustomerSearchMigrationManifest.TargetMigration,
                 StringComparison.Ordinal))
+        {
+            if (expectedUnrelatedReasonsSha256 is not null)
+            {
+                return Rejected(targetMigration, "this target does not accept an unrelated-reasons SHA-256");
+            }
+
+            return await CustomerSearchPostflightRunner.RunAsync(
+                configuration,
+                targetMigration,
+                cancellationToken);
+        }
+
+        if (!string.Equals(targetMigration, InventoryMigrationManifest.TargetMigration, StringComparison.Ordinal))
         {
             return Rejected(targetMigration, "the target is not supported by this postflight");
         }
@@ -37,7 +50,7 @@ public static class ControlledPostflightRunner
             return Rejected(targetMigration, "the expected unrelated-reasons SHA-256 is invalid");
         }
 
-        var normalizedExpectedSha256 = expectedUnrelatedReasonsSha256.ToLowerInvariant();
+        var normalizedExpectedSha256 = expectedUnrelatedReasonsSha256!.ToLowerInvariant();
 
         var connectionString = configuration.GetConnectionString("ControlPlusDb");
         if (string.IsNullOrWhiteSpace(connectionString))

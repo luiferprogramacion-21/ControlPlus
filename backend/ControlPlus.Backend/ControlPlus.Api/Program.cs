@@ -15,6 +15,8 @@ using ControlPlus.Application.Numbering.Contracts;
 using ControlPlus.Application.Numbering.Services;
 using ControlPlus.Application.Inventory.Contracts;
 using ControlPlus.Application.Inventory.Services;
+using ControlPlus.Application.Customers.Contracts;
+using ControlPlus.Application.Customers.Services;
 using ControlPlus.Infrastructure.Persistence;
 using ControlPlus.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -73,7 +75,7 @@ if (controlledCommand.Mode == ControlledExecutionMode.Postflight)
     var postflightResult = await ControlledPostflightRunner.RunAsync(
         postflightBuilder.Configuration,
         controlledCommand.TargetMigration!,
-        controlledCommand.ExpectedUnrelatedReasonsSha256!);
+        controlledCommand.ExpectedUnrelatedReasonsSha256);
 
     var postflightOutput = postflightResult.ExitCode == 0 ? Console.Out : Console.Error;
     postflightOutput.WriteLine(postflightResult.Message);
@@ -139,6 +141,7 @@ builder.Services.AddScoped<ICashService, CashService>();
 builder.Services.AddScoped<ISalesService, SalesService>();
 builder.Services.AddScoped<IDocumentNumberingService, DocumentNumberingService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<ICurrentUserSessionValidator, CurrentUserSessionValidator>();
 builder.Services.AddScoped<IPermissionChecker, PermissionChecker>();
 builder.Services.AddScoped<CurrentActorContextResolver>();

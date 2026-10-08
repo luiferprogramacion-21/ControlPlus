@@ -20,9 +20,13 @@ public sealed class PermissionAuthorizationHandler(IPermissionChecker permission
             return;
         }
 
-        if (await permissionChecker.HasPermissionAsync(userId, requirement.Permission))
+        foreach (var permission in requirement.Permission.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            context.Succeed(requirement);
+            if (await permissionChecker.HasPermissionAsync(userId, permission))
+            {
+                context.Succeed(requirement);
+                return;
+            }
         }
     }
 }

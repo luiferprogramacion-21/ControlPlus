@@ -27,7 +27,8 @@ public sealed record ControlledExecutionCommand(
     private const string InvalidArgumentsMessage =
         "Command line rejected: expected no arguments, --health-check, " +
         "--migrate-to <MigrationId>, --preflight-to <MigrationId>, " +
-        "or --postflight-to <MigrationId> " +
+        "--postflight-to 20261005010000_CustomerSearchIndexesV1, " +
+        "or --postflight-to 20260930010000_SeedInventoryAdjustmentReasonsV1 " +
         "--expect-unrelated-reasons-sha256 <64-hex-sha256>.";
 
     public static ControlledExecutionCommand Parse(
@@ -47,6 +48,10 @@ public sealed record ControlledExecutionCommand(
 
         if (arguments.Count == 4 &&
             string.Equals(arguments[0], PostflightTargetArgument, StringComparison.Ordinal) &&
+            string.Equals(
+                arguments[1],
+                InventoryMigrationManifest.TargetMigration,
+                StringComparison.Ordinal) &&
             string.Equals(
                 arguments[2],
                 ExpectedUnrelatedReasonsSha256Argument,
@@ -79,6 +84,10 @@ public sealed record ControlledExecutionCommand(
         {
             MigrationTargetArgument => ControlledExecutionMode.Migration,
             PreflightTargetArgument => ControlledExecutionMode.Preflight,
+            PostflightTargetArgument when string.Equals(
+                arguments[1],
+                CustomerSearchMigrationManifest.TargetMigration,
+                StringComparison.Ordinal) => ControlledExecutionMode.Postflight,
             _ => (ControlledExecutionMode?)null
         };
         if (mode is null)

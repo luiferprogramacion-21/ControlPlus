@@ -62,7 +62,14 @@ public sealed class OpenApiContractTests
         AssertProtected(paths, "/api/inventory/movements", "get");
         AssertProtected(paths, "/api/inventory/adjustment-reasons", "get");
         AssertProtected(paths, "/api/inventory/adjustments", "post");
+        AssertProtected(paths, "/api/customers", "get");
+        AssertProtected(paths, "/api/customers", "post");
+        AssertProtected(paths, "/api/customers/{customerId}", "get");
+        AssertProtected(paths, "/api/customers/{customerId}", "put");
+        AssertProtected(paths, "/api/customers/{customerId}/status", "put");
         Assert.False(paths.GetProperty("/api/document-numbering/sales").TryGetProperty("delete", out _));
+        Assert.False(paths.GetProperty("/api/customers").TryGetProperty("delete", out _));
+        Assert.False(paths.GetProperty("/api/customers/{customerId}").TryGetProperty("delete", out _));
         foreach (var inventoryPath in new[]
                  {
                      "/api/inventory/stock", "/api/inventory/movements",
@@ -96,6 +103,11 @@ public sealed class OpenApiContractTests
         AssertResponses(paths, "/api/inventory/movements", "get", "200", "400", "401", "403");
         AssertResponses(paths, "/api/inventory/adjustment-reasons", "get", "200", "401", "403");
         AssertResponses(paths, "/api/inventory/adjustments", "post", "201", "400", "401", "403", "404", "409");
+        AssertExactResponses(paths, "/api/customers", "get", "200", "400", "401", "403");
+        AssertExactResponses(paths, "/api/customers", "post", "201", "400", "401", "403", "409");
+        AssertExactResponses(paths, "/api/customers/{customerId}", "get", "200", "401", "403", "404");
+        AssertExactResponses(paths, "/api/customers/{customerId}", "put", "200", "400", "401", "403", "404", "409");
+        AssertExactResponses(paths, "/api/customers/{customerId}/status", "put", "200", "400", "401", "403", "404", "409");
         AssertResponseContentType(paths, "/api/inventory/adjustments", "post", "201", "application/json");
         AssertResponseContentType(paths, "/api/inventory/adjustments", "post", "400", "application/problem+json");
         AssertResponseContentType(paths, "/api/inventory/adjustments", "post", "403", "application/problem+json");
@@ -172,6 +184,18 @@ public sealed class OpenApiContractTests
         {
             Assert.True(responses.TryGetProperty(code, out _), $"Missing OpenAPI response {code} for {method.ToUpperInvariant()} {path}.");
         }
+    }
+
+    private static void AssertExactResponses(
+        JsonElement paths,
+        string path,
+        string method,
+        params string[] expectedCodes)
+    {
+        var responses = paths.GetProperty(path).GetProperty(method).GetProperty("responses");
+        Assert.Equal(
+            expectedCodes.Order(StringComparer.Ordinal),
+            responses.EnumerateObject().Select(response => response.Name).Order(StringComparer.Ordinal));
     }
 
     private static void AssertResponseContentType(
