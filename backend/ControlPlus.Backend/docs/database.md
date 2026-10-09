@@ -12,13 +12,13 @@ La fuente de verdad es `docs/ControlPlus_Fase4_Documento_y_Complementos.zip` des
 - `20260913010000_SeedMeasurementUnitsV1`: registra idempotentemente las unidades V1 Unidad, Paquete y Metro requeridas para crear productos.
 - `20260913020000_CashRegisterModuleV1`: migración publicada y aplicada una vez a la base PostgreSQL persistente local/de desarrollo; agrega `diferencia_total`, detalle inmutable de arqueo y `autorizacion_cierre_turno`, restricciones diferibles y los medios iniciales. Conserva `turno_caja.diferencia = efectivo_contado - efectivo_esperado` y permite varios pagos por movimiento para pagos combinados.
 - `20260930010000_SeedInventoryAdjustmentReasonsV1`: migración publicada en código y aplicada en PostgreSQL persistente local; siembra para cada establecimiento existente los cuatro motivos aprobados de tipo `AJUSTE_INVENTARIO` sin modificar el esquema. Su reversión conserva todos los datos del catálogo y sus referencias; un `Up` posterior es idempotente por establecimiento, tipo y código.
-- `20261005010000_CustomerSearchIndexesV1`: migración publicada en código y pendiente de aplicación en PostgreSQL persistente; agrega únicamente los índices de prefijo de `catalogo.cliente` para `lower(nombre_completo)`, `numero_documento`, `lower(telefono)` y el listado por estado/nombre/ID. No modifica tablas, columnas ni datos.
+- `20261005010000_CustomerSearchIndexesV1`: migración publicada en código y aplicada exactamente una vez en la base PostgreSQL persistente local/de desarrollo; agrega únicamente los índices de prefijo de `catalogo.cliente` para `lower(nombre_completo)`, `numero_documento`, `lower(telefono)` y el listado por estado/nombre/ID. No modifica tablas, columnas ni datos.
 
 Las cantidades de producto, venta, compra e inventario permanecen enteras, incluidos los metros, de acuerdo con el documento principal y el script PostgreSQL V3 aprobados.
 
 La administración del consecutivo de Ventas reutiliza `configuracion.consecutivo_documento` sin cambiar el esquema. El registro usa `tipo_documento = 'VENTA'`, la instalación activa y su serie; la unicidad oficial `(instalacion_id, tipo_documento, serie)` impide duplicados. El primer número visible se representa guardando `ultimo_numero = firstNumber - 1`; por ello la configuración inicial aprobada con `firstNumber = 1` guarda cero. Las altas y correcciones bloquean la instalación activa y la corrección usa además el token `version`. Una venta `CONFIRMADA` para la misma instalación y serie vuelve inmutable la configuración mediante la API.
 
-Las migraciones de unidades, Caja e Inventario están aplicadas y registradas en la base PostgreSQL persistente local/de desarrollo. No modifican `20260912010000_OfficialPhase4Baseline` ni convierten columnas `integer` a tipos decimales.
+Las migraciones de unidades, Caja, Inventario y Clientes están aplicadas y registradas en la base PostgreSQL persistente local/de desarrollo. No modifican `20260912010000_OfficialPhase4Baseline` ni convierten columnas `integer` a tipos decimales.
 
 La migración de Caja usa `numeric(18,0)` para los importes nuevos y no modifica ninguna migración anterior. Antes de DDL comprueba, bajo bloqueo, que `caja.turno_caja` esté vacía. Fue validada en PostgreSQL 17 aislado y aplicada una vez de forma controlada a la base PostgreSQL persistente local/de desarrollo; no debe ejecutarse otra vez ni revertirse en esa instalación. Cualquier operación persistente futura de esquema o datos requiere evaluación, respaldo y autorización específica.
 
@@ -26,7 +26,7 @@ La diferencia por medio y el total tienen signo contado menos esperado. `diferen
 
 ## Inmutabilidad y reversión
 
-Las migraciones ya publicadas son inmutables: no se modifican, regeneran ni reemplazan, aunque una corrección posterior afecte su resultado. Las correcciones de esquema o de datos aprobados se realizan mediante una nueva migración compensatoria, revisada y documentada. `20260913020000_CashRegisterModuleV1` ya está aplicada una vez a la base PostgreSQL persistente local/de desarrollo; `20260930010000_SeedInventoryAdjustmentReasonsV1` ya está aplicada allí; `20261005010000_CustomerSearchIndexesV1` está publicada en código y aún no aplicada. Cualquier operación persistente futura de esquema o datos requiere evaluación, respaldo y autorización específica.
+Las migraciones ya publicadas son inmutables: no se modifican, regeneran ni reemplazan, aunque una corrección posterior afecte su resultado. Las correcciones de esquema o de datos aprobados se realizan mediante una nueva migración compensatoria, revisada y documentada. `20260913020000_CashRegisterModuleV1` ya está aplicada una vez a la base PostgreSQL persistente local/de desarrollo; `20260930010000_SeedInventoryAdjustmentReasonsV1` ya está aplicada allí; `20261005010000_CustomerSearchIndexesV1` fue aplicada exactamente una vez en la base PostgreSQL persistente local/de desarrollo. Cualquier operación persistente futura de esquema o datos requiere evaluación, respaldo y autorización específica.
 
 `20260912012000_HybridPermissionsV1.Down` no es una reversión completa ni segura de la migración híbrida: no deshace todas las inserciones ni asignaciones de permisos introducidas en `Up`. No debe utilizarse como mecanismo de reversión de una base persistente. Toda reversión persistente exige un respaldo local verificado antes de cualquier operación y una revisión explícita de sus efectos.
 
@@ -89,7 +89,7 @@ La migración `20260930010000_SeedInventoryAdjustmentReasonsV1` ya fue aplicada 
 
 Para los índices de búsqueda de Clientes, un tercer manifiesto tipado fija exactamente `20261005010000_CustomerSearchIndexesV1`, las seis predecesoras terminando en Inventario, las catorce columnas oficiales de `catalogo.cliente` y las definiciones exactas de los cuatro índices reservados. El preflight de solo lectura exige historial `6/6/0`, objetivo único pendiente, forma exacta de tabla e inexistencia de esos nombres en cualquier tabla del esquema `catalogo`. El migrador solo acepta Inventario como sexta y última fila aplicada y aplica exclusivamente el objetivo de Clientes. El postflight de solo lectura exige historial `7/7/0` y las cuatro definiciones exactas; no necesita huella porque esta migración no transforma datos.
 
-Los comandos futuros, documentados pero no ejecutados contra PostgreSQL persistente en este corte, son:
+Los comandos se conservan únicamente como referencia histórica de la aplicación controlada en la base PostgreSQL persistente local/de desarrollo:
 
 ```bash
 CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --preflight-to 20261005010000_CustomerSearchIndexesV1
@@ -97,7 +97,11 @@ CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --migrate-to 2026
 CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --postflight-to 20261005010000_CustomerSearchIndexesV1
 ```
 
-Estos comandos requieren que Inventario figure como la sexta migración aplicada; Inventario ya está aplicado localmente. Requieren autorización específica, respaldo y ventana de mantenimiento; su presencia en la documentación no afirma que los índices existan en la base persistente local.
+Estos comandos requirieron que Inventario figurara como sexta migración aplicada. No deben repetirse en la base PostgreSQL persistente local/de desarrollo sin una evaluación y autorización nuevas.
+
+En la base PostgreSQL persistente local/de desarrollo, el preflight se ejecutó una sola vez con código 0: transacción `REPEATABLE READ, READ ONLY`, historial esperado/verificado/diferencia `6/6/0`, índices reservados encontrados/permitidos `0/4` y rollback confirmado. Antes de migrar se creó y verificó un respaldo externo al repositorio, conservado fuera de él: `ControlPlus_before_20261005010000_CustomerSearchIndexesV1_20261009-133250.dump`, formato `CUSTOM`, 472954 bytes, 796 entradas TOC verificadas con `pg_restore --list` y SHA-256 `368d8db08720634c982272ed9bf2d66f7a3a13e7c629754dbeabecf84e3f2c37`.
+
+La migración se ejecutó una sola vez con código 0 y el resultado `Migration target '20261005010000_CustomerSearchIndexesV1' applied successfully.` El postflight se ejecutó una sola vez con código 0: transacción `REPEATABLE READ, READ ONLY`, historial `7/7/0`, índices `4/4/0` y rollback confirmado. Solo se recreó `controlplus-api`, con imagen `sha256:02bb2df581f8714d8125ccc865509d4b3533aba08603a6d9da2a9ed5e15d6238`; quedó running/healthy y con `RestartCount` 0. PostgreSQL conservó su identidad, estado running/healthy, `RestartCount` 0 y el volumen `controlplusbackend_controlplus_postgres_data`. La verificación HTTP final devolvió 200 para `GET /api/health`, `GET /api/health/database` y `GET /openapi/v1.json`. Inventario continúa figurando como aplicado previamente en esa misma base PostgreSQL persistente local/de desarrollo. El respaldo permanece conservado fuera del repositorio.
 
 El runner rechaza destinos vacíos, inexistentes, ya aplicados o anteriores al último aplicado. También rechaza historiales que no sean un prefijo exacto del catálogo y secuencias pendientes incoherentes. La única operación permitida es aplicar la secuencia ascendente pendiente cuyo último elemento sea exactamente el destino solicitado. No existe una opción para aplicar genéricamente todo lo pendiente.
 
@@ -110,15 +114,6 @@ docker compose run --rm --no-deps `
 ```
 
 `--no-deps` impide que este comando cree o reinicie PostgreSQL; el destino autorizado debe estar disponible previamente mediante la configuración normal de Compose. El runner conserva la cadena de conexión solo en memoria y nunca registra configuración, credenciales, tokens, JWT, Master Key ni contenido de `.env`. Solo informa el identificador objetivo, resultado y mensajes sanitizados. El objetivo de Caja ya está aplicado en la base PostgreSQL persistente local/de desarrollo y el runner debe rechazar un segundo intento allí.
-
-Procedimiento obligatorio para la futura aplicación persistente de `20261005010000_CustomerSearchIndexesV1`:
-
-1. Obtener autorización explícita para el entorno y la migración; producción nunca se migra por iniciativa del operador ni mediante el arranque de la API.
-2. Abrir una ventana de mantenimiento, crear un respaldo fuera del repositorio y comprobar que pueda restaurarse.
-3. Confirmar de forma independiente la imagen que se ejecutará, el entorno destino, el estado actual del historial y el identificador exacto que cerrará la secuencia pendiente.
-4. Ejecutar una sola vez el comando controlado y exigir código de salida 0. No reintentarlo a ciegas.
-5. Verificar por un mecanismo autorizado que `__EFMigrationsHistory` contiene exactamente una fila para el objetivo, comprobar `/api/health` y `/api/health/database`, y revisar los errores sanitizados.
-6. Conservar el respaldo hasta terminar la verificación funcional. Cualquier reversión requiere un plan y una autorización separados.
 
 La API normal no llama `Migrate`, `MigrateAsync`, `EnsureCreated` ni equivalentes. No aplique la migración base sobre un esquema existente: el SQL oficial está diseñado para una base vacía. No use operaciones que borren volúmenes.
 

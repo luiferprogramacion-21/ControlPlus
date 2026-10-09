@@ -62,7 +62,7 @@ El preflight de Inventario exige exactamente las cinco predecesoras terminando e
 
 La comparación SHA-256 detecta adiciones, eliminaciones o modificaciones entre ambas comprobaciones, pero no es una garantía frente a escrituras simultáneas fuera de ellas. El flujo persistente futuro sigue exigiendo una ventana de mantenimiento que impida cambios externos desde el preflight hasta terminar el postflight.
 
-`20261005010000_CustomerSearchIndexesV1` también está publicada en código y pendiente de aplicación persistente. Solo agrega cuatro índices de búsqueda de Clientes y requiere que Inventario sea exactamente la sexta migración ya aplicada. Sus comandos futuros, documentados pero no ejecutados en este corte, son:
+`20261005010000_CustomerSearchIndexesV1` está publicada en código y fue aplicada exactamente una vez en la base PostgreSQL persistente local/de desarrollo. Solo agrega cuatro índices de búsqueda de Clientes y requirió que Inventario fuera exactamente la sexta migración ya aplicada. Sus comandos se conservan como referencia histórica de esa aplicación:
 
 ```bash
 CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --preflight-to 20261005010000_CustomerSearchIndexesV1
@@ -70,7 +70,7 @@ CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --migrate-to 2026
 CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --postflight-to 20261005010000_CustomerSearchIndexesV1
 ```
 
-Preflight exige las seis predecesoras, la forma oficial de `catalogo.cliente` y ausencia de los nombres de índices reservados en cualquier tabla de `catalogo`. Postflight exige historial `7/7/0` y las cuatro definiciones exactas. Ambos son `REPEATABLE READ, READ ONLY`, terminan con rollback y no inician HTTP. Estos comandos requieren autorización y respaldo independientes; la publicación del código no afirma que los índices existan en la base persistente local.
+Preflight exige las seis predecesoras, la forma oficial de `catalogo.cliente` y ausencia de los nombres de índices reservados en cualquier tabla de `catalogo`. Postflight exige historial `7/7/0` y las cuatro definiciones exactas. Ambos son `REPEATABLE READ, READ ONLY`, terminan con rollback y no inician HTTP. El preflight, la migración y el postflight se ejecutaron una sola vez y terminaron con código 0 en la base PostgreSQL persistente local/de desarrollo. Estos comandos no deben repetirse allí sin una evaluación y autorización nuevas.
 
 Antes de cualquier uso persistente se debe contar con autorización explícita, ventana de mantenimiento, respaldo verificado y confirmación independiente del identificador objetivo. El comando no debe automatizarse en el arranque ni ejecutarse contra producción sin autorización expresa. Después se debe confirmar el código 0, una sola fila del objetivo en `__EFMigrationsHistory`, salud de API y ausencia de errores sanitizados. Consulte [docs/database.md](docs/database.md).
 
@@ -100,6 +100,6 @@ Más detalles:
 - [Inventario](docs/inventory.md)
 - [Clientes](docs/customers.md)
 - [Caja](docs/cash.md)
-- Caja conserva la diferencia oficial de efectivo y separa el total; su migración ya aplicada conserva métodos de pago al revertir. Inventario ya está aplicado en PostgreSQL persistente local; los índices de búsqueda de Clientes siguen pendientes. La validación usa únicamente Testcontainers; no despliega servicios ni migra PostgreSQL persistente.
+- Caja conserva la diferencia oficial de efectivo y separa el total; su migración ya aplicada conserva métodos de pago al revertir. Inventario y los índices de búsqueda de Clientes ya están aplicados en la base PostgreSQL persistente local/de desarrollo. Las pruebas automatizadas usan Testcontainers y no alteran esa base.
 - [Base de datos](docs/database.md)
 - [Decisión de persistencia y concurrencia](docs/decisions/0001-persistencia-concurrencia-y-migraciones.md)
