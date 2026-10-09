@@ -134,12 +134,11 @@ internal static class CustomerSearchDatabaseValidation
                 SELECT 1
                 FROM pg_catalog.pg_indexes
                 WHERE schemaname = @schema
-                  AND tablename = @table
                   AND indexname = @name)
             """,
             connection,
             transaction);
-        AddTableParameters(command);
+        command.Parameters.AddWithValue("schema", CustomerSearchMigrationManifest.Schema);
         command.Parameters.AddWithValue("name", name);
         return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
     }

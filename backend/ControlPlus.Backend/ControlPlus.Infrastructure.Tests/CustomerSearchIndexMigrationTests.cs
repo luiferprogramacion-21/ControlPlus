@@ -1,3 +1,4 @@
+using ControlPlus.Tests;
 using System.Security.Cryptography;
 using ControlPlus.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -32,7 +33,11 @@ public sealed class CustomerSearchIndexMigrationTests : IAsyncLifetime
         .WithPassword(Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
         .Build();
 
-    public Task InitializeAsync() => _postgres.StartAsync();
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+        await PostgresAvailability.WaitAsync(_postgres);
+    }
     public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
 
     [Fact, Trait("Category", "Integration")]

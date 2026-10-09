@@ -126,6 +126,25 @@ public sealed class ControlledCustomerSearchMigrationTests(ControlledMigrationPo
     }
 
     [Fact]
+    public async Task Preflight_RejectsReservedIndexOnAnotherCatalogoTableWithoutChangingDatabase()
+    {
+        foreach (var index in CustomerSearchMigrationManifest.Indexes)
+        {
+            var connectionString = await CreateReadyDatabaseAsync();
+            await ControlledMigrationTests.ExecuteAsync(
+                connectionString,
+                $"CREATE INDEX {index.Name} ON catalogo.categoria(id)");
+            var historyBefore = await HistorySnapshotAsync(connectionString);
+
+            AssertRejected(
+                await RunAsync(connectionString, ControlledExecutionCommand.PreflightTargetArgument),
+                "reserved for the target already exists");
+            Assert.Equal(historyBefore, await HistorySnapshotAsync(connectionString));
+            Assert.Equal(0L, await TargetIndexCountAsync(connectionString));
+        }
+    }
+
+    [Fact]
     public async Task Migration_RequiresInventoryAndAppliesOnlyTargetExactlyOnce()
     {
         var missing = await postgres.CreateDatabaseAsync();

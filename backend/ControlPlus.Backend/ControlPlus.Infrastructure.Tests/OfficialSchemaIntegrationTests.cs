@@ -1,3 +1,4 @@
+using ControlPlus.Tests;
 using System.Data.Common;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Infrastructure.Persistence;
@@ -37,6 +38,7 @@ public sealed class OfficialSchemaIntegrationTests
             .WithPassword("integration-password-not-for-production")
             .Build();
         await postgres.StartAsync();
+        await PostgresAvailability.WaitAsync(postgres);
 
         var options = new DbContextOptionsBuilder<ControlPlusDbContext>()
             .UseNpgsql(postgres.GetConnectionString())
@@ -247,6 +249,7 @@ public sealed class OfficialSchemaIntegrationTests
             .WithPassword("integration-password-not-for-production")
             .Build();
         await postgres.StartAsync();
+        await PostgresAvailability.WaitAsync(postgres);
 
         var migrationOptions = new DbContextOptionsBuilder<ControlPlusDbContext>()
             .UseNpgsql(postgres.GetConnectionString())

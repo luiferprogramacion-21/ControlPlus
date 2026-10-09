@@ -16,4 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ControlPlus.Api\ControlPlus.Api.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\PostgresAvailability.cs" Link="PostgresAvailability.cs" />
+  </ItemGroup>
 </Project>

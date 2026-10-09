@@ -56,24 +56,7 @@ docker compose run --rm --no-deps `
 
 El contenedor temporal de aplicación valida que el historial sea un prefijo coherente, que el destino exista, esté pendiente y solo requiera una secuencia ascendente que termine exactamente en él. No inicia HTTP ni acepta “todo lo pendiente”; un error termina con código distinto de cero y sin rollback manual automático. Las migraciones publicadas son inmutables.
 
-`20260930010000_SeedInventoryAdjustmentReasonsV1` está publicada en el código, pero continúa pendiente de aplicación en la base PostgreSQL persistente local. Sus tres comandos futuros, que no deben ejecutarse sin evaluación, respaldo verificado y autorización específica, son:
-
-```powershell
-docker compose run --rm --no-deps `
-  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
-  api --preflight-to 20260930010000_SeedInventoryAdjustmentReasonsV1
-
-$inventoryReasonsSha256 = '<valor motivos_ajenos_sha256 emitido por el preflight>'
-
-docker compose run --rm --no-deps `
-  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
-  api --migrate-to 20260930010000_SeedInventoryAdjustmentReasonsV1
-
-docker compose run --rm --no-deps `
-  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
-  api --postflight-to 20260930010000_SeedInventoryAdjustmentReasonsV1 `
-  --expect-unrelated-reasons-sha256 $inventoryReasonsSha256
-```
+`20260930010000_SeedInventoryAdjustmentReasonsV1` ya fue aplicada a la base PostgreSQL persistente local/de desarrollo. No debe aplicarse de nuevo allí.
 
 El preflight de Inventario exige exactamente las cinco predecesoras terminando en Caja, objetivo pendiente, las once columnas de `configuracion.motivo_operacion`, el índice natural correcto y ausencia total de los cuatro motivos aprobados y de colisiones UUID. También emite `motivos_ajenos` y una huella canónica SHA-256 de las once columnas de todos los motivos ajenos, sin imprimir sus valores. Esa huella se captura literalmente antes de migrar y se suministra al postflight. La migración acepta únicamente el estado con Caja como quinta y última fila aplicada, por lo que nunca aplica Caja e Inventario juntos. El postflight es de solo lectura, exige historial `6/6/0`, valida `4×E` motivos completos y rechaza si la huella ajena cambió. Preflight y postflight confirman `READ ONLY` al inicio y al final y terminan con rollback; ninguno usa `IMigrator`, DDL, HTTP ni escritura.
 
@@ -87,7 +70,7 @@ CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --migrate-to 2026
 CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --postflight-to 20261005010000_CustomerSearchIndexesV1
 ```
 
-Preflight exige las seis predecesoras, la forma oficial de `catalogo.cliente` y ausencia de los índices reservados. Postflight exige historial `7/7/0` y las cuatro definiciones exactas. Ambos son `REPEATABLE READ, READ ONLY`, terminan con rollback y no inician HTTP. Estos comandos requieren autorización y respaldo independientes; la publicación del código no afirma que los índices existan en la base persistente local.
+Preflight exige las seis predecesoras, la forma oficial de `catalogo.cliente` y ausencia de los nombres de índices reservados en cualquier tabla de `catalogo`. Postflight exige historial `7/7/0` y las cuatro definiciones exactas. Ambos son `REPEATABLE READ, READ ONLY`, terminan con rollback y no inician HTTP. Estos comandos requieren autorización y respaldo independientes; la publicación del código no afirma que los índices existan en la base persistente local.
 
 Antes de cualquier uso persistente se debe contar con autorización explícita, ventana de mantenimiento, respaldo verificado y confirmación independiente del identificador objetivo. El comando no debe automatizarse en el arranque ni ejecutarse contra producción sin autorización expresa. Después se debe confirmar el código 0, una sola fila del objetivo en `__EFMigrationsHistory`, salud de API y ausencia de errores sanitizados. Consulte [docs/database.md](docs/database.md).
 
@@ -117,6 +100,6 @@ Más detalles:
 - [Inventario](docs/inventory.md)
 - [Clientes](docs/customers.md)
 - [Caja](docs/cash.md)
-- Caja conserva la diferencia oficial de efectivo y separa el total; su migración ya aplicada conserva métodos de pago al revertir. Inventario y los índices de búsqueda de Clientes están publicados en código y pendientes en PostgreSQL persistente local. La validación usa únicamente Testcontainers; no despliega servicios ni migra PostgreSQL persistente.
+- Caja conserva la diferencia oficial de efectivo y separa el total; su migración ya aplicada conserva métodos de pago al revertir. Inventario ya está aplicado en PostgreSQL persistente local; los índices de búsqueda de Clientes siguen pendientes. La validación usa únicamente Testcontainers; no despliega servicios ni migra PostgreSQL persistente.
 - [Base de datos](docs/database.md)
 - [Decisión de persistencia y concurrencia](docs/decisions/0001-persistencia-concurrencia-y-migraciones.md)

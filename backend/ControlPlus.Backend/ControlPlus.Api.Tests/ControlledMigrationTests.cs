@@ -1,3 +1,4 @@
+using ControlPlus.Tests;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -28,7 +29,11 @@ public sealed class ControlledMigrationPostgresFixture : IAsyncLifetime
         .WithPassword(Guid.NewGuid().ToString("N"))
         .Build();
 
-    public Task InitializeAsync() => _postgres.StartAsync();
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+        await PostgresAvailability.WaitAsync(_postgres);
+    }
 
     public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
 

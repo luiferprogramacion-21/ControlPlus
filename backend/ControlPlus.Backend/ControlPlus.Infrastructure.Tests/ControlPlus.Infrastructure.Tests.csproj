@@ -19,4 +19,7 @@
     <ProjectReference Include="..\ControlPlus.Infrastructure\ControlPlus.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\PostgresAvailability.cs" Link="PostgresAvailability.cs" />
+  </ItemGroup>
 </Project>

@@ -1,3 +1,4 @@
+using ControlPlus.Tests;
 using System.Globalization;
 using ControlPlus.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,7 @@ internal sealed class CashMigrationDatabase : IAsyncDisposable
         try
         {
             await database._postgres.StartAsync();
+            await PostgresAvailability.WaitAsync(database._postgres);
             database.Connection = await database.OpenConnectionAsync();
             await database.MigrateAsync(applyCash ? CashMigration : PreviousMigration);
             return database;

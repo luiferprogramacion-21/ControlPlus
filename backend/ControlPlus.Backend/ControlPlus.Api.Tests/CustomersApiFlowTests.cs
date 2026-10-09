@@ -1,3 +1,4 @@
+using ControlPlus.Tests;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -43,6 +44,7 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
+        await PostgresAvailability.WaitAsync(_postgres);
         await using (var migrations = new ControlPlusDbContext(new DbContextOptionsBuilder<ControlPlusDbContext>()
                          .UseNpgsql(_postgres.GetConnectionString()).Options))
             await migrations.Database.MigrateAsync();

@@ -1,3 +1,4 @@
+using ControlPlus.Tests;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -48,6 +49,7 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
+        await PostgresAvailability.WaitAsync(_postgres);
         var options = new DbContextOptionsBuilder<ControlPlusDbContext>()
             .UseNpgsql(_postgres.GetConnectionString())
             .Options;
