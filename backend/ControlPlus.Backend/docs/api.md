@@ -158,7 +158,7 @@ Los tres endpoints exigen el permiso efectivo `NUMBERING.MANAGE`. Instalación, 
 | `POST` | `/api/document-numbering/credit-payments` | Crea el consecutivo con prefijo obligatorio `ABO`; `firstNumber: 1` guarda `lastNumber: 0` |
 | `PUT` | `/api/document-numbering/credit-payments` | Corrige antes del primer abono, con `version` vigente |
 
-Requieren `NUMBERING.MANAGE`. Tipo, instalación y serie se resuelven solo en servidor y los contratos JSON rechazan campos internos y propiedades desconocidas. La configuración inicial aprobada usa `firstNumber: 1`; las correcciones antes del primer pago admiten un número inicial positivo. No existe `DELETE`. **ABO aún no está configurado en PostgreSQL persistente local/de desarrollo**; su configuración operativa posterior a publicación y despliegue requiere autorización independiente. Este corte no creó migración ni configuró el consecutivo automáticamente.
+Requieren `NUMBERING.MANAGE`. Tipo, instalación y serie se resuelven solo en servidor y los contratos JSON rechazan campos internos y propiedades desconocidas. La configuración inicial aprobada usa `firstNumber: 1`; las correcciones antes del primer pago admiten un número inicial positivo. No existe `DELETE`. Tras la publicación del commit y el despliegue local de la imagen API, ABO quedó presente y certificado mediante la API en PostgreSQL persistente local/de desarrollo con `prefix=ABO`, `lastNumber=0`, `nextNumber=1` y `version` válida. Este corte no creó migración ni configuró el consecutivo automáticamente; no se usó `PUT` para cambiar ABO.
 
 ## Respuestas de error
 

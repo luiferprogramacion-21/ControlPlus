@@ -4,7 +4,9 @@
 
 Este corte permite confirmar una venta `CREDITO` y registrar abonos sobre créditos existentes. Reutiliza las tablas oficiales de Ventas, Clientes, Caja, seguridad, auditoría y numeración; no crea migración, tablas ni columnas. La ejecución focalizada final terminó `174/174` y la suite completa `415/415`, sin fallos ni omitidas. Durante la implementación y validación no se aplicaron migraciones ni cambios en PostgreSQL persistente local/de desarrollo.
 
-No se configuró el consecutivo `PAGO_CREDITO`/`ABO` en PostgreSQL persistente local o de desarrollo. La configuración operativa tras publicación y despliegue requiere una autorización independiente. Sin consecutivo, `POST /api/credits/{creditId}/payments` devuelve `409` y no escribe.
+El corte se implementó y validó antes de su publicación. El commit `4eb9fcf659035a3c7c723f4d14c4e20e2906f030` (`feat: implementar créditos y abonos`) fue publicado; la imagen API `sha256:17e0ae4f77bb9a5c91bc996af3f89cc3e325d10d9088df4ce10e2ecacaebcb05` se construyó y desplegó localmente como contenedor `e3be2b4ae0265b334c14e1b80e107d073be67f5b3f3115cdcfba50337d5b0099`, `running/healthy` y `RestartCount=0`. PostgreSQL conservó el contenedor `e31e0486ce3f556776e29cf46eea42714129bdc9f48c650a0d884045cec67277`, `running/healthy` y `RestartCount=0`, el volumen `controlplusbackend_controlplus_postgres_data` y el montaje `/var/lib/postgresql/data`. `/api/health`, `/api/health/database` y `/openapi/v1.json` respondieron `200`.
+
+Después del despliegue, el consecutivo `PAGO_CREDITO`/`ABO` quedó presente y certificado mediante la API en PostgreSQL persistente local/de desarrollo: `prefix=ABO`, `lastNumber=0`, `nextNumber=1` y `version` válida. `AboWindowOperationExit=0`; la API y PostgreSQL conservaron salud e identidad durante la operación. No se ejecutaron migraciones, SQL directo ni cambios de esquema; PostgreSQL no se reinició ni recreó, y no se usó `PUT` para cambiar ABO. La evidencia conservada no determina si el `POST` de ABO devolvió `0` o `1`. Sin consecutivo, `POST /api/credits/{creditId}/payments` devuelve `409` y no escribe.
 
 ## Venta a crédito
 
