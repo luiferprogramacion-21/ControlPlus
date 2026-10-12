@@ -20,6 +20,75 @@ public sealed class DocumentNumberingService(
 {
     private const string SalesDocumentType = "VENTA";
 
+    public async Task<Result<SalesDocumentNumberingDto>> GetCreditPaymentsAsync(
+        ActorContext actor, CancellationToken cancellationToken = default)
+    {
+        var error = await RequirePermissionAsync(actor, cancellationToken);
+        if (error is not null) return Result.Failure<SalesDocumentNumberingDto>(error);
+        var installation = await repository.GetActiveInstallationAsync(false, cancellationToken);
+        if (installation is null) return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("la instalación activa"));
+        var numbering = await repository.GetCreditPaymentNumberingAsync(installation.Id, installation.Serie, false, cancellationToken);
+        return numbering is null
+            ? Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("el consecutivo de abonos"))
+            : MapResult(numbering);
+    }
+
+    public async Task<Result<SalesDocumentNumberingDto>> CreateCreditPaymentsAsync(
+        ActorContext actor, CreateSalesDocumentNumberingRequest request, CancellationToken cancellationToken = default)
+    {
+        var error = await RequirePermissionAsync(actor, cancellationToken);
+        if (error is not null) return Result.Failure<SalesDocumentNumberingDto>(error);
+        var input = NormalizeAndValidate(request.Prefix, request.FirstNumber);
+        if (input.Error is not null) return Result.Failure<SalesDocumentNumberingDto>(input.Error);
+        if (input.Prefix != "ABO")
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.Validation("El prefijo aprobado para abonos es ABO."));
+        await using var transaction = await transactionManager.BeginAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        var installation = await repository.GetActiveInstallationAsync(true, cancellationToken);
+        if (installation is null) return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("la instalación activa"));
+        if (await repository.GetCreditPaymentNumberingAsync(installation.Id, installation.Serie, false, cancellationToken) is not null)
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.Conflict("Ya existe el consecutivo de abonos."));
+        var numbering = new ConsecutivoDocumento
+        {
+            Id = Guid.CreateVersion7(), InstalacionId = installation.Id, TipoDocumento = "PAGO_CREDITO",
+            Prefijo = input.Prefix!, Serie = installation.Serie, UltimoNumero = input.LastNumber, Version = 1
+        };
+        await repository.AddAsync(numbering, cancellationToken);
+        await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId,
+            AuditAction.CreditPaymentNumberingCreated, nameof(ConsecutivoDocumento), numbering.Id,
+            new { numbering.TipoDocumento, numbering.Serie, numbering.Prefijo, request.FirstNumber }, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return MapResult(numbering);
+    }
+
+    public async Task<Result<SalesDocumentNumberingDto>> UpdateCreditPaymentsAsync(
+        ActorContext actor, UpdateSalesDocumentNumberingRequest request, CancellationToken cancellationToken = default)
+    {
+        var error = await RequirePermissionAsync(actor, cancellationToken);
+        if (error is not null) return Result.Failure<SalesDocumentNumberingDto>(error);
+        if (request.Version <= 0) return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.Validation("La versión debe ser mayor que cero."));
+        var input = NormalizeAndValidate(request.Prefix, request.FirstNumber);
+        if (input.Error is not null) return Result.Failure<SalesDocumentNumberingDto>(input.Error);
+        if (input.Prefix != "ABO")
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.Validation("El prefijo aprobado para abonos es ABO."));
+        await using var transaction = await transactionManager.BeginAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        var installation = await repository.GetActiveInstallationAsync(true, cancellationToken);
+        if (installation is null) return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("la instalación activa"));
+        var numbering = await repository.GetCreditPaymentNumberingAsync(installation.Id, installation.Serie, true, cancellationToken);
+        if (numbering is null) return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("el consecutivo de abonos"));
+        if (numbering.Version != request.Version) return Result.Failure<SalesDocumentNumberingDto>(VersionConflict);
+        if (await repository.HasCreditPaymentsAsync(installation.Id, installation.Serie, cancellationToken))
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.Conflict("El consecutivo de abonos no puede corregirse después del primer pago."));
+        numbering.Prefijo = input.Prefix!;
+        numbering.UltimoNumero = input.LastNumber;
+        await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId,
+            AuditAction.CreditPaymentNumberingUpdated, nameof(ConsecutivoDocumento), numbering.Id,
+            new { numbering.TipoDocumento, numbering.Serie, numbering.Prefijo, request.FirstNumber }, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return MapResult(numbering);
+    }
+
     public async Task<Result<SalesDocumentNumberingDto>> GetSalesAsync(
         ActorContext actor,
         CancellationToken cancellationToken = default)
@@ -175,7 +244,9 @@ public sealed class DocumentNumberingService(
     {
         if (numbering.UltimoNumero == long.MaxValue)
             return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NumberingExhausted(
-                "El consecutivo de VENTAS alcanzó el número máximo admitido."));
+                numbering.TipoDocumento == "PAGO_CREDITO"
+                    ? "El consecutivo de abonos alcanzó el número máximo admitido."
+                    : "El consecutivo de VENTAS alcanzó el número máximo admitido."));
         return Result.Success(new SalesDocumentNumberingDto(
             numbering.TipoDocumento,
             numbering.Serie,

@@ -14,7 +14,7 @@ public sealed class SalesController(
     CurrentActorContextResolver actorContextResolver,
     ISalesService salesService) : ApiControllerBase(actorContextResolver)
 {
-    /// <summary>Confirma una venta CONTADO idempotente y descuenta su inventario.</summary>
+    /// <summary>Confirma una venta CONTADO o CREDITO idempotente y descuenta su inventario.</summary>
     [HttpPost]
     [PermissionAuthorize(PermissionCodes.SalesCreate)]
     [Consumes("application/json")]

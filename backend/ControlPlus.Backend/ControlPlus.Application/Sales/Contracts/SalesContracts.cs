@@ -27,7 +27,13 @@ public sealed record ConfirmSaleRequest(
     IReadOnlyCollection<SaleLineRequest> Lines,
     SaleDiscountRequest? GeneralDiscount,
     string? DiscountReason,
-    IReadOnlyCollection<SalePaymentRequest> Payments);
+    IReadOnlyCollection<SalePaymentRequest> Payments,
+    string? SaleType = null,
+    DateOnly? DueDate = null,
+    SaleCreditAuthorizationRequest? Authorization = null);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record SaleCreditAuthorizationRequest(string UserName, string Password);
 
 public sealed record SaleLineDto(
     Guid Id,
@@ -75,7 +81,8 @@ public sealed record SaleDto(
     string State,
     long Version,
     IReadOnlyCollection<SaleLineDto> Lines,
-    IReadOnlyCollection<SalePaymentDto> Payments);
+    IReadOnlyCollection<SalePaymentDto> Payments,
+    Guid? CreditId = null);
 
 public sealed record SaleSummaryDto(
     Guid Id,

@@ -42,6 +42,8 @@ Los únicos endpoints anónimos son los de salud y los flujos de autenticación 
 | Ventas | `/api/sales` | `SALES.CREATE`, `SALES.OWN_READ` o `SALES.ALL_READ` según operación |
 | Numeración de Ventas | `/api/document-numbering/sales` | `NUMBERING.MANAGE` |
 | Clientes | `/api/customers` | `CUSTOMERS.BASIC_MANAGE` o `CUSTOMERS.MANAGE` según operación |
+| Créditos y abonos | `/api/credits` | `CREDIT.MANAGE`; el historial añade `CUSTOMERS.HISTORY_READ` |
+| Numeración de abonos | `/api/document-numbering/credit-payments` | `NUMBERING.MANAGE` |
 
 Cada usuario tiene exactamente un rol principal. La reasignación se realiza con `POST /api/users/{userId}/roles`; no existe `DELETE /api/users/{userId}/roles/{roleId}` porque no sería válido retirar el único rol.
 
@@ -116,14 +118,27 @@ Las respuestas separan `cashDifference` (contado de efectivo menos esperado de e
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| `POST` | `/api/sales` | `SALES.CREATE` |
+| `POST` | `/api/sales` | `SALES.CREATE`; `CREDITO` añade `CREDIT.REQUEST` y autorización de otro Supervisor o Administrador con `CREDIT.AUTHORIZE` |
 | `GET` | `/api/sales/own` | `SALES.OWN_READ` |
 | `GET` | `/api/sales` | `SALES.ALL_READ` |
 | `GET` | `/api/sales/{saleId}` | `SALES.ALL_READ`, o venta propia con `SALES.OWN_READ` |
 
-La confirmación crea únicamente ventas `CONTADO` y exige `Idempotency-Key`. Una repetición con el mismo usuario y contenido devuelve la venta original; una reutilización incompatible responde `409`. Efectivo es el único método con `receivedAmount` y cambio. Transferencia y Nequi no usan `receivedAmount`, se aplican exactamente y exigen referencia. En modalidad compartida cada venta queda vinculada a una sesión breve activa y la consume de forma atómica; el siguiente cobro debe iniciar una sesión nueva, aunque pertenezca al mismo operador. Este consumo no declara un cambio real de usuario.
+La confirmación exige `Idempotency-Key` y admite `saleType: "CONTADO"` o `"CREDITO"`; omitirlo conserva `CONTADO` y el replay de claves anteriores. Una repetición con el mismo usuario, tipo y contenido devuelve la venta original; una reutilización incompatible responde `409`. Contado usa pagos: Efectivo es el único método con `receivedAmount` y cambio; Transferencia y Nequi no usan `receivedAmount`, se aplican exactamente y exigen referencia. Crédito exige cliente activo identificable, `dueDate` entre mañana y 90 días desde la fecha operativa, `authorization` de otro usuario habilitado y `payments: []`. No crea pago de venta ni movimiento de Caja inicial; la respuesta incluye `creditId`. En modalidad compartida cada venta queda vinculada a una sesión breve activa y la consume de forma atómica; el siguiente cobro debe iniciar una sesión nueva, aunque pertenezca al mismo operador. Este consumo no declara un cambio real de usuario.
 
-La respuesta `201` incluye la venta, líneas y pagos, sin exponer el costo histórico. Los listados son paginados y respetan permisos efectivos híbridos vigentes. Las respuestas documentadas son `400`, `401`, `403`, `404` y `409` según validación, autenticación, autorización, ausencia o conflicto. El contrato funcional completo está en [sales.md](sales.md).
+La respuesta `201` incluye la venta, líneas y pagos, sin exponer el costo histórico. Los listados son paginados y respetan permisos efectivos híbridos vigentes. Las respuestas documentadas son `400`, `401`, `403`, `404` y `409` según validación, autenticación, autorización, ausencia o conflicto. El contrato funcional completo está en [sales.md](sales.md) y los estados y abonos en [credits.md](credits.md).
+
+## Créditos y abonos
+
+| Método | Ruta | Permiso efectivo | Resultado |
+|---|---|---|---|
+| `GET` | `/api/credits` | `CREDIT.MANAGE` | Lista paginada `200` |
+| `GET` | `/api/credits/{creditId}` | `CREDIT.MANAGE` | Detalle `200` o `404` |
+| `GET` | `/api/credits/{creditId}/payments` | `CREDIT.MANAGE` y `CUSTOMERS.HISTORY_READ` | Historial paginado `200` o `404` |
+| `POST` | `/api/credits/{creditId}/payments` | `CREDIT.MANAGE` | Abono `201`; exige `Idempotency-Key` y `expectedVersion` |
+
+`GET /api/credits` acepta `page` (1 por defecto), `pageSize` (20 por defecto, máximo 100), `state`, `dueFrom`, `dueTo`, `customerId` y `saleNumber`. `state` admite `PENDIENTE`, `VENCIDO`, `PAGADO` y `ANULADO`. `saleNumber` acepta número completo o prefijo sin comodín inicial. Los créditos se ordenan por otorgamiento e ID descendentes; los abonos por fecha e ID descendentes. Las lecturas proyectan `VENCIDO` cuando un `PENDIENTE` con saldo supera su fecha local de vencimiento, sin modificar la base.
+
+El cuerpo de abono contiene `expectedVersion` y `payments`, una a tres filas con `methodCode`, `appliedAmount`, `receivedAmount` y `reference`. Cada método debe ser distinto y activo; la suma positiva no supera el saldo. Efectivo exige recibido suficiente y calcula cambio; Transferencia y Nequi no aceptan recibido y requieren referencia cuando el método la exige. Cada fila obtiene número `ABO` propio, comparte correlación y un movimiento canónico de Caja. Se requiere turno abierto y, en turno compartido, sesión de operador activa. Versiones obsoletas, créditos `PAGADO` o `ANULADO`, numeración ausente o agotada e idempotencia incompatible devuelven `409`; entradas inválidas devuelven `400`. Las respuestas omiten dirección, correo, observaciones, referencia electrónica y auditoría detallada. No hay `PUT`, `PATCH` ni `DELETE` de créditos o abonos.
 
 ## Numeración de Ventas
 
@@ -134,6 +149,16 @@ La respuesta `201` incluye la venta, líneas y pagos, sin exponer el costo hist�
 | `PUT` | `/api/document-numbering/sales` | Corrige prefijo y primer número solamente antes de la primera venta confirmada |
 
 Los tres endpoints exigen el permiso efectivo `NUMBERING.MANAGE`. Instalación, serie y tipo `VENTA` se resuelven en el servidor y no forman parte de las solicitudes. El prefijo se recorta, se normaliza a mayúsculas, no puede quedar vacío, contener caracteres de control ni superar 10 caracteres. La corrección exige `version`; una versión obsoleta o cualquier venta confirmada para la instalación y serie produce `409`. No existe endpoint de eliminación. Las respuestas solo muestran tipo, serie, prefijo, último número, próximo número y versión.
+
+## Numeración de abonos
+
+| Método | Ruta | Resultado |
+|---|---|---|
+| `GET` | `/api/document-numbering/credit-payments` | Consulta `PAGO_CREDITO` para instalación y serie activas; `404` si falta |
+| `POST` | `/api/document-numbering/credit-payments` | Crea el consecutivo con prefijo obligatorio `ABO`; `firstNumber: 1` guarda `lastNumber: 0` |
+| `PUT` | `/api/document-numbering/credit-payments` | Corrige antes del primer abono, con `version` vigente |
+
+Requieren `NUMBERING.MANAGE`. Tipo, instalación y serie se resuelven solo en servidor y los contratos JSON rechazan campos internos y propiedades desconocidas. La configuración inicial aprobada usa `firstNumber: 1`; las correcciones antes del primer pago admiten un número inicial positivo. No existe `DELETE`. **ABO aún no está configurado en PostgreSQL persistente local/de desarrollo**; su configuración operativa posterior a publicación y despliegue requiere autorización independiente. Este corte no creó migración ni configuró el consecutivo automáticamente.
 
 ## Respuestas de error
 

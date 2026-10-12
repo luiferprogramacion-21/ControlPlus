@@ -30,6 +30,9 @@ public interface ISalesRepository
     Task<IReadOnlyDictionary<Guid, string>> GetMeasurementUnitNamesAsync(IReadOnlyCollection<Guid> unitIds, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<MetodoPago>> GetPaymentMethodsAsync(IReadOnlyCollection<string> codes, CancellationToken cancellationToken = default);
     Task<Cliente?> GetCustomerAsync(Guid customerId, CancellationToken cancellationToken = default);
+    Task<Usuario?> GetUserForUpdateAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task AddCreditAsync(Credito credit, CancellationToken cancellationToken = default);
+    Task AddAuthorizationAsync(AutorizacionOperacion authorization, CancellationToken cancellationToken = default);
 
     Task AddSaleAsync(Venta sale, CancellationToken cancellationToken = default);
     Task AddSaleDetailsAsync(IReadOnlyCollection<DetalleVenta> details, CancellationToken cancellationToken = default);

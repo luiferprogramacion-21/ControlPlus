@@ -20,6 +20,12 @@ public interface IDocumentNumberingRepository
         string series,
         CancellationToken cancellationToken = default);
 
+    Task<ConsecutivoDocumento?> GetCreditPaymentNumberingAsync(
+        Guid installationId, string series, bool forUpdate, CancellationToken cancellationToken = default);
+
+    Task<bool> HasCreditPaymentsAsync(
+        Guid installationId, string series, CancellationToken cancellationToken = default);
+
     Task AddAsync(ConsecutivoDocumento numbering, CancellationToken cancellationToken = default);
 }
 

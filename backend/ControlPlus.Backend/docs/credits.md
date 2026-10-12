@@ -1,0 +1,65 @@
+# Créditos y abonos — corte 1
+
+## Alcance y estado
+
+Este corte permite confirmar una venta `CREDITO` y registrar abonos sobre créditos existentes. Reutiliza las tablas oficiales de Ventas, Clientes, Caja, seguridad, auditoría y numeración; no crea migración, tablas ni columnas. La ejecución focalizada final terminó `174/174` y la suite completa `415/415`, sin fallos ni omitidas. Durante la implementación y validación no se aplicaron migraciones ni cambios en PostgreSQL persistente local/de desarrollo.
+
+No se configuró el consecutivo `PAGO_CREDITO`/`ABO` en PostgreSQL persistente local o de desarrollo. La configuración operativa tras publicación y despliegue requiere una autorización independiente. Sin consecutivo, `POST /api/credits/{creditId}/payments` devuelve `409` y no escribe.
+
+## Venta a crédito
+
+`POST /api/sales` acepta `saleType: "CONTADO"` o `"CREDITO"`; si se omite, se conserva `CONTADO` y la compatibilidad de claves idempotentes anteriores. La venta a crédito conserva el consecutivo `VENTA` y no recibe otro número propio. Necesita `Idempotency-Key`, `SALES.CREATE` y `CREDIT.REQUEST` efectivos, cliente activo existente con documento completo (tipo y número) o teléfono, fecha `dueDate` desde el día siguiente hasta 90 días inclusive según la fecha operativa del turno, y `authorization` con usuario y contraseña. `payments` debe ser `[]`: no se crea `pago_venta` ni movimiento de Caja inicial.
+
+El autorizador debe ser un usuario diferente del ejecutor, activo, no bloqueado, con rol base Supervisor o Administrador y `CREDIT.AUTHORIZE` efectivo. Se revalidan permisos vigentes y se usa el coordinador común de intentos de Login, Caja e Inventario. Una contraseña errónea conserva el intento fallido y su auditoría sanitizada; el quinto intento bloquea una sola vez. El ejecutor conserva su contador. Un éxito consume la autorización y reinicia los intentos del autorizador dentro de la transacción de la venta.
+
+Venta, detalles, movimientos y stock de inventario, autorización, crédito, idempotencia, sesión compartida y auditoría se confirman o revierten juntos. El crédito inicia `PENDIENTE` con `monto_original`, `monto_ajustado` y `saldo_pendiente` iguales al total de la venta. Un replay compatible devuelve la venta original; reutilizar la clave con usuario, tipo o contenido incompatible devuelve `409`.
+
+## Estados y consultas
+
+| Estado | Regla |
+|---|---|
+| `PENDIENTE` | Saldo positivo, vencimiento vigente. |
+| `VENCIDO` | Saldo positivo y vencimiento anterior a la fecha local del negocio. Una lectura proyecta este estado sin escribir. |
+| `PAGADO` | Saldo cero tras un abono; se registra `fecha_pago`. |
+| `ANULADO` | Estado oficial que no admite nuevos abonos. La cancelación no se implementa en este corte. |
+
+Un crédito vencido puede recibir abonos. Si el cliente se inactiva después del otorgamiento, su crédito sigue siendo consultable y pagable; la inactividad impide otorgarle uno nuevo.
+
+| Método | Ruta | Permiso efectivo |
+|---|---|---|
+| `GET` | `/api/credits` | `CREDIT.MANAGE` |
+| `GET` | `/api/credits/{creditId}` | `CREDIT.MANAGE` |
+| `GET` | `/api/credits/{creditId}/payments` | `CREDIT.MANAGE` y `CUSTOMERS.HISTORY_READ` |
+| `POST` | `/api/credits/{creditId}/payments` | `CREDIT.MANAGE` |
+
+Lista e historial usan `page=1`, `pageSize=20`, máximo 100 y desempate estable por UUID. La lista acepta `state` (`PENDIENTE`, `VENCIDO`, `PAGADO`, `ANULADO`), `dueFrom`, `dueTo`, `customerId` y `saleNumber`; este último busca número completo o prefijo de venta sin comodín inicial. Los créditos se ordenan por fecha de otorgamiento e ID descendentes; los pagos por fecha e ID descendentes. Las lecturas no modifican estado ni versión.
+
+Las respuestas de crédito contienen solo identificadores, número de venta, nombre, tipo y número de documento, teléfono, importes, fechas, estado y versión. El historial contiene método, número, importe aplicado, recibido/cambio cuando corresponda, fecha, estado y correlación. Cajero y Supervisor no reciben dirección, correo, observaciones, credenciales ni auditoría detallada; Administrador usa el mismo contrato de este corte.
+
+## Abonos
+
+`POST /api/credits/{creditId}/payments` exige `Idempotency-Key` y `expectedVersion` del crédito. El cuerpo contiene `payments` con uno a tres métodos distintos entre `EFECTIVO`, `TRANSFERENCIA` y `NEQUI`; cada fila indica `methodCode`, `appliedAmount`, `receivedAmount` opcional y `reference` opcional. Los importes son COP enteros positivos dentro del rango monetario oficial. El total aplicado no puede superar el saldo; se rechazan pagos sobre `PAGADO` o `ANULADO` y versiones obsoletas con `409`.
+
+El abono requiere turno abierto de la terminal activa. En modalidad individual, el actor debe ser el responsable; en compartida, debe tener sesión de operador activa, que se consume en la transacción. Los métodos deben estar activos. Efectivo exige recibido al menos igual al aplicado y es el único que genera cambio. Transferencia y Nequi no aceptan `receivedAmount`; requieren referencia si así lo configura el método. Una repetición compatible de la clave devuelve la operación original, y su reutilización incompatible devuelve `409`.
+
+Cada método crea una fila `ventas.pago_credito` y consume un número `PAGO_CREDITO`. El prefijo operativo es `ABO`: efectivo más Nequi consume, por ejemplo, los consecutivos 1 y 2 de la serie activa; la API los presenta como `ABO-<serie>-1` y `ABO-<serie>-2`. Todas las filas de la solicitud comparten una correlación, un único movimiento canónico de Caja y una respuesta de operación. Caja calcula el arqueo por método desde `pago_credito.valor_aplicado` y excluye el movimiento vinculado del sumatorio manual para evitar doble conteo. Una venta a crédito sin abonos no contribuye al arqueo.
+
+La transacción de abono sigue el orden de bloqueo instalación → turno y sesión → consecutivo → crédito → recursos restantes, compatible con el orden inicial de Ventas y Numeración. La venta a crédito usa antes el coordinador por cuenta del autorizador y luego bloquea instalación → turno y sesión → autorizador → consecutivo `VENTA` → productos. Confirma o revierte saldo, versión, pagos, movimiento, consecutivos, sesión, idempotencia y auditoría como una unidad. Dos abonos concurrentes no pueden dejar saldo negativo; la versión obsoleta devuelve `409`.
+
+## Numeración de abonos
+
+| Método | Ruta | Resultado |
+|---|---|---|
+| `GET` | `/api/document-numbering/credit-payments` | Consulta la configuración `PAGO_CREDITO`; `404` si falta. |
+| `POST` | `/api/document-numbering/credit-payments` | Crea la configuración para la instalación y serie activas. |
+| `PUT` | `/api/document-numbering/credit-payments` | Corrige antes del primer `pago_credito`, con `version` vigente. |
+
+Las tres operaciones exigen `NUMBERING.MANAGE`. El servidor fija tipo `PAGO_CREDITO`, instalación y serie; esos campos y `lastNumber` no son entradas de cliente. El prefijo de abonos se fija a `ABO`, con el límite de 10 caracteres del contrato. La configuración inicial aprobada usa `firstNumber: 1`, que guarda `ultimo_numero = 0`; el contrato de corrección admite números iniciales positivos antes del primer pago. La creación duplicada, una versión obsoleta o una corrección tras el primer pago producen `409`. No hay `DELETE`.
+
+## Errores, auditoría y exclusiones
+
+Los contratos raíz y anidados rechazan propiedades JSON desconocidas. Los errores conocidos usan `application/problem+json` y códigos estables: `400` validación, `401` sin autenticación, `403` sin permiso o autorización, `404` recurso ausente, `409` estado, numeración, idempotencia o concurrencia. No se exponen excepciones ni detalles internos.
+
+La auditoría registra IDs internos, resultado, estado y correlación necesarios. Omite contraseña, JWT, `Idempotency-Key`, referencia electrónica, dirección, correo, observaciones y datos personales o importes innecesarios. Los intentos fallidos de autorización se registran sin credenciales; un fallo de COMMIT revierte la auditoría de éxito junto con la operación.
+
+Permanecen pendientes la cancelación de créditos, reversión o anulación de abonos, intereses, mora, cuotas, límites de crédito, `CREDIT.FUTURE_BLOCK`, cambios/devoluciones de venta, impresión física y operaciones `PUT`, `PATCH` o `DELETE` sobre créditos y abonos. No se hizo eliminación física.

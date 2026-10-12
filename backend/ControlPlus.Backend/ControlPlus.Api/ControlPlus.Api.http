@@ -19,6 +19,13 @@
 @inventoryReasonId = paste-an-active-inventory-adjustment-reason-id
 @productVersion = paste-the-current-product-version
 @inventoryIdempotencyKey = replace-with-a-unique-local-inventory-key
+@customerId = paste-an-active-customer-id-returned-by-the-api
+@creditId = paste-a-credit-id-returned-by-a-credit-sale
+@creditVersion = paste-the-current-credit-version
+@creditDueDate = replace-with-a-date-1-to-90-days-after-the-business-date
+@creditSaleIdempotencyKey = replace-with-a-unique-local-credit-sale-key
+@creditPaymentIdempotencyKey = replace-with-a-unique-local-credit-payment-key
+@creditPaymentNumberingVersion = paste-the-current-credit-payment-numbering-version
 
 ### Instalación inicial (solo funciona mientras no exista ningún usuario)
 POST {{host}}/api/auth/setup
@@ -307,4 +314,91 @@ Content-Type: application/json
     "userName": "{{authorizerUser}}",
     "password": "{{authorizerPassword}}"
   }
+}
+
+### Confirmar venta a crédito (sin pago inicial)
+# Requiere SALES.CREATE y CREDIT.REQUEST; autorizador distinto con CREDIT.AUTHORIZE.
+# Sustituya dueDate por una fecha válida de su entorno local. No envíe claves reales al repositorio.
+POST {{host}}/api/sales
+Authorization: Bearer {{token}}
+Idempotency-Key: {{creditSaleIdempotencyKey}}
+Content-Type: application/json
+
+{
+  "customerId": "{{customerId}}",
+  "lines": [
+    {
+      "productId": "{{productId}}",
+      "quantity": 1,
+      "priceType": "MINORISTA",
+      "discount": null
+    }
+  ],
+  "generalDiscount": null,
+  "discountReason": null,
+  "payments": [],
+  "saleType": "CREDITO",
+  "dueDate": "{{creditDueDate}}",
+  "authorization": {
+    "userName": "{{authorizerUser}}",
+    "password": "{{authorizerPassword}}"
+  }
+}
+
+### Listar créditos
+GET {{host}}/api/credits?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Consultar crédito
+GET {{host}}/api/credits/{{creditId}}
+Authorization: Bearer {{token}}
+
+### Consultar historial de abonos (requiere CREDIT.MANAGE y CUSTOMERS.HISTORY_READ)
+GET {{host}}/api/credits/{{creditId}}/payments?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### Registrar abono en efectivo
+# Requiere turno abierto, expectedVersion vigente y consecutivo ABO configurado.
+# ABO aún no está configurado en PostgreSQL persistente local/de desarrollo.
+POST {{host}}/api/credits/{{creditId}}/payments
+Authorization: Bearer {{token}}
+Idempotency-Key: {{creditPaymentIdempotencyKey}}
+Content-Type: application/json
+
+{
+  "expectedVersion": {{creditVersion}},
+  "payments": [
+    {
+      "methodCode": "EFECTIVO",
+      "appliedAmount": 1000,
+      "receivedAmount": 1000,
+      "reference": null
+    }
+  ]
+}
+
+### Consultar numeración de abonos (requiere NUMBERING.MANAGE)
+GET {{host}}/api/document-numbering/credit-payments
+Authorization: Bearer {{token}}
+
+### Configuración futura de ABO: requiere autorización operativa independiente tras despliegue
+# No ejecutar contra PostgreSQL persistente sin esa autorización.
+POST {{host}}/api/document-numbering/credit-payments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "prefix": "ABO",
+  "firstNumber": 1
+}
+
+### Corrección futura de ABO: solo antes del primer abono y con versión vigente
+PUT {{host}}/api/document-numbering/credit-payments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "prefix": "ABO",
+  "firstNumber": 1,
+  "version": {{creditPaymentNumberingVersion}}
 }

@@ -133,6 +133,20 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
     public Task<Cliente?> GetCustomerAsync(Guid customerId, CancellationToken cancellationToken = default) =>
         dbContext.Cliente.AsNoTracking().SingleOrDefaultAsync(x => x.Id == customerId, cancellationToken);
 
+    public async Task<Usuario?> GetUserForUpdateAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Usuario.FromSqlInterpolated(
+            $"SELECT u.* FROM seguridad.usuario AS u WHERE u.id = {userId} FOR UPDATE")
+            .AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
+    public Task AddCreditAsync(Credito credit, CancellationToken cancellationToken = default) =>
+        dbContext.Credito.AddAsync(credit, cancellationToken).AsTask();
+
+    public Task AddAuthorizationAsync(AutorizacionOperacion authorization, CancellationToken cancellationToken = default) =>
+        dbContext.AutorizacionOperacion.AddAsync(authorization, cancellationToken).AsTask();
+
     public Task AddSaleAsync(Venta sale, CancellationToken cancellationToken = default) =>
         dbContext.Venta.AddAsync(sale, cancellationToken).AsTask();
 
@@ -168,5 +182,6 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
         dbContext.Venta.AsNoTracking()
             .Include(x => x.DetalleVenta)
             .Include(x => x.PagoVenta).ThenInclude(x => x.MetodoPago)
+            .Include(x => x.Credito)
             .SingleOrDefaultAsync(x => x.Id == saleId, cancellationToken);
 }

@@ -90,6 +90,27 @@ public sealed class EfDocumentNumberingRepository(OfficialControlPlusDbContext d
                  x.Estado == "CONFIRMADA",
             cancellationToken);
 
+    public async Task<ConsecutivoDocumento?> GetCreditPaymentNumberingAsync(
+        Guid installationId, string series, bool forUpdate, CancellationToken cancellationToken = default)
+    {
+        if (!forUpdate)
+            return await dbContext.ConsecutivoDocumento.AsNoTracking().SingleOrDefaultAsync(
+                x => x.InstalacionId == installationId && x.TipoDocumento == "PAGO_CREDITO" && x.Serie == series,
+                cancellationToken);
+        var rows = await dbContext.ConsecutivoDocumento.FromSqlInterpolated(
+            $"""
+             SELECT c.* FROM configuracion.consecutivo_documento AS c
+             WHERE c.instalacion_id = {installationId} AND c.tipo_documento = 'PAGO_CREDITO' AND c.serie = {series}
+             FOR UPDATE
+             """).AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
+    public Task<bool> HasCreditPaymentsAsync(Guid installationId, string series,
+        CancellationToken cancellationToken = default) =>
+        dbContext.PagoCredito.AsNoTracking().AnyAsync(
+            x => x.InstalacionId == installationId && x.Serie == series, cancellationToken);
+
     public Task AddAsync(
         ConsecutivoDocumento numbering,
         CancellationToken cancellationToken = default) =>

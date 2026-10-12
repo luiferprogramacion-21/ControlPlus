@@ -2,7 +2,7 @@
 
 ## Alcance aprobado
 
-El módulo usa `OfficialControlPlusDbContext` y el esquema oficial de Fase 4. Implementa una sola caja por instalación, estado actual, modalidad de turno, apertura, ingresos manuales, gastos, sangrías, movimientos, arqueo por medio de pago y cierre. No implementa Ventas ni Inventario y no crea datos comerciales simulados.
+El módulo usa `OfficialControlPlusDbContext` y el esquema oficial de Fase 4. Implementa una sola caja por instalación, estado actual, modalidad de turno, apertura, ingresos manuales, gastos, sangrías, movimientos, arqueo por medio de pago y cierre. Caja no confirma ventas ni modifica inventario; el arqueo integra pagos de Ventas y abonos de Créditos sin crear datos comerciales simulados.
 
 La caja se configura una sola vez mediante un endpoint protegido por `CONFIGURATION.MANAGE`. Requiere código de hasta 50 caracteres y nombre de hasta 100. Un segundo intento responde `409`; la creación se ejecuta en una transacción serializable y se audita.
 
@@ -43,6 +43,8 @@ Los intentos del autorizador comparten el bloqueo transaccional por cuenta usado
 ## Fuente única e importes
 
 Los pagos son la fuente de distribución por método. Se usa `ValorAplicado`, que ya descuenta el cambio entregado; nunca se vuelve a sumar el movimiento enlazado al pago. Los pagos combinados pueden compartir movimiento. Apertura, ingreso manual, gasto y sangría sin pagos vinculados se suman como movimientos físicos según su signo.
+
+La venta `CREDITO` se confirma sin pago inicial ni movimiento de Caja. Cada abono posterior crea una fila `ventas.pago_credito` por método y un único movimiento canónico de Caja para toda la solicitud; las filas comparten la correlación del movimiento. El arqueo atribuye `valor_aplicado` a Efectivo, Transferencia o Nequi desde esas filas y no suma el movimiento vinculado otra vez. El cambio solo corresponde al efectivo recibido por encima de su importe aplicado. El abono exige turno abierto y pertenencia del responsable individual o sesión activa del operador compartido; la sesión se consume con la misma transacción. La reversión/anulación de abonos queda pendiente de otro corte.
 
 Un reverso explícito de un movimiento con pagos distribuye la contrapartida inversa por los medios originales. El modelo no asigna un reverso parcial a medios concretos: se exige que el reverso coincida con la suma de los importes originales. Un pago `ANULADO` con reverso conserva su contribución histórica y su contrapartida; sin reverso no aporta y su movimiento tampoco reaparece como ingreso manual. Las devoluciones de cambios y reembolsos de apartados aportan importes negativos por su medio. Este es un contrato de lectura y cálculo para integrar Caja; no implementa operaciones de Ventas.
 

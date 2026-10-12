@@ -21,6 +21,10 @@ public sealed class SalesService(
     IUnitOfWork unitOfWork,
     IUserRepository userRepository,
     IAuditRepository auditRepository,
+    ILoginAttemptCoordinator loginAttemptCoordinator,
+    IPasswordHasher passwordHasher,
+    IPermissionChecker permissionChecker,
+    IPermissionRepository permissionRepository,
     IClock clock) : ISalesService
 {
     private const int MaximumPageSize = 200;
@@ -36,7 +40,20 @@ public sealed class SalesService(
         var input = NormalizeInput(idempotencyKey, request);
         if (input.Error is not null) return Result.Failure<SaleDto>(input.Error);
 
+        if (input.SaleType == "CREDITO")
+            return await loginAttemptCoordinator.ExecuteAsync(
+                request.Authorization!.UserName.Trim().ToUpperInvariant(),
+                token => ConfirmWithinTransactionAsync(actor, request, input, token), cancellationToken);
+
         await using var transaction = await transactionManager.BeginAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        var result = await ConfirmWithinTransactionAsync(actor, request, input, cancellationToken);
+        if (result.IsSuccess) await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    private async Task<Result<SaleDto>> ConfirmWithinTransactionAsync(
+        ActorContext actor, ConfirmSaleRequest request, NormalizedInput input, CancellationToken cancellationToken)
+    {
         var installation = await repository.GetActiveInstallationForUpdateAsync(cancellationToken);
         if (installation is null) return Result.Failure<SaleDto>(ApplicationError.NotFound("la instalación activa"));
 
@@ -44,12 +61,16 @@ public sealed class SalesService(
         if (authorization is null) return Result.Failure<SaleDto>(ApplicationError.Unauthorized());
         if (!authorization.PermissionCodes.Contains(PermissionCodes.SalesCreate, StringComparer.OrdinalIgnoreCase))
             return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+        if (input.SaleType == "CREDITO" &&
+            !authorization.PermissionCodes.Contains(PermissionCodes.CreditRequest, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<SaleDto>(ApplicationError.Forbidden());
 
         var requestHash = Hash(input.Canonical!);
         var existingOperation = await repository.GetIdempotencyAsync(installation.Id, input.Key!, cancellationToken);
         if (existingOperation is not null)
         {
-            if (existingOperation.UsuarioId != actor.UserId || existingOperation.HashSolicitud != requestHash ||
+            if (existingOperation.UsuarioId != actor.UserId || existingOperation.TipoOperacion != "REGISTRAR_VENTA" ||
+                existingOperation.HashSolicitud != requestHash ||
                 existingOperation.EntidadId is not Guid existingSaleId)
                 return Result.Failure<SaleDto>(ApplicationError.Conflict("La clave de idempotencia ya fue utilizada con otra solicitud."));
             var existingSale = await repository.GetSaleAsync(existingSaleId, cancellationToken);
@@ -84,11 +105,48 @@ public sealed class SalesService(
             return Result.Failure<SaleDto>(ApplicationError.Conflict("El turno abierto tiene una modalidad no admitida."));
         }
 
+        if (input.SaleType == "CREDITO" &&
+            (request.DueDate is null || request.DueDate.Value.DayNumber <= shift.FechaOperativa.DayNumber ||
+             request.DueDate.Value.DayNumber > shift.FechaOperativa.DayNumber + 90))
+            return Result.Failure<SaleDto>(Validation("El vencimiento debe estar entre mañana y 90 días desde la fecha operativa."));
+
         if (request.CustomerId is Guid customerId)
         {
             var customer = await repository.GetCustomerAsync(customerId, cancellationToken);
             if (customer is null || !customer.Activo)
                 return Result.Failure<SaleDto>(ApplicationError.NotFound("el cliente activo"));
+            if (input.SaleType == "CREDITO" &&
+                (string.IsNullOrWhiteSpace(customer.TipoDocumento) || string.IsNullOrWhiteSpace(customer.NumeroDocumento)) &&
+                string.IsNullOrWhiteSpace(customer.Telefono))
+                return Result.Failure<SaleDto>(Validation("El cliente requiere documento completo o teléfono para crédito."));
+        }
+        else if (input.SaleType == "CREDITO")
+            return Result.Failure<SaleDto>(Validation("El cliente es obligatorio para una venta a crédito."));
+
+        Usuario? creditAuthorizer = null;
+        if (input.SaleType == "CREDITO")
+        {
+            var candidate = await userRepository.GetByUserNameAsync(request.Authorization!.UserName.Trim(), cancellationToken);
+            if (candidate is null) return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+            creditAuthorizer = await repository.GetUserForUpdateAsync(candidate.Id, cancellationToken);
+            if (creditAuthorizer is null || !creditAuthorizer.IsActive || creditAuthorizer.Id == actor.UserId ||
+                creditAuthorizer.HighestRoleLevel < RoleLevel.Supervisor)
+                return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+            if (!passwordHasher.Verify(request.Authorization.Password, creditAuthorizer.PasswordHash))
+            {
+                var locked = creditAuthorizer.RegisterFailedLogin(clock.UtcNow);
+                await userRepository.UpdateAsync(creditAuthorizer, cancellationToken);
+                if (locked)
+                    await AuditWriter.WriteAsync(auditRepository, clock, creditAuthorizer.Id,
+                        AuditAction.UserLocked, nameof(Usuario), creditAuthorizer.Id,
+                        new { creditAuthorizer.Id, creditAuthorizer.FailedLoginAttempts }, cancellationToken);
+                await AuditWriter.WriteCreditAuthorizationFailureAsync(auditRepository, clock,
+                    actor.UserId, Guid.CreateVersion7(), terminal.Id, cancellationToken);
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+            }
+            if (!await permissionChecker.HasPermissionAsync(creditAuthorizer.Id, PermissionCodes.CreditAuthorize, cancellationToken))
+                return Result.Failure<SaleDto>(ApplicationError.Forbidden());
         }
 
         var sequence = await repository.GetSaleSequenceForUpdateAsync(installation.Id, installation.Serie, cancellationToken);
@@ -151,7 +209,7 @@ public sealed class SalesService(
         {
             paymentValidation = Validation("Los importes deben ser pesos COP enteros dentro del rango permitido.");
         }
-        if (paymentValidation is not null) return Result.Failure<SaleDto>(paymentValidation);
+        if (input.SaleType == "CONTADO" && paymentValidation is not null) return Result.Failure<SaleDto>(paymentValidation);
 
         var now = clock.UtcNow;
         var correlationId = Guid.CreateVersion7();
@@ -170,7 +228,7 @@ public sealed class SalesService(
             FechaHora = now.UtcDateTime,
             FechaOperativa = shift.FechaOperativa,
             FechaLimiteCambio = shift.FechaOperativa.AddDays(establishment.DiasLimiteCambio),
-            TipoVenta = "CONTADO",
+            TipoVenta = input.SaleType!,
             AmbitoDescuento = prepared.DiscountScope,
             TipoDescuento = input.GeneralDiscount?.Type,
             ValorDescuentoSolicitado = input.GeneralDiscount?.Value,
@@ -185,7 +243,7 @@ public sealed class SalesService(
             Version = 1
         };
 
-        var cashMovement = MovimientoCaja.Create(
+        var cashMovement = input.SaleType == "CONTADO" ? MovimientoCaja.Create(
             shift.Id,
             actor.UserId,
             operatorSession?.Id,
@@ -194,7 +252,7 @@ public sealed class SalesService(
             sale.Total,
             $"Venta {VisibleNumber(sale)}",
             correlationId,
-            now);
+            now) : null;
 
         var details = new List<DetalleVenta>(prepared.Lines.Count);
         var inventoryMovements = new List<MovimientoInventario>(prepared.Lines.Count);
@@ -255,7 +313,7 @@ public sealed class SalesService(
                 Id = Guid.CreateVersion7(),
                 VentaId = sale.Id,
                 MetodoPagoId = method.Id,
-                MovimientoCajaId = cashMovement.Id,
+                MovimientoCajaId = cashMovement!.Id,
                 UsuarioId = actor.UserId,
                 SesionOperadorId = operatorSession?.Id,
                 ValorAplicado = payment.AppliedAmount,
@@ -267,13 +325,41 @@ public sealed class SalesService(
             };
         }).ToArray();
 
+        Credito? credit = null;
+        if (input.SaleType == "CREDITO")
+        {
+            var permission = await permissionRepository.GetByCodeAsync(PermissionCodes.CreditAuthorize, cancellationToken);
+            if (permission is null || !permission.Activo)
+                return Result.Failure<SaleDto>(ApplicationError.Conflict("El permiso de autorización de crédito no está activo."));
+            var operationAuthorization = new AutorizacionOperacion
+            {
+                Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId,
+                UsuarioAutorizadorId = creditAuthorizer!.Id, PermisoId = permission.Id,
+                TipoOperacion = "CREAR_CREDITO", CorrelacionId = correlationId,
+                DescripcionOperacion = "Autorización de venta a crédito.", MetodoAutenticacion = "PASSWORD",
+                Resultado = "EXITOSA", Estado = "UTILIZADA", FechaSolicitud = now.UtcDateTime,
+                FechaExpiracion = now.AddMinutes(5).UtcDateTime, FechaUtilizacion = now.UtcDateTime
+            };
+            credit = new Credito
+            {
+                Id = Guid.CreateVersion7(), VentaId = sale.Id, AutorizacionOperacionId = operationAuthorization.Id,
+                MontoOriginal = sale.Total, MontoAjustado = sale.Total, SaldoPendiente = sale.Total,
+                FechaOtorgamiento = shift.FechaOperativa, FechaVencimiento = request.DueDate!.Value,
+                Estado = "PENDIENTE", Version = 1
+            };
+            creditAuthorizer.RegisterSuccessfulLogin(now);
+            await userRepository.UpdateAsync(creditAuthorizer, cancellationToken);
+            await repository.AddAuthorizationAsync(operationAuthorization, cancellationToken);
+            await repository.AddCreditAsync(credit, cancellationToken);
+        }
+
         await repository.AddSaleAsync(sale, cancellationToken);
         await repository.AddSaleDetailsAsync(details, cancellationToken);
-        await repository.AddCashMovementAsync(cashMovement, cancellationToken);
-        await repository.AddPaymentsAsync(payments, cancellationToken);
+        if (cashMovement is not null) await repository.AddCashMovementAsync(cashMovement, cancellationToken);
+        if (payments.Length > 0) await repository.AddPaymentsAsync(payments, cancellationToken);
         await repository.AddInventoryMovementsAsync(inventoryMovements, cancellationToken);
 
-        var response = Map(sale, details, payments, methodsByCode);
+        var response = Map(sale, details, payments, methodsByCode) with { CreditId = credit?.Id };
         await repository.AddIdempotencyAsync(new OperacionIdempotente
         {
             Id = Guid.CreateVersion7(),
@@ -303,30 +389,28 @@ public sealed class SalesService(
                 sale.ClienteId,
                 sale.AmbitoDescuento,
                 sale.TipoDescuento,
-                sale.ValorDescuentoSolicitado,
-                sale.MotivoDescuento,
-                sale.Total,
-                sale.DescuentoTotal,
+                DiscountReasonPresent = !string.IsNullOrWhiteSpace(sale.MotivoDescuento),
+                sale.TipoVenta,
                 ProductCount = details.Count,
                 Lines = prepared.Lines.Select(x => new
                 {
                     ProductId = x.Product.Id,
                     x.Quantity,
                     x.PriceType,
-                    x.UnitPrice,
                     x.DiscountOrigin,
                     x.DiscountType,
-                    x.DiscountPercentage,
-                    x.DiscountAmount,
-                    x.GrossAmount,
-                    x.NetAmount
+                    x.DiscountPercentage
                 }).ToArray(),
-                PaymentMethods = normalizedPayments.Select(x => new { x.MethodCode, x.AppliedAmount }).ToArray()
+                PaymentMethods = normalizedPayments.Select(x => x.MethodCode).ToArray()
             },
             correlationId,
             operatorSession?.Id,
             terminal.Id,
             cancellationToken);
+        if (credit is not null)
+            await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId,
+                AuditAction.CreditCreated, nameof(Credito), credit.Id,
+                new { credit.Id, credit.VentaId, credit.Estado, CorrelationId = correlationId }, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         if (operatorSession is not null)
@@ -348,7 +432,6 @@ public sealed class SalesService(
                 cancellationToken);
             await unitOfWork.SaveChangesAsync(cancellationToken);
         }
-        await transaction.CommitAsync(cancellationToken);
         return Result.Success(response);
     }
 
@@ -515,8 +598,17 @@ public sealed class SalesService(
             return NormalizedInput.Fail("Idempotency-Key es obligatorio y admite hasta 100 caracteres.");
         if (request?.Lines is null || request.Lines.Count == 0)
             return NormalizedInput.Fail("La venta debe contener al menos una línea.");
-        if (request.Payments is null || request.Payments.Count == 0)
-            return NormalizedInput.Fail("La venta debe contener al menos un pago.");
+        var saleType = string.IsNullOrWhiteSpace(request.SaleType) ? "CONTADO" : NormalizeCode(request.SaleType);
+        if (saleType is not "CONTADO" and not "CREDITO")
+            return NormalizedInput.Fail("El tipo de venta debe ser CONTADO o CREDITO.");
+        if (request.Payments is null || (saleType == "CONTADO" && request.Payments.Count == 0))
+            return NormalizedInput.Fail("La venta de contado debe contener al menos un pago.");
+        if (saleType == "CREDITO" && (request.Payments.Count != 0 || request.DueDate is null ||
+            request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
+            string.IsNullOrWhiteSpace(request.Authorization.Password)))
+            return NormalizedInput.Fail("El crédito requiere vencimiento y autorizador, sin pago inicial.");
+        if (saleType == "CONTADO" && (request.DueDate is not null || request.Authorization is not null))
+            return NormalizedInput.Fail("Una venta de contado no admite vencimiento ni autorización de crédito.");
         if (request.DiscountReason?.Length > 2000)
             return NormalizedInput.Fail("El motivo de descuento admite hasta 2000 caracteres.");
 
@@ -560,15 +652,28 @@ public sealed class SalesService(
         if (payments.Select(x => x.MethodCode).Distinct(StringComparer.Ordinal).Count() != payments.Length)
             return NormalizedInput.Fail("No se puede repetir un método de pago en la misma venta.");
 
-        var canonical = JsonSerializer.Serialize(new
-        {
-            request.CustomerId,
-            Lines = lines.OrderBy(x => x.ProductId),
-            GeneralDiscount = general.Value,
-            DiscountReason = NormalizeOptional(request.DiscountReason),
-            Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal)
-        });
-        return new NormalizedInput(key.Trim(), lines, general.Value, payments, canonical, null);
+        // Preserve the original CONTADO hash so existing keys remain replayable.
+        var canonical = saleType == "CONTADO"
+            ? JsonSerializer.Serialize(new
+            {
+                request.CustomerId,
+                Lines = lines.OrderBy(x => x.ProductId),
+                GeneralDiscount = general.Value,
+                DiscountReason = NormalizeOptional(request.DiscountReason),
+                Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal)
+            })
+            : JsonSerializer.Serialize(new
+            {
+                SaleType = saleType,
+                request.CustomerId,
+                Lines = lines.OrderBy(x => x.ProductId),
+                GeneralDiscount = general.Value,
+                DiscountReason = NormalizeOptional(request.DiscountReason),
+                Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal),
+                request.DueDate,
+                Authorizer = request.Authorization!.UserName.Trim().ToUpperInvariant()
+            });
+        return new NormalizedInput(key.Trim(), lines, general.Value, payments, saleType, canonical, null);
     }
 
     private static (NormalizedDiscount? Value, ApplicationError? Error) NormalizeDiscount(SaleDiscountRequest? discount)
@@ -623,7 +728,8 @@ public sealed class SalesService(
             x.TipoPrecio, x.PrecioUnitario, x.OrigenDescuento, x.TipoDescuento,
             x.PorcentajeDescuento, x.ValorDescuento, x.SubtotalBruto, x.SubtotalNeto)).ToArray(),
         sale.PagoVenta.OrderBy(x => x.MetodoPago.OrdenVisual).Select(x => new SalePaymentDto(
-            x.Id, x.MetodoPago.Codigo, x.MetodoPago.Nombre, x.ValorAplicado, x.ValorRecibido, x.Cambio, x.Referencia)).ToArray());
+            x.Id, x.MetodoPago.Codigo, x.MetodoPago.Nombre, x.ValorAplicado, x.ValorRecibido, x.Cambio, x.Referencia)).ToArray(),
+        sale.Credito?.Id);
 
     private static SaleDto Map(
         Venta sale,
@@ -673,10 +779,11 @@ public sealed class SalesService(
         IReadOnlyCollection<NormalizedLine>? Lines,
         NormalizedDiscount? GeneralDiscount,
         IReadOnlyCollection<NormalizedPayment>? Payments,
+        string? SaleType,
         string? Canonical,
         ApplicationError? Error)
     {
-        public static NormalizedInput Fail(string message) => new(null, null, null, null, null, Validation(message));
+        public static NormalizedInput Fail(string message) => new(null, null, null, null, null, null, Validation(message));
     }
 
     private sealed class PreparedLine(Producto product, int quantity, string priceType, decimal unitPrice, decimal grossAmount)

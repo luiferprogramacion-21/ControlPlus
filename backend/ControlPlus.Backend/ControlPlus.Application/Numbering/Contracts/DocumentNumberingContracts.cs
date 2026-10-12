@@ -33,4 +33,11 @@ public interface IDocumentNumberingService
         ActorContext actor,
         UpdateSalesDocumentNumberingRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<Result<SalesDocumentNumberingDto>> GetCreditPaymentsAsync(ActorContext actor,
+        CancellationToken cancellationToken = default);
+    Task<Result<SalesDocumentNumberingDto>> CreateCreditPaymentsAsync(ActorContext actor,
+        CreateSalesDocumentNumberingRequest request, CancellationToken cancellationToken = default);
+    Task<Result<SalesDocumentNumberingDto>> UpdateCreditPaymentsAsync(ActorContext actor,
+        UpdateSalesDocumentNumberingRequest request, CancellationToken cancellationToken = default);
 }

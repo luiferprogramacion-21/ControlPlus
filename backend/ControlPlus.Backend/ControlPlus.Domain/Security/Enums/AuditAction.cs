@@ -58,5 +58,10 @@ public enum AuditAction
     CustomerCreated = 50,
     CustomerUpdated = 51,
     CustomerDeactivated = 52,
-    CustomerReactivated = 53
+    CustomerReactivated = 53,
+    CreditCreated = 54,
+    CreditPaymentApplied = 55,
+    CreditPaymentNumberingCreated = 56,
+    CreditPaymentNumberingUpdated = 57,
+    CreditAuthorizationRejected = 58
 }

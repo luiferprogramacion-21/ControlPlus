@@ -39,6 +39,18 @@ La plantilla Supervisor permite restablecer contraseñas únicamente de Cajeros;
 
 La plantilla Cajero permite búsqueda de productos y existencias, alertas de reposición, consulta de su caja, turno, movimientos y ventas propias, ventas y pagos, reimpresión de comprobantes propios o recientes, descuentos hasta 5 %, datos básicos e historial de clientes, solicitudes y operaciones ya autorizadas de crédito, abonos, apartados y reportes operativos de su alcance. No permite apertura o cierre de caja, autorizaciones, anulaciones, costos, ajustes, proveedores, compras, productos existentes, categorías, seguridad ni configuración.
 
+## Créditos y abonos — primer corte
+
+| Operación | Permisos efectivos y regla adicional |
+|---|---|
+| Confirmar venta `CREDITO` | Ejecutor: `SALES.CREATE` y `CREDIT.REQUEST`; otro autorizador: `CREDIT.AUTHORIZE`, rol base Supervisor o Administrador, activo y no bloqueado |
+| Listar o consultar crédito | `CREDIT.MANAGE` |
+| Consultar historial de abonos | `CREDIT.MANAGE` y `CUSTOMERS.HISTORY_READ` |
+| Registrar abono | `CREDIT.MANAGE`, turno abierto y pertenencia o sesión de operador vigente |
+| Consultar, crear o corregir numeración `PAGO_CREDITO` | `NUMBERING.MANAGE` |
+
+El servicio revalida cada permiso en PostgreSQL; una revocación individual efectiva prevalece sobre la plantilla del rol. Cajero puede solicitar créditos, consultar saldos e historial y registrar abonos según su plantilla, pero no autoriza el crédito ni administra numeración. Supervisor puede solicitar, autorizar a otro ejecutor y gestionar créditos y abonos; Administrador también. Ningún rol recibe una excepción que permita al actor autorizar su propia solicitud. No se agregó permiso nuevo. `CREDIT.FUTURE_BLOCK` ya existe en el catálogo, pero su operación permanece fuera del primer corte. Las rutas de crédito no revelan dirección, correo, observaciones ni auditoría detallada a Cajero o Supervisor; Administrador recibe el mismo contrato de consulta en este corte.
+
 En Caja, Administrador y Supervisor reciben por plantilla `CASH.OWN_READ`, `CASH.SHIFT_MANAGE`, `CASH.MOVEMENTS_MANAGE` y `CASH.SHIFT_MODE_MANAGE`. Cajero recibe únicamente `CASH.OWN_READ`: no abre, mueve ni cierra salvo que una excepción individual vigente le conceda el permiso correspondiente. La configuración única de la caja usa el permiso existente `CONFIGURATION.MANAGE` y la emisión de credenciales rápidas usa `USERS.MANAGE`; no se agregan permisos al catálogo aprobado.
 
 Un cierre con diferencia no se resuelve concediendo un permiso nuevo: el ejecutor necesita `CASH.SHIFT_MANAGE` y debe ser autorizado por otro usuario activo y no bloqueado, con rol base Supervisor o Administrador y el mismo permiso efectivo. Una revocación individual impide actuar como autorizador aunque la plantilla del rol lo conceda.

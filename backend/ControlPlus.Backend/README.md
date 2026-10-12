@@ -100,6 +100,10 @@ Más detalles:
 - [Inventario](docs/inventory.md)
 - [Clientes](docs/customers.md)
 - [Caja](docs/cash.md)
+- [Ventas](docs/sales.md)
+- [Créditos y abonos](docs/credits.md)
 - Caja conserva la diferencia oficial de efectivo y separa el total; su migración ya aplicada conserva métodos de pago al revertir. Inventario y los índices de búsqueda de Clientes ya están aplicados en la base PostgreSQL persistente local/de desarrollo. Las pruebas automatizadas usan Testcontainers y no alteran esa base.
 - [Base de datos](docs/database.md)
 - [Decisión de persistencia y concurrencia](docs/decisions/0001-persistencia-concurrencia-y-migraciones.md)
+
+La numeración `PAGO_CREDITO` con prefijo `ABO` aún no está configurada en PostgreSQL persistente local/de desarrollo. Su configuración operativa después de publicar y desplegar requiere autorización independiente. Durante la implementación y validación de este corte no se aplicaron migraciones ni cambios persistentes. El árbol actual, incluida la corrección de paginación de Créditos, quedó validado con build serial completo (0 errores, 0 advertencias), pruebas nuevas de paginación extrema `2/2`, focalizadas `174/174`, Domain `35/35`, Infrastructure `58/58` y API `322/322`: total `415/415`, 0 fallidas y 0 omitidas. `git diff --check origin/main` terminó con código 0 y solo avisos informativos LF/CRLF; al cierre no quedaron procesos VSTest/testhost/dotnet test ni contenedores con `org.testcontainers=true`.

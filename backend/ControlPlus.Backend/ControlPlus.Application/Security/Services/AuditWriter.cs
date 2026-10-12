@@ -115,6 +115,21 @@ internal static class AuditWriter
         return auditRepository.AddAsync(auditRecord, cancellationToken);
     }
 
+    public static Task WriteCreditAuthorizationFailureAsync(
+        IAuditRepository auditRepository,
+        IClock clock,
+        Guid actorUserId,
+        Guid correlationId,
+        Guid terminalId,
+        CancellationToken cancellationToken)
+    {
+        var auditRecord = AuditRecord.Create(actorUserId,
+            AuditAction.CreditAuthorizationRejected, "Credito", null,
+            JsonSerializer.Serialize(new { Reason = "INVALID_AUTHORIZER_CREDENTIALS" }),
+            clock.UtcNow, correlationId.ToString(), terminalId: terminalId, result: "FALLIDO");
+        return auditRepository.AddAsync(auditRecord, cancellationToken);
+    }
+
     public static Task WriteInventoryAsync(
         IAuditRepository auditRepository,
         IClock clock,
