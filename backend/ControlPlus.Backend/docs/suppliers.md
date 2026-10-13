@@ -20,8 +20,12 @@ Las escrituras y su auditoría comparten transacción explícita; se confirma de
 
 Inactivar no borra ni cambia productos asociados. La validación de Productos continúa rechazando nuevas asignaciones de proveedores inactivos. Compras, pedidos, recepción parcial, pagos y movimientos de inventario permanecen fuera de este corte.
 
-## Estado de implementación y validación
+## Estado de implementación, publicación y despliegue local
 
 El primer corte está implementado y validado en código. El build serial completo terminó con 0 errores y 0 advertencias; las pruebas focalizadas terminaron `36/36` y la suite completa Domain `35/35`, Infrastructure `58/58` y API `331/331`: total `424/424`, sin fallidas ni omitidas. La evidencia está en `TestResults/suppliers-final-evidence-20261013/SuppliersFocused.trx` y en `TestResults/suppliers-final-evidence-20261013/Domain.trx`, `TestResults/suppliers-final-evidence-20261013/InfrastructureFinal.trx` y `TestResults/suppliers-final-evidence-20261013/APIFinal.trx`. `git diff --check origin/main` terminó con código 0 y solo avisos informativos LF/CRLF. Al cierre no quedaron procesos VSTest/testhost/dotnet test/API temporal ni contenedores `org.testcontainers=true`.
 
-No se añadieron migraciones ni se modificaron entidades oficiales, `OfficialControlPlusDbContext` o Docker Compose. La implementación y validación no accedieron ni modificaron PostgreSQL persistente. La API con Proveedores no se ha desplegado; este corte tampoco tiene commit ni push.
+El commit `38ea98798c19f0a639600a8c4136cae3dfd4bb4b` se publicó en `origin/main`. La imagen API `sha256:78dc8f6329ae784d3ca31c45ad657a291c35e3ad9778cb37cbb40777e4daae4e` quedó desplegada localmente en el contenedor `81045712ddd38949b3323bfe981068b47d153134c309f9c97f32451f9c3165a2`, `running`/`healthy` y con `RestartCount=0`. El contenedor PostgreSQL `e31e0486ce3f556776e29cf46eea42714129bdc9f48c650a0d884045cec67277` se preservó, `running`/`healthy` y con `RestartCount=0`; también se preservó el volumen `controlplusbackend_controlplus_postgres_data`.
+
+Las comprobaciones HTTP devolvieron `200` para `/api/health`, `/api/health/database` y `/openapi/v1.json`. El documento OpenAPI servido contiene exactamente las cinco operaciones aprobadas de Proveedores y ninguna operación DELETE.
+
+No se añadieron migraciones ni se modificaron entidades oficiales, `OfficialControlPlusDbContext` o Docker Compose. La implementación y validación no accedieron ni modificaron PostgreSQL persistente. La publicación y el despliegue local no ejecutaron migraciones ni SQL directo y no produjeron cambios persistentes en PostgreSQL.
