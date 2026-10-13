@@ -42,6 +42,7 @@ Los únicos endpoints anónimos son los de salud y los flujos de autenticación 
 | Ventas | `/api/sales` | `SALES.CREATE`, `SALES.OWN_READ` o `SALES.ALL_READ` según operación |
 | Numeración de Ventas | `/api/document-numbering/sales` | `NUMBERING.MANAGE` |
 | Clientes | `/api/customers` | `CUSTOMERS.BASIC_MANAGE` o `CUSTOMERS.MANAGE` según operación |
+| Proveedores | `/api/suppliers` | Lectura `SUPPLIERS.READ`; escritura Administrador y `SUPPLIERS.MANAGE` efectivos |
 | Créditos y abonos | `/api/credits` | `CREDIT.MANAGE`; el historial añade `CUSTOMERS.HISTORY_READ` |
 | Numeración de abonos | `/api/document-numbering/credit-payments` | `NUMBERING.MANAGE` |
 
@@ -59,6 +60,8 @@ Cada usuario tiene exactamente un rol principal. La reasignación se realiza con
 El listado usa `status=active` por defecto; `inactive` y `all` requieren gestión completa. Busca por prefijo de documento, nombre o teléfono, sin distinguir mayúsculas en el nombre; `%`, `_` y `\` son texto literal y no comodines. Es paginado (`page=1`, `pageSize=20`, máximo 100) y mantiene el orden por nombre completo e ID. Las actualizaciones incluyen `expectedVersion`; un valor obsoleto devuelve `409 concurrency.conflict`. No hay `DELETE` ni historial comercial en este corte. Todos los cuerpos rechazan propiedades JSON desconocidas.
 
 ## Productos y filtros
+
+El contrato del primer corte de Proveedores, sus filtros exactos, paginación, concurrencia y estado lógico están en [suppliers.md](suppliers.md).
 
 `GET /api/products` requiere `PRODUCTS.READ`. El listado normal omite agotados e inactivos.
 

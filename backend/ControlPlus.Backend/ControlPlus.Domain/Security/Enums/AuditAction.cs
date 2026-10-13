@@ -63,5 +63,9 @@ public enum AuditAction
     CreditPaymentApplied = 55,
     CreditPaymentNumberingCreated = 56,
     CreditPaymentNumberingUpdated = 57,
-    CreditAuthorizationRejected = 58
+    CreditAuthorizationRejected = 58,
+    SupplierCreated = 59,
+    SupplierUpdated = 60,
+    SupplierDeactivated = 61,
+    SupplierReactivated = 62
 }

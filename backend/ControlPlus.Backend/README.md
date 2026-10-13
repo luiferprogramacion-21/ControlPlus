@@ -99,6 +99,7 @@ Más detalles:
 - [Catálogo](docs/catalog.md)
 - [Inventario](docs/inventory.md)
 - [Clientes](docs/customers.md)
+- [Proveedores](docs/suppliers.md)
 - [Caja](docs/cash.md)
 - [Ventas](docs/sales.md)
 - [Créditos y abonos](docs/credits.md)
@@ -106,4 +107,6 @@ Más detalles:
 - [Base de datos](docs/database.md)
 - [Decisión de persistencia y concurrencia](docs/decisions/0001-persistencia-concurrencia-y-migraciones.md)
 
-El commit `4eb9fcf659035a3c7c723f4d14c4e20e2906f030` (`feat: implementar créditos y abonos`) fue publicado y su imagen API desplegada localmente. La numeración `PAGO_CREDITO` quedó presente y certificada mediante la API en PostgreSQL persistente local/de desarrollo con `prefix=ABO`, `lastNumber=0`, `nextNumber=1` y `version` válida. Durante la implementación y validación de este corte no se aplicaron migraciones ni cambios persistentes. El árbol actual, incluida la corrección de paginación de Créditos, quedó validado con build serial completo (0 errores, 0 advertencias), pruebas nuevas de paginación extrema `2/2`, focalizadas `174/174`, Domain `35/35`, Infrastructure `58/58` y API `322/322`: total `415/415`, 0 fallidas y 0 omitidas. `git diff --check origin/main` terminó con código 0 y solo avisos informativos LF/CRLF; al cierre no quedaron procesos VSTest/testhost/dotnet test ni contenedores con `org.testcontainers=true`.
+El commit `4eb9fcf659035a3c7c723f4d14c4e20e2906f030` (`feat: implementar créditos y abonos`) fue publicado y su imagen API desplegada localmente. La numeración `PAGO_CREDITO` quedó presente y certificada mediante la API en PostgreSQL persistente local/de desarrollo con `prefix=ABO`, `lastNumber=0`, `nextNumber=1` y `version` válida. Durante la implementación y validación de aquel corte no se aplicaron migraciones ni cambios persistentes.
+
+El primer corte de Proveedores está implementado en código con exactamente cinco operaciones y sin DELETE. El árbol actual terminó el build serial con 0 errores y 0 advertencias, las focalizadas `36/36` y la suite completa Domain `35/35`, Infrastructure `58/58` y API `331/331`: total `424/424`, 0 fallidas y 0 omitidas. Los TRX se registran en [docs/testing.md](docs/testing.md). `git diff --check origin/main` terminó con código 0 y solo avisos informativos LF/CRLF; al cierre no quedaron procesos VSTest/testhost/dotnet test/API temporal ni contenedores con `org.testcontainers=true`. Proveedores no añadió migraciones ni cambió entidades oficiales, `OfficialControlPlusDbContext` o Docker Compose; no accedió ni modificó PostgreSQL persistente. La API con Proveedores no se desplegó, y este corte no tiene commit ni push.
