@@ -30,7 +30,7 @@ El build serial completo terminó con **0 errores y 0 advertencias** (`TestResul
 
 Como antecedentes diagnósticos, el primer intento focalizado dentro del sandbox abortó antes de ejecutar casos porque `TcpListener` recibió `System.Net.Sockets.SocketException (13): Permission denied`; consta en `TestResults/purchases-cut1-20261013/focused.log` y sus TRX registran 0 casos. Más tarde, el primer intento completo de Infrastructure (`TestResults/purchases-cut1-full-final-20261013-194407/Infrastructure.trx`) terminó `57/58` por un fallo transitorio de disponibilidad de Testcontainers al abrir PostgreSQL. La teoría afectada se verificó después `12/12` en `TestResults/purchases-cash-theory-isolated-20261013-195941/CashTheoryIsolated.trx`; la ejecución certificadora posterior es `InfrastructureFinal.trx`, `58/58`. El TRX `57/58` no integra la evidencia final.
 
-`git diff --check origin/main` terminó con código `0` y avisos informativos LF/CRLF. Al cierre de la validación no quedaron procesos VSTest, testhost o dotnet test ni contenedores con `org.testcontainers=true`. Este corte no aplicó migraciones ni accedió o modificó PostgreSQL persistente. Commit, push, publicación y despliegue permanecen pendientes.
+`git diff --check origin/main` terminó con código `0` y avisos informativos LF/CRLF. Al cierre de la validación no quedaron procesos VSTest, testhost o dotnet test ni contenedores con `org.testcontainers=true`. Durante la implementación y validación no se aplicaron migraciones ni se accedió o modificó PostgreSQL persistente. La publicación, el despliegue local y la configuración operativa posterior de `COMPRA` se registran en [purchases.md](purchases.md).
 
 ## Créditos y abonos — evidencia final del corte 1
 

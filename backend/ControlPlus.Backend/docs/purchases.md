@@ -39,4 +39,18 @@ Una confirmación repetida con la misma clave, actor, compra y versión devuelve
 
 ## Límites y estado operativo
 
-La anulación corresponde al **corte 2**. Pedidos de compra y recepción parcial corresponden al **corte 3**. Tampoco se incluyen sobre recepción, excepciones, pagos, devoluciones, cuentas por pagar ni contabilidad externa. No se cambiaron migraciones publicadas, entidades oficiales, `OfficialControlPlusDbContext`, Docker Compose o el esquema PostgreSQL. La implementación y validación usan solo el repositorio y PostgreSQL 17 efímero de Testcontainers; no acceden a PostgreSQL persistente. La validación final terminó con build serial de 0 errores y 0 advertencias, focalizadas `70/70`, corrección aislada de confirmación `2/2` y suite completa `438/438`, sin fallidas ni omitidas; los TRX se registran en [testing.md](testing.md). Commit, push, publicación y despliegue siguen pendientes.
+La anulación corresponde al **corte 2**. Pedidos de compra y recepción parcial corresponden al **corte 3**. Tampoco se incluyen sobre recepción, excepciones, pagos, devoluciones, cuentas por pagar ni contabilidad externa. No se cambiaron migraciones publicadas, entidades oficiales, `OfficialControlPlusDbContext`, Docker Compose o el esquema PostgreSQL. La implementación y validación usaron solo el repositorio y PostgreSQL 17 efímero de Testcontainers; no accedieron a PostgreSQL persistente. La validación final terminó con build serial de 0 errores y 0 advertencias, focalizadas `70/70`, corrección aislada de confirmación `2/2` y suite completa `438/438`: Domain `40/40`, Infrastructure `58/58` y API `340/340`, sin fallidas ni omitidas. Los TRX se registran en [testing.md](testing.md).
+
+## Publicación y configuración operativa
+
+El commit `f75bc7bf14e71fb54e9babb595d221f38cf53017` fue publicado y la imagen API `sha256:98656711cfa47651d3b7fb337bf199c2013708577327a686eb79fa70b6969e24` quedó desplegada localmente.
+
+| Recurso | Identificador y conservación | Estado al cierre |
+| --- | --- | --- |
+| API | Contenedor `5575c65800c756351798003ad6e5503a20bf6ef3cbbf55589bf4a09f82f517fd`; iniciado `2026-10-14T14:09:34.177110507Z` | running/healthy; `RestartCount=0` |
+| PostgreSQL | Contenedor preservado `e31e0486ce3f556776e29cf46eea42714129bdc9f48c650a0d884045cec67277`; iniciado `2026-10-14T12:43:37.102886627Z` | running/healthy; `RestartCount=0` |
+| Datos PostgreSQL | Volumen conservado `controlplusbackend_controlplus_postgres_data`, creado `2026-09-12T02:01:15Z`, montado en `/var/lib/postgresql/data` | conservado |
+
+`/api/health`, `/api/health/database` y `/openapi/v1.json` respondieron HTTP `200`. El OpenAPI desplegado expuso las cinco operaciones de `/api/purchases` y las tres de `/api/document-numbering/purchases`, sin `DELETE` en ninguna de ambas rutas.
+
+La configuración operativa de `COMPRA` siguió esta secuencia: `GET` inicial `404`, un único `POST` autorizado con `prefix=CMP` y `firstNumber=1`, y una certificación posterior mediante un único `GET` de solo lectura. El resultado certificado fue `prefix=CMP`, `lastNumber=0`, `nextNumber=1` y `version=1`. No se usaron SQL directo, migraciones, `PUT`, `DELETE`, borradores ni confirmaciones de compras. La configuración de `COMPRA` fue el único cambio funcional autorizado en PostgreSQL persistente durante esta fase operativa.
