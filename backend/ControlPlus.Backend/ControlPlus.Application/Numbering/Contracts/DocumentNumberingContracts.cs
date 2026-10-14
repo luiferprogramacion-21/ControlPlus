@@ -12,11 +12,25 @@ public sealed record SalesDocumentNumberingDto(
     long NextNumber,
     long Version);
 
+public sealed record PurchaseDocumentNumberingDto(
+    string DocumentType,
+    string Series,
+    string Prefix,
+    long LastNumber,
+    long NextNumber,
+    long Version);
+
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CreateSalesDocumentNumberingRequest(string Prefix, long FirstNumber);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record UpdateSalesDocumentNumberingRequest(string Prefix, long FirstNumber, long Version);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CreatePurchaseDocumentNumberingRequest(string Prefix, long FirstNumber);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record UpdatePurchaseDocumentNumberingRequest(string Prefix, long FirstNumber, long Version);
 
 public interface IDocumentNumberingService
 {
@@ -40,4 +54,15 @@ public interface IDocumentNumberingService
         CreateSalesDocumentNumberingRequest request, CancellationToken cancellationToken = default);
     Task<Result<SalesDocumentNumberingDto>> UpdateCreditPaymentsAsync(ActorContext actor,
         UpdateSalesDocumentNumberingRequest request, CancellationToken cancellationToken = default);
+
+    Task<Result<PurchaseDocumentNumberingDto>> GetPurchasesAsync(
+        ActorContext actor, CancellationToken cancellationToken = default);
+
+    Task<Result<PurchaseDocumentNumberingDto>> CreatePurchasesAsync(
+        ActorContext actor, CreatePurchaseDocumentNumberingRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<PurchaseDocumentNumberingDto>> UpdatePurchasesAsync(
+        ActorContext actor, UpdatePurchaseDocumentNumberingRequest request,
+        CancellationToken cancellationToken = default);
 }

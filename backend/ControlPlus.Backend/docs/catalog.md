@@ -36,6 +36,12 @@ Los productos sin existencias se omiten del listado normal, pero una búsqueda d
 
 El historial de costos usa `compras.detalle_compra`, conserva costos documentales y promedios anteriores/resultantes, y expone el último costo de una compra confirmada como referencia. `catalogo.producto.costo_promedio` permanece como promedio vigente.
 
+## Costos originados en Compras
+
+En el corte 1 de Compras, `unitCost`/`costo_unitario_documento` representa el costo unitario neto final de cualquier descuento concedido. No existe un campo de descuento de compra: uno global debe distribuirse entre los costos unitarios antes de registrar el borrador. La base conserva `subtotal_bruto = costo_unitario_documento × cantidad`. El borrador no altera stock ni costo; al confirmar, la recepción completa calcula el nuevo promedio con precisión decimal de cuatro posiciones y conserva el promedio anterior y resultante en el detalle y el movimiento `COMPRA`.
+
+Para `NO_DISCRIMINADO` e `INCLUIDO`, el costo efectivo unitario es `unitCost`; en `INCLUIDO` el IVA no se suma otra vez. Para `SEPARADO`, el costo efectivo incluye el IVA agregado conforme a la tasa oficial del producto. Todo IVA registrado en este corte es no recuperable. Las lecturas de Productos e Inventario conservan la restricción `PRODUCTS.COSTS_READ`; las rutas de Compras muestran costos solo a quien tenga `PURCHASES.RECEIVE` efectivo y rol vigente permitido. Consulte [purchases.md](purchases.md).
+
 ## Persistencia
 
 La estructura de Categorías, Productos y costos pertenece al esquema oficial de Fase 4. La única migración nueva del módulo es `20260913010000_SeedMeasurementUnitsV1`; no altera migraciones oficiales ni tipos de cantidad y solo registra idempotentemente las tres unidades aprobadas.

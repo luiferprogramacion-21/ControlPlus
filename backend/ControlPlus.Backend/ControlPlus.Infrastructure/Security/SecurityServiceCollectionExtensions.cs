@@ -8,6 +8,7 @@ using ControlPlus.Application.Inventory.Ports;
 using ControlPlus.Application.Customers.Ports;
 using ControlPlus.Application.Suppliers.Ports;
 using ControlPlus.Application.Credits.Ports;
+using ControlPlus.Application.Purchases.Ports;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -41,6 +42,7 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<ICustomerRepository, EfCustomerRepository>();
         services.AddScoped<ISupplierRepository, EfSupplierRepository>();
         services.AddScoped<ICreditsRepository, EfCreditsRepository>();
+        services.AddScoped<IPurchaseRepository, EfPurchaseRepository>();
         services.AddSingleton<ICredentialTokenGenerator, Code128CredentialTokenGenerator>();
         services.AddScoped<SecurityCatalogSeeder>();
         services.AddScoped<InstallationBootstrapper>();

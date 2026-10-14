@@ -1,0 +1,29 @@
+using ControlPlus.Application.Common;
+using ControlPlus.Application.Purchases.Contracts;
+using ControlPlus.Domain.OfficialModel;
+
+namespace ControlPlus.Application.Purchases.Ports;
+
+public interface IPurchaseTransaction : IAsyncDisposable
+{
+    Task CommitAsync(CancellationToken ct = default);
+}
+
+public interface IPurchaseRepository
+{
+    Task<IPurchaseTransaction> BeginAsync(CancellationToken ct = default);
+    Task<Instalacion?> GetActiveInstallationForUpdateAsync(CancellationToken ct = default);
+    Task<Terminal?> GetActiveTerminalAsync(Guid installationId, CancellationToken ct = default);
+    Task<Proveedor?> GetSupplierForUpdateAsync(Guid id, CancellationToken ct = default);
+    Task<IReadOnlyCollection<Producto>> GetProductsForUpdateAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default);
+    Task<Compra?> GetForUpdateAsync(Guid id, CancellationToken ct = default);
+    Task<Compra?> GetAsync(Guid id, CancellationToken ct = default);
+    Task<PagedResult<Compra>> ListAsync(PurchaseListQuery query, int offset, CancellationToken ct = default);
+    Task<ConsecutivoDocumento?> GetSequenceForUpdateAsync(Guid installationId, string series, CancellationToken ct = default);
+    Task<OperacionIdempotente?> GetIdempotencyAsync(Guid installationId, string key, CancellationToken ct = default);
+    Task<bool> DocumentExistsAsync(Guid supplierId, string document, Guid? excludingId, CancellationToken ct = default);
+    Task AddAsync(Compra purchase, CancellationToken ct = default);
+    Task ReplaceDetailsAsync(Compra purchase, IReadOnlyCollection<DetalleCompra> details, CancellationToken ct = default);
+    Task AddMovementsAsync(IReadOnlyCollection<MovimientoInventario> movements, CancellationToken ct = default);
+    Task AddIdempotencyAsync(OperacionIdempotente operation, CancellationToken ct = default);
+}

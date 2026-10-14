@@ -111,6 +111,36 @@ public sealed class EfDocumentNumberingRepository(OfficialControlPlusDbContext d
         dbContext.PagoCredito.AsNoTracking().AnyAsync(
             x => x.InstalacionId == installationId && x.Serie == series, cancellationToken);
 
+    public async Task<ConsecutivoDocumento?> GetPurchaseNumberingAsync(
+        Guid installationId, string series, bool forUpdate,
+        CancellationToken cancellationToken = default)
+    {
+        if (!forUpdate)
+            return await dbContext.ConsecutivoDocumento.AsNoTracking().SingleOrDefaultAsync(
+                x => x.InstalacionId == installationId &&
+                     x.TipoDocumento == "COMPRA" && x.Serie == series,
+                cancellationToken);
+
+        var rows = await dbContext.ConsecutivoDocumento.FromSqlInterpolated(
+            $"""
+             SELECT c.*
+             FROM configuracion.consecutivo_documento AS c
+             WHERE c.instalacion_id = {installationId}
+               AND c.tipo_documento = 'COMPRA'
+               AND c.serie = {series}
+             FOR UPDATE
+             """).AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
+    public Task<bool> HasNumberedPurchasesAsync(
+        Guid installationId, string series,
+        CancellationToken cancellationToken = default) =>
+        dbContext.Compra.AsNoTracking().AnyAsync(
+            x => x.InstalacionId == installationId &&
+                 x.Serie == series && x.Consecutivo != null,
+            cancellationToken);
+
     public Task AddAsync(
         ConsecutivoDocumento numbering,
         CancellationToken cancellationToken = default) =>

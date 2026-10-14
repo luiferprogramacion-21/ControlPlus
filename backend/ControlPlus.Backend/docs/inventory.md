@@ -93,14 +93,21 @@ ningún motivo de catálogo, incluidos los cuatro sembrados, filas preexistentes
 motivos ya referenciados. Una nueva aplicación reutiliza la clave natural y no
 duplica ni reemplaza el UUID existente.
 
-## Ventas y futura Recepción
+## Ventas y Compras
 
 Ventas ya bloquea productos y confirma venta, stock y movimiento `VENTA` en una
 sola transacción. Las pruebas PostgreSQL ejercitan carreras ajuste-ajuste y
 venta-ajuste sobre la misma fila.
 
-Compras, Proveedores, Pedidos y Recepción permanecen fuera de este corte. En el
-futuro, una recepción deberá crear el producto con stock cero cuando corresponda,
-bloquearlo y registrar el incremento mediante el movimiento oficial `COMPRA` en
-la misma transacción. No existe un motivo de ajuste para inventario inicial,
-compra formal o compra informal.
+El corte 1 de Compras recibe únicamente compras independientes. Crear o editar su
+borrador no cambia stock, costo promedio ni kardex. Confirmar recibe todas las
+líneas en una transacción, bloquea los productos existentes y activos, aumenta
+sus existencias, calcula su costo promedio y registra exactamente un movimiento
+oficial `COMPRA` por producto. El detalle y el movimiento conservan el promedio
+anterior y el resultante. Una falla de escritura o de `COMMIT` revierte también
+la compra, su número visible, idempotencia y auditoría. La compra no usa motivos
+de ajuste; `PRODUCTS.COSTS_READ` sigue controlando los costos del stock y kardex,
+aunque las rutas protegidas de Compras muestran los costos de sus documentos.
+
+Pedidos de compra y recepción parcial pertenecen al corte 3. La anulación de
+compras pertenece al corte 2. Consulte [purchases.md](purchases.md).

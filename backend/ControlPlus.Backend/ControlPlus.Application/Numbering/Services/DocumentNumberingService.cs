@@ -19,6 +19,126 @@ public sealed class DocumentNumberingService(
     IClock clock) : IDocumentNumberingService
 {
     private const string SalesDocumentType = "VENTA";
+    private const string PurchaseDocumentType = "COMPRA";
+    private const string PurchasePrefix = "CMP";
+
+    public async Task<Result<PurchaseDocumentNumberingDto>> GetPurchasesAsync(
+        ActorContext actor, CancellationToken cancellationToken = default)
+    {
+        var permissionError = await RequirePermissionAsync(actor, cancellationToken);
+        if (permissionError is not null)
+            return Result.Failure<PurchaseDocumentNumberingDto>(permissionError);
+
+        var installation = await repository.GetActiveInstallationAsync(false, cancellationToken);
+        if (installation is null)
+            return Result.Failure<PurchaseDocumentNumberingDto>(
+                ApplicationError.NotFound("la instalación activa"));
+
+        var numbering = await repository.GetPurchaseNumberingAsync(
+            installation.Id, installation.Serie, false, cancellationToken);
+        return numbering is null
+            ? Result.Failure<PurchaseDocumentNumberingDto>(
+                ApplicationError.NotFound("el consecutivo de compras"))
+            : MapPurchaseResult(numbering);
+    }
+
+    public async Task<Result<PurchaseDocumentNumberingDto>> CreatePurchasesAsync(
+        ActorContext actor, CreatePurchaseDocumentNumberingRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var permissionError = await RequirePermissionAsync(actor, cancellationToken);
+        if (permissionError is not null)
+            return Result.Failure<PurchaseDocumentNumberingDto>(permissionError);
+
+        var input = NormalizeAndValidate(request.Prefix, request.FirstNumber);
+        if (input.Error is not null)
+            return Result.Failure<PurchaseDocumentNumberingDto>(input.Error);
+        if (input.Prefix != PurchasePrefix || request.FirstNumber != 1)
+            return Result.Failure<PurchaseDocumentNumberingDto>(ApplicationError.Validation(
+                "La numeración inicial de compras exige prefijo CMP y primer número 1."));
+
+        await using var transaction = await transactionManager.BeginAsync(
+            IsolationLevel.ReadCommitted, cancellationToken);
+        var installation = await repository.GetActiveInstallationAsync(true, cancellationToken);
+        if (installation is null)
+            return Result.Failure<PurchaseDocumentNumberingDto>(
+                ApplicationError.NotFound("la instalación activa"));
+        if (await repository.GetPurchaseNumberingAsync(
+                installation.Id, installation.Serie, false, cancellationToken) is not null)
+            return Result.Failure<PurchaseDocumentNumberingDto>(ApplicationError.Conflict(
+                "Ya existe el consecutivo de compras para la instalación y serie activas."));
+
+        var numbering = new ConsecutivoDocumento
+        {
+            Id = Guid.CreateVersion7(),
+            InstalacionId = installation.Id,
+            TipoDocumento = PurchaseDocumentType,
+            Prefijo = PurchasePrefix,
+            Serie = installation.Serie,
+            UltimoNumero = 0,
+            Version = 1
+        };
+        await repository.AddAsync(numbering, cancellationToken);
+        await AuditWriter.WriteAsync(
+            auditRepository, clock, actor.UserId,
+            AuditAction.PurchaseDocumentNumberingCreated,
+            nameof(ConsecutivoDocumento), numbering.Id,
+            new { numbering.TipoDocumento, numbering.Serie, numbering.Prefijo,
+                PrimerNumero = request.FirstNumber }, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return MapPurchaseResult(numbering);
+    }
+
+    public async Task<Result<PurchaseDocumentNumberingDto>> UpdatePurchasesAsync(
+        ActorContext actor, UpdatePurchaseDocumentNumberingRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var permissionError = await RequirePermissionAsync(actor, cancellationToken);
+        if (permissionError is not null)
+            return Result.Failure<PurchaseDocumentNumberingDto>(permissionError);
+        if (request.Version <= 0)
+            return Result.Failure<PurchaseDocumentNumberingDto>(ApplicationError.Validation(
+                "La versión debe ser mayor que cero."));
+
+        var input = NormalizeAndValidate(request.Prefix, request.FirstNumber);
+        if (input.Error is not null)
+            return Result.Failure<PurchaseDocumentNumberingDto>(input.Error);
+        if (input.Prefix != PurchasePrefix)
+            return Result.Failure<PurchaseDocumentNumberingDto>(ApplicationError.Validation(
+                "El prefijo aprobado para compras es CMP."));
+
+        await using var transaction = await transactionManager.BeginAsync(
+            IsolationLevel.ReadCommitted, cancellationToken);
+        var installation = await repository.GetActiveInstallationAsync(true, cancellationToken);
+        if (installation is null)
+            return Result.Failure<PurchaseDocumentNumberingDto>(
+                ApplicationError.NotFound("la instalación activa"));
+        var numbering = await repository.GetPurchaseNumberingAsync(
+            installation.Id, installation.Serie, true, cancellationToken);
+        if (numbering is null)
+            return Result.Failure<PurchaseDocumentNumberingDto>(
+                ApplicationError.NotFound("el consecutivo de compras"));
+        if (numbering.Version != request.Version)
+            return Result.Failure<PurchaseDocumentNumberingDto>(VersionConflict);
+        if (await repository.HasNumberedPurchasesAsync(
+                installation.Id, installation.Serie, cancellationToken))
+            return Result.Failure<PurchaseDocumentNumberingDto>(ApplicationError.Conflict(
+                "El consecutivo de compras no puede corregirse después de la primera compra confirmada."));
+
+        var previousFirstNumber = checked(numbering.UltimoNumero + 1);
+        numbering.UltimoNumero = input.LastNumber;
+        await AuditWriter.WriteAsync(
+            auditRepository, clock, actor.UserId,
+            AuditAction.PurchaseDocumentNumberingUpdated,
+            nameof(ConsecutivoDocumento), numbering.Id,
+            new { numbering.TipoDocumento, numbering.Serie,
+                PrimerNumeroAnterior = previousFirstNumber,
+                PrimerNumeroNuevo = request.FirstNumber }, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return MapPurchaseResult(numbering);
+    }
 
     public async Task<Result<SalesDocumentNumberingDto>> GetCreditPaymentsAsync(
         ActorContext actor, CancellationToken cancellationToken = default)
@@ -248,6 +368,22 @@ public sealed class DocumentNumberingService(
                     ? "El consecutivo de abonos alcanzó el número máximo admitido."
                     : "El consecutivo de VENTAS alcanzó el número máximo admitido."));
         return Result.Success(new SalesDocumentNumberingDto(
+            numbering.TipoDocumento,
+            numbering.Serie,
+            numbering.Prefijo,
+            numbering.UltimoNumero,
+            numbering.UltimoNumero + 1,
+            numbering.Version));
+    }
+
+    private static Result<PurchaseDocumentNumberingDto> MapPurchaseResult(
+        ConsecutivoDocumento numbering)
+    {
+        if (numbering.UltimoNumero == long.MaxValue)
+            return Result.Failure<PurchaseDocumentNumberingDto>(
+                ApplicationError.NumberingExhausted(
+                    "El consecutivo de compras alcanzó el número máximo admitido."));
+        return Result.Success(new PurchaseDocumentNumberingDto(
             numbering.TipoDocumento,
             numbering.Serie,
             numbering.Prefijo,

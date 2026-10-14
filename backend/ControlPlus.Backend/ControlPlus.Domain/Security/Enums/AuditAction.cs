@@ -67,5 +67,10 @@ public enum AuditAction
     SupplierCreated = 59,
     SupplierUpdated = 60,
     SupplierDeactivated = 61,
-    SupplierReactivated = 62
+    SupplierReactivated = 62,
+    PurchaseDocumentNumberingCreated = 63,
+    PurchaseDocumentNumberingUpdated = 64,
+    PurchaseDraftCreated = 65,
+    PurchaseDraftUpdated = 66,
+    PurchaseConfirmed = 67
 }

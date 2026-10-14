@@ -26,6 +26,13 @@ public interface IDocumentNumberingRepository
     Task<bool> HasCreditPaymentsAsync(
         Guid installationId, string series, CancellationToken cancellationToken = default);
 
+    Task<ConsecutivoDocumento?> GetPurchaseNumberingAsync(
+        Guid installationId, string series, bool forUpdate,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> HasNumberedPurchasesAsync(
+        Guid installationId, string series, CancellationToken cancellationToken = default);
+
     Task AddAsync(ConsecutivoDocumento numbering, CancellationToken cancellationToken = default);
 }
 

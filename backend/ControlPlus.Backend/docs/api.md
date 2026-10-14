@@ -43,6 +43,8 @@ Los únicos endpoints anónimos son los de salud y los flujos de autenticación 
 | Numeración de Ventas | `/api/document-numbering/sales` | `NUMBERING.MANAGE` |
 | Clientes | `/api/customers` | `CUSTOMERS.BASIC_MANAGE` o `CUSTOMERS.MANAGE` según operación |
 | Proveedores | `/api/suppliers` | Lectura `SUPPLIERS.READ`; escritura Administrador y `SUPPLIERS.MANAGE` efectivos |
+| Compras | `/api/purchases` | Administrador o Supervisor vigente y `PURCHASES.RECEIVE` efectivo |
+| Numeración de Compras | `/api/document-numbering/purchases` | `NUMBERING.MANAGE` efectivo |
 | Créditos y abonos | `/api/credits` | `CREDIT.MANAGE`; el historial añade `CUSTOMERS.HISTORY_READ` |
 | Numeración de abonos | `/api/document-numbering/credit-payments` | `NUMBERING.MANAGE` |
 
@@ -142,6 +144,34 @@ La respuesta `201` incluye la venta, líneas y pagos, sin exponer el costo hist�
 `GET /api/credits` acepta `page` (1 por defecto), `pageSize` (20 por defecto, máximo 100), `state`, `dueFrom`, `dueTo`, `customerId` y `saleNumber`. `state` admite `PENDIENTE`, `VENCIDO`, `PAGADO` y `ANULADO`. `saleNumber` acepta número completo o prefijo sin comodín inicial. Los créditos se ordenan por otorgamiento e ID descendentes; los abonos por fecha e ID descendentes. Las lecturas proyectan `VENCIDO` cuando un `PENDIENTE` con saldo supera su fecha local de vencimiento, sin modificar la base.
 
 El cuerpo de abono contiene `expectedVersion` y `payments`, una a tres filas con `methodCode`, `appliedAmount`, `receivedAmount` y `reference`. Cada método debe ser distinto y activo; la suma positiva no supera el saldo. Efectivo exige recibido suficiente y calcula cambio; Transferencia y Nequi no aceptan recibido y requieren referencia cuando el método la exige. Cada fila obtiene número `ABO` propio, comparte correlación y un movimiento canónico de Caja. Se requiere turno abierto y, en turno compartido, sesión de operador activa. Versiones obsoletas, créditos `PAGADO` o `ANULADO`, numeración ausente o agotada e idempotencia incompatible devuelven `409`; entradas inválidas devuelven `400`. Las respuestas omiten dirección, correo, observaciones, referencia electrónica y auditoría detallada. No hay `PUT`, `PATCH` ni `DELETE` de créditos o abonos.
+
+## Compras — corte 1
+
+| Método | Ruta | Resultado principal |
+|---|---|---|
+| `GET` | `/api/purchases` | Compras filtradas y paginadas (`200`) |
+| `GET` | `/api/purchases/{purchaseId}` | Detalle (`200` o `404`) |
+| `POST` | `/api/purchases` | Borrador (`201`) |
+| `PUT` | `/api/purchases/{purchaseId}` | Borrador editado (`200`); exige `expectedVersion` |
+| `POST` | `/api/purchases/{purchaseId}/confirm` | Confirmación y recepción completa (`200`); exige `expectedVersion` e `Idempotency-Key` |
+
+Todas estas rutas exigen JWT, rol vigente Administrador o Supervisor y `PURCHASES.RECEIVE` efectivo. Una revocación individual bloquea el acceso y una concesión válida se evalúa con la plantilla híbrida. Cajero no accede. Los importes y costos se muestran dentro del permiso de Compras; `PRODUCTS.COSTS_READ` no se amplía para las rutas de Productos, Inventario o historial de costos.
+
+El cuerpo de alta solo admite `supplierId`, `supplierDocumentNumber` opcional, `invoiceDate`, `vatMode` y `lines` con `productId`, `quantity`, `unitCost` y `vatPercentage` opcional. La edición añade `expectedVersion`. Los modos IVA oficiales son `NO_DISCRIMINADO`, `INCLUIDO` y `SEPARADO`; `vatPercentage`, si se proporciona, debe coincidir con la tasa oficial del producto. `unitCost` es el costo unitario neto de cualquier descuento; un descuento global debe distribuirse antes entre esos costos. No se aceptan campos de descuento, `orderId`, identificadores, estado, numeración, stock, costos promedio, movimientos ni auditoría. Las propiedades JSON desconocidas responden `400`.
+
+El borrador no consume numeración ni cambia inventario o costos. Al confirmar se asigna el consecutivo `COMPRA`, se recibe cada línea completa, se crea un movimiento `COMPRA` por producto y se actualizan stock y promedio en una transacción. Si falta el documento externo se crea una referencia interna `CP-INTERNO-` vinculada al número visible; ese prefijo está reservado y el cliente no puede presentarlo como documento externo. Una repetición compatible de `Idempotency-Key` devuelve el resultado original; contenido distinto, versión obsoleta, documento duplicado o estado incompatible responden `409`.
+
+`GET /api/purchases` acepta filtros exactos `supplierId`, `status`, `invoiceDate` y `supplierDocumentNumber`. El orden es `invoiceDate` descendente e ID descendente; `page` inicia en 1 y `pageSize` admite 1 a 100. Una página cuyo desplazamiento exceda el entero aceptado por persistencia responde `400` antes de consultar la base. No hay `DELETE` ni ruta de cancelación. El contrato completo y las exclusiones están en [purchases.md](purchases.md).
+
+## Numeración de Compras
+
+| Método | Ruta | Resultado |
+|---|---|---|
+| `GET` | `/api/document-numbering/purchases` | Consulta `COMPRA` para instalación y serie activas (`200` o `404`) |
+| `POST` | `/api/document-numbering/purchases` | Crea una configuración única de `COMPRA` (`201`) |
+| `PUT` | `/api/document-numbering/purchases` | Corrige la configuración antes de la primera compra confirmada (`200`) |
+
+Las tres operaciones requieren `NUMBERING.MANAGE` efectivo y mantienen las restricciones actuales del proyecto. Tipo, instalación y serie se resuelven en el servidor; la corrección exige versión vigente. No existe `DELETE` ni se crea el consecutivo automáticamente al crear un borrador. Numeración y recepción se confirman o revierten juntas.
 
 ## Numeración de Ventas
 
