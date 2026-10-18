@@ -14,9 +14,256 @@ using ControlPlus.Domain.Security.Enums;
 namespace ControlPlus.Application.Purchases.Services;
 
 public sealed class PurchaseService(IPurchaseRepository repository, IUserRepository users,
-    IAuditRepository audit, IUnitOfWork unitOfWork, IClock clock) : IPurchaseService
+    IAuditRepository audit, IUnitOfWork unitOfWork, IClock clock,
+    IPermissionRepository permissions, IPasswordHasher passwords, ILoginAttemptCoordinator loginAttempts) : IPurchaseService
 {
     private const string InternalDocumentPrefix = "CP-INTERNO-";
+    private static readonly (string Code, string Name)[] CancellationCatalog =
+    [
+        ("ERROR_REGISTRO", "Error de registro"),
+        ("COMPRA_DUPLICADA", "Compra duplicada"),
+        ("DOCUMENTO_PROVEEDOR_ANULADO", "Documento de proveedor anulado"),
+        ("MERCANCIA_NO_RECIBIDA", "Mercancía no recibida"),
+        ("OTRO", "Otro")
+    ];
+
+    public async Task<Result<IReadOnlyCollection<PurchaseCancellationReasonDto>>> ListCancellationReasonsAsync(
+        ActorContext actor, CancellationToken ct = default)
+    {
+        if (!await CanCancelAsync(actor, ct)) return Denied<IReadOnlyCollection<PurchaseCancellationReasonDto>>();
+        var installation = await repository.GetActiveInstallationForUpdateAsync(ct);
+        if (installation is null) return Result.Failure<IReadOnlyCollection<PurchaseCancellationReasonDto>>(ApplicationError.NotFound("la instalación activa"));
+        var reasons = await repository.ListCancellationReasonsAsync(installation.EstablecimientoId, ct);
+        return Result.Success<IReadOnlyCollection<PurchaseCancellationReasonDto>>(reasons
+            .Where(x => x.Activo && IsApprovedCancellationReason(x))
+            .Select(MapReason).ToArray());
+    }
+
+    public async Task<Result<IReadOnlyCollection<PurchaseCancellationReasonDto>>> InitializeCancellationReasonsAsync(
+        ActorContext actor, CancellationToken ct = default)
+    {
+        await using var transaction = await repository.BeginAsync(ct);
+        var installation = await repository.GetActiveInstallationForUpdateAsync(ct);
+        if (installation is null) return Result.Failure<IReadOnlyCollection<PurchaseCancellationReasonDto>>(ApplicationError.NotFound("la instalación activa"));
+        if (!await CanCancelAsync(actor, ct)) return Denied<IReadOnlyCollection<PurchaseCancellationReasonDto>>();
+        var existing = await repository.ListCancellationReasonsAsync(installation.EstablecimientoId, ct);
+        var now = clock.UtcNow.UtcDateTime;
+        var created = new List<MotivoOperacion>();
+        for (var index = 0; index < CancellationCatalog.Length; index++)
+        {
+            var (code, name) = CancellationCatalog[index];
+            var found = existing.SingleOrDefault(x => x.Codigo == code);
+            if (found is not null)
+            {
+                if (!IsApprovedCancellationReason(found))
+                    return Result.Failure<IReadOnlyCollection<PurchaseCancellationReasonDto>>(ApplicationError.Conflict("El catálogo de anulación de compras contiene una configuración incompatible."));
+                continue;
+            }
+            created.Add(new MotivoOperacion { Id = Guid.CreateVersion7(), EstablecimientoId = installation.EstablecimientoId,
+                TipoOperacion = "ANULACION_COMPRA", Codigo = code, Nombre = name,
+                Descripcion = name, OrdenVisual = (index + 1) * 10, Activo = true,
+                FechaCreacion = now, Version = 1 });
+        }
+        if (created.Count > 0)
+        {
+            await repository.AddCancellationReasonsAsync(created, ct);
+            await unitOfWork.SaveChangesAsync(ct);
+        }
+        await transaction.CommitAsync(ct);
+        return Result.Success<IReadOnlyCollection<PurchaseCancellationReasonDto>>(existing.Concat(created)
+            .Where(IsApprovedCancellationReason).OrderBy(x => x.OrdenVisual).Select(MapReason).ToArray());
+    }
+
+    public async Task<Result<PurchaseDto>> CancelAsync(ActorContext actor, Guid id, string key,
+        CancelPurchaseRequest request, CancellationToken ct = default)
+    {
+        if (!await CanCancelAsync(actor, ct)) return Denied<PurchaseDto>();
+        key = key?.Trim() ?? "";
+        if (id == Guid.Empty || request is null || request.ReasonId == Guid.Empty || request.ExpectedVersion <= 0 ||
+            key.Length is < 1 or > 100 || key.Any(x => !char.IsAsciiLetterOrDigit(x) && x is not ('-' or '_' or '.' or ':')) ||
+            request.Observation?.Length > 500)
+            return Invalid<PurchaseDto>("La solicitud de anulación o Idempotency-Key es inválida.");
+        if (request.ExpectedVersion == long.MaxValue)
+            return Result.Failure<PurchaseDto>(ApplicationError.ConcurrencyConflict("La versión de la compra está agotada."));
+        var observation = string.IsNullOrWhiteSpace(request.Observation) ? null : request.Observation.Trim();
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+            JsonSerializer.Serialize(new { PurchaseId = id, request.ExpectedVersion, request.ReasonId, Observation = observation, Actor = actor.UserId }))));
+        // Replays without credentials still enter the same installation/purchase lock order.
+        // The coordinator owns the only transaction and COMMIT for a new cancellation.
+        var accountLockKey = string.IsNullOrWhiteSpace(request.Authorization?.UserName)
+            ? $"PURCHASE-CANCEL-REPLAY:{actor.UserId:N}"
+            : request.Authorization.UserName.Trim().ToUpperInvariant();
+        return await loginAttempts.ExecuteAsync(accountLockKey,
+            token => CancelWithinTransactionAsync(actor, id, key, request, observation, fingerprint, token), ct);
+    }
+
+    private async Task<Result<PurchaseDto>> CancelWithinTransactionAsync(ActorContext actor, Guid id, string key,
+        CancelPurchaseRequest request, string? observation, string fingerprint, CancellationToken ct)
+    {
+        var installation = await repository.GetActiveInstallationForUpdateAsync(ct);
+        if (installation is null) return Result.Failure<PurchaseDto>(ApplicationError.NotFound("la instalación activa"));
+        if (!await CanCancelAsync(actor, ct)) return Denied<PurchaseDto>();
+        var previous = await repository.GetIdempotencyAsync(installation.Id, key, ct);
+        if (previous is not null)
+        {
+            if (previous.UsuarioId != actor.UserId || previous.TipoOperacion != "ANULAR_COMPRA" ||
+                previous.HashSolicitud != fingerprint || previous.EntidadId != id)
+                return Result.Failure<PurchaseDto>(ApplicationError.Conflict("La clave de idempotencia ya fue utilizada con otra solicitud."));
+            PurchaseDto? saved;
+            try
+            {
+                saved = previous.Resultado is null ? null : JsonSerializer.Deserialize<PurchaseDto>(previous.Resultado);
+            }
+            catch (JsonException)
+            {
+                saved = null;
+            }
+            return saved is null ? Result.Failure<PurchaseDto>(ApplicationError.Conflict("La anulación original no es recuperable.")) : Result.Success(saved);
+        }
+        if (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
+            string.IsNullOrWhiteSpace(request.Authorization.Password))
+            return Invalid<PurchaseDto>("Las credenciales del autorizador son obligatorias para una nueva anulación.");
+        var purchase = await repository.GetForUpdateAsync(id, ct);
+        if (purchase is null) return Result.Failure<PurchaseDto>(ApplicationError.NotFound("la compra"));
+        if (purchase.Version != request.ExpectedVersion) return Stale();
+        if (purchase.PedidoCompraId is not null || purchase.Estado != "CONFIRMADA")
+            return Result.Failure<PurchaseDto>(ApplicationError.Conflict("Solo puede anularse una compra independiente confirmada."));
+        var reason = await repository.GetCancellationReasonAsync(installation.EstablecimientoId, request.ReasonId, ct);
+        if (reason is null) return Result.Failure<PurchaseDto>(ApplicationError.NotFound("el motivo activo de anulación de compra"));
+        if (!IsApprovedCancellationReason(reason))
+            return Result.Failure<PurchaseDto>(ApplicationError.Conflict("El motivo no conserva la configuración aprobada."));
+        if (reason.Codigo == "OTRO" && observation is null)
+            return Invalid<PurchaseDto>("La observación es obligatoria para OTRO.");
+        var terminal = await repository.GetActiveTerminalAsync(installation.Id, ct);
+        if (terminal is null) return Result.Failure<PurchaseDto>(ApplicationError.NotFound("la terminal activa"));
+        var originals = await repository.GetPurchaseMovementsAsync(id, ct);
+        var details = purchase.DetalleCompra.OrderBy(x => x.ProductoId).ToArray();
+        if (details.Length == 0 || originals.Count != details.Length ||
+            details.Any(x => originals.Count(m => m.ProductoId == x.ProductoId && m.CantidadStock == x.Cantidad) != 1))
+            return Result.Failure<PurchaseDto>(ApplicationError.Conflict("Los movimientos originales de compra son inconsistentes."));
+        var products = await repository.GetProductsForUpdateAsync(details.Select(x => x.ProductoId).ToArray(), ct);
+        if (products.Count != details.Length) return Result.Failure<PurchaseDto>(ApplicationError.Conflict("Falta un producto de la compra."));
+        var reverse = new List<MovimientoInventario>();
+        var now = clock.UtcNow.UtcDateTime;
+        var correlation = Guid.CreateVersion7();
+        foreach (var detail in details)
+        {
+            var product = products.Single(x => x.Id == detail.ProductoId);
+            var original = originals.Single(x => x.ProductoId == detail.ProductoId);
+            if (original.OrdenRegistro is not long originalOrder)
+                return Result.Failure<PurchaseDto>(ApplicationError.Conflict("El movimiento histórico no tiene orden de registro certificable."));
+            if (await repository.HasLaterMovementAsync(product.Id, originalOrder, ct) ||
+                await repository.HasReversalAsync(original.Id, ct) ||
+                product.StockActual != original.StockPosterior || product.CostoPromedio != detail.CostoPromedioResultante ||
+                original.StockPosterior - original.CantidadStock != original.StockAnterior ||
+                original.CostoPromedioAnterior != detail.CostoPromedioAnterior ||
+                original.CostoPromedioPosterior != detail.CostoPromedioResultante ||
+                product.StockActual - detail.Cantidad < product.StockReservado ||
+                product.StockActual - detail.Cantidad < 0)
+                return Result.Failure<PurchaseDto>(ApplicationError.Conflict("El inventario de la compra ya cambió o no admite reversión."));
+            var nextStock = product.StockActual - detail.Cantidad;
+            reverse.Add(new MovimientoInventario { Id = Guid.CreateVersion7(), ProductoId = product.Id,
+                UsuarioId = actor.UserId, MovimientoRevertidoId = original.Id,
+                TipoMovimiento = "ANULACION_COMPRA", CantidadStock = -detail.Cantidad, CantidadReservada = 0,
+                StockAnterior = product.StockActual, StockPosterior = nextStock,
+                ReservadoAnterior = product.StockReservado, ReservadoPosterior = product.StockReservado,
+                CostoPromedioAnterior = product.CostoPromedio, CostoPromedioPosterior = detail.CostoPromedioAnterior,
+                FechaHora = now, CorrelacionId = correlation });
+        }
+        var authorizer = await users.GetByUserNameAsync(request.Authorization.UserName.Trim(), ct);
+        if (authorizer is null)
+        {
+            await WriteRejectedAuthorizationAsync(actor, id, correlation, terminal.Id, ct);
+            return Result.Failure<PurchaseDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+        }
+        authorizer = await repository.GetUserForUpdateAsync(authorizer.Id, ct) ?? authorizer;
+        if (!authorizer.IsActive || !await CanCancelUserAsync(authorizer.Id, ct))
+            return Result.Failure<PurchaseDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+        if (!passwords.Verify(request.Authorization.Password, authorizer.PasswordHash))
+        {
+            var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
+            await users.UpdateAsync(authorizer, ct);
+            if (locked)
+                await AuditWriter.WriteAsync(audit, clock, authorizer.Id, AuditAction.UserLocked,
+                    nameof(Usuario), authorizer.Id,
+                    new { authorizer.Id, authorizer.FailedLoginAttempts }, ct);
+            await WriteRejectedAuthorizationAsync(actor, id, correlation, terminal.Id, ct);
+            return Result.Failure<PurchaseDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+        }
+        var permission = await permissions.GetByCodeAsync(PermissionCodes.PurchasesCancel, ct);
+        if (permission is null || !permission.Activo)
+            return Result.Failure<PurchaseDto>(ApplicationError.Conflict("El permiso de anulación no está disponible."));
+        authorizer.RegisterSuccessfulLogin(clock.UtcNow);
+        await users.UpdateAsync(authorizer, ct);
+        var authorization = new AutorizacionOperacion { Id = Guid.CreateVersion7(),
+            UsuarioSolicitanteId = actor.UserId, UsuarioAutorizadorId = authorizer.Id, PermisoId = permission.Id,
+            TipoOperacion = "ANULAR_COMPRA", CorrelacionId = correlation,
+            DescripcionOperacion = "Autorización de anulación de compra.", Motivo = reason.Codigo,
+            MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA", Estado = "UTILIZADA",
+            FechaSolicitud = now, FechaExpiracion = now.AddMinutes(5), FechaUtilizacion = now };
+        await repository.AddAuthorizationAsync(authorization, ct);
+        await unitOfWork.SaveChangesAsync(ct);
+        foreach (var movement in reverse)
+        {
+            var product = products.Single(x => x.Id == movement.ProductoId);
+            product.StockActual = movement.StockPosterior;
+            product.CostoPromedio = movement.CostoPromedioPosterior;
+        }
+        purchase.Estado = "ANULADA";
+        purchase.UsuarioAnulacionId = actor.UserId;
+        purchase.AutorizacionAnulacionId = authorization.Id;
+        purchase.MotivoAnulacionId = reason.Id;
+        purchase.FechaAnulacion = now;
+        purchase.ObservacionAnulacion = observation;
+        purchase.Version = checked(request.ExpectedVersion + 1);
+        foreach (var movement in reverse) movement.AutorizacionOperacionId = authorization.Id;
+        await repository.AddMovementsAsync(reverse, ct);
+        var response = Map(purchase);
+        await repository.AddIdempotencyAsync(new OperacionIdempotente { Id = Guid.CreateVersion7(),
+            InstalacionId = installation.Id, TerminalId = terminal.Id, UsuarioId = actor.UserId,
+            ClaveIdempotencia = key, TipoOperacion = "ANULAR_COMPRA", HashSolicitud = fingerprint,
+            Entidad = nameof(Compra), EntidadId = id, Resultado = JsonSerializer.Serialize(response),
+            CorrelacionId = correlation, FechaRegistro = now }, ct);
+        await AuditWriter.WriteCashAsync(audit, clock, actor.UserId, AuditAction.PurchaseCancelled,
+            nameof(Compra), id, new { PurchaseId = id, From = "CONFIRMADA", To = "ANULADA",
+                ReasonId = reason.Id, AuthorizationId = authorization.Id, Version = purchase.Version,
+                ProductIds = details.Select(x => x.ProductoId).ToArray(), CorrelationId = correlation,
+                Result = "SUCCESS" }, correlation, authorizer.Id, null, terminal.Id, null, ct);
+        await unitOfWork.SaveChangesAsync(ct);
+        return Result.Success(response);
+    }
+
+    private async Task<bool> CanCancelAsync(ActorContext actor, CancellationToken ct) =>
+        await CanCancelUserAsync(actor.UserId, ct);
+
+    private async Task<bool> CanCancelUserAsync(Guid userId, CancellationToken ct)
+    {
+        var snapshot = await users.GetAuthorizationSnapshotAsync(userId, ct);
+        return snapshot is not null && snapshot.HighestRoleLevel >= RoleLevel.Administrador &&
+            snapshot.PermissionCodes.Contains(PermissionCodes.PurchasesCancel, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static PurchaseCancellationReasonDto MapReason(MotivoOperacion reason) =>
+        new(reason.Id, reason.Codigo, reason.Nombre, reason.Descripcion, reason.OrdenVisual);
+
+    private static bool IsApprovedCancellationReason(MotivoOperacion reason)
+    {
+        var index = Array.FindIndex(CancellationCatalog, x => x.Code == reason.Codigo);
+        return index >= 0 && reason.Activo && reason.TipoOperacion == "ANULACION_COMPRA" &&
+            reason.Nombre == CancellationCatalog[index].Name &&
+            reason.Descripcion == CancellationCatalog[index].Name &&
+            reason.OrdenVisual == (index + 1) * 10;
+    }
+
+    private async Task WriteRejectedAuthorizationAsync(ActorContext actor, Guid purchaseId,
+        Guid correlationId, Guid terminalId, CancellationToken ct)
+    {
+        await AuditWriter.WriteCashFailureAsync(audit, clock, actor.UserId,
+            AuditAction.PurchaseCancellationAuthorizationRejected, nameof(Compra), purchaseId,
+            new { PurchaseId = purchaseId, Result = "INVALID_AUTHORIZATION" },
+            correlationId, terminalId, null, ct);
+        await unitOfWork.SaveChangesAsync(ct);
+    }
 
     public async Task<Result<PagedResult<PurchaseSummaryDto>>> ListAsync(ActorContext actor,
         PurchaseListQuery query, CancellationToken ct = default)
@@ -265,6 +512,231 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         return Result.Success(Map(purchase));
     }
 
+    public async Task<Result<PurchaseReceiptDto>> ReceiveOrderAsync(ActorContext actor, Guid orderId,
+        string key, ReceivePurchaseOrderRequest request, CancellationToken ct = default)
+    {
+        if (!await AllowedAsync(actor, ct)) return Denied<PurchaseReceiptDto>();
+        key = key?.Trim() ?? "";
+        if (orderId == Guid.Empty || request is null || request.ExpectedOrderVersion <= 0 ||
+            key.Length is < 1 or > 100 || key.Any(x => !char.IsAsciiLetterOrDigit(x) && x is not ('-' or '_' or '.' or ':')) ||
+            request.Lines is null || request.Lines.Count is < 1 or > 200 ||
+            request.Lines.Any(x => x is null || x.OrderLineId == Guid.Empty || x.ProductId == Guid.Empty) ||
+            request.Lines.Select(x => x.OrderLineId).Distinct().Count() != request.Lines.Count)
+            return Invalid<PurchaseReceiptDto>("Pedido, versión, líneas únicas e Idempotency-Key válidos son obligatorios.");
+        var input = Validate(orderId, request.SupplierDocumentNumber, request.InvoiceDate,
+            request.VatMode, request.Lines.Select(x => new PurchaseLineRequest(x.ProductId, x.Quantity,
+                x.UnitCost, x.VatPercentage)).ToArray());
+        if (input.Error is not null) return Result.Failure<PurchaseReceiptDto>(input.Error);
+        var normalized = new { OrderId = orderId, request.ExpectedOrderVersion,
+            Document = input.Document, request.InvoiceDate, VatMode = input.VatMode,
+            Lines = request.Lines.OrderBy(x => x.OrderLineId).Select(x => new
+            { x.OrderLineId, x.ProductId, x.Quantity, x.UnitCost, x.VatPercentage }).ToArray(), Actor = actor.UserId };
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(normalized))));
+        var lockKey = string.IsNullOrWhiteSpace(request.Authorization?.UserName)
+            ? $"PURCHASE-RECEIPT:{actor.UserId:N}" : request.Authorization.UserName.Trim().ToUpperInvariant();
+        return await loginAttempts.ExecuteAsync(lockKey, token =>
+            ReceiveOrderWithinTransactionAsync(actor, orderId, key, request, input, fingerprint, token), ct);
+    }
+
+    private async Task<Result<PurchaseReceiptDto>> ReceiveOrderWithinTransactionAsync(ActorContext actor,
+        Guid orderId, string key, ReceivePurchaseOrderRequest request, ValidatedInput input,
+        string fingerprint, CancellationToken ct)
+    {
+        var installation = await repository.GetActiveInstallationForUpdateAsync(ct);
+        if (installation is null) return Result.Failure<PurchaseReceiptDto>(ApplicationError.NotFound("la instalación activa"));
+        if (!await AllowedAsync(actor, ct)) return Denied<PurchaseReceiptDto>();
+        var previous = await repository.GetIdempotencyAsync(installation.Id, key, ct);
+        if (previous is not null)
+        {
+            if (previous.UsuarioId != actor.UserId || previous.TipoOperacion != "RECIBIR_PEDIDO_COMPRA" ||
+                previous.HashSolicitud != fingerprint)
+                return Result.Failure<PurchaseReceiptDto>(ApplicationError.Conflict("La clave de idempotencia ya fue utilizada con otra solicitud."));
+            try
+            {
+                var savedReceipt = previous.Resultado is null ? null : JsonSerializer.Deserialize<PurchaseReceiptDto>(previous.Resultado);
+                return savedReceipt is null ? Result.Failure<PurchaseReceiptDto>(ApplicationError.Conflict("La recepción original no es recuperable."))
+                    : Result.Success(savedReceipt);
+            }
+            catch (JsonException)
+            {
+                return Result.Failure<PurchaseReceiptDto>(ApplicationError.Conflict("La recepción original no es recuperable."));
+            }
+        }
+        var order = await repository.GetOrderForUpdateAsync(orderId, ct);
+        if (order is null || order.InstalacionId != installation.Id)
+            return Result.Failure<PurchaseReceiptDto>(ApplicationError.NotFound("el pedido"));
+        if (order.Version != request.ExpectedOrderVersion || order.Version == long.MaxValue)
+            return Result.Failure<PurchaseReceiptDto>(ApplicationError.ConcurrencyConflict("El pedido cambió. Recargue los datos."));
+        if (order.Estado is not ("ENVIADO" or "RECIBIDO_PARCIAL"))
+            return Result.Failure<PurchaseReceiptDto>(ApplicationError.Conflict("Solo puede recibirse un pedido enviado o parcial."));
+        var supplier = await repository.GetSupplierForUpdateAsync(order.ProveedorId, ct);
+        if (supplier is null || !supplier.Activo)
+            return Result.Failure<PurchaseReceiptDto>(ApplicationError.NotFound("el proveedor activo"));
+        var sequence = await repository.GetSequenceForUpdateAsync(installation.Id, installation.Serie, ct);
+        if (sequence is null || sequence.Prefijo != "CMP" || sequence.UltimoNumero < 0)
+            return Result.Failure<PurchaseReceiptDto>(ApplicationError.Conflict("Configure primero el consecutivo COMPRA con prefijo CMP."));
+        if (sequence.UltimoNumero == long.MaxValue)
+            return Result.Failure<PurchaseReceiptDto>(ApplicationError.NumberingExhausted("El consecutivo COMPRA está agotado."));
+        var byLine = order.DetallePedidoCompra.ToDictionary(x => x.Id);
+        if (request.Lines.Any(x => !byLine.ContainsKey(x.OrderLineId)))
+            return Invalid<PurchaseReceiptDto>("Todas las líneas recibidas deben pertenecer al pedido.");
+        if (request.Lines.Any(x => (long)byLine[x.OrderLineId].CantidadRecibida + x.Quantity > int.MaxValue))
+            return Result.Failure<PurchaseReceiptDto>(ApplicationError.Conflict("La cantidad acumulada supera el rango oficial."));
+        var products = await repository.GetProductsForUpdateAsync(request.Lines.Select(x => x.ProductId).ToArray(), ct);
+        if (products.Count != request.Lines.Count || products.Any(x => !x.Activo))
+            return Result.Failure<PurchaseReceiptDto>(ApplicationError.NotFound("uno o más productos activos"));
+        var prepared = Prepare(input.Lines!, input.VatMode!, products);
+        if (prepared.Error is not null) return Result.Failure<PurchaseReceiptDto>(prepared.Error);
+        var number = checked(sequence.UltimoNumero + 1);
+        var document = input.Document ?? $"{InternalDocumentPrefix}{installation.Id:N}-{sequence.Prefijo}-{sequence.Serie}-{number}";
+        if (document.Length > 100 || await repository.DocumentExistsAsync(supplier.Id, document, null, ct))
+            return Result.Failure<PurchaseReceiptDto>(ApplicationError.Conflict("El documento del proveedor ya existe o supera el límite permitido."));
+        var terminal = await repository.GetActiveTerminalAsync(installation.Id, ct);
+        if (terminal is null) return Result.Failure<PurchaseReceiptDto>(ApplicationError.NotFound("la terminal activa"));
+        var exceptional = request.Lines.Any(x => x.ProductId != byLine[x.OrderLineId].ProductoId ||
+            (long)byLine[x.OrderLineId].CantidadRecibida + x.Quantity > byLine[x.OrderLineId].CantidadSolicitada);
+        var correlation = Guid.CreateVersion7();
+        AutorizacionOperacion? authorization = null;
+        if (exceptional)
+        {
+            if (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
+                string.IsNullOrWhiteSpace(request.Authorization.Password))
+                return Invalid<PurchaseReceiptDto>("La recepción excepcional exige credenciales de Administrador.");
+            var authorizer = await users.GetByUserNameAsync(request.Authorization.UserName.Trim(), ct);
+            if (authorizer is null)
+            {
+                await RejectReceiptAuthorizationAsync(actor.UserId, orderId, correlation, terminal.Id, ct);
+                return Result.Failure<PurchaseReceiptDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            }
+            authorizer = await repository.GetUserForUpdateAsync(authorizer.Id, ct) ?? authorizer;
+            if (!authorizer.IsActive || !await CanReceiveExceptionAsync(authorizer.Id, ct))
+                return Result.Failure<PurchaseReceiptDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            if (!passwords.Verify(request.Authorization.Password, authorizer.PasswordHash))
+            {
+                var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
+                await users.UpdateAsync(authorizer, ct);
+                if (locked) await AuditWriter.WriteAsync(audit, clock, authorizer.Id, AuditAction.UserLocked,
+                    nameof(Usuario), authorizer.Id, new { authorizer.Id, authorizer.FailedLoginAttempts }, ct);
+                await RejectReceiptAuthorizationAsync(actor.UserId, orderId, correlation, terminal.Id, ct);
+                return Result.Failure<PurchaseReceiptDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            }
+            var permission = await permissions.GetByCodeAsync(PermissionCodes.PurchasesReceiveExceptions, ct);
+            if (permission is null)
+                return Result.Failure<PurchaseReceiptDto>(ApplicationError.Conflict("El permiso de excepciones no está disponible."));
+            authorizer.RegisterSuccessfulLogin(clock.UtcNow);
+            await users.UpdateAsync(authorizer, ct);
+            var authTime = clock.UtcNow.UtcDateTime;
+            authorization = new AutorizacionOperacion { Id = Guid.CreateVersion7(),
+                UsuarioSolicitanteId = actor.UserId, UsuarioAutorizadorId = authorizer.Id, PermisoId = permission.Id,
+                TipoOperacion = "EXCEPCION_RECEPCION_COMPRA", CorrelacionId = correlation,
+                DescripcionOperacion = "Autorización de exceso o sustitución en recepción de pedido.",
+                Motivo = "EXCESO_O_SUSTITUCION", MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA",
+                Estado = "UTILIZADA", FechaSolicitud = authTime, FechaExpiracion = authTime.AddMinutes(5),
+                FechaUtilizacion = authTime };
+            await repository.AddAuthorizationAsync(authorization, ct);
+        }
+        var now = clock.UtcNow.UtcDateTime;
+        var purchase = new Compra { Id = Guid.CreateVersion7(), InstalacionId = installation.Id,
+            ProveedorId = order.ProveedorId, PedidoCompraId = order.Id, UsuarioId = actor.UserId,
+            NumeroDocumentoProveedor = document, FechaDocumento = request.InvoiceDate, FechaHoraRegistro = now,
+            ModoIva = input.VatMode!, SubtotalBruto = prepared.Gross, ImpuestoTotal = prepared.Vat,
+            Total = prepared.Total, Estado = "BORRADOR", Version = 1 };
+        var requestsByProduct = request.Lines.ToDictionary(x => x.ProductId);
+        var movements = new List<MovimientoInventario>();
+        try
+        {
+            foreach (var line in prepared.Lines!.OrderBy(x => x.Product.Id))
+            {
+                var receiptLine = requestsByProduct[line.Product.Id];
+                var orderLine = byLine[receiptLine.OrderLineId];
+                var substitute = line.Product.Id != orderLine.ProductoId;
+                var oldStock = line.Product.StockActual;
+                var oldAverage = line.Product.CostoPromedio;
+                var effective = PurchaseCostPolicy.EffectiveUnitCost(line.UnitCost, input.VatMode!, line.Rate);
+                var newStock = checked(oldStock + line.Quantity);
+                var average = PurchaseCostPolicy.Average(oldAverage, oldStock, line.Quantity, effective);
+                var detail = ToDetail(purchase.Id, line);
+                detail.DetallePedidoCompraId = orderLine.Id;
+                detail.EsSustituto = substitute;
+                detail.AutorizacionExcepcionId = substitute ? authorization?.Id : null;
+                detail.CostoPromedioAnterior = oldAverage;
+                detail.CostoPromedioResultante = average;
+                purchase.DetalleCompra.Add(detail);
+                movements.Add(new MovimientoInventario { Id = Guid.CreateVersion7(), ProductoId = line.Product.Id,
+                    UsuarioId = actor.UserId, CompraId = purchase.Id, TipoMovimiento = "COMPRA",
+                    CantidadStock = line.Quantity, CantidadReservada = 0, StockAnterior = oldStock,
+                    StockPosterior = newStock, ReservadoAnterior = line.Product.StockReservado,
+                    ReservadoPosterior = line.Product.StockReservado, CostoPromedioAnterior = oldAverage,
+                    CostoPromedioPosterior = average, FechaHora = now, CorrelacionId = correlation });
+            }
+        }
+        catch (OverflowException)
+        {
+            return Result.Failure<PurchaseReceiptDto>(ApplicationError.Conflict("El stock o costo resultante excede el rango oficial."));
+        }
+        // The official detail trigger accepts inserts only while the purchase header is BORRADOR.
+        await repository.AddAsync(purchase, ct);
+        await unitOfWork.SaveChangesAsync(ct);
+        foreach (var movement in movements)
+        {
+            var product = products.Single(x => x.Id == movement.ProductoId);
+            product.StockActual = movement.StockPosterior;
+            product.CostoPromedio = movement.CostoPromedioPosterior;
+        }
+        foreach (var receiptLine in request.Lines)
+        {
+            var orderLine = byLine[receiptLine.OrderLineId];
+            orderLine.CantidadRecibida = checked(orderLine.CantidadRecibida + receiptLine.Quantity);
+            orderLine.CantidadExcedente = Math.Max(0, orderLine.CantidadRecibida - orderLine.CantidadSolicitada);
+            if (orderLine.CantidadExcedente > 0) orderLine.AutorizacionExcesoId = authorization!.Id;
+        }
+        order.Estado = order.DetallePedidoCompra.All(x => x.CantidadRecibida >= x.CantidadSolicitada)
+            ? "COMPLETADO" : "RECIBIDO_PARCIAL";
+        if (order.Estado == "COMPLETADO")
+        {
+            order.FechaCierre = now;
+            order.UsuarioCierreId = actor.UserId;
+        }
+        order.Version = checked(order.Version + 1);
+        sequence.UltimoNumero = number;
+        purchase.Prefijo = sequence.Prefijo;
+        purchase.Serie = sequence.Serie;
+        purchase.Consecutivo = number;
+        purchase.Estado = "CONFIRMADA";
+        purchase.FechaHoraConfirmacion = now;
+        purchase.Version = 2;
+        await repository.AddMovementsAsync(movements, ct);
+        var response = new PurchaseReceiptDto(Map(purchase), order.Id, order.Estado, order.Version);
+        await repository.AddIdempotencyAsync(new OperacionIdempotente { Id = Guid.CreateVersion7(),
+            InstalacionId = installation.Id, TerminalId = terminal.Id, UsuarioId = actor.UserId,
+            ClaveIdempotencia = key, TipoOperacion = "RECIBIR_PEDIDO_COMPRA", HashSolicitud = fingerprint,
+            Entidad = nameof(Compra), EntidadId = purchase.Id, Resultado = JsonSerializer.Serialize(response),
+            CorrelacionId = correlation, FechaRegistro = now }, ct);
+        await AuditWriter.WriteCashAsync(audit, clock, actor.UserId, AuditAction.PurchaseOrderReceived,
+            nameof(Compra), purchase.Id, new { PurchaseId = purchase.Id, OrderId = order.Id,
+                OrderState = order.Estado, OrderVersion = order.Version, ProductIds = products.Select(x => x.Id).Order().ToArray(),
+                AuthorizationId = authorization?.Id, CorrelationId = correlation }, correlation,
+            authorization?.UsuarioAutorizadorId, null, terminal.Id, null, ct);
+        await unitOfWork.SaveChangesAsync(ct);
+        return Result.Success(response);
+    }
+
+    private async Task<bool> CanReceiveExceptionAsync(Guid userId, CancellationToken ct)
+    {
+        var snapshot = await users.GetAuthorizationSnapshotAsync(userId, ct);
+        return snapshot is not null && snapshot.HighestRoleLevel >= RoleLevel.Administrador &&
+            snapshot.PermissionCodes.Contains(PermissionCodes.PurchasesReceiveExceptions, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private async Task RejectReceiptAuthorizationAsync(Guid actorId, Guid orderId, Guid correlation,
+        Guid terminalId, CancellationToken ct)
+    {
+        await AuditWriter.WriteCashFailureAsync(audit, clock, actorId,
+            AuditAction.PurchaseReceiptAuthorizationRejected, nameof(PedidoCompra), orderId,
+            new { OrderId = orderId, Result = "INVALID_AUTHORIZATION" }, correlation, terminalId, null, ct);
+        await unitOfWork.SaveChangesAsync(ct);
+    }
+
     private async Task<bool> AllowedAsync(ActorContext actor, CancellationToken ct)
     {
         var snapshot = await users.GetAuthorizationSnapshotAsync(actor.UserId, ct);
@@ -368,7 +840,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         purchase.SubtotalBruto, purchase.ImpuestoTotal, purchase.Total, purchase.Version,
         purchase.DetalleCompra.OrderBy(x => x.ProductoId).Select(x => new PurchaseLineDto(x.Id, x.ProductoId,
             x.Cantidad, x.CostoUnitarioDocumento, x.ModoIva, x.PorcentajeIva, x.SubtotalBruto,
-            x.BaseGravable, x.ValorIva, x.TotalLinea, x.CostoPromedioAnterior, x.CostoPromedioResultante)).ToArray());
+            x.BaseGravable, x.ValorIva, x.TotalLinea, x.CostoPromedioAnterior, x.CostoPromedioResultante)).ToArray(),
+        purchase.PedidoCompraId);
 
     private static PurchaseSummaryDto MapSummary(Compra purchase) => new(purchase.Id, purchase.ProveedorId,
         purchase.NumeroDocumentoProveedor, purchase.FechaDocumento, purchase.Estado, VisibleNumber(purchase),

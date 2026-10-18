@@ -14,7 +14,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 namespace ControlPlus.Api.Tests;
@@ -23,22 +22,18 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
 {
     private readonly string _masterKey = RandomSecret(48);
     private readonly string _jwtSigningKey = RandomSecret(64);
-    private readonly PostgreSqlContainer _postgres;
+    private readonly LocalPostgresDatabase _postgres;
     private WebApplicationFactory<Program>? _factory;
 
     public SecurityApiFlowTests()
     {
-        _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-            .WithDatabase("controlplus_api_test")
-            .WithUsername("controlplus_test")
-            .WithPassword(RandomSecret(32))
-            .Build();
+        _postgres = new LocalPostgresDatabase();
     }
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        await PostgresAvailability.WaitAsync(_postgres);
+
         var options = new DbContextOptionsBuilder<ControlPlusDbContext>()
             .UseNpgsql(_postgres.GetConnectionString())
             .Options;

@@ -45,6 +45,15 @@ public sealed class EfPurchaseRepository(OfficialControlPlusDbContext db) : IPur
         return purchase;
     }
 
+    public async Task<PedidoCompra?> GetOrderForUpdateAsync(Guid id, CancellationToken ct = default)
+    {
+        var order = (await db.PedidoCompra.FromSqlInterpolated(
+            $"SELECT o.* FROM compras.pedido_compra AS o WHERE o.id = {id} FOR UPDATE")
+            .AsTracking().ToArrayAsync(ct)).SingleOrDefault();
+        if (order is not null) await db.Entry(order).Collection(x => x.DetallePedidoCompra).LoadAsync(ct);
+        return order;
+    }
+
     public Task<Compra?> GetAsync(Guid id, CancellationToken ct = default) =>
         db.Compra.AsNoTracking().Include(x => x.DetalleCompra).SingleOrDefaultAsync(x => x.Id == id, ct);
 
@@ -95,6 +104,39 @@ public sealed class EfPurchaseRepository(OfficialControlPlusDbContext db) : IPur
 
     public Task AddIdempotencyAsync(OperacionIdempotente operation, CancellationToken ct = default) =>
         db.OperacionIdempotente.AddAsync(operation, ct).AsTask();
+
+    public async Task<IReadOnlyCollection<MotivoOperacion>> ListCancellationReasonsAsync(Guid establishmentId, CancellationToken ct = default) =>
+        await db.MotivoOperacion.AsNoTracking().Where(x => x.EstablecimientoId == establishmentId &&
+            x.TipoOperacion == "ANULACION_COMPRA").OrderBy(x => x.OrdenVisual).ThenBy(x => x.Id).ToArrayAsync(ct);
+
+    public Task<MotivoOperacion?> GetCancellationReasonAsync(Guid establishmentId, Guid id, CancellationToken ct = default) =>
+        db.MotivoOperacion.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id &&
+            x.EstablecimientoId == establishmentId && x.TipoOperacion == "ANULACION_COMPRA" && x.Activo, ct);
+
+    public Task AddCancellationReasonsAsync(IReadOnlyCollection<MotivoOperacion> reasons, CancellationToken ct = default) =>
+        db.MotivoOperacion.AddRangeAsync(reasons, ct);
+
+    public async Task<IReadOnlyCollection<MovimientoInventario>> GetPurchaseMovementsAsync(Guid purchaseId, CancellationToken ct = default) =>
+        await db.MovimientoInventario.AsNoTracking().Where(x => x.CompraId == purchaseId &&
+            x.TipoMovimiento == "COMPRA").ToArrayAsync(ct);
+
+    public Task<bool> HasLaterMovementAsync(Guid productId, long originalOrder, CancellationToken ct = default) =>
+        db.MovimientoInventario.AsNoTracking().AnyAsync(x => x.ProductoId == productId &&
+            x.OrdenRegistro != null && x.OrdenRegistro > originalOrder, ct);
+
+    public Task<bool> HasReversalAsync(Guid movementId, CancellationToken ct = default) =>
+        db.MovimientoInventario.AsNoTracking().AnyAsync(x => x.MovimientoRevertidoId == movementId, ct);
+
+    public async Task<Usuario?> GetUserForUpdateAsync(Guid id, CancellationToken ct = default)
+    {
+        var user = (await db.Usuario.FromSqlInterpolated($"SELECT u.* FROM seguridad.usuario AS u WHERE u.id = {id} FOR UPDATE")
+            .AsTracking().ToArrayAsync(ct)).SingleOrDefault();
+        if (user is not null) await db.Entry(user).ReloadAsync(ct);
+        return user;
+    }
+
+    public Task AddAuthorizationAsync(AutorizacionOperacion authorization, CancellationToken ct = default) =>
+        db.AutorizacionOperacion.AddAsync(authorization, ct).AsTask();
 
     private sealed class Transaction(IDbContextTransaction transaction) : IPurchaseTransaction
     {

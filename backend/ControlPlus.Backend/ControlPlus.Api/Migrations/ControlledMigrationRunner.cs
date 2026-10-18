@@ -92,7 +92,7 @@ public static class ControlledMigrationRunner
                     StringComparer.Ordinal) ||
                  targetIndex != applied.Length ||
                  targetIndex - applied.Length + 1 != 1 ||
-                 pending.Length != 1 ||
+                 pending.Length == 0 ||
                  !string.Equals(pending[0], targetMigration, StringComparison.Ordinal)))
             {
                 return Rejected(

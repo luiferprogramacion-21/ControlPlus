@@ -28,9 +28,10 @@ internal static class CustomerSearchPostflightRunner
             var expectedHistory = CustomerSearchMigrationManifest.RequiredPreviousMigrations
                 .Append(CustomerSearchMigrationManifest.TargetMigration)
                 .ToArray();
-            if (!context.Database.GetMigrations().SequenceEqual(expectedHistory, StringComparer.Ordinal))
+            if (!context.Database.GetMigrations().Take(expectedHistory.Length)
+                    .SequenceEqual(expectedHistory, StringComparer.Ordinal))
             {
-                return Rejected(targetMigration, "the EF migration catalog is not the exact required sequence");
+                return Rejected(targetMigration, "the EF migration catalog does not start with the exact required sequence");
             }
 
             await context.Database.OpenConnectionAsync(cancellationToken);

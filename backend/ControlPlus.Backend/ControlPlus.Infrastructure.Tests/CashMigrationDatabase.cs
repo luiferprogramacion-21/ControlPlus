@@ -5,11 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
-using Testcontainers.PostgreSql;
 
 namespace ControlPlus.Infrastructure.Tests;
 
-// Every test owns a PostgreSQL 17 container; no ambient connection string is ever read.
+// Every test owns a disposable database on the local PostgreSQL 18 service.
 internal sealed class CashMigrationDatabase : IAsyncDisposable
 {
     public const string PreviousMigration = "20260913010000_SeedMeasurementUnitsV1";
@@ -22,15 +21,11 @@ internal sealed class CashMigrationDatabase : IAsyncDisposable
     public static readonly Guid Authorizer = Guid.Parse("01950000-0000-7000-8000-000000000006");
     public static readonly Guid OtherUser = Guid.Parse("01950000-0000-7000-8000-000000000007");
     public static readonly Guid Reason = Guid.Parse("01950000-0000-7000-8000-000000000008");
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("cash_migration_test")
-        .WithUsername("cash_test")
-        .WithPassword("isolated-test-password-only")
-        .Build();
+    private readonly LocalPostgresDatabase _postgres = new LocalPostgresDatabase();
 
     public NpgsqlConnection Connection { get; private set; } = null!;
 
-    // Keep the Testcontainers-provided connection string for secondary test connections.
+    // Keep the temporary database connection string for secondary test connections.
     // Npgsql may omit the password when reading Connection.ConnectionString after opening it.
     public string ConnectionString => _postgres.GetConnectionString();
 
@@ -40,7 +35,7 @@ internal sealed class CashMigrationDatabase : IAsyncDisposable
         try
         {
             await database._postgres.StartAsync();
-            await PostgresAvailability.WaitAsync(database._postgres);
+
             database.Connection = await database.OpenConnectionAsync();
             await database.MigrateAsync(applyCash ? CashMigration : PreviousMigration);
             return database;

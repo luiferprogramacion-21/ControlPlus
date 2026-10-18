@@ -12,7 +12,7 @@ ControlPlus conserva un script PostgreSQL, MER y diccionario oficiales de Fase 4
 1. `OfficialControlPlusDbContext` es la única fuente de verdad del modelo persistente en ejecución. `ControlPlusDbContext` queda limitado a portar la asociación con la cadena histórica de migraciones; no se registra para los repositorios runtime.
 2. Las 27 entidades oficiales que tienen `version` como token en el diccionario se configuran centralmente con `IsConcurrencyToken()`. `OfficialControlPlusDbContext` incrementa la versión desde el valor original una vez por guardado y EF Core compara el valor original al actualizar. Un conflicto se convierte en `409` con código `concurrency.conflict`.
 3. Las cuatro migraciones publicadas son inmutables: `20260912010000_OfficialPhase4Baseline`, `20260912011000_SeedApprovedSecurityCatalog`, `20260912012000_HybridPermissionsV1` y `20260913010000_SeedMeasurementUnitsV1`. En particular, `HybridPermissionsV1.Down` no es una reversión completa y segura.
-4. Las correcciones futuras se implementan mediante migraciones compensatorias nuevas, no editando la historia. Cada una se revisa contra el modelo oficial, se prueba creando una base limpia con Testcontainers y solo después se considera para PostgreSQL persistente. Antes de una aplicación o reversión persistente se exige un respaldo local verificado fuera del repositorio.
+4. Las correcciones futuras se implementan mediante migraciones compensatorias nuevas, no editando la historia. Cada una se revisa contra el modelo oficial, se prueba creando una base limpia y aislada y solo después se considera para PostgreSQL persistente. Antes de una aplicación o reversión persistente se exige un respaldo local verificado fuera del repositorio.
 5. No se crea un `ModelSnapshot` parcial o artificial. Si se incorpora una estrategia de snapshot o generación de migraciones por EF Core, el snapshot deberá representar fielmente el modelo oficial completo y demostrarlo mediante una creación limpia de la base.
 
 ## Consecuencias
@@ -23,3 +23,7 @@ ControlPlus conserva un script PostgreSQL, MER y diccionario oficiales de Fase 4
 - Las futuras migraciones requieren disciplina de revisión, pruebas aisladas y respaldo, pero no introducen cambios manuales no documentados en PostgreSQL.
 
 La arquitectura y la operación práctica se describen en [architecture.md](../architecture.md) y [database.md](../database.md).
+
+## Actualización operativa 2026-10-15
+
+La V1 se ejecuta con .NET 10 y PostgreSQL 18 nativos en Windows. Las pruebas crean bases temporales con un rol `CREATEDB` dedicado y nunca usan la base persistente `controlplus`. Esta decisión no modifica la historia ni los requisitos de autorización y respaldo de migraciones.

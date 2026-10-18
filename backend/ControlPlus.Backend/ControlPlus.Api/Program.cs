@@ -23,6 +23,8 @@ using ControlPlus.Application.Credits.Contracts;
 using ControlPlus.Application.Credits.Services;
 using ControlPlus.Application.Purchases.Contracts;
 using ControlPlus.Application.Purchases.Services;
+using ControlPlus.Application.PurchaseOrders.Contracts;
+using ControlPlus.Application.PurchaseOrders.Services;
 using ControlPlus.Infrastructure.Persistence;
 using ControlPlus.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -39,26 +41,6 @@ if (!controlledCommand.IsValid)
 {
     Console.Error.WriteLine(controlledCommand.Message);
     Environment.ExitCode = ControlledMigrationRunner.RejectedExitCode;
-    return;
-}
-
-if (controlledCommand.Mode == ControlledExecutionMode.HealthCheck)
-{
-    using var healthClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-    try
-    {
-        using var response = await healthClient.GetAsync("http://127.0.0.1:8080/api/health");
-        Environment.ExitCode = response.IsSuccessStatusCode ? 0 : 1;
-    }
-    catch (HttpRequestException)
-    {
-        Environment.ExitCode = 1;
-    }
-    catch (TaskCanceledException)
-    {
-        Environment.ExitCode = 1;
-    }
-
     return;
 }
 
@@ -151,6 +133,7 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<ICreditsService, CreditsService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
+builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<ICurrentUserSessionValidator, CurrentUserSessionValidator>();
 builder.Services.AddScoped<IPermissionChecker, PermissionChecker>();
 builder.Services.AddScoped<CurrentActorContextResolver>();

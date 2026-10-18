@@ -1,8 +1,149 @@
-# Compras — corte 1
+# Compras — cortes 1, 2 y 3
 
-Este corte registra compras **independientes** (`pedido_compra_id = NULL`). Crear o editar un borrador no modifica inventario, costos ni numeración. `POST /api/purchases/{purchaseId}/confirm` recibe **todas** sus líneas en una sola transacción y genera exactamente un movimiento `COMPRA` por producto. No hay DELETE ni cancelación.
+## Corte 3: pedidos y recepción parcial
 
-## Rutas y permisos
+`PEDIDO_COMPRA` usa prefijo `PED` y la serie de la instalación activa. El
+Administrador con `NUMBERING.MANAGE` lo crea expresamente en
+`POST /api/purchase-orders/numbering/initialize`; comienza en 1 y se consume
+al crear el borrador. `GET /api/purchase-orders/numbering` consulta el estado.
+No se siembra al arrancar. Solo hay un borrador por proveedor e instalación;
+sus productos activos deben estar asignados a ese proveedor.
+
+`GET/POST /api/purchase-orders`, `GET/PUT /api/purchase-orders/{orderId}` y
+`POST /api/purchase-orders/{orderId}/send` exigen Supervisor o Administrador y
+`PURCHASE_ORDERS.MANAGE` efectivo. Las líneas contienen `productId`,
+`requestedQuantity`, `estimatedUnitCost` y `observation` opcionales. El servidor
+fija código y nombre histórico del producto, stock disponible, stock mínimo,
+pendientes de otros pedidos, cantidad sugerida y origen de necesidad. La
+edición y el envío exigen `expectedVersion`. Tras enviar, el contenido
+comercial queda inmutable.
+
+`POST /api/purchase-orders/{orderId}/receipts` requiere `PURCHASES.RECEIVE`,
+`Idempotency-Key` y `expectedOrderVersion`; recibe `invoiceDate`,
+`supplierDocumentNumber` opcional, `vatMode` y líneas con `orderLineId`,
+`productId`, `quantity`, `unitCost` y `vatPercentage` opcional. Cada recepción
+crea una compra confirmada vinculada con número `CMP`, detalle y movimientos
+`COMPRA`, actualiza stock y costo promedio y suma lo recibido en el pedido en
+un único commit. Se admiten varias recepciones parciales. Cuando todas las
+líneas alcanzan lo solicitado, el pedido pasa a `COMPLETADO` con el receptor
+como usuario de cierre. Una repetición exacta devuelve la respuesta guardada
+sin nuevos movimientos ni consumo de número.
+
+Exceso o sustituto exige credenciales actuales de un Administrador con
+`PURCHASES.RECEIVE_EXCEPTIONS`; puede ser el receptor si cumple ese requisito.
+El pedido conserva la autorización de exceso y el detalle de compra, la de
+sustitución. Contraseña incorrecta incrementa fallos y se audita sin
+confirmar compra, inventario ni número. No se aceptan líneas sin vínculo a
+un detalle del pedido ni productos repetidos en la misma recepción.
+
+`POST /api/purchase-orders/{orderId}/close` cierra un pedido enviado o parcial
+con pendientes, con `expectedVersion`, motivo de `CIERRE_PEDIDO_PENDIENTE` y
+reautenticación de Administrador con `PURCHASE_ORDERS.MANAGE`. El ejecutor
+puede ser Supervisor. `POST /api/purchase-orders/{orderId}/cancel` exige
+Administrador con `PURCHASE_ORDERS.CANCEL`, `expectedVersion`, motivo de
+`CANCELACION_PEDIDO` y reautenticación de Administrador con ese permiso. Solo
+se cancela un borrador o pedido enviado sin recepción. Ninguna transición
+revierte compras ni inventario ya recibidos.
+
+Los catálogos se consultan en `GET /api/purchase-orders/reasons/close` y
+`/reasons/cancel` y se inicializan expresamente mediante los correspondientes
+`POST .../initialize`. Se proponen los códigos `PROVEEDOR_NO_ENTREGARA`,
+`PENDIENTE_NO_REQUERIDO`, `OTRO` para cierre y `ERROR_PEDIDO`,
+`PROVEEDOR_NO_ATIENDE`, `OTRO` para cancelación. `OTRO` exige observación.
+Las pruebas integradas del corte 3 se completaron el 18 de octubre de 2026.
+La aprobación funcional de los códigos sigue pendiente antes de inicializar
+los catálogos en PostgreSQL persistente.
+
+La compilación del corte 3 terminó correctamente y la suite completa de API
+registró **329/329**, sin fallidas ni omitidas. El mismo bloque ejecutó antes
+Domain e Infrastructure con salida exitosa; los conteos de esas dos suites no
+figuran en el extracto conservado. Las pruebas utilizaron bases locales
+temporales y no inicializaron catálogos ni numeración en `controlplus`.
+Véase [testing.md](testing.md) para el alcance de esta evidencia.
+
+## Corte 2: anulación completa
+
+`POST /api/purchases/{purchaseId:guid}/cancel` exige JWT, rol vigente
+Administrador, permiso efectivo `PURCHASES.CANCEL` y `Idempotency-Key` validada
+con las reglas comunes. La solicitud JSON es estricta: admite `expectedVersion`,
+`reasonId`, `observation` opcional y `authorization` opcional con `userName` y
+`password`. No admite propiedades de servidor ni campos desconocidos en ninguno
+de los niveles. La primera ejecución exige credenciales válidas de un
+Administrador activo; puede ser el mismo ejecutor u otro Administrador. Omitir
+`authorization` en una anulación nueva produce un rechazo controlado.
+
+Antes de tratar una repetición se revalidan JWT, rol y permiso actuales del
+ejecutor. La huella idempotente incluye compra, `expectedVersion`, motivo,
+observación normalizada y actor; excluye por completo credenciales. La clave
+es única por `(instalacion_id, clave)`. Una repetición exacta ya completada
+devuelve `200` con la instantánea persistida del resultado original, sin
+reautenticación ni escrituras. Reutilizar la clave con contenido semántico
+distinto responde `409 resource.conflict`. Una clave nueva no permite volver a
+anular la misma compra. Credenciales, documento del proveedor, costos y texto
+libre no aparecen en la auditoría de la anulación.
+
+`GET /api/purchases/cancellation-reasons` consulta los motivos activos;
+`POST /api/purchases/cancellation-reasons/initialize` crea explícitamente los
+faltantes. Ambas rutas exigen JWT, Administrador vigente y `PURCHASES.CANCEL`
+efectivo. Los códigos oficiales del tipo `ANULACION_COMPRA` son
+`ERROR_REGISTRO`, `COMPRA_DUPLICADA`, `DOCUMENTO_PROVEEDOR_ANULADO`,
+`MERCANCIA_NO_RECIBIDA` y `OTRO`; este último exige observación no vacía.
+Los ID nuevos son UUIDv7. La inicialización es idempotente, no modifica filas
+existentes y responde `409 resource.conflict` sin cambios si algún código
+existente presenta una configuración incompatible. No hay inicialización
+silenciosa en el arranque ni al anular.
+
+La anulación acepta solo una compra independiente `CONFIRMADA`, exige que sus
+movimientos `COMPRA` originales uno a uno por detalle y que ninguno de sus
+productos tenga movimientos posteriores, incluso si hubiera stock suficiente.
+La certificación del orden usa `compras.movimiento_inventario.orden_registro`:
+PostgreSQL lo asigna mediante trigger después de bloquear la fila del producto,
+y no permite modificarlo ni cambiar el producto del movimiento. La secuencia
+es global; las consultas filtran por producto y comparan el ordinal. Los gaps
+por rollback son válidos. Los movimientos anteriores a la nueva migración
+conservan `NULL`, sin backfill por fecha, ID ni orden físico. Una compra cuyo
+movimiento original tenga `NULL` responde `409 resource.conflict` antes de crear
+autorización, idempotencia, auditoría o reversión y requiere un procedimiento
+operativo independiente. No se ha verificado ni migrado ese historial.
+Después de bloquear instalación, compra y productos en orden estable por UUID,
+verifica que stock y costo correspondan a la compra y que
+`stockActual - cantidad` no sea negativo ni inferior al reservado. Resta
+exactamente la cantidad recibida, restaura el `costo_promedio_anterior` de cada
+detalle sin recalcularlo, incluso si es `NULL`, y crea un movimiento
+`ANULACION_COMPRA` por línea. Cada inverso lleva cantidad negativa, stock y
+costo antes/después, correlación común y solo `movimiento_revertido_id` como
+fuente; no lleva `compra_id` simultáneamente. La cabecera pasa a `ANULADA` con
+usuario, autorización, motivo, fecha y versión nueva. Número visible, prefijo,
+serie, consecutivo, confirmación, importes y detalles permanecen iguales.
+Estado, productos, movimientos, autorización creada y consumida, idempotencia y
+auditoría se guardan en una transacción con un único COMMIT. Un fallo tardío o
+de COMMIT revierte todos esos efectos. Los bloqueos, la versión optimista y el
+índice único de reversión impiden duplicados en carreras con la misma o con
+distintas claves.
+
+La auditoría específica guarda solo ID de compra, transición
+`CONFIRMADA → ANULADA`, IDs de motivo y autorización, versión, IDs de productos,
+correlación y resultado. No copia credenciales, documento del proveedor,
+costos, nombre del motivo, observación ni el cuerpo completo.
+
+| Resultado | Tipo | Significado |
+| --- | --- | --- |
+| `200` | `application/json` | Anulación o repetición exacta completada |
+| `400 validation.failed` | `application/problem+json` | JSON, clave, cabecera o campos inválidos |
+| `401` | `application/problem+json` | JWT o reautenticación inválidos |
+| `403 authorization.forbidden` | `application/problem+json` | Rol o permiso insuficiente |
+| `404 resource.not_found` | `application/problem+json` | Compra o motivo válido inexistente |
+| `409 concurrency.conflict` | `application/problem+json` | `expectedVersion` obsoleta |
+| `409 resource.conflict` | `application/problem+json` | Estado, clave, motivo, movimiento, stock, reserva, costo o reversión incompatibles |
+
+La API no expone detalles internos de PostgreSQL. No hay `DELETE` de compras ni
+de motivos.
+
+## Corte 1: registro y recepción
+
+El corte 1 registra compras **independientes** (`pedido_compra_id = NULL`). Crear o editar un borrador no modifica inventario, costos ni numeración. `POST /api/purchases/{purchaseId}/confirm` recibe **todas** sus líneas en una sola transacción y genera exactamente un movimiento `COMPRA` por producto. No hay `DELETE`.
+
+## Rutas y permisos de ambos cortes
 
 | Método | Ruta | Uso |
 | --- | --- | --- |
@@ -11,11 +152,14 @@ Este corte registra compras **independientes** (`pedido_compra_id = NULL`). Crea
 | POST | `/api/purchases` | Crear `BORRADOR` |
 | PUT | `/api/purchases/{purchaseId}` | Editar solo `BORRADOR` con `expectedVersion` |
 | POST | `/api/purchases/{purchaseId}/confirm` | Confirmar y recibir todo con `expectedVersion` e `Idempotency-Key` |
+| POST | `/api/purchases/{purchaseId}/cancel` | Anular una compra independiente confirmada; Administrador y `PURCHASES.CANCEL` |
+| GET | `/api/purchases/cancellation-reasons` | Consultar motivos oficiales activos; Administrador y `PURCHASES.CANCEL` |
+| POST | `/api/purchases/cancellation-reasons/initialize` | Crear explícitamente motivos faltantes; Administrador y `PURCHASES.CANCEL` |
 | GET | `/api/document-numbering/purchases` | Consultar consecutivo `COMPRA` |
 | POST | `/api/document-numbering/purchases` | Configurar `CMP`, `firstNumber = 1` |
 | PUT | `/api/document-numbering/purchases` | Corregir antes de la primera compra numerada, con `version` |
 
-Compras exige JWT, rol vigente Administrador o Supervisor y `PURCHASES.RECEIVE` efectivo. La revocación individual prevalece; las concesiones válidas siguen el modelo híbrido. Cajero no accede. Los costos de estas rutas protegidas son necesarios para registrar y revisar compras. La autorización de `PRODUCTS.COSTS_READ` en Productos e Inventario no cambia. Numeración exige `NUMBERING.MANAGE` y conserva su restricción de gestión vigente.
+Las cinco operaciones originales de Compras exigen JWT, rol vigente Administrador o Supervisor y `PURCHASES.RECEIVE` efectivo. La revocación individual prevalece; las concesiones válidas siguen el modelo híbrido. Cajero no accede. Las tres operaciones del corte 2 exigen Administrador y `PURCHASES.CANCEL` efectivo. Los costos de las rutas originales protegidas son necesarios para registrar y revisar compras. La autorización de `PRODUCTS.COSTS_READ` en Productos e Inventario no cambia. Numeración exige `NUMBERING.MANAGE` y conserva su restricción de gestión vigente.
 
 ## Contratos
 
@@ -39,11 +183,13 @@ Una confirmación repetida con la misma clave, actor, compra y versión devuelve
 
 ## Límites y estado operativo
 
-La anulación corresponde al **corte 2**. Pedidos de compra y recepción parcial corresponden al **corte 3**. Tampoco se incluyen sobre recepción, excepciones, pagos, devoluciones, cuentas por pagar ni contabilidad externa. No se cambiaron migraciones publicadas, entidades oficiales, `OfficialControlPlusDbContext`, Docker Compose o el esquema PostgreSQL. La implementación y validación usaron solo el repositorio y PostgreSQL 17 efímero de Testcontainers; no accedieron a PostgreSQL persistente. La validación final terminó con build serial de 0 errores y 0 advertencias, focalizadas `70/70`, corrección aislada de confirmación `2/2` y suite completa `438/438`: Domain `40/40`, Infrastructure `58/58` y API `340/340`, sin fallidas ni omitidas. Los TRX se registran en [testing.md](testing.md).
+La anulación completa corresponde al **corte 2**. Pedidos, recepción parcial, sustitución y sobre recepción autorizadas, cierre con pendientes y cancelación del pedido corresponden al **corte 3**. Siguen fuera la anulación parcial de compras, pagos, devoluciones, cuentas por pagar y contabilidad externa. El corte 2 añade únicamente la migración `20261014010000_InventoryMovementRegistrationOrderV1` después del baseline y las migraciones publicadas. Se aplicó una vez a PostgreSQL 18 persistente local el 16 de octubre de 2026 después de un respaldo y preflight; el postflight confirmó historial exacto, columna, secuencia, restricción, índice, funciones y disparadores. La API local inició después y `/api/health`, `/api/health/database` y `/openapi/v1.json` respondieron `200`. Esto certifica el arranque y la estructura, pero no prueba una anulación real contra la base persistente. El catálogo de motivos se inicializa exclusivamente por su endpoint y no formó parte de esta migración; véase [database.md](database.md) para la evidencia del cambio local.
 
-## Publicación y configuración operativa
+Las focalizadas posteriores a esta evolución registran Infrastructure `1/1` y API `23/23`, total `24/24`, sin fallidas ni omitidas. La ejecución local posterior de la suite terminó con API `325/325`, sin fallidas ni omitidas; el extracto compartido no incluye los conteos finales de Domain e Infrastructure. El build previo registra `BuildExit: 0`, 0 errores y 0 advertencias; las rutas de evidencia se registran por separado en [testing.md](testing.md). La validación final del **corte 1** terminó con build serial de 0 errores y 0 advertencias, focalizadas `70/70`, corrección aislada de confirmación `2/2` y suite completa `438/438`: Domain `40/40`, Infrastructure `58/58` y API `340/340`, sin fallidas ni omitidas. Se usó PostgreSQL 17 efímero de Testcontainers y no se accedió a PostgreSQL persistente durante aquella implementación y validación.
 
-El commit `f75bc7bf14e71fb54e9babb595d221f38cf53017` fue publicado y la imagen API `sha256:98656711cfa47651d3b7fb337bf199c2013708577327a686eb79fa70b6969e24` quedó desplegada localmente.
+## Publicación y configuración operativa del corte 1 (registro histórico)
+
+El commit `f75bc7bf14e71fb54e9babb595d221f38cf53017` fue publicado y la imagen API `sha256:98656711cfa47651d3b7fb337bf199c2013708577327a686eb79fa70b6969e24` quedó desplegada localmente en esa fase. Los contenedores y el volumen de la tabla siguiente son antecedentes del 14 de octubre; la operación actual usa PostgreSQL 18 y API nativos en Windows.
 
 | Recurso | Identificador y conservación | Estado al cierre |
 | --- | --- | --- |

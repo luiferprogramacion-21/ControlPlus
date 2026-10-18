@@ -17,7 +17,7 @@ Variables requeridas en desarrollo/local:
 - `Jwt__ClockSkewSeconds`
 - `Installation__MasterKey` — Master Key local de al menos 32 bytes UTF-8 para habilitar `POST /api/auth/setup` mediante el encabezado `X-ControlPlus-Master-Key`.
 
-En Docker Compose se usan las equivalentes `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_SIGNING_KEY`, `JWT_ACCESS_TOKEN_MINUTES`, `JWT_CLOCK_SKEW_SECONDS` y `CONTROLPLUS_MASTER_KEY` desde `.env`, que no se versiona.
+En Development local, `Jwt:SigningKey`, `Installation:MasterKey` y `ConnectionStrings:ControlPlusDb` se guardan en User Secrets de `ControlPlus.Api`. Los parámetros no sensibles del token se leen de `appsettings.json`.
 Fuera de `Testing`, la API falla al iniciar si `CONTROLPLUS_MASTER_KEY` falta o no alcanza 32 bytes UTF-8, o si falta `JWT_SIGNING_KEY`. Después de crear el primer administrador, `CONTROLPLUS_MASTER_KEY` debe conservarse en almacenamiento local seguro o rotarse. El endpoint vuelve a comprobar la existencia de usuarios dentro de una transacción serializable con bloqueo asesor y rechaza cualquier reutilización.
 
 La Master Key se compara en tiempo constante. Nunca se registra, se incluye en respuestas ni se reemplaza por un valor predeterminado en archivos versionados.

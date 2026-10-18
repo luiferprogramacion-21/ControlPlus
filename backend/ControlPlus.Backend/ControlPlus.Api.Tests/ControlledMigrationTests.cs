@@ -10,7 +10,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 namespace ControlPlus.Api.Tests;
@@ -18,38 +17,21 @@ namespace ControlPlus.Api.Tests;
 [CollectionDefinition(Name, DisableParallelization = true)]
 public sealed class ControlledMigrationCollection : ICollectionFixture<ControlledMigrationPostgresFixture>
 {
-    public const string Name = "Controlled migration PostgreSQL 17";
+    public const string Name = "Controlled migration local PostgreSQL";
 }
 
 public sealed class ControlledMigrationPostgresFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("controlled_migration_tests")
-        .WithUsername("migration_tests")
-        .WithPassword(Guid.NewGuid().ToString("N"))
-        .Build();
+    private readonly LocalPostgresDatabase _postgres = new LocalPostgresDatabase();
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        await PostgresAvailability.WaitAsync(_postgres);
     }
 
     public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
 
-    public async Task<string> CreateDatabaseAsync()
-    {
-        var databaseName = $"migration_test_{Guid.NewGuid():N}";
-        await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
-        await connection.OpenAsync();
-        await using var command = new NpgsqlCommand($"CREATE DATABASE \"{databaseName}\"", connection);
-        await command.ExecuteNonQueryAsync();
-
-        return new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString())
-        {
-            Database = databaseName
-        }.ConnectionString;
-    }
+    public Task<string> CreateDatabaseAsync() => _postgres.CreateDatabaseAsync();
 }
 
 [Collection(ControlledMigrationCollection.Name)]

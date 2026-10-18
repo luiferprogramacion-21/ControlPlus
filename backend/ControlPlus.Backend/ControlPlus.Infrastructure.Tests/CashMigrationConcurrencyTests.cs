@@ -10,7 +10,6 @@ namespace ControlPlus.Infrastructure.Tests;
 [Trait("Category", "Integration")]
 public sealed class CashMigrationConcurrencyTests
 {
-    private const long MigrationGate = 720260913020000;
     private const string MigrationApplication = "cash-migration-race";
     private const string InsertApplication = "cash-concurrent-insert";
 
@@ -23,33 +22,27 @@ public sealed class CashMigrationConcurrencyTests
         await using var observer = await database.OpenConnectionAsync();
         await using var inserter = await OpenNamedConnectionAsync(database, InsertApplication);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var blocker = await coordinator.BeginTransactionAsync();
         Task? migrationTask = null;
         Task<int>? insertTask = null;
-        var advisoryLockHeld = false;
+        var blockerHeld = true;
 
         try
         {
-            await CashMigrationDatabase.ExecuteAsync(coordinator, $"""
-                CREATE FUNCTION public.test_pause_cash_migration_ddl()
-                RETURNS event_trigger LANGUAGE plpgsql AS $function$
-                BEGIN
-                  IF current_setting('application_name') = '{MigrationApplication}'
-                     AND TG_TAG = 'ALTER TABLE' THEN
-                    PERFORM pg_advisory_xact_lock({MigrationGate});
-                  END IF;
-                END;
-                $function$;
-                CREATE EVENT TRIGGER test_pause_cash_migration_ddl
-                  ON ddl_command_start WHEN TAG IN ('ALTER TABLE')
-                  EXECUTE FUNCTION public.test_pause_cash_migration_ddl();
-                SELECT pg_advisory_lock({MigrationGate});
-                """);
-            advisoryLockHeld = true;
+            // The migration changes pago_venta only after checking and altering turno_caja.
+            // A read lock there pauses its later DDL while it still owns the cash lock.
+            await using (var hold = new NpgsqlCommand(
+                "LOCK TABLE ventas.pago_venta IN ACCESS SHARE MODE", coordinator, blocker))
+            {
+                await hold.ExecuteNonQueryAsync(timeout.Token);
+            }
 
             var migrationConnectionString = NamedConnectionString(database, MigrationApplication);
             migrationTask = MigrateAsync(migrationConnectionString, timeout.Token);
             await WaitForRelationLockAsync(observer, MigrationApplication,
-                "AccessExclusiveLock", granted: true, timeout.Token);
+                "caja.turno_caja", "AccessExclusiveLock", granted: true, timeout.Token);
+            await WaitForRelationLockAsync(observer, MigrationApplication,
+                "ventas.pago_venta", "AccessExclusiveLock", granted: false, timeout.Token);
             Assert.False(migrationTask.IsCompleted);
 
             await using var insert = new NpgsqlCommand($"""
@@ -62,14 +55,13 @@ public sealed class CashMigrationConcurrencyTests
                 """, inserter);
             insertTask = insert.ExecuteNonQueryAsync(timeout.Token);
             await WaitForRelationLockAsync(observer, InsertApplication,
-                "RowExclusiveLock", granted: false, timeout.Token);
+                "caja.turno_caja", "RowExclusiveLock", granted: false, timeout.Token);
             Assert.False(insertTask.IsCompleted);
 
-            Assert.True(await ReleaseAdvisoryLockAsync(coordinator));
-            advisoryLockHeld = false;
+            await blocker.CommitAsync(timeout.Token);
+            blockerHeld = false;
             await migrationTask;
             Assert.Equal(1, await insertTask);
-            await DropTestEventTriggerAsync(database.Connection);
 
             Assert.Equal(1L, await database.ScalarAsync<long>("SELECT count(*) FROM caja.turno_caja"));
             Assert.Equal("Concurrente tras precondicion", await database.ScalarAsync<string>(
@@ -96,9 +88,9 @@ public sealed class CashMigrationConcurrencyTests
         }
         finally
         {
-            if (advisoryLockHeld)
+            if (blockerHeld)
             {
-                try { await ReleaseAdvisoryLockAsync(coordinator); }
+                try { await blocker.RollbackAsync(); }
                 catch (Exception) { }
             }
             if (migrationTask is not null)
@@ -111,8 +103,6 @@ public sealed class CashMigrationConcurrencyTests
                 try { await insertTask; }
                 catch (Exception) { }
             }
-            try { await DropTestEventTriggerAsync(database.Connection); }
-            catch (Exception) { }
         }
     }
 
@@ -146,6 +136,7 @@ public sealed class CashMigrationConcurrencyTests
     private static async Task WaitForRelationLockAsync(
         NpgsqlConnection observer,
         string applicationName,
+        string relation,
         string mode,
         bool granted,
         CancellationToken cancellationToken)
@@ -159,28 +150,16 @@ public sealed class CashMigrationConcurrencyTests
                   JOIN pg_stat_activity activity ON activity.pid = locks.pid
                   WHERE activity.application_name = @application_name
                     AND locks.locktype = 'relation'
-                    AND locks.relation = 'caja.turno_caja'::regclass
+                    AND locks.relation = to_regclass(@relation)
                     AND locks.mode = @mode
                     AND locks.granted = @granted);
                 """, observer);
             command.Parameters.AddWithValue("application_name", applicationName);
+            command.Parameters.AddWithValue("relation", relation);
             command.Parameters.AddWithValue("mode", mode);
             command.Parameters.AddWithValue("granted", granted);
             if ((bool)(await command.ExecuteScalarAsync(cancellationToken))!) return;
             await Task.Delay(20, cancellationToken);
         }
     }
-
-    private static async Task<bool> ReleaseAdvisoryLockAsync(NpgsqlConnection coordinator)
-    {
-        await using var command = new NpgsqlCommand(
-            $"SELECT pg_advisory_unlock({MigrationGate})", coordinator);
-        return (bool)(await command.ExecuteScalarAsync())!;
-    }
-
-    private static Task DropTestEventTriggerAsync(NpgsqlConnection connection) =>
-        CashMigrationDatabase.ExecuteAsync(connection, """
-            DROP EVENT TRIGGER IF EXISTS test_pause_cash_migration_ddl;
-            DROP FUNCTION IF EXISTS public.test_pause_cash_migration_ddl();
-            """);
 }

@@ -43,7 +43,11 @@ Los únicos endpoints anónimos son los de salud y los flujos de autenticación 
 | Numeración de Ventas | `/api/document-numbering/sales` | `NUMBERING.MANAGE` |
 | Clientes | `/api/customers` | `CUSTOMERS.BASIC_MANAGE` o `CUSTOMERS.MANAGE` según operación |
 | Proveedores | `/api/suppliers` | Lectura `SUPPLIERS.READ`; escritura Administrador y `SUPPLIERS.MANAGE` efectivos |
-| Compras | `/api/purchases` | Administrador o Supervisor vigente y `PURCHASES.RECEIVE` efectivo |
+| Compras: registro y recepción | `/api/purchases` | Administrador o Supervisor vigente y `PURCHASES.RECEIVE` efectivo |
+| Compras: anulación y motivos | `/api/purchases/{purchaseId}/cancel`, `/api/purchases/cancellation-reasons` | Administrador vigente y `PURCHASES.CANCEL` efectivo |
+| Pedidos de compra | `/api/purchase-orders` | Supervisor o Administrador con `PURCHASE_ORDERS.MANAGE` efectivo |
+| Recepción de pedidos | `/api/purchase-orders/{orderId}/receipts` | Supervisor o Administrador con `PURCHASES.RECEIVE`; excepciones con autorización vigente `PURCHASES.RECEIVE_EXCEPTIONS` de Administrador |
+| Cierre y cancelación de pedidos | `/api/purchase-orders/{orderId}/close`, `/cancel` | Cierre con `PURCHASE_ORDERS.MANAGE`; cancelación con `PURCHASE_ORDERS.CANCEL`; ambos con reautenticación de Administrador |
 | Numeración de Compras | `/api/document-numbering/purchases` | `NUMBERING.MANAGE` efectivo |
 | Créditos y abonos | `/api/credits` | `CREDIT.MANAGE`; el historial añade `CUSTOMERS.HISTORY_READ` |
 | Numeración de abonos | `/api/document-numbering/credit-payments` | `NUMBERING.MANAGE` |
@@ -145,7 +149,7 @@ La respuesta `201` incluye la venta, líneas y pagos, sin exponer el costo hist�
 
 El cuerpo de abono contiene `expectedVersion` y `payments`, una a tres filas con `methodCode`, `appliedAmount`, `receivedAmount` y `reference`. Cada método debe ser distinto y activo; la suma positiva no supera el saldo. Efectivo exige recibido suficiente y calcula cambio; Transferencia y Nequi no aceptan recibido y requieren referencia cuando el método la exige. Cada fila obtiene número `ABO` propio, comparte correlación y un movimiento canónico de Caja. Se requiere turno abierto y, en turno compartido, sesión de operador activa. Versiones obsoletas, créditos `PAGADO` o `ANULADO`, numeración ausente o agotada e idempotencia incompatible devuelven `409`; entradas inválidas devuelven `400`. Las respuestas omiten dirección, correo, observaciones, referencia electrónica y auditoría detallada. No hay `PUT`, `PATCH` ni `DELETE` de créditos o abonos.
 
-## Compras — corte 1
+## Compras — cortes 1 y 2
 
 | Método | Ruta | Resultado principal |
 |---|---|---|
@@ -154,14 +158,27 @@ El cuerpo de abono contiene `expectedVersion` y `payments`, una a tres filas con
 | `POST` | `/api/purchases` | Borrador (`201`) |
 | `PUT` | `/api/purchases/{purchaseId}` | Borrador editado (`200`); exige `expectedVersion` |
 | `POST` | `/api/purchases/{purchaseId}/confirm` | Confirmación y recepción completa (`200`); exige `expectedVersion` e `Idempotency-Key` |
+| `POST` | `/api/purchases/{purchaseId}/cancel` | Anulación completa de compra independiente confirmada (`200`); exige `expectedVersion`, `reasonId` e `Idempotency-Key` |
+| `GET` | `/api/purchases/cancellation-reasons` | Motivos oficiales activos (`200`) |
+| `POST` | `/api/purchases/cancellation-reasons/initialize` | Inicialización explícita e idempotente de motivos faltantes (`200`) |
+| `GET/POST` | `/api/purchase-orders` | Listar por proveedor/estado o crear borrador numerado `PED` |
+| `GET/PUT` | `/api/purchase-orders/{orderId}` | Consultar o editar borrador con versión |
+| `POST` | `/api/purchase-orders/{orderId}/send` | Enviar borrador con versión |
+| `POST` | `/api/purchase-orders/{orderId}/receipts` | Confirmar una recepción parcial con versión de pedido e `Idempotency-Key` (`201`) |
+| `POST` | `/api/purchase-orders/{orderId}/close` | Cerrar con pendientes, motivo y reautenticación |
+| `POST` | `/api/purchase-orders/{orderId}/cancel` | Cancelar borrador o enviado, motivo y reautenticación |
+| `GET/POST` | `/api/purchase-orders/reasons/{close|cancel}[/initialize]` | Consultar o inicializar expresamente motivos de pedido |
+| `GET/POST` | `/api/purchase-orders/numbering[/initialize]` | Consultar o configurar una sola vez `PED`, primer número 1 |
 
-Todas estas rutas exigen JWT, rol vigente Administrador o Supervisor y `PURCHASES.RECEIVE` efectivo. Una revocación individual bloquea el acceso y una concesión válida se evalúa con la plantilla híbrida. Cajero no accede. Los importes y costos se muestran dentro del permiso de Compras; `PRODUCTS.COSTS_READ` no se amplía para las rutas de Productos, Inventario o historial de costos.
+Las cinco rutas del corte 1 exigen JWT, rol vigente Administrador o Supervisor y `PURCHASES.RECEIVE` efectivo. Las tres rutas del corte 2 exigen JWT, Administrador vigente y `PURCHASES.CANCEL` efectivo. Una revocación individual bloquea el acceso y una concesión válida se evalúa con la plantilla híbrida. Cajero no accede. Los importes y costos se muestran dentro del permiso de recepción de Compras; `PRODUCTS.COSTS_READ` no se amplía para las rutas de Productos, Inventario o historial de costos.
 
 El cuerpo de alta solo admite `supplierId`, `supplierDocumentNumber` opcional, `invoiceDate`, `vatMode` y `lines` con `productId`, `quantity`, `unitCost` y `vatPercentage` opcional. La edición añade `expectedVersion`. Los modos IVA oficiales son `NO_DISCRIMINADO`, `INCLUIDO` y `SEPARADO`; `vatPercentage`, si se proporciona, debe coincidir con la tasa oficial del producto. `unitCost` es el costo unitario neto de cualquier descuento; un descuento global debe distribuirse antes entre esos costos. No se aceptan campos de descuento, `orderId`, identificadores, estado, numeración, stock, costos promedio, movimientos ni auditoría. Las propiedades JSON desconocidas responden `400`.
 
 El borrador no consume numeración ni cambia inventario o costos. Al confirmar se asigna el consecutivo `COMPRA`, se recibe cada línea completa, se crea un movimiento `COMPRA` por producto y se actualizan stock y promedio en una transacción. Si falta el documento externo se crea una referencia interna `CP-INTERNO-` vinculada al número visible; ese prefijo está reservado y el cliente no puede presentarlo como documento externo. Una repetición compatible de `Idempotency-Key` devuelve el resultado original; contenido distinto, versión obsoleta, documento duplicado o estado incompatible responden `409`.
 
-`GET /api/purchases` acepta filtros exactos `supplierId`, `status`, `invoiceDate` y `supplierDocumentNumber`. El orden es `invoiceDate` descendente e ID descendente; `page` inicia en 1 y `pageSize` admite 1 a 100. Una página cuyo desplazamiento exceda el entero aceptado por persistencia responde `400` antes de consultar la base. No hay `DELETE` ni ruta de cancelación. El contrato completo y las exclusiones están en [purchases.md](purchases.md).
+`GET /api/purchases` acepta filtros exactos `supplierId`, `status`, `invoiceDate` y `supplierDocumentNumber`. El orden es `invoiceDate` descendente e ID descendente; `page` inicia en 1 y `pageSize` admite 1 a 100. Una página cuyo desplazamiento exceda el entero aceptado por persistencia responde `400` antes de consultar la base.
+
+La anulación admite JSON estricto con `expectedVersion`, `reasonId`, `observation` opcional y `authorization` opcional. Para una operación nueva, `authorization` con `userName` y `password` de un Administrador activo es obligatorio; puede ser el mismo ejecutor. Una repetición exacta completada puede omitirlo y devuelve la instantánea original sin escrituras, tras validar el JWT, rol y permiso actuales. Credenciales y campos de autorización no participan en el fingerprint. Una clave reutilizada con otros datos responde `409 resource.conflict`. `OTRO` exige observación normalizada no vacía. Los cinco motivos se crean solo mediante `/initialize`, con UUIDv7 para filas nuevas; un código existente incompatible produce `409` sin modificaciones. El éxito usa `application/json`; los errores `400 validation.failed`, `401`, `403 authorization.forbidden`, `404 resource.not_found`, `409 concurrency.conflict` o `409 resource.conflict` usan `application/problem+json`. No hay `DELETE` de compras o motivos. El contrato completo y las exclusiones están en [purchases.md](purchases.md).
 
 ## Numeración de Compras
 

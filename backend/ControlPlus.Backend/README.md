@@ -1,91 +1,44 @@
 # ControlPlus Backend
 
-Backend del sistema POS ControlPlus. La fuente de verdad del diseño es el paquete oficial de Fase 4 ubicado en `../../docs/ControlPlus_Fase4_Documento_y_Complementos.zip`, dentro de la carpeta `docs` de la raíz del repositorio; no se modifica desde el código de la aplicación.
+Backend del POS ControlPlus. La fuente de verdad del diseño es el paquete oficial de Fase 4 en `../../docs/ControlPlus_Fase4_Documento_y_Complementos.zip`.
 
-## Requisitos
+## Requisitos de desarrollo local
 
 - .NET SDK 10.
-- Docker Desktop con contenedores Linux.
-- Una configuración local de secretos fuera del control de versiones.
+- PostgreSQL 18 instalado como servicio de Windows, accesible en `127.0.0.1:5432`.
+- Una base `controlplus` con el rol `controlplus_app` y una configuración de secretos fuera del repositorio.
 
-## Configuración local
+## Configuración de la API
 
-Copie `.env.example` a `.env` únicamente en su entorno local y complete los valores requeridos sin versionar el archivo. La configuración incluye datos de PostgreSQL, `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_SIGNING_KEY`, duración y desfase del token, y `CONTROLPLUS_MASTER_KEY`.
+La API lee `ConnectionStrings:ControlPlusDb`, `Jwt:SigningKey` e `Installation:MasterKey` desde User Secrets en Development. `Jwt:Issuer`, `Jwt:Audience`, duración y desfase están definidos sin secretos en `ControlPlus.Api/appsettings.json`. No registre contraseñas ni claves en los archivos versionados. La Master Key debe tener al menos 32 bytes UTF-8 y la clave JWT al menos 64 bytes para HS512.
 
-`JWT_SIGNING_KEY` debe ser un secreto aleatorio de al menos 64 bytes para HS512. `CONTROLPLUS_MASTER_KEY` debe ser un secreto aleatorio de al menos 32 bytes UTF-8. No reutilice datos reales en archivos `.http`, pruebas o documentación.
+En esta instalación local, la cadena de conexión y las dos claves se guardaron previamente en User Secrets del proyecto `ControlPlus.Api`. Al mover la aplicación a otro equipo, configure allí sus propios secretos y restaure una copia lógica verificada de la base antes de usarla.
 
-## Ejecutar con Docker Compose
+## Iniciar y comprobar
 
 Desde esta carpeta:
 
 ```powershell
-docker compose config --quiet
-docker compose up --build
+dotnet run --project ControlPlus.Api/ControlPlus.Api.csproj --launch-profile http
 ```
 
-La API queda disponible en `http://localhost:8080`. Compruebe su estado mediante:
+La API escucha en `http://localhost:5000`. En otra terminal:
 
 ```powershell
-Invoke-WebRequest http://localhost:8080/api/health
-Invoke-WebRequest http://localhost:8080/api/health/database
+Invoke-RestMethod http://localhost:5000/api/health
+Invoke-RestMethod http://localhost:5000/api/health/database
+Invoke-RestMethod http://localhost:5000/openapi/v1.json
 ```
 
-Compose mantiene PostgreSQL en el volumen `controlplus_postgres_data`; no use `docker compose down -v` para un entorno con datos que deba conservarse. La API tiene un healthcheck que ejecuta su propio comando `dotnet` contra `/api/health`.
+La primera ruta comprueba el proceso; la segunda abre una conexión real a PostgreSQL y devuelve `503` si falla. No inicie una segunda instancia si el puerto 5000 está ocupado.
 
-## Migraciones
+## Migraciones controladas
 
-La API no aplica migraciones al iniciar. La línea de comandos acepta exclusivamente: cero argumentos para el servidor normal, `--health-check`, `--migrate-to <MigrationId>`, `--preflight-to <MigrationId>`, el postflight de Clientes con `--postflight-to 20261005010000_CustomerSearchIndexesV1`, o el postflight de Inventario con `--postflight-to 20260930010000_SeedInventoryAdjustmentReasonsV1 --expect-unrelated-reasons-sha256 <64-hex-sha256>`. `MigrationId` debe tener entre 1 y 200 caracteres y contener únicamente letras o dígitos ASCII y `_`; la huella debe contener exactamente 64 caracteres hexadecimales ASCII. Cualquier opción, argumento, identificador o huella inválidos, sintaxis con `=` o combinación adicional devuelve código 2 con `Command line rejected` antes de construir configuración, abrir una conexión o iniciar HTTP. Los tres modos controlados de base de datos exigen además el gate exacto `CONTROLPLUS_MIGRATIONS_ENABLED=true`.
-
-Antes de autorizar la migración de Caja, el preflight futuro se ejecuta así:
-
-```powershell
-docker compose run --rm --no-deps `
-  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
-  api --preflight-to 20260913020000_CashRegisterModuleV1
-```
-
-El preflight no aplica migraciones ni inicia HTTP. Usa `ControlPlusDbContext` y Npgsql dentro de una transacción PostgreSQL `REPEATABLE READ, READ ONLY`; certifica con código `0`, devuelve `2` si una precondición no se cumple y `1` ante un fallo técnico. Para Caja valida la cadena exacta de cuatro migraciones anteriores, el objetivo pendiente, ausencia de turnos y de estructura parcial, y presencia exacta de las siete restricciones base.
-
-Solo después de un preflight exitoso, respaldo verificado y autorización independiente, el comando de aplicación futura es:
-
-```powershell
-docker compose run --rm --no-deps `
-  -e CONTROLPLUS_MIGRATIONS_ENABLED=true `
-  api --migrate-to 20260913020000_CashRegisterModuleV1
-```
-
-El contenedor temporal de aplicación valida que el historial sea un prefijo coherente, que el destino exista, esté pendiente y solo requiera una secuencia ascendente que termine exactamente en él. No inicia HTTP ni acepta “todo lo pendiente”; un error termina con código distinto de cero y sin rollback manual automático. Las migraciones publicadas son inmutables.
-
-`20260930010000_SeedInventoryAdjustmentReasonsV1` ya fue aplicada a la base PostgreSQL persistente local/de desarrollo. No debe aplicarse de nuevo allí.
-
-El preflight de Inventario exige exactamente las cinco predecesoras terminando en Caja, objetivo pendiente, las once columnas de `configuracion.motivo_operacion`, el índice natural correcto y ausencia total de los cuatro motivos aprobados y de colisiones UUID. También emite `motivos_ajenos` y una huella canónica SHA-256 de las once columnas de todos los motivos ajenos, sin imprimir sus valores. Esa huella se captura literalmente antes de migrar y se suministra al postflight. La migración acepta únicamente el estado con Caja como quinta y última fila aplicada, por lo que nunca aplica Caja e Inventario juntos. El postflight es de solo lectura, exige historial `6/6/0`, valida `4×E` motivos completos y rechaza si la huella ajena cambió. Preflight y postflight confirman `READ ONLY` al inicio y al final y terminan con rollback; ninguno usa `IMigrator`, DDL, HTTP ni escritura.
-
-La comparación SHA-256 detecta adiciones, eliminaciones o modificaciones entre ambas comprobaciones, pero no es una garantía frente a escrituras simultáneas fuera de ellas. El flujo persistente futuro sigue exigiendo una ventana de mantenimiento que impida cambios externos desde el preflight hasta terminar el postflight.
-
-`20261005010000_CustomerSearchIndexesV1` está publicada en código y fue aplicada exactamente una vez en la base PostgreSQL persistente local/de desarrollo. Solo agrega cuatro índices de búsqueda de Clientes y requirió que Inventario fuera exactamente la sexta migración ya aplicada. Sus comandos se conservan como referencia histórica de esa aplicación:
-
-```bash
-CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --preflight-to 20261005010000_CustomerSearchIndexesV1
-CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --migrate-to 20261005010000_CustomerSearchIndexesV1
-CONTROLPLUS_MIGRATIONS_ENABLED=true dotnet ControlPlus.Api.dll --postflight-to 20261005010000_CustomerSearchIndexesV1
-```
-
-Preflight exige las seis predecesoras, la forma oficial de `catalogo.cliente` y ausencia de los nombres de índices reservados en cualquier tabla de `catalogo`. Postflight exige historial `7/7/0` y las cuatro definiciones exactas. Ambos son `REPEATABLE READ, READ ONLY`, terminan con rollback y no inician HTTP. El preflight, la migración y el postflight se ejecutaron una sola vez y terminaron con código 0 en la base PostgreSQL persistente local/de desarrollo. Estos comandos no deben repetirse allí sin una evaluación y autorización nuevas.
-
-Antes de cualquier uso persistente se debe contar con autorización explícita, ventana de mantenimiento, respaldo verificado y confirmación independiente del identificador objetivo. El comando no debe automatizarse en el arranque ni ejecutarse contra producción sin autorización expresa. Después se debe confirmar el código 0, una sola fila del objetivo en `__EFMigrationsHistory`, salud de API y ausencia de errores sanitizados. Consulte [docs/database.md](docs/database.md).
+El arranque normal jamás aplica migraciones. `--preflight-to`, `--migrate-to` y `--postflight-to` se ejecutan por separado con `CONTROLPLUS_MIGRATIONS_ENABLED=true` y un destino explícito. El parser valida los argumentos antes de abrir HTTP o la base de datos. Para una base persistente, cada aplicación futura exige revisión del objetivo, respaldo verificable, ventana de mantenimiento y autorización específica. Las migraciones ya aplicadas no deben ejecutarse de nuevo; `20261014010000_InventoryMovementRegistrationOrderV1` se aplicó una vez a la base persistente local el 16 de octubre de 2026. Consulte [docs/database.md](docs/database.md) para los contratos y la evidencia.
 
 ## Pruebas
 
-Docker Desktop debe estar iniciado para las pruebas de integración aisladas:
-
-```powershell
-dotnet build ControlPlus.Backend.slnx --no-restore -m:1 /p:BuildInParallel=false
-dotnet test ControlPlus.Domain.Tests --no-restore -m:1 /p:BuildInParallel=false
-dotnet test ControlPlus.Infrastructure.Tests --no-restore -m:1 /p:BuildInParallel=false
-dotnet test ControlPlus.Api.Tests --no-restore -m:1 /p:BuildInParallel=false
-```
-
-Testcontainers crea PostgreSQL 17 aislado para las pruebas y no utiliza la base persistente de desarrollo. Los comandos se ejecutan en serie porque el empaquetado WSL validado puede fallar silenciosamente al compilar `.slnx` en paralelo con mensajes `MSB4276`, mientras la solución serial y los proyectos compilan sin errores ni advertencias. Consulte [docs/testing.md](docs/testing.md).
+Las pruebas de integración crean bases temporales independientes en PostgreSQL 18 mediante el rol `controlplus_test_admin`. Nunca reutilizan la base `controlplus`. Configure el rol y ejecute `scripts/Run-LocalTests.ps1` siguiendo [docs/testing.md](docs/testing.md).
 
 ## API y seguridad
 
@@ -100,11 +53,11 @@ Más detalles:
 - [Inventario](docs/inventory.md)
 - [Clientes](docs/customers.md)
 - [Proveedores](docs/suppliers.md)
-- [Compras — corte 1](docs/purchases.md)
+- [Compras — cortes 1, 2 y 3](docs/purchases.md)
 - [Caja](docs/cash.md)
 - [Ventas](docs/sales.md)
 - [Créditos y abonos](docs/credits.md)
-- Caja conserva la diferencia oficial de efectivo y separa el total; su migración ya aplicada conserva métodos de pago al revertir. Inventario y los índices de búsqueda de Clientes ya están aplicados en la base PostgreSQL persistente local/de desarrollo. Las pruebas automatizadas usan Testcontainers y no alteran esa base.
+- Caja conserva la diferencia oficial de efectivo y separa el total; su migración ya aplicada conserva métodos de pago al revertir. Inventario, los índices de búsqueda de Clientes y la migración del corte 2 de Compras ya están aplicados en la base PostgreSQL persistente local/de desarrollo. Las pruebas actuales crean bases temporales locales y no alteran esa base.
 - [Base de datos](docs/database.md)
 - [Decisión de persistencia y concurrencia](docs/decisions/0001-persistencia-concurrencia-y-migraciones.md)
 
@@ -113,3 +66,7 @@ El commit `4eb9fcf659035a3c7c723f4d14c4e20e2906f030` (`feat: implementar crédit
 El primer corte de Proveedores está implementado en código con exactamente cinco operaciones y sin DELETE. El árbol de esa entrega terminó el build serial con 0 errores y 0 advertencias, las focalizadas `36/36` y la suite completa Domain `35/35`, Infrastructure `58/58` y API `331/331`: total `424/424`, 0 fallidas y 0 omitidas. Los TRX se registran en [docs/testing.md](docs/testing.md). `git diff --check origin/main` terminó con código 0 y solo avisos informativos LF/CRLF; al cierre no quedaron procesos VSTest/testhost/dotnet test/API temporal ni contenedores con `org.testcontainers=true`. Proveedores no añadió migraciones ni cambió entidades oficiales, `OfficialControlPlusDbContext` o Docker Compose; durante su implementación y validación no se accedió a PostgreSQL persistente ni se modificó. El commit `38ea98798c19f0a639600a8c4136cae3dfd4bb4b` fue publicado y la API con Proveedores quedó desplegada localmente. La evidencia operativa está en [docs/suppliers.md](docs/suppliers.md).
 
 Compras, corte 1, registra borradores de compras independientes y recibe todas sus líneas en una transacción al confirmar. La anulación corresponde al corte 2; los pedidos y la recepción parcial, al corte 3. El `unitCost` enviado es neto de descuentos y el IVA registrado se incorpora al costo sin doble conteo. No hubo cambios de esquema; la implementación y validación no accedieron a PostgreSQL persistente. Su validación final terminó con build serial de 0 errores y 0 advertencias, focalizadas `70/70`, corrección aislada de confirmación `2/2` y suite completa `438/438`, sin fallidas ni omitidas. Los TRX se registran en [docs/testing.md](docs/testing.md). El commit `f75bc7bf14e71fb54e9babb595d221f38cf53017` fue publicado, la API quedó desplegada localmente y el consecutivo `COMPRA` quedó certificado mediante la API con `prefix=CMP`, `lastNumber=0`, `nextNumber=1` y `version=1`. Esta configuración fue el único cambio funcional autorizado en PostgreSQL persistente durante la fase operativa; véase [docs/purchases.md](docs/purchases.md).
+
+El corte 2 agrega anulación de compras independientes confirmadas y el catálogo de motivos. Su migración ya está aplicada en PostgreSQL 18 persistente local, con respaldo, preflight y postflight satisfactorios. La API local respondió `200` en salud, salud de base de datos y OpenAPI después del cambio; esta comprobación HTTP no certifica una anulación real en la base persistente.
+
+El corte 3 agrega pedidos, recepción parcial, sustitución y exceso autorizados, cierre con pendientes y cancelación del pedido. La solución compiló y la suite completa de API terminó **329/329**, sin fallidas ni omitidas, en bases temporales locales. La numeración `PED` y los motivos de pedido no se inicializaron en `controlplus`; los códigos propuestos requieren aprobación funcional antes de hacerlo. Consulte [docs/purchases.md](docs/purchases.md) y [docs/testing.md](docs/testing.md).

@@ -8,7 +8,45 @@ namespace ControlPlus.Api.Tests;
 public sealed class OpenApiPurchasesContractTests
 {
     [Fact]
-    public async Task Purchases_ExposeOnlyTheEightApprovedProtectedOperations()
+    public async Task PurchaseOrders_ExposeProtectedLifecycleAndReceiptHeader()
+    {
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseSetting("ConnectionStrings:ControlPlusDb",
+                "Host=127.0.0.1;Port=1;Database=controlplus_openapi_orders_test;Username=test;Password=test");
+            builder.UseSetting("Installation:MasterKey", new string('m', 32));
+            builder.UseSetting("Jwt:Issuer", "controlplus-openapi-orders-tests");
+            builder.UseSetting("Jwt:Audience", "controlplus-openapi-orders-client");
+            builder.UseSetting("Jwt:SigningKey", new string('j', 64));
+        });
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            { AllowAutoRedirect = false, BaseAddress = new Uri("https://localhost") });
+        using var document = JsonDocument.Parse(await client.GetStringAsync("/openapi/v1.json"));
+        var paths = document.RootElement.GetProperty("paths");
+        Check(paths, "/api/purchase-orders", "get", "post");
+        Check(paths, "/api/purchase-orders/{orderId}", "get", "put");
+        foreach (var suffix in new[] { "send", "close", "cancel", "receipts" })
+            Check(paths, $"/api/purchase-orders/{{orderId}}/{suffix}", "post");
+        Check(paths, "/api/purchase-orders/numbering", "get");
+        Check(paths, "/api/purchase-orders/numbering/initialize", "post");
+        foreach (var kind in new[] { "close", "cancel" })
+        {
+            Check(paths, $"/api/purchase-orders/reasons/{kind}", "get");
+            Check(paths, $"/api/purchase-orders/reasons/{kind}/initialize", "post");
+        }
+        foreach (var path in paths.EnumerateObject().Where(x => x.Name.StartsWith("/api/purchase-orders", StringComparison.Ordinal)))
+            foreach (var operation in path.Value.EnumerateObject())
+                Assert.True(Assert.Single(operation.Value.GetProperty("security").EnumerateArray())
+                    .TryGetProperty("Bearer", out _));
+        var receipt = paths.GetProperty("/api/purchase-orders/{orderId}/receipts").GetProperty("post");
+        var header = Assert.Single(receipt.GetProperty("parameters").EnumerateArray(),
+            x => x.GetProperty("name").GetString() == "Idempotency-Key");
+        Assert.True(header.GetProperty("required").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Purchases_PreserveTheEightOriginalProtectedOperations()
     {
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -28,8 +66,6 @@ public sealed class OpenApiPurchasesContractTests
         Check(paths, "/api/purchases/{purchaseId}", "get", "put");
         Check(paths, "/api/purchases/{purchaseId}/confirm", "post");
         Check(paths, "/api/document-numbering/purchases", "get", "post", "put");
-        Assert.DoesNotContain(paths.EnumerateObject(), x => x.Name.Contains("cancel", StringComparison.OrdinalIgnoreCase)
-            && x.Name.Contains("purchase", StringComparison.OrdinalIgnoreCase));
         foreach (var path in new[] { "/api/purchases", "/api/purchases/{purchaseId}",
                      "/api/purchases/{purchaseId}/confirm", "/api/document-numbering/purchases" })
         foreach (var operation in paths.GetProperty(path).EnumerateObject())

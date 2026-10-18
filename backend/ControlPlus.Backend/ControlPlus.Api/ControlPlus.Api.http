@@ -1,4 +1,4 @@
-@host = http://localhost:8080
+@host = http://localhost:5000
 @masterKey = replace-locally-never-commit-the-real-master-key
 @adminUser = admin.local
 @adminPassword = replace-locally-never-commit-the-real-password

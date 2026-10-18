@@ -12,6 +12,50 @@ namespace ControlPlus.Api.Controllers;
 public sealed class PurchasesController(CurrentActorContextResolver actors, IPurchaseService purchases)
     : ApiControllerBase(actors)
 {
+    [HttpGet("cancellation-reasons")]
+    [PermissionAuthorize(PermissionCodes.PurchasesCancel)]
+    [ProducesResponseType<IReadOnlyCollection<PurchaseCancellationReasonDto>>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> ListCancellationReasons(CancellationToken ct)
+    {
+        var actor = await GetActorAsync(ct);
+        return actor is null ? MissingActor() : FromResult(await purchases.ListCancellationReasonsAsync(actor, ct), Ok);
+    }
+
+    [HttpPost("cancellation-reasons/initialize")]
+    [PermissionAuthorize(PermissionCodes.PurchasesCancel)]
+    [ProducesResponseType<IReadOnlyCollection<PurchaseCancellationReasonDto>>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> InitializeCancellationReasons(CancellationToken ct)
+    {
+        var actor = await GetActorAsync(ct);
+        return actor is null ? MissingActor() : FromResult(await purchases.InitializeCancellationReasonsAsync(actor, ct), Ok);
+    }
+
+    [HttpPost("{purchaseId:guid}/cancel")]
+    [PermissionAuthorize(PermissionCodes.PurchasesCancel)]
+    [Consumes("application/json")]
+    [ProducesResponseType<PurchaseDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> Cancel(Guid purchaseId,
+        [FromHeader(Name = "Idempotency-Key"), Required] string key,
+        [FromBody] CancelPurchaseRequest request, CancellationToken ct)
+    {
+        var actor = await GetActorAsync(ct);
+        return actor is null ? MissingActor() : FromResult(await purchases.CancelAsync(actor, purchaseId, key, request, ct), Ok);
+    }
     [HttpGet]
     [PermissionAuthorize(PermissionCodes.PurchasesReceive)]
     [ProducesResponseType<PagedResult<PurchaseSummaryDto>>(StatusCodes.Status200OK, "application/json")]

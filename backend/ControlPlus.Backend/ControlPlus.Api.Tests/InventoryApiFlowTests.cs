@@ -20,7 +20,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 namespace ControlPlus.Api.Tests;
@@ -38,17 +37,13 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
 
     private readonly string _masterKey = RandomSecret(48);
     private readonly string _jwtKey = RandomSecret(64);
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("controlplus_inventory_api_test")
-        .WithUsername("controlplus_test")
-        .WithPassword(RandomSecret(32))
-        .Build();
+    private readonly LocalPostgresDatabase _postgres = new LocalPostgresDatabase();
     private WebApplicationFactory<Program>? _factory;
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        await PostgresAvailability.WaitAsync(_postgres);
+
         await using (var context = new ControlPlusDbContext(
                          new DbContextOptionsBuilder<ControlPlusDbContext>()
                              .UseNpgsql(_postgres.GetConnectionString()).Options))

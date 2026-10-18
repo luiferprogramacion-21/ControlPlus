@@ -3,7 +3,6 @@ namespace ControlPlus.Api.Migrations;
 public enum ControlledExecutionMode
 {
     Api,
-    HealthCheck,
     Migration,
     Preflight,
     Postflight
@@ -17,7 +16,6 @@ public sealed record ControlledExecutionCommand(
     string Message)
 {
     public const string EnabledEnvironmentVariable = "CONTROLPLUS_MIGRATIONS_ENABLED";
-    public const string HealthCheckArgument = "--health-check";
     public const string MigrationTargetArgument = "--migrate-to";
     public const string PreflightTargetArgument = "--preflight-to";
     public const string PostflightTargetArgument = "--postflight-to";
@@ -25,7 +23,7 @@ public sealed record ControlledExecutionCommand(
         "--expect-unrelated-reasons-sha256";
 
     private const string InvalidArgumentsMessage =
-        "Command line rejected: expected no arguments, --health-check, " +
+        "Command line rejected: expected no arguments, " +
         "--migrate-to <MigrationId>, --preflight-to <MigrationId>, " +
         "--postflight-to 20261005010000_CustomerSearchIndexesV1, " +
         "or --postflight-to 20260930010000_SeedInventoryAdjustmentReasonsV1 " +
@@ -38,12 +36,6 @@ public sealed record ControlledExecutionCommand(
         if (arguments.Count == 0)
         {
             return Valid(ControlledExecutionMode.Api);
-        }
-
-        if (arguments.Count == 1 &&
-            string.Equals(arguments[0], HealthCheckArgument, StringComparison.Ordinal))
-        {
-            return Valid(ControlledExecutionMode.HealthCheck);
         }
 
         if (arguments.Count == 4 &&

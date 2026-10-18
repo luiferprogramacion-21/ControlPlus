@@ -22,7 +22,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 namespace ControlPlus.Api.Tests;
@@ -38,17 +37,13 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
     private readonly string _adminPassword = $"Credits-Admin-{Secret(24)}!";
     private readonly string _supervisorPassword = $"Credits-Supervisor-{Secret(24)}!";
     private readonly string _cashierPassword = $"Credits-Cashier-{Secret(24)}!";
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("controlplus_credit_payments_test")
-        .WithUsername("controlplus_test")
-        .WithPassword(Secret(32))
-        .Build();
+    private readonly LocalPostgresDatabase _postgres = new LocalPostgresDatabase();
     private WebApplicationFactory<Program>? _factory;
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        await PostgresAvailability.WaitAsync(_postgres);
+
         await using (var migrations = new ControlPlusDbContext(new DbContextOptionsBuilder<ControlPlusDbContext>()
                          .UseNpgsql(_postgres.GetConnectionString()).Options))
             await migrations.Database.MigrateAsync();

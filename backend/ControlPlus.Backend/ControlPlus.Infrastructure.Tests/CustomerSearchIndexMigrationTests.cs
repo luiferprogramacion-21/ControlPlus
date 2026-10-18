@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 namespace ControlPlus.Infrastructure.Tests;
@@ -27,16 +26,11 @@ public sealed class CustomerSearchIndexMigrationTests : IAsyncLifetime
                 "CREATE INDEX ix_cliente_activo_nombre_id ON catalogo.cliente USING btree (activo, nombre_completo, id)"
         };
 
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("controlplus_customer_search_migration_test")
-        .WithUsername("controlplus_test")
-        .WithPassword(Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)))
-        .Build();
+    private readonly LocalPostgresDatabase _postgres = new LocalPostgresDatabase();
 
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
-        await PostgresAvailability.WaitAsync(_postgres);
     }
     public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
 

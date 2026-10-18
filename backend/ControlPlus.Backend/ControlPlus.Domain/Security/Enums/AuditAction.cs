@@ -72,5 +72,17 @@ public enum AuditAction
     PurchaseDocumentNumberingUpdated = 64,
     PurchaseDraftCreated = 65,
     PurchaseDraftUpdated = 66,
-    PurchaseConfirmed = 67
+    PurchaseConfirmed = 67,
+    PurchaseCancelled = 68,
+    PurchaseCancellationAuthorizationRejected = 69,
+    PurchaseOrderNumberingCreated = 70,
+    PurchaseOrderCreated = 71,
+    PurchaseOrderUpdated = 72,
+    PurchaseOrderSent = 73,
+    PurchaseOrderClosed = 74,
+    PurchaseOrderCancelled = 75,
+    PurchaseOrderAuthorizationRejected = 76,
+    PurchaseOrderReasonsInitialized = 77,
+    PurchaseOrderReceived = 78,
+    PurchaseReceiptAuthorizationRejected = 79
 }

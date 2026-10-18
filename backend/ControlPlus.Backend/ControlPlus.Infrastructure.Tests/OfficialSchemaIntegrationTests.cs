@@ -4,7 +4,6 @@ using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Infrastructure.Persistence;
 using ControlPlus.Infrastructure.Persistence.Official;
 using Microsoft.EntityFrameworkCore;
-using Testcontainers.PostgreSql;
 using Xunit;
 
 namespace ControlPlus.Infrastructure.Tests;
@@ -32,13 +31,8 @@ public sealed class OfficialSchemaIntegrationTests
     [Trait("Category", "Integration")]
     public async Task Migrations_CreateTheApprovedPhase4SchemaAndSecuritySeed()
     {
-        await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
-            .WithDatabase("controlplus_schema_test")
-            .WithUsername("controlplus_test")
-            .WithPassword("integration-password-not-for-production")
-            .Build();
+        await using var postgres = new LocalPostgresDatabase();
         await postgres.StartAsync();
-        await PostgresAvailability.WaitAsync(postgres);
 
         var options = new DbContextOptionsBuilder<ControlPlusDbContext>()
             .UseNpgsql(postgres.GetConnectionString())
@@ -243,13 +237,8 @@ public sealed class OfficialSchemaIntegrationTests
     [Trait("Category", "Integration")]
     public async Task OfficialModel_UsesVersionForOptimisticConcurrencyAndIncrementsItOnce()
     {
-        await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
-            .WithDatabase("controlplus_concurrency_test")
-            .WithUsername("controlplus_test")
-            .WithPassword("integration-password-not-for-production")
-            .Build();
+        await using var postgres = new LocalPostgresDatabase();
         await postgres.StartAsync();
-        await PostgresAvailability.WaitAsync(postgres);
 
         var migrationOptions = new DbContextOptionsBuilder<ControlPlusDbContext>()
             .UseNpgsql(postgres.GetConnectionString())

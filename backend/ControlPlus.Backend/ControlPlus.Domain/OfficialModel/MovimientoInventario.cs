@@ -9,6 +9,8 @@ public partial class MovimientoInventario
 
     public Guid ProductoId { get; set; }
 
+    public long? OrdenRegistro { get; set; }
+
     public Guid UsuarioId { get; set; }
 
     public Guid? SesionOperadorId { get; set; }

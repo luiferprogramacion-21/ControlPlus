@@ -66,7 +66,7 @@ La migración nueva `20260913020000_CashRegisterModuleV1`:
 - registra idempotentemente Efectivo, Transferencia y Nequi; `Down` conserva siempre esos catálogos y sus nombres personalizados;
 - permite varios pagos por movimiento mediante relaciones 1:N y conserva las FK; `Down` rechaza datos que no puedan representarse con las restricciones anteriores.
 
-La migración no publicada se corrige conservando su nombre y se prueba exclusivamente en PostgreSQL 17 con Testcontainers. No fabrica cierres, conteos ni autorizaciones históricas y no se aplica al entorno persistente en este bloque.
+La migración no publicada se corrige conservando su nombre y se probó en su corte original con PostgreSQL 17 efímero; las ejecuciones futuras usan PostgreSQL 18 local con bases temporales. No fabrica cierres, conteos ni autorizaciones históricas y no se aplica al entorno persistente en este bloque.
 
 ## Permisos y auditoría
 

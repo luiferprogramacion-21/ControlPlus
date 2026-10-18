@@ -2111,6 +2111,11 @@ public partial class OfficialControlPlusDbContext : DbContext
             entity.Property(e => e.MotivoOperacionId).HasColumnName("motivo_operacion_id");
             entity.Property(e => e.MovimientoRevertidoId).HasColumnName("movimiento_revertido_id");
             entity.Property(e => e.ProductoId).HasColumnName("producto_id");
+            var ordenRegistro = entity.Property(e => e.OrdenRegistro)
+                .HasColumnName("orden_registro")
+                .ValueGeneratedOnAdd();
+            ordenRegistro.Metadata.SetBeforeSaveBehavior(Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Throw);
+            ordenRegistro.Metadata.SetAfterSaveBehavior(Microsoft.EntityFrameworkCore.Metadata.PropertySaveBehavior.Throw);
             entity.Property(e => e.ReservadoAnterior).HasColumnName("reservado_anterior");
             entity.Property(e => e.ReservadoPosterior).HasColumnName("reservado_posterior");
             entity.Property(e => e.SesionOperadorId).HasColumnName("sesion_operador_id");
