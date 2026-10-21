@@ -1,5 +1,13 @@
 # Pruebas
 
+## Apartados — cortes 1 a 3 (árbol local sin publicar)
+
+Después de los últimos ajustes, la compilación serial de la solución terminó con **0 errores y 0 advertencias**. Las focalizadas sin PostgreSQL terminaron `LayawayPolicyTests` **6/6** y API (`LayawayQueryServiceTests` y `OpenApiLayawayContractTests`) **8/8**; la suite completa Domain terminó **46/46**, sin fallos ni omitidas.
+
+Las pruebas de integración de Apartados usan `LocalPostgresDatabase`: crean bases con prefijo `controlplus_test_` mediante `controlplus_test_admin`; no acceden a la base persistente `controlplus`. En Windows, las focalizadas de entrega terminaron **10/10** y las de cancelación **12/12**, sin fallidas ni omitidas. La ejecución diagnóstica final de `Api.Tests` terminó **418/418**, con TRX `Completed`, cero `RunErrors` y códigos de salida **0** de `dotnet test` y del script diagnóstico.
+
+Una ejecución anterior de `Run-LocalTests.ps1` terminó con código de salida **1** pese a contar **418 pruebas API aprobadas**. La causa de ese código no quedó demostrada y esa ejecución no se considera una suite completa exitosa. Domain e Infrastructure habían pasado en la ejecución anterior; el extracto diagnóstico final citado arriba acredita específicamente `Api.Tests`, no una nueva ejecución completa de las tres suites. La validación inicial sin credenciales PostgreSQL y sus resultados parciales quedan como antecedente, no como evidencia final de integración.
+
 ## PostgreSQL local para integraciones
 
 La suite actual usa PostgreSQL 18 nativo en `127.0.0.1:5432`. Una única vez, cree un rol separado de la aplicación con permiso `CREATEDB`, sin `SUPERUSER`. Abra `psql` en PowerShell (pedirá la clave de `postgres`):

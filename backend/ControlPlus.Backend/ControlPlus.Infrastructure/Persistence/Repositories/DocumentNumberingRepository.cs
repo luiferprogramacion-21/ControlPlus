@@ -111,6 +111,38 @@ public sealed class EfDocumentNumberingRepository(OfficialControlPlusDbContext d
         dbContext.PagoCredito.AsNoTracking().AnyAsync(
             x => x.InstalacionId == installationId && x.Serie == series, cancellationToken);
 
+    public Task<ConsecutivoDocumento?> GetLayawayNumberingAsync(
+        Guid installationId, string series, bool forUpdate,
+        CancellationToken cancellationToken = default) =>
+        GetLayawaySequenceAsync(installationId, series, "APARTADO", forUpdate, cancellationToken);
+
+    public Task<ConsecutivoDocumento?> GetLayawayPaymentNumberingAsync(
+        Guid installationId, string series, bool forUpdate,
+        CancellationToken cancellationToken = default) =>
+        GetLayawaySequenceAsync(installationId, series, "PAGO_APARTADO", forUpdate, cancellationToken);
+
+    private async Task<ConsecutivoDocumento?> GetLayawaySequenceAsync(
+        Guid installationId, string series, string documentType, bool forUpdate,
+        CancellationToken cancellationToken)
+    {
+        if (!forUpdate)
+            return await dbContext.ConsecutivoDocumento.AsNoTracking().SingleOrDefaultAsync(
+                x => x.InstalacionId == installationId &&
+                     x.TipoDocumento == documentType && x.Serie == series,
+                cancellationToken);
+
+        var rows = await dbContext.ConsecutivoDocumento.FromSqlInterpolated(
+            $"""
+             SELECT c.*
+             FROM configuracion.consecutivo_documento AS c
+             WHERE c.instalacion_id = {installationId}
+               AND c.tipo_documento = {documentType}
+               AND c.serie = {series}
+             FOR UPDATE
+             """).AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
     public async Task<ConsecutivoDocumento?> GetPurchaseNumberingAsync(
         Guid installationId, string series, bool forUpdate,
         CancellationToken cancellationToken = default)

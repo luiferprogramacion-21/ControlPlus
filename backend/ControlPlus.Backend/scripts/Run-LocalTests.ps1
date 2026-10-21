@@ -19,6 +19,21 @@ try {
         & dotnet build ControlPlus.Backend.slnx --no-restore -m:1 /p:BuildInParallel=false
         if ($LASTEXITCODE -ne 0) { throw 'Falló la compilación.' }
 
+        & dotnet test ControlPlus.Domain.Tests --no-build --no-restore -m:1 /p:BuildInParallel=false `
+            --filter 'FullyQualifiedName~LayawayPolicyTests'
+        if ($LASTEXITCODE -ne 0) { throw 'Fallaron las pruebas focalizadas de dominio de Apartados.' }
+
+        $focusedApiFilter = @(
+            'FullyQualifiedName~LayawayCreateApiFlowTests',
+            'FullyQualifiedName~LayawayDocumentNumberingApiTests',
+            'FullyQualifiedName~LayawayQueryServiceTests',
+            'FullyQualifiedName~OpenApiLayawayContractTests',
+            'FullyQualifiedName~LayawayMixedInitialPayment_AttributesEachMethodOnceAndExcludesLinkedMovement'
+        ) -join '|'
+        & dotnet test ControlPlus.Api.Tests --no-build --no-restore -m:1 /p:BuildInParallel=false `
+            --filter $focusedApiFilter
+        if ($LASTEXITCODE -ne 0) { throw 'Fallaron las pruebas focalizadas de API de Apartados.' }
+
         foreach ($project in @('ControlPlus.Domain.Tests', 'ControlPlus.Infrastructure.Tests', 'ControlPlus.Api.Tests')) {
             & dotnet test $project --no-build --no-restore -m:1 /p:BuildInParallel=false
             if ($LASTEXITCODE -ne 0) { throw "Fallaron las pruebas de $project." }

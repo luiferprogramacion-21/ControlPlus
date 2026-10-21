@@ -84,5 +84,12 @@ public enum AuditAction
     PurchaseOrderAuthorizationRejected = 76,
     PurchaseOrderReasonsInitialized = 77,
     PurchaseOrderReceived = 78,
-    PurchaseReceiptAuthorizationRejected = 79
+    PurchaseReceiptAuthorizationRejected = 79,
+    LayawayNumberingCreated = 80,
+    LayawayPaymentNumberingCreated = 81,
+    LayawayCreated = 82,
+    LayawayAuthorizationRejected = 83,
+    LayawayPaymentApplied = 84,
+    LayawayDelivered = 85,
+    LayawayCancelled = 86
 }

@@ -67,7 +67,7 @@ internal static class AuditWriter
         Guid actorUserId,
         AuditAction action,
         string entityType,
-        Guid entityId,
+        Guid? entityId,
         object? details,
         Guid correlationId,
         Guid? terminalId,

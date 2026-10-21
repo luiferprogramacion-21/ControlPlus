@@ -30,10 +30,27 @@ public sealed record UpdateSalesDocumentNumberingRequest(string Prefix, long Fir
 public sealed record CreatePurchaseDocumentNumberingRequest(string Prefix, long FirstNumber);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CreateLayawayDocumentNumberingRequest(string Prefix, long FirstNumber);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record UpdatePurchaseDocumentNumberingRequest(string Prefix, long FirstNumber, long Version);
 
 public interface IDocumentNumberingService
 {
+    Task<Result<SalesDocumentNumberingDto>> GetLayawaysAsync(
+        ActorContext actor, CancellationToken cancellationToken = default);
+
+    Task<Result<SalesDocumentNumberingDto>> CreateLayawaysAsync(
+        ActorContext actor, CreateLayawayDocumentNumberingRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<SalesDocumentNumberingDto>> GetLayawayPaymentsAsync(
+        ActorContext actor, CancellationToken cancellationToken = default);
+
+    Task<Result<SalesDocumentNumberingDto>> CreateLayawayPaymentsAsync(
+        ActorContext actor, CreateLayawayDocumentNumberingRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<Result<SalesDocumentNumberingDto>> GetSalesAsync(
         ActorContext actor,
         CancellationToken cancellationToken = default);

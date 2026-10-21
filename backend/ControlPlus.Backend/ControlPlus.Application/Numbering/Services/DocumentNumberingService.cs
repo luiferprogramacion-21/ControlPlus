@@ -14,6 +14,7 @@ public sealed class DocumentNumberingService(
     IDocumentNumberingRepository repository,
     IDocumentNumberingTransactionManager transactionManager,
     IPermissionChecker permissionChecker,
+    IUserRepository userRepository,
     IAuditRepository auditRepository,
     IUnitOfWork unitOfWork,
     IClock clock) : IDocumentNumberingService
@@ -21,6 +22,102 @@ public sealed class DocumentNumberingService(
     private const string SalesDocumentType = "VENTA";
     private const string PurchaseDocumentType = "COMPRA";
     private const string PurchasePrefix = "CMP";
+
+    public Task<Result<SalesDocumentNumberingDto>> GetLayawaysAsync(
+        ActorContext actor, CancellationToken cancellationToken = default) =>
+        GetLayawayNumberingAsync(actor, "apartados", repository.GetLayawayNumberingAsync,
+            cancellationToken);
+
+    public Task<Result<SalesDocumentNumberingDto>> CreateLayawaysAsync(
+        ActorContext actor, CreateLayawayDocumentNumberingRequest request,
+        CancellationToken cancellationToken = default) =>
+        CreateLayawayNumberingAsync(actor, request, "APARTADO", "APT", "apartados",
+            AuditAction.LayawayNumberingCreated, repository.GetLayawayNumberingAsync,
+            cancellationToken);
+
+    public Task<Result<SalesDocumentNumberingDto>> GetLayawayPaymentsAsync(
+        ActorContext actor, CancellationToken cancellationToken = default) =>
+        GetLayawayNumberingAsync(actor, "pagos de apartados",
+            repository.GetLayawayPaymentNumberingAsync, cancellationToken);
+
+    public Task<Result<SalesDocumentNumberingDto>> CreateLayawayPaymentsAsync(
+        ActorContext actor, CreateLayawayDocumentNumberingRequest request,
+        CancellationToken cancellationToken = default) =>
+        CreateLayawayNumberingAsync(actor, request, "PAGO_APARTADO", "PAP",
+            "pagos de apartados", AuditAction.LayawayPaymentNumberingCreated,
+            repository.GetLayawayPaymentNumberingAsync, cancellationToken);
+
+    private async Task<Result<SalesDocumentNumberingDto>> GetLayawayNumberingAsync(
+        ActorContext actor, string label,
+        Func<Guid, string, bool, CancellationToken, Task<ConsecutivoDocumento?>> getNumbering,
+        CancellationToken cancellationToken)
+    {
+        var error = await RequirePermissionAsync(actor, cancellationToken);
+        if (error is not null) return Result.Failure<SalesDocumentNumberingDto>(error);
+
+        var installation = await repository.GetActiveInstallationAsync(false, cancellationToken);
+        if (installation is null)
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("la instalación activa"));
+
+        var numbering = await getNumbering(installation.Id, installation.Serie, false, cancellationToken);
+        return numbering is null
+            ? Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound($"el consecutivo de {label}"))
+            : MapResult(numbering);
+    }
+
+    private async Task<Result<SalesDocumentNumberingDto>> CreateLayawayNumberingAsync(
+        ActorContext actor, CreateLayawayDocumentNumberingRequest request,
+        string documentType, string prefix, string label, AuditAction action,
+        Func<Guid, string, bool, CancellationToken, Task<ConsecutivoDocumento?>> getNumbering,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
+        if (snapshot is null)
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.Unauthorized());
+        if (snapshot.HighestRoleLevel != RoleLevel.Administrador ||
+            !snapshot.PermissionCodes.Contains(PermissionCodes.NumberingManage, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.Forbidden());
+
+        var input = NormalizeAndValidate(request.Prefix, request.FirstNumber);
+        if (input.Error is not null) return Result.Failure<SalesDocumentNumberingDto>(input.Error);
+        if (input.Prefix != prefix || request.FirstNumber != 1)
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.Validation(
+                $"La numeración inicial de {label} exige prefijo {prefix} y primer número 1."));
+
+        await using var transaction = await transactionManager.BeginAsync(
+            IsolationLevel.ReadCommitted, cancellationToken);
+        var installation = await repository.GetActiveInstallationAsync(true, cancellationToken);
+        if (installation is null)
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("la instalación activa"));
+        snapshot = await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
+        if (snapshot is null)
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.Unauthorized());
+        if (snapshot.HighestRoleLevel != RoleLevel.Administrador ||
+            !snapshot.PermissionCodes.Contains(PermissionCodes.NumberingManage, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.Forbidden());
+        if (await getNumbering(installation.Id, installation.Serie, false, cancellationToken) is not null)
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.Conflict(
+                $"Ya existe el consecutivo de {label} para la instalación y serie activas."));
+
+        var numbering = new ConsecutivoDocumento
+        {
+            Id = Guid.CreateVersion7(),
+            InstalacionId = installation.Id,
+            TipoDocumento = documentType,
+            Prefijo = prefix,
+            Serie = installation.Serie,
+            UltimoNumero = 0,
+            Version = 1
+        };
+        await repository.AddAsync(numbering, cancellationToken);
+        await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId,
+            action, nameof(ConsecutivoDocumento), numbering.Id,
+            new { numbering.TipoDocumento, numbering.Serie, numbering.Prefijo,
+                PrimerNumero = request.FirstNumber }, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return MapResult(numbering);
+    }
 
     public async Task<Result<PurchaseDocumentNumberingDto>> GetPurchasesAsync(
         ActorContext actor, CancellationToken cancellationToken = default)
@@ -364,9 +461,13 @@ public sealed class DocumentNumberingService(
     {
         if (numbering.UltimoNumero == long.MaxValue)
             return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NumberingExhausted(
-                numbering.TipoDocumento == "PAGO_CREDITO"
-                    ? "El consecutivo de abonos alcanzó el número máximo admitido."
-                    : "El consecutivo de VENTAS alcanzó el número máximo admitido."));
+                numbering.TipoDocumento switch
+                {
+                    "PAGO_CREDITO" => "El consecutivo de abonos alcanzó el número máximo admitido.",
+                    "APARTADO" => "El consecutivo de apartados alcanzó el número máximo admitido.",
+                    "PAGO_APARTADO" => "El consecutivo de pagos de apartados alcanzó el número máximo admitido.",
+                    _ => "El consecutivo de VENTAS alcanzó el número máximo admitido."
+                }));
         return Result.Success(new SalesDocumentNumberingDto(
             numbering.TipoDocumento,
             numbering.Serie,

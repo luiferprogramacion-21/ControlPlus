@@ -45,7 +45,9 @@ public sealed class SalesApiFlowTests : IAsyncLifetime
         "20260913020000_CashRegisterModuleV1",
         "20260930010000_SeedInventoryAdjustmentReasonsV1",
         "20261005010000_CustomerSearchIndexesV1",
-        "20261014010000_InventoryMovementRegistrationOrderV1"
+        "20261014010000_InventoryMovementRegistrationOrderV1",
+        "20261020010000_LayawayDeliveryWithoutSaleV1",
+        "20261021010000_LayawayCancellationOptionalReasonV1"
     ];
 
     private readonly string _masterKey = RandomSecret(48);
