@@ -25,6 +25,18 @@ public sealed class CashService(
 {
     private const int MaximumPageSize = 200;
 
+    public async Task<Result<IReadOnlyCollection<CashClosureDifferenceReasonDto>>> ListClosureDifferenceReasonsAsync(
+        ActorContext actor, CancellationToken cancellationToken = default)
+    {
+        var error = await RequireAsync(actor, PermissionCodes.CashShiftManage, cancellationToken);
+        if (error is not null) return Result.Failure<IReadOnlyCollection<CashClosureDifferenceReasonDto>>(error);
+
+        var reasons = await repository.ListActiveDifferenceReasonsAsync(cancellationToken);
+        return Result.Success<IReadOnlyCollection<CashClosureDifferenceReasonDto>>(
+            reasons.Select(reason => new CashClosureDifferenceReasonDto(
+                reason.Id, reason.Codigo, reason.Nombre, reason.Activo)).ToArray());
+    }
+
     public async Task<Result<CashStateDto>> GetStateAsync(
         ActorContext actor, CancellationToken cancellationToken = default)
     {

@@ -65,9 +65,10 @@ public partial class Producto
         decimal? taxPercentage,
         int minimumStock,
         Guid actorUserId,
-        DateTimeOffset createdAtUtc) => new()
+        DateTimeOffset createdAtUtc,
+        Guid? productId = null) => new()
     {
-        Id = Guid.CreateVersion7(),
+        Id = productId ?? Guid.CreateVersion7(),
         CategoriaId = categoryId,
         UnidadMedidaId = measurementUnitId,
         ProveedorId = supplierId,

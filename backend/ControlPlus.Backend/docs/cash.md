@@ -38,6 +38,8 @@ Los medios iniciales son `EFECTIVO`, `TRANSFERENCIA` y `NEQUI`. El cálculo admi
 
 Una diferencia total distinta de cero exige motivo activo `DIFERENCIA_CIERRE` y contraseña de otro Supervisor o Administrador activo, no bloqueado y con `CASH.SHIFT_MANAGE` efectivo. La API no recibe IDs de autorizaciones anteriores. Genera una autorización de cinco minutos y la vincula mediante `caja.autorizacion_cierre_turno` al turno, correlación, ejecutor e instalación/establecimiento derivados del contexto. PostgreSQL verifica vigencia, tipo, solicitante, autorizador y consumo único; el vínculo y la autorización consumida quedan inmutables.
 
+`GET /api/cash/closure-difference-reasons` requiere Bearer JWT y `CASH.SHIFT_MANAGE` efectivo. Devuelve `200` con un arreglo `{ id, code, name, isActive }` ordenado por orden visual y código, tomado de `configuracion.motivo_operacion`: solo motivos activos de tipo `DIFERENCIA_CIERRE` pertenecientes a establecimientos activos. Sin permiso devuelve `403`; sin autenticación, `401`. Un arreglo vacío indica que falta un motivo utilizable en el catálogo persistente; la lectura no lo crea. El frontend debe ofrecer estos motivos y enviar el `id` elegido como `differenceReasonId` en `POST /api/cash/shifts/{shiftId}/close`; el servidor vuelve a comprobar que el motivo siga activo y sea del tipo correcto al cerrar. Nunca guardar un UUID fijo en la interfaz.
+
 Los intentos del autorizador comparten el bloqueo transaccional por cuenta usado por login. Una contraseña incorrecta conserva su contador y auditoría aunque el turno no cierre; el quinto intento produce un solo bloqueo del autorizador. Un acierto reinicia el contador únicamente dentro de la transacción financiera que escribe autorización, detalles, vínculo, cierre, sesiones y auditorías. Un fallo al confirmar revierte todos esos efectos.
 
 ## Fuente única e importes
@@ -73,3 +75,28 @@ La migración no publicada se corrige conservando su nombre y se probó en su co
 La plantilla V1 no cambia. Administrador y Supervisor tienen `CASH.SHIFT_MANAGE`, `CASH.MOVEMENTS_MANAGE`, `CASH.SHIFT_MODE_MANAGE` y `CASH.OWN_READ`; Cajero tiene solo `CASH.OWN_READ`. Las excepciones individuales `CONCEDER` y `REVOCAR` conservan la precedencia del modelo híbrido.
 
 Se auditan configuración, modalidad, apertura, movimientos, arqueo, cierre, emisión de credenciales, inicio y fin de sesiones y rechazos de autorización. Cada evento conserva correlación y, cuando corresponde, ejecutor, autorizador, terminal, sesión, motivo y resultado, sin secretos ni tokens.
+
+## Cierre de motivos de diferencia, 24 de octubre de 2026
+
+La ruta de motivos y la integración del selector con el cierre compartido se incorporaron después de la revisión que registró API **442/442** para Reportes. No están en `d6e9bd5` ni heredan ese resultado. La consulta no necesita un token de concurrencia del cliente: usa `AsNoTracking`, no escribe ni autoriza un cierre. El cierre conserva su versión del turno, transacción, autorización y validación del motivo; un motivo desactivado después de la consulta se rechaza al cerrar. No se añaden catálogos, seeds, permisos ni migraciones.
+
+Pruebas focalizadas, todas en `ControlPlus.Api.Tests.CashApiFlowTests`:
+
+- `ClosureDifferenceReasons_RequirePermissionAndReturnOnlyActiveOfficialType` (1): `401`, `403`, catálogo vacío, tipo y estado activos.
+- `ClosureDifferenceReasons_OrderReadOnlyAndInactiveEstablishment` (1): orden visual/código, establecimiento inactivo y lecturas repetidas sin modificar catálogo, versiones, auditoría o turno.
+- `ClosureDifferenceReasons_HybridGrantRevocationAndSessionInvalidation` (2): Supervisor y Cajero; concesión individual, revocación, invalidación del JWT y rechazo con sesión nueva.
+- `ClosureDifferenceReasons_DeactivatedAfterReadIsRejectedAtCloseWithoutFinancialWrites` (1): desactivación entre consulta y cierre con diferencia, sin cierre ni vínculos o detalles financieros parciales.
+- `SharedShift_UsesCode128HashedCredentialActiveSessionAndHybridMovementPermission` (1): regresión del flujo existente, ahora seleccionando el motivo mediante la ruta nueva.
+
+El fixture de `ClosureDifferenceReasons_RequirePermissionAndReturnOnlyActiveOfficialType` utiliza `AJUSTE_INVENTARIO` como tipo de contraste: el CHECK oficial `ck_motivo_operacion_tipo` lo permite y es distinto de `DIFERENCIA_CIERRE`. Se sustituyó el valor inventado `OTRA_OPERACION`, que producía `23514` antes de consultar el endpoint. Se conservan la restricción, los permisos y la aserción de devolver únicamente el motivo activo de cierre.
+
+En Windows, configurar únicamente `CONTROLPLUS_TEST_ADMIN_CONNECTION` para el rol `controlplus_test_admin` contra `postgres`, según `docs/testing.md`. El arnés crea y elimina bases temporales `controlplus_test_*`; no usa la conexión de la API ni la base persistente. Para ejecutar estos **6 casos**, con salida aislada:
+
+```powershell
+dotnet build ControlPlus.Backend.slnx -m:1 /p:BuildInParallel=false /p:BaseOutputPath=bin/CashCatalogReview/
+dotnet test ControlPlus.Api.Tests --no-build --no-restore -m:1 /p:BuildInParallel=false /p:BaseOutputPath=bin/CashCatalogReview/ --filter 'FullyQualifiedName~ControlPlus.Api.Tests.CashApiFlowTests.ClosureDifferenceReasons_|FullyQualifiedName~SharedShift_UsesCode128HashedCredentialActiveSessionAndHybridMovementPermission' --logger 'trx;LogFileName=CashClosureDifferenceReasons.trx'
+```
+
+En la revisión previa, el contrato OpenAPI y su regresión general terminaron **3/3** sin PostgreSQL, el build serial terminó con **0 errores y 0 advertencias**, y el descubrimiento confirmó estos **6 casos** de Caja. Véase el comando OpenAPI en `docs/catalog.md`.
+
+El usuario comunicó posteriormente que `scripts/Run-LocalTests.ps1` terminó correctamente en Windows: **457/457 pruebas aprobadas, 0 fallidas y 0 omitidas, y compilación correcta**. Este resultado corresponde al código y las pruebas revisados, incluida la corrección del fixture; no se hereda de 442/442 ni se suman los subconjuntos focalizados a 457. Se registra el resultado comunicado sin inventar un desglose por proyecto ni rutas de TRX no suministradas. Para este cierre y preparación de staging solo se actualizó documentación, sin modificar código o pruebas después de esa ejecución ni abrir conexiones a PostgreSQL.

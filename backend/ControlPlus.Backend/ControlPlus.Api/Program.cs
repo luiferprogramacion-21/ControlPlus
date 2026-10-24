@@ -114,7 +114,10 @@ builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
     };
 });
 builder.Services.AddOpenApi(options =>
-    options.AddDocumentTransformer<ControlPlusOpenApiSecurityTransformer>());
+{
+    options.AddDocumentTransformer<ControlPlusOpenApiSecurityTransformer>();
+    options.AddSchemaTransformer<OptionalProductInternalCodeSchemaTransformer>();
+});
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ConcurrencyExceptionHandler>();
 builder.Services.AddExceptionHandler<CashMoneyExceptionHandler>();

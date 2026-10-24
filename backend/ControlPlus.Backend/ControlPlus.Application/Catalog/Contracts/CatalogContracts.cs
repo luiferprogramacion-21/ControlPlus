@@ -75,7 +75,7 @@ public sealed record CreateProductRequest(
     Guid CategoryId,
     Guid MeasurementUnitId,
     Guid? SupplierId,
-    string InternalCode,
+    string? InternalCode,
     string? Barcode,
     string? BarcodeFormat,
     bool GenerateBarcode,

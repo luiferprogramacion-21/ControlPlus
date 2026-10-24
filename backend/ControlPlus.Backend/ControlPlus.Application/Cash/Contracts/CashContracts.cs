@@ -6,6 +6,8 @@ namespace ControlPlus.Application.Cash.Contracts;
 
 public sealed record CashRegisterDto(Guid Id, string Code, string Name, bool IsActive, long Version);
 
+public sealed record CashClosureDifferenceReasonDto(Guid Id, string Code, string Name, bool IsActive);
+
 public sealed record CashShiftDto(
     Guid Id,
     Guid CashRegisterId,
@@ -129,6 +131,7 @@ public sealed record ExpectedPaymentMethodAmount(
 
 public interface ICashService
 {
+    Task<Result<IReadOnlyCollection<CashClosureDifferenceReasonDto>>> ListClosureDifferenceReasonsAsync(ActorContext actor, CancellationToken cancellationToken = default);
     Task<Result<CashStateDto>> GetStateAsync(ActorContext actor, CancellationToken cancellationToken = default);
     Task<Result<CashRegisterDto>> ConfigureCashRegisterAsync(ActorContext actor, ConfigureCashRegisterRequest request, CancellationToken cancellationToken = default);
     Task<Result<CashStateDto>> UpdateShiftModeAsync(ActorContext actor, UpdateCashShiftModeRequest request, CancellationToken cancellationToken = default);

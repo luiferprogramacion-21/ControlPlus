@@ -13,6 +13,19 @@ public sealed class CashController(
     CurrentActorContextResolver actorContextResolver,
     ICashService cashService) : ApiControllerBase(actorContextResolver)
 {
+    [HttpGet("closure-difference-reasons")]
+    [PermissionAuthorize(PermissionCodes.CashShiftManage)]
+    [ProducesResponseType<IReadOnlyCollection<CashClosureDifferenceReasonDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ListClosureDifferenceReasons(CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null
+            ? MissingActor()
+            : FromResult(await cashService.ListClosureDifferenceReasonsAsync(actor, cancellationToken), Ok);
+    }
+
     [HttpGet("state")]
     [PermissionAuthorize(PermissionCodes.CashOwnRead)]
     [ProducesResponseType<CashStateDto>(StatusCodes.Status200OK)]

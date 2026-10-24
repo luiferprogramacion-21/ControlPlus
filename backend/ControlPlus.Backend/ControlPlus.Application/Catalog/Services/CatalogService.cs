@@ -179,25 +179,34 @@ public sealed class CatalogService(
     {
         var error = await RequireAsync(actor, PermissionCodes.ProductsCreate, cancellationToken);
         if (error is not null) return Result.Failure<ProductDto>(error);
-        var validation = ValidateProduct(request.InternalCode, request.Name, request.Description, request.Barcode,
+        var requestedInternalCode = NormalizeOptional(request.InternalCode)?.ToUpperInvariant();
+        var validation = ValidateProduct(requestedInternalCode, request.Name, request.Description, request.Barcode,
             request.BarcodeFormat, request.GenerateBarcode, request.RetailPrice, request.WholesalePrice,
-            request.TaxPercentage, request.MinimumStock, allowGeneratedBarcodeWithoutValue: true);
+            request.TaxPercentage, request.MinimumStock, allowGeneratedBarcodeWithoutValue: true,
+            allowMissingInternalCode: true);
         if (validation is not null) return Result.Failure<ProductDto>(validation);
         var related = await ValidateRelationsAsync(request.CategoryId, request.MeasurementUnitId, request.SupplierId, cancellationToken);
         if (related.Error is not null) return Result.Failure<ProductDto>(related.Error);
 
-        var internalCode = request.InternalCode.Trim().ToUpperInvariant();
-        if (await repository.ProductInternalCodeExistsAsync(internalCode, null, cancellationToken))
+        if (requestedInternalCode is not null &&
+            await repository.ProductInternalCodeExistsAsync(requestedInternalCode, null, cancellationToken))
             return Result.Failure<ProductDto>(ApplicationError.Conflict("Ya existe un producto con ese código interno."));
         var barcode = request.GenerateBarcode ? await GenerateBarcodeAsync(cancellationToken) : NormalizeOptional(request.Barcode);
         if (barcode is not null && await repository.ProductBarcodeExistsAsync(barcode, null, cancellationToken))
             return Result.Failure<ProductDto>(ApplicationError.Conflict("Ya existe un producto con ese código de barras."));
         var format = request.GenerateBarcode ? "CODE128" : NormalizeOptional(request.BarcodeFormat)?.ToUpperInvariant();
+        var productId = Guid.CreateVersion7();
+        var internalCode = requestedInternalCode ?? GenerateInternalCode(productId);
+        if (requestedInternalCode is null &&
+            await repository.ProductInternalCodeExistsAsync(internalCode, null, cancellationToken))
+        {
+            return Result.Failure<ProductDto>(ApplicationError.Conflict("No se pudo asignar un código interno único. Intente crear el producto nuevamente."));
+        }
 
         var product = Producto.Create(request.CategoryId, request.MeasurementUnitId, request.SupplierId,
             internalCode, barcode, format, request.GenerateBarcode, request.Name.Trim(), request.Description,
             request.RetailPrice, request.WholesalePrice, request.TaxPercentage, request.MinimumStock,
-            actor.UserId, clock.UtcNow);
+            actor.UserId, clock.UtcNow, productId);
         product.Categoria = related.Category!;
         product.UnidadMedida = related.Unit!;
         await repository.AddProductAsync(product, cancellationToken);
@@ -298,9 +307,9 @@ public sealed class CatalogService(
     private static ApplicationError? ValidateProduct(
         string? internalCode, string? name, string? description, string? barcode, string? barcodeFormat,
         bool barcodeGenerated, decimal retailPrice, decimal? wholesalePrice, decimal? taxPercentage, int minimumStock,
-        bool allowGeneratedBarcodeWithoutValue)
+        bool allowGeneratedBarcodeWithoutValue, bool allowMissingInternalCode = false)
     {
-        if (string.IsNullOrWhiteSpace(internalCode) || internalCode.Trim().Length > 50)
+        if ((!allowMissingInternalCode && string.IsNullOrWhiteSpace(internalCode)) || internalCode?.Trim().Length > 50)
             return ApplicationError.Validation("El código interno es obligatorio y no puede superar 50 caracteres.");
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200)
             return ApplicationError.Validation("El nombre es obligatorio y no puede superar 200 caracteres.");
@@ -329,6 +338,8 @@ public sealed class CatalogService(
         page < 1 || pageSize is < 1 or > 200
             ? ApplicationError.Validation("La página debe ser mayor que cero y el tamaño debe estar entre 1 y 200.")
             : null;
+
+    private static string GenerateInternalCode(Guid productId) => $"PRD-{productId:N}".ToUpperInvariant();
 
     private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static CategoryDto Map(Categoria x) => new(x.Id, x.Nombre, x.Descripcion, x.Activo, x.Version);

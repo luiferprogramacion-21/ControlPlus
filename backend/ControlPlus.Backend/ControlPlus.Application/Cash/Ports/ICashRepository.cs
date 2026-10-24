@@ -41,6 +41,7 @@ public interface ICashRepository
     Task AddReconciliationDetailsAsync(IReadOnlyCollection<DetalleArqueoMedioPago> details, CancellationToken cancellationToken = default);
 
     Task<MotivoOperacion?> GetActiveDifferenceReasonAsync(Guid reasonId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<MotivoOperacion>> ListActiveDifferenceReasonsAsync(CancellationToken cancellationToken = default);
     Task AddAuthorizationAsync(AutorizacionOperacion authorization, CancellationToken cancellationToken = default);
     Task AddCloseAuthorizationLinkAsync(AutorizacionCierreTurno link, CancellationToken cancellationToken = default);
 

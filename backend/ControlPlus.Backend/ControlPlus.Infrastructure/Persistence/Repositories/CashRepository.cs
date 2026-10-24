@@ -358,6 +358,15 @@ public sealed class EfCashRepository(OfficialControlPlusDbContext dbContext) : I
                       reason.TipoOperacion == CashConstants.CashDifferenceReasonType,
             cancellationToken);
 
+    public async Task<IReadOnlyCollection<MotivoOperacion>> ListActiveDifferenceReasonsAsync(
+        CancellationToken cancellationToken = default) =>
+        await dbContext.MotivoOperacion.AsNoTracking()
+            .Where(reason => reason.Activo && reason.Establecimiento.Activo &&
+                             reason.TipoOperacion == CashConstants.CashDifferenceReasonType)
+            .OrderBy(reason => reason.OrdenVisual)
+            .ThenBy(reason => reason.Codigo)
+            .ToArrayAsync(cancellationToken);
+
     public Task AddAuthorizationAsync(
         AutorizacionOperacion authorization,
         CancellationToken cancellationToken = default) =>

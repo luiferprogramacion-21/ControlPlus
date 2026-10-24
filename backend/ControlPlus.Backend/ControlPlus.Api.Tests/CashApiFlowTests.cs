@@ -81,6 +81,58 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
+    public async Task ClosureDifferenceReasons_RequirePermissionAndReturnOnlyActiveOfficialType()
+    {
+        using var client = CreateClient();
+        await SetupAsync(client);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.GetAsync("/api/cash/closure-difference-reasons")).StatusCode);
+
+        var administrator = await LoginAsync(client, AdministratorUserName, AdministratorPassword);
+        SetBearer(client, administrator.AccessToken);
+        await CreateOperationalUsersAsync(client);
+        var cashier = await LoginAsync(client, CashierUserName, CashierPassword);
+        SetBearer(client, cashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await client.GetAsync("/api/cash/closure-difference-reasons")).StatusCode);
+
+        SetBearer(client, administrator.AccessToken);
+        Assert.Empty(await ReadSuccessAsync<CashClosureDifferenceReasonDto[]>(
+            await client.GetAsync("/api/cash/closure-difference-reasons"), HttpStatusCode.OK));
+
+        var catalog = await SeedReconciliationCatalogAsync();
+        await using (var scope = _factory!.Services.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            var active = await context.MotivoOperacion.SingleAsync(x => x.Id == catalog.DifferenceReasonId);
+            context.MotivoOperacion.Add(new MotivoOperacion
+            {
+                Id = Guid.CreateVersion7(), EstablecimientoId = active.EstablecimientoId,
+                TipoOperacion = CashConstants.CashDifferenceReasonType, Codigo = "INACTIVO",
+                Nombre = "Motivo inactivo", OrdenVisual = 2, Activo = false,
+                FechaCreacion = _clock.UtcNow.UtcDateTime, Version = 1
+            });
+            context.MotivoOperacion.Add(new MotivoOperacion
+            {
+                Id = Guid.CreateVersion7(), EstablecimientoId = active.EstablecimientoId,
+                TipoOperacion = "AJUSTE_INVENTARIO", Codigo = "OTRO_TIPO",
+                Nombre = "Otro tipo", OrdenVisual = 3, Activo = true,
+                FechaCreacion = _clock.UtcNow.UtcDateTime, Version = 1
+            });
+            await context.SaveChangesAsync();
+        }
+
+        var reasons = await ReadSuccessAsync<CashClosureDifferenceReasonDto[]>(
+            await client.GetAsync("/api/cash/closure-difference-reasons"), HttpStatusCode.OK);
+        var reason = Assert.Single(reasons);
+        Assert.Equal(catalog.DifferenceReasonId, reason.Id);
+        Assert.Equal("CONTEO_DIFERENTE", reason.Code);
+        Assert.Equal("Diferencia ficticia de conteo", reason.Name);
+        Assert.True(reason.IsActive);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
     public async Task IndividualShift_EnforcesConcurrencyHybridPermissionsReconciliationAndAuthorizedDifference()
     {
         using var client = CreateClient();
@@ -408,10 +460,14 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
                 method.PaymentMethodId,
                 method.Code == "EFECTIVO" ? method.ExpectedAmount - 1_000m : method.ExpectedAmount))
             .ToArray();
+        var availableReasons = await ReadSuccessAsync<CashClosureDifferenceReasonDto[]>(
+            await client.GetAsync("/api/cash/closure-difference-reasons"), HttpStatusCode.OK);
+        var selectedReason = Assert.Single(availableReasons);
+        Assert.Equal(catalog.DifferenceReasonId, selectedReason.Id);
         var administratorClosed = await ReadSuccessAsync<CashReconciliationDto>(await client.PostAsJsonAsync(
             $"/api/cash/shifts/{administratorAuthorizedShift.Id}/close",
             new CloseCashShiftRequest(administratorReconciliation.ShiftVersion, administratorCounts,
-                catalog.DifferenceReasonId, "Diferencia autorizada en prueba",
+                selectedReason.Id, "Diferencia autorizada en prueba",
                 new CashCloseAuthorizationRequest(AdministratorUserName, AdministratorPassword))), HttpStatusCode.OK);
         Assert.Equal(-1_000m, administratorClosed.TotalDifference);
         await AssertAdministratorAuthorizationAsync(administratorAuthorizedShift.Id, administrator.User.Id);
