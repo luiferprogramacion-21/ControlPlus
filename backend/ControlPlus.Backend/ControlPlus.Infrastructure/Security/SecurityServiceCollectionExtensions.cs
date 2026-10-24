@@ -11,6 +11,7 @@ using ControlPlus.Application.Credits.Ports;
 using ControlPlus.Application.Layaways.Ports;
 using ControlPlus.Application.Purchases.Ports;
 using ControlPlus.Application.PurchaseOrders.Ports;
+using ControlPlus.Application.Reports;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -37,6 +38,8 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<ICashRepository, EfCashRepository>();
         services.AddScoped<ICashTransactionManager, EfCashTransactionManager>();
         services.AddScoped<ISalesRepository, EfSalesRepository>();
+        services.AddScoped<IFinancialSalesReportRepository, EfFinancialSalesReportRepository>();
+        services.AddScoped<IDailyCashFlowRepository, EfDailyCashFlowRepository>();
         services.AddScoped<ISalesTransactionManager, EfSalesTransactionManager>();
         services.AddScoped<IDocumentNumberingRepository, EfDocumentNumberingRepository>();
         services.AddScoped<IDocumentNumberingTransactionManager, EfDocumentNumberingTransactionManager>();

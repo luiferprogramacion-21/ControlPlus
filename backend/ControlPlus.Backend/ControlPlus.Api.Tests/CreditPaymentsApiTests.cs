@@ -146,6 +146,12 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
             var movement = await db.MovimientoCaja.AsNoTracking().SingleAsync(x => x.Id == movementId);
             Assert.Equal("ABONO_CREDITO", movement.CategoriaMovimiento);
             Assert.Equal(1_000m, movement.Valor);
+            var cashFlow = scope.ServiceProvider.GetRequiredService<ControlPlus.Application.Reports.IDailyCashFlowRepository>();
+            var operatingDate = await db.TurnoCaja.Where(x => x.Id == rows[0].TurnoCajaId)
+                .Select(x => x.FechaOperativa).SingleAsync();
+            var entries = await cashFlow.GetEntriesAsync(rows[0].InstalacionId, operatingDate, operatingDate, default);
+            Assert.Equal(1_000m, entries.Where(x => x.Origin == "ABONO_CREDITO").Sum(x => x.Amount));
+            Assert.Equal(3, entries.Count(x => x.Origin == "ABONO_CREDITO"));
             Assert.Equal(operation.CorrelationId, movement.CorrelacionId);
             Assert.All(rows, x => Assert.Equal("ABO", x.Prefijo));
             Assert.Equal(1, await db.EventoAuditoria.CountAsync(x => x.Accion == "CREDITPAYMENTAPPLIED" && x.EntidadId == creditId));
@@ -637,6 +643,56 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         Assert.Equal(before, await SnapshotAsync(creditId, setup.ProductId));
         Assert.Equal(sessionBefore, await SessionSnapshotAsync(session.Id));
         Assert.Equal("ACTIVA", sessionBefore.State);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task ReportCashFlowCoverage_CreditPaymentUsesPaymentTurnDateInsteadOfSaleDate()
+    {
+        using var client = CreateClient();
+        var setup = await BootstrapAsync(client);
+        var sale = await CreateCreditAsync(client, setup, "report-later-credit-sale");
+        var reconciliation = await ReadAsync<CashReconciliationDto>(
+            await client.GetAsync("/api/cash/reconciliation"), HttpStatusCode.OK);
+        Assert.Equal(0m, reconciliation.TotalExpected);
+        await ReadAsync<CashReconciliationDto>(await client.PostAsJsonAsync(
+            $"/api/cash/shifts/{setup.Shift.Id}/close", new CloseCashShiftRequest(
+                reconciliation.ShiftVersion, reconciliation.PaymentMethods.Select(x =>
+                    new CountedPaymentMethodRequest(x.PaymentMethodId, x.ExpectedAmount)).ToArray(),
+                null, null, null)), HttpStatusCode.OK);
+        var next = await ReadAsync<CashShiftDto>(await client.PostAsJsonAsync("/api/cash/shifts",
+            new OpenCashShiftRequest(0m, "Turno posterior a la venta a credito")), HttpStatusCode.Created);
+        var paymentDate = setup.Shift.OperatingDate.AddDays(1);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        await db.TurnoCaja.Where(x => x.Id == next.Id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.FechaOperativa, paymentDate));
+        await ReadAsync<CreditPaymentOperationDto>(await PayAsync(client, sale.CreditId!.Value,
+            "report-later-credit-payment", new ApplyCreditPaymentRequest(1,
+                [new("EFECTIVO", 200m, 250m, null), new("TRANSFERENCIA", 300m, null, "REPORT-LATER-ABO")])),
+            HttpStatusCode.Created);
+
+        var entries = await scope.ServiceProvider.GetRequiredService<ControlPlus.Application.Reports.IDailyCashFlowRepository>()
+            .GetEntriesAsync(await db.Caja.Select(x => x.InstalacionId).SingleAsync(),
+                setup.Shift.OperatingDate, paymentDate, default);
+        Assert.DoesNotContain(entries, x => x.Date == setup.Shift.OperatingDate && x.Method is not null);
+        Assert.Equal(new ControlPlus.Application.Reports.CashFlowEntry(paymentDate, "ABONO_CREDITO", "EFECTIVO", 200m),
+            Assert.Single(entries, x => x.Method == "EFECTIVO"));
+        Assert.Equal(new ControlPlus.Application.Reports.CashFlowEntry(paymentDate, "ABONO_CREDITO", "TRANSFERENCIA", 300m),
+            Assert.Single(entries, x => x.Method == "TRANSFERENCIA"));
+        Assert.DoesNotContain(entries, x => x.Method is null && x.Origin != "APERTURA");
+        var payments = await db.PagoCredito.AsNoTracking().ToArrayAsync();
+        Assert.Equal(2, payments.Length);
+        Assert.All(payments, x => Assert.Equal(next.Id, x.TurnoCajaId));
+        Assert.Single(payments.Select(x => x.MovimientoCajaId).Distinct());
+        var expected = await scope.ServiceProvider.GetRequiredService<ControlPlus.Application.Cash.Ports.ICashRepository>()
+            .GetExpectedAmountsAsync(next.Id);
+        Assert.All(expected, x => Assert.Equal(x.Code switch
+        {
+            "EFECTIVO" => 200m,
+            "TRANSFERENCIA" => 300m,
+            _ => 0m
+        }, x.ExpectedAmount));
+        Assert.Equal(expected.Sum(x => x.ExpectedAmount), entries.Sum(x => x.Amount));
     }
 
     private async Task<Setup> BootstrapAsync(HttpClient client, bool configureAbo = true, bool shared = false)

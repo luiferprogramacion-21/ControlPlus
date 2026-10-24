@@ -63,6 +63,16 @@ public sealed partial class LayawayCreateApiFlowTests
             .ToArrayAsync();
         Assert.Equal(cancelled.Refunds.Count, rows.Length);
         Assert.Equal(refund, rows.Sum(x => x.Valor));
+        var cashFlow = scope.ServiceProvider.GetRequiredService<ControlPlus.Application.Reports.IDailyCashFlowRepository>();
+        var refundShift = refund > 0 ? rows[0].TurnoCajaId : (Guid?)null;
+        if (refundShift.HasValue)
+        {
+            var operatingDate = await db.TurnoCaja.Where(x => x.Id == refundShift.Value)
+                .Select(x => x.FechaOperativa).SingleAsync();
+            var installationId = await db.Caja.Select(x => x.InstalacionId).SingleAsync();
+            var entries = await cashFlow.GetEntriesAsync(installationId, operatingDate, operatingDate, default);
+            Assert.Equal(-refund, entries.Where(x => x.Origin == "REEMBOLSO_APARTADO").Sum(x => x.Amount));
+        }
         if (refund > 0)
         {
             Assert.Single(rows.Select(x => x.MovimientoCajaId).Distinct());

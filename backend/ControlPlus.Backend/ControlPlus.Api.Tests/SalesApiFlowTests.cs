@@ -11,6 +11,7 @@ using ControlPlus.Application.Common;
 using ControlPlus.Application.Customers.Contracts;
 using ControlPlus.Application.Numbering.Contracts;
 using ControlPlus.Application.Sales.Contracts;
+using ControlPlus.Application.Reports;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Infrastructure.Persistence;
@@ -27,6 +28,83 @@ namespace ControlPlus.Api.Tests;
 
 public sealed class SalesApiFlowTests : IAsyncLifetime
 {
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task DailySalesReport_CountsSaleHeadersOnceAndExcludesOtherInstallation()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var credential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
+        _ = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "report-cash-sale",
+            new ConfirmSaleRequest(null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
+                [new("EFECTIVO", 400m, 400m, null),
+                 new("TRANSFERENCIA", 600m, null, "REPORT-COMBINED-REFERENCE")])), HttpStatusCode.Created);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var repository = scope.ServiceProvider.GetRequiredService<IFinancialSalesReportRepository>();
+        var persisted = await context.Venta.AsNoTracking().SingleAsync(x => x.Id == sale.Id);
+        Assert.Equal(2, await context.PagoVenta.CountAsync(x => x.VentaId == sale.Id));
+        var rows = await repository.GetDailySalesAsync(persisted.InstalacionId,
+            persisted.FechaOperativa, persisted.FechaOperativa, default);
+        var cash = Assert.Single(rows);
+        Assert.Equal("CONTADO", cash.SaleType);
+        Assert.Equal(1, cash.Transactions);
+        Assert.Equal(persisted.Total, cash.Total);
+        Assert.Empty(await repository.GetDailySalesAsync(Guid.NewGuid(),
+            persisted.FechaOperativa, persisted.FechaOperativa, default));
+        Assert.Empty(await repository.GetDailySalesAsync(persisted.InstalacionId,
+            persisted.FechaOperativa.AddDays(1), persisted.FechaOperativa.AddDays(1), default));
+
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(
+            $"/api/reports/sales/daily?from={persisted.FechaOperativa:yyyy-MM-dd}&to={persisted.FechaOperativa:yyyy-MM-dd}")).StatusCode);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var report = await ReadAsync<FinancialSalesReport>(await client.GetAsync(
+            $"/api/reports/sales/daily?from={persisted.FechaOperativa:yyyy-MM-dd}&to={persisted.FechaOperativa:yyyy-MM-dd}"), HttpStatusCode.OK);
+        Assert.Equal(new SalesAmount(1, persisted.Total), report.Total);
+        Assert.Equal(new SalesAmount(0, 0m), report.Credit);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task DailyCashFlowReport_SplitsMixedPaymentByMethodAndExcludesLinkedMovement()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var credential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
+        _ = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "report-c2-mixed-sale",
+            new ConfirmSaleRequest(null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
+                [new("EFECTIVO", 400m, 400m, null),
+                 new("TRANSFERENCIA", 600m, null, "REPORT-C2-REFERENCE")])), HttpStatusCode.Created);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var repository = scope.ServiceProvider.GetRequiredService<IDailyCashFlowRepository>();
+        var persisted = await context.Venta.AsNoTracking().SingleAsync(x => x.Id == sale.Id);
+        var date = persisted.FechaOperativa;
+        var entries = await repository.GetEntriesAsync(persisted.InstalacionId, date, date, default);
+        Assert.Equal(400m, Assert.Single(entries, x => x.Origin == "VENTA_CONTADO" && x.Method == "EFECTIVO").Amount);
+        Assert.Equal(600m, Assert.Single(entries, x => x.Origin == "VENTA_CONTADO" && x.Method == "TRANSFERENCIA").Amount);
+        Assert.Equal(1000m, entries.Where(x => x.Method is not null).Sum(x => x.Amount));
+        Assert.DoesNotContain(entries, x => x.Method is null && x.Origin != "APERTURA");
+        Assert.Empty(await repository.GetEntriesAsync(Guid.NewGuid(), date, date, default));
+
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(
+            $"/api/reports/cash-flow/daily?from={date:yyyy-MM-dd}&to={date:yyyy-MM-dd}")).StatusCode);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var report = await ReadAsync<DailyCashFlowReport>(await client.GetAsync(
+            $"/api/reports/cash-flow/daily?from={date:yyyy-MM-dd}&to={date.AddDays(1):yyyy-MM-dd}"), HttpStatusCode.OK);
+        Assert.Equal(1000m, report.PaymentTotal);
+        Assert.Empty(report.Days[1].Payments);
+        Assert.Equal(0m, report.Days[1].PaymentTotal);
+    }
     private const string AdminUser = "sales.admin.test";
     private const string AdminPassword = "Sales-Administrator-Test-2026!";
     private const string SupervisorUser = "sales.supervisor.test";

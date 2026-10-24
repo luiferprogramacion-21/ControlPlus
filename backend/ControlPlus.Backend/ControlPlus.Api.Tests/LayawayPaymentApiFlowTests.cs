@@ -72,6 +72,11 @@ public sealed partial class LayawayCreateApiFlowTests
             var rows = await db.PagoApartado.AsNoTracking().Where(x => x.ApartadoId == created.Id)
                 .OrderBy(x => x.Consecutivo).ToArrayAsync();
             Assert.Single(rows.Skip(1).Select(x => x.MovimientoCajaId).Distinct());
+            var cashFlow = scope.ServiceProvider.GetRequiredService<ControlPlus.Application.Reports.IDailyCashFlowRepository>();
+            var operatingDate = await db.TurnoCaja.Where(x => x.Id == rows[1].TurnoCajaId)
+                .Select(x => x.FechaOperativa).SingleAsync();
+            var entries = await cashFlow.GetEntriesAsync(rows[1].InstalacionId, operatingDate, operatingDate, default);
+            Assert.Equal(1_001m, entries.Where(x => x.Origin == "PAGO_APARTADO").Sum(x => x.Amount));
             Assert.Equal(result.CorrelationId, await db.MovimientoCaja.AsNoTracking()
                 .Where(x => x.Id == rows[1].MovimientoCajaId)
                 .Select(x => x.CorrelacionId).SingleAsync());
