@@ -2,6 +2,8 @@
 
 ## Alcance del primer corte
 
+La anulación posterior se documenta en [sales-cancellation.md](sales-cancellation.md).
+
 Ventas confirma `CONTADO` y `CREDITO`. Si falta `saleType`, se mantiene `CONTADO` como valor predeterminado. Contado admite cliente opcional, precios minorista y mayorista, y pagos con Efectivo, Transferencia, Nequi o una combinación de estos. Crédito exige cliente activo, vencimiento y autorización, sin pago inicial. Los abonos se describen en [credits.md](credits.md). Apartados, anulaciones, cambios, devoluciones, reembolsos e impresión física permanecen fuera de este corte.
 
 La numeración usa el registro oficial `configuracion.consecutivo_documento` de tipo `VENTA` para la instalación y serie activas. Si ese consecutivo no existe, la confirmación responde `409`; la API no inventa prefijos ni series.
@@ -49,5 +51,17 @@ Todos los importes se validan como COP enteros dentro de `numeric(18,0)`.
 Los permisos se vuelven a resolver desde PostgreSQL y una revocación individual prevalece sobre la plantilla del rol. El detalle público conserva precios, descuentos y pagos, pero no expone el costo histórico del producto. La auditoría registra identificadores, tipo de venta, métodos aplicados, presencia del motivo de descuento y que la sesión fue consumida por la venta; no declara un cambio real de operador ni conserva el motivo libre, montos de descuento, referencias de pago, claves de idempotencia, credenciales o secretos. La auditoría específica del crédito conserva únicamente IDs, estado y correlación.
 
 ## Impresión
+
+### Comprobante consultable y solicitud de reimpresión
+
+`GET /api/sales/{saleId}/receipt` devuelve, para una venta `CONFIRMADA`, el número visible, fecha UTC y operativa, tipo, líneas y pagos con importes guardados en la venta. Exige `SALES.ALL_READ`, o `SALES.OWN_READ` si la venta pertenece al actor. No escribe ni inicia una impresión. No incluye referencia de pago, datos personales del cliente ni costos. El código del método proviene del catálogo vinculado al pago; la identidad y el importe del pago son históricos. No se presenta esta respuesta como factura electrónica ni como comprobante fiscal.
+
+`POST /api/sales/{saleId}/reprint-requests` exige `SALES.REPRINT` efectivo y el mismo alcance de lectura. Recibe `Idempotency-Key` (1–100 caracteres) y devuelve `{ requestId, saleId, requestedAtUtc, status: "SOLICITADA" }`. La primera ejecución guarda la solicitud en `auditoria.operacion_idempotente` y un evento `SALEREPRINTREQUESTED` en una transacción; un replay exacto del mismo actor y venta devuelve la respuesta guardada sin otra auditoría. Una clave reutilizada para otra operación, actor o venta produce `409`. La solicitud no marca impresión exitosa, no consume sesión y no modifica venta, pagos, Caja ni inventario.
+
+El mecanismo de impresión local, su confirmación real, perfiles, plantillas, contenido renderizado y trabajo en `configuracion.trabajo_impresion` quedan para la integración con la impresora. Antes de usar esas tablas se deben definir perfil y plantilla aplicables. El comprobante consultable reconstruye datos desde la venta y sus detalles históricos; para garantizar una copia byte a byte idéntica aun si cambia el catálogo de medios de pago o el formato, se requiere emitir y conservar un snapshot de documento con una plantilla aprobada.
+
+Pruebas nuevas: `ControlPlus.Api.Tests.SalesApiFlowTests.SaleReceipt_ReprintRequest_ReplayPreservesFinancialRowsAndAuditsOnce` (base temporal `controlplus_test_*`) y `ControlPlus.Api.Tests.OpenApiSaleReceiptContractTests.ReceiptAndReprintRequest_DeclareAuthenticationAndResponses` (sin base). No se ha ejecutado ninguna contra `controlplus`.
+
+El usuario comunicó que la suite completa de Windows, incluidos comprobante y solicitud de reimpresión, terminó **470/470**, sin fallidas ni omitidas y con compilación correcta. No se repitió esa suite durante la preparación del índice.
 
 Confirmar la venta no depende de una impresora. La emisión y cola de impresión se implementarán en un subbloque posterior, de modo que un fallo físico no duplique ni revierta una venta ya confirmada. Este corte no crea perfiles, documentos emitidos ni configuración ficticia de impresora.

@@ -96,6 +96,28 @@ public sealed record SaleSummaryDto(
 
 public sealed record SaleListQuery(int Page = 1, int PageSize = 20);
 
+public sealed record SaleReceiptDto(Guid SaleId, string VisibleNumber, DateTimeOffset OccurredAtUtc,
+    DateOnly OperatingDate, string SaleType, string State, decimal GrossSubtotal,
+    decimal DiscountTotal, decimal Total, decimal Change,
+    IReadOnlyCollection<SaleLineDto> Lines, IReadOnlyCollection<SaleReceiptPaymentDto> Payments);
+
+public sealed record SaleReceiptPaymentDto(string MethodCode, decimal AppliedAmount,
+    decimal? ReceivedAmount, decimal Change);
+
+public sealed record SaleReprintRequestDto(Guid RequestId, Guid SaleId, DateTimeOffset RequestedAtUtc,
+    string Status);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CancelSaleRequest([property: JsonRequired] long ExpectedVersion,
+    [property: JsonRequired] Guid ReasonId, string? Observation,
+    SaleCreditAuthorizationRequest? Authorization = null);
+
+public sealed record SaleCancellationReasonDto(Guid Id, string Code, string Name, int DisplayOrder);
+
+public sealed record CancelSaleDto(Guid SaleId, string VisibleNumber, string State, long Version,
+    Guid CancellationId, Guid CorrelationId, DateTimeOffset CancelledAtUtc,
+    string SaleType, decimal ReversedAmount);
+
 public interface ISalesService
 {
     Task<Result<SaleDto>> ConfirmAsync(
@@ -118,4 +140,17 @@ public interface ISalesService
         ActorContext actor,
         Guid saleId,
         CancellationToken cancellationToken = default);
+
+    Task<Result<SaleReceiptDto>> GetReceiptAsync(ActorContext actor, Guid saleId,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<SaleReprintRequestDto>> RequestReprintAsync(ActorContext actor, Guid saleId,
+        string idempotencyKey, CancellationToken cancellationToken = default);
+
+    Task<Result<IReadOnlyCollection<SaleCancellationReasonDto>>> ListCancellationReasonsAsync(
+        ActorContext actor, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyCollection<SaleCancellationReasonDto>>> InitializeCancellationReasonsAsync(
+        ActorContext actor, CancellationToken cancellationToken = default);
+    Task<Result<CancelSaleDto>> CancelAsync(ActorContext actor, Guid saleId, string idempotencyKey,
+        CancelSaleRequest request, CancellationToken cancellationToken = default);
 }

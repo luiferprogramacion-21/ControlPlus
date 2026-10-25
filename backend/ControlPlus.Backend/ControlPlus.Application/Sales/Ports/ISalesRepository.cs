@@ -24,6 +24,8 @@ public interface ISalesRepository
     Task<Terminal?> GetActiveTerminalAsync(Guid installationId, CancellationToken cancellationToken = default);
     Task<TurnoCaja?> GetOpenShiftForUpdateAsync(CancellationToken cancellationToken = default);
     Task<SesionOperador?> GetActiveOperatorSessionAsync(Guid shiftId, Guid terminalId, Guid userId, CancellationToken cancellationToken = default);
+    Task<SesionOperador?> GetActiveOperatorSessionForUpdateAsync(Guid shiftId, Guid terminalId,
+        Guid userId, CancellationToken cancellationToken = default);
     Task<ConsecutivoDocumento?> GetSaleSequenceForUpdateAsync(Guid installationId, string series, CancellationToken cancellationToken = default);
     Task<OperacionIdempotente?> GetIdempotencyAsync(Guid installationId, string key, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<Producto>> GetProductsForUpdateAsync(IReadOnlyCollection<Guid> productIds, CancellationToken cancellationToken = default);
@@ -43,4 +45,16 @@ public interface ISalesRepository
 
     Task<PagedResult<Venta>> ListAsync(Guid? userId, SaleListQuery query, CancellationToken cancellationToken = default);
     Task<Venta?> GetSaleAsync(Guid saleId, CancellationToken cancellationToken = default);
+    Task<Venta?> GetSaleForUpdateAsync(Guid saleId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<MotivoOperacion>> GetCancellationReasonsAsync(Guid establishmentId,
+        string operationType, CancellationToken cancellationToken = default);
+    Task AddCancellationReasonsAsync(IReadOnlyCollection<MotivoOperacion> reasons,
+        CancellationToken cancellationToken = default);
+    Task AddSaleCancellationAsync(AnulacionVenta cancellation, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<MovimientoInventario>> GetSaleInventoryMovementsAsync(Guid saleId,
+        CancellationToken cancellationToken = default);
+    Task<bool> HasInventoryReversalAsync(Guid movementId, CancellationToken cancellationToken = default);
+    Task<MovimientoCaja?> GetOriginalSaleCashMovementAsync(Guid saleId, CancellationToken cancellationToken = default);
+    Task<bool> HasCashReversalAsync(Guid movementId, CancellationToken cancellationToken = default);
+    Task<int> GetCreditPaymentCountAsync(Guid creditId, CancellationToken cancellationToken = default);
 }

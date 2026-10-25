@@ -125,6 +125,10 @@ Las respuestas separan `cashDifference` (contado de efectivo menos esperado de e
 
 ## Ventas
 
+`GET /api/sales/cancellation-reasons` consulta los motivos aprobados y `POST /api/sales/cancellation-reasons/initialize` inicializa explícitamente los tres códigos para anulación de venta y pago. `POST /api/sales/{saleId}/cancel` exige `SALES.VOID`, rol Supervisor o Administrador, `Idempotency-Key`, `{ expectedVersion, reasonId, observation?, authorization? }` y devuelve `CancelSaleDto`. Una operación nueva requiere credenciales de otro Supervisor/Administrador; un replay exacto puede omitirlas. Ver [sales-cancellation.md](sales-cancellation.md) para devolución por los medios originales, crédito sin abonos, permisos, estados y errores.
+
+`GET /api/sales/{saleId}/receipt` devuelve los datos de comprobante de una venta confirmada con `SALES.ALL_READ` o `SALES.OWN_READ` para la propia. `POST /api/sales/{saleId}/reprint-requests` exige además `SALES.REPRINT` e `Idempotency-Key`; registra la solicitud auditada y devuelve estado `SOLICITADA`. Ninguna ruta comunica éxito físico de impresión. Véase [sales.md](sales.md) para alcance histórico y límites de la integración local.
+
 | Método | Ruta | Permiso |
 |---|---|---|
 | `POST` | `/api/sales` | `SALES.CREATE`; `CREDITO` añade `CREDIT.REQUEST` y autorización de otro Supervisor o Administrador con `CREDIT.AUTHORIZE` |

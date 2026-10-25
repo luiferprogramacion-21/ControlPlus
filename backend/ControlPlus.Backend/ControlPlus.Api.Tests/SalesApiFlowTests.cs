@@ -26,8 +26,78 @@ using Xunit;
 
 namespace ControlPlus.Api.Tests;
 
-public sealed class SalesApiFlowTests : IAsyncLifetime
+public sealed partial class SalesApiFlowTests : IAsyncLifetime
 {
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task SaleReceipt_ReprintRequest_ReplayPreservesFinancialRowsAndAuditsOnce()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        var credential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
+        _ = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "receipt-sale",
+            new ConfirmSaleRequest(null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
+                [new("EFECTIVO", 1000m, 1000m, null)])), HttpStatusCode.Created);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var beforeSales = await db.Venta.CountAsync();
+        var beforePayments = await db.PagoVenta.CountAsync();
+        var beforeCash = await db.MovimientoCaja.CountAsync();
+        var beforeStock = await db.MovimientoInventario.CountAsync();
+
+        var url = $"/api/sales/{sale.Id}/receipt";
+        var first = await ReadAsync<SaleReceiptDto>(await client.GetAsync(url), HttpStatusCode.OK);
+        var second = await ReadAsync<SaleReceiptDto>(await client.GetAsync(url), HttpStatusCode.OK);
+        Assert.Equal(JsonSerializer.Serialize(first), JsonSerializer.Serialize(second));
+        Assert.Equal(sale.Total, first.Total);
+        Assert.Equal(sale.VisibleNumber, first.VisibleNumber);
+
+        var requestUrl = $"/api/sales/{sale.Id}/reprint-requests";
+        using var firstRequest = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+        firstRequest.Headers.Add("Idempotency-Key", "receipt-reprint-1");
+        var requested = await ReadAsync<SaleReprintRequestDto>(await client.SendAsync(firstRequest), HttpStatusCode.OK);
+        using var replayRequest = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+        replayRequest.Headers.Add("Idempotency-Key", "receipt-reprint-1");
+        var replay = await ReadAsync<SaleReprintRequestDto>(await client.SendAsync(replayRequest), HttpStatusCode.OK);
+        Assert.Equal(requested, replay);
+        Assert.Equal("SOLICITADA", requested.Status);
+        using var anotherRequest = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+        anotherRequest.Headers.Add("Idempotency-Key", "receipt-reprint-2");
+        var another = await ReadAsync<SaleReprintRequestDto>(await client.SendAsync(anotherRequest), HttpStatusCode.OK);
+        Assert.NotEqual(requested.RequestId, another.RequestId);
+        Assert.Equal(2, await db.EventoAuditoria.CountAsync(x => x.Accion == "SALEREPRINTREQUESTED" && x.EntidadId == sale.Id));
+        Assert.Equal(beforeSales, await db.Venta.CountAsync());
+        Assert.Equal(beforePayments, await db.PagoVenta.CountAsync());
+        Assert.Equal(beforeCash, await db.MovimientoCaja.CountAsync());
+        Assert.Equal(beforeStock, await db.MovimientoInventario.CountAsync());
+
+        SetBearer(client, scenario.SecondCashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(url)).StatusCode);
+        using (var otherRequest = new HttpRequestMessage(HttpMethod.Post, requestUrl))
+        {
+            otherRequest.Headers.Add("Idempotency-Key", "receipt-other-user");
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(otherRequest)).StatusCode);
+        }
+        SetBearer(client, scenario.Admin.AccessToken);
+        var reprintPermission = await GetPermissionIdAsync(client, PermissionCodes.SalesReprint);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{scenario.Users.Cashier.Id}/permissions/{reprintPermission}",
+            new SetUserPermissionRequest(false))).StatusCode);
+        var revokedCashier = await LoginAsync(client, CashierUser, CashierPassword);
+        SetBearer(client, revokedCashier.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(url)).StatusCode);
+        using (var deniedRequest = new HttpRequestMessage(HttpMethod.Post, requestUrl))
+        {
+            deniedRequest.Headers.Add("Idempotency-Key", "receipt-revoked-user");
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(deniedRequest)).StatusCode);
+        }
+        Assert.Equal(2, await db.EventoAuditoria.CountAsync(x => x.Accion == "SALEREPRINTREQUESTED" && x.EntidadId == sale.Id));
+    }
+
     [Fact]
     [Trait("Category", "Integration")]
     public async Task DailySalesReport_CountsSaleHeadersOnceAndExcludesOtherInstallation()

@@ -73,4 +73,79 @@ public sealed class SalesController(
         var actor = await GetActorAsync(cancellationToken);
         return actor is null ? MissingActor() : FromResult(await salesService.GetAsync(actor, saleId, cancellationToken), Ok);
     }
+
+    /// <summary>Obtiene los datos históricos del comprobante de una venta confirmada.</summary>
+    [HttpGet("{saleId:guid}/receipt")]
+    [Authorize]
+    [ProducesResponseType<SaleReceiptDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> GetReceipt(Guid saleId, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.GetReceiptAsync(actor, saleId, cancellationToken), Ok);
+    }
+
+    /// <summary>Registra una solicitud de reimpresión; no confirma impresión física.</summary>
+    [HttpPost("{saleId:guid}/reprint-requests")]
+    [PermissionAuthorize(PermissionCodes.SalesReprint)]
+    [ProducesResponseType<SaleReprintRequestDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> RequestReprint(Guid saleId,
+        [FromHeader(Name = "Idempotency-Key"), Required] string idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.RequestReprintAsync(actor, saleId, idempotencyKey, cancellationToken), Ok);
+    }
+
+    /// <summary>Consulta los motivos activos y aprobados para anular ventas.</summary>
+    [HttpGet("cancellation-reasons")]
+    [PermissionAuthorize(PermissionCodes.SalesVoid)]
+    [ProducesResponseType<IReadOnlyCollection<SaleCancellationReasonDto>>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<IActionResult> ListCancellationReasons(CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.ListCancellationReasonsAsync(actor, cancellationToken), Ok);
+    }
+
+    /// <summary>Inicializa explícitamente los tres motivos de anulación aprobados.</summary>
+    [HttpPost("cancellation-reasons/initialize")]
+    [PermissionAuthorize(PermissionCodes.SalesVoid)]
+    [ProducesResponseType<IReadOnlyCollection<SaleCancellationReasonDto>>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> InitializeCancellationReasons(CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.InitializeCancellationReasonsAsync(actor, cancellationToken), Ok);
+    }
+
+    /// <summary>Anula una venta con autorización y reversión atómica de sus efectos.</summary>
+    [HttpPost("{saleId:guid}/cancel")]
+    [PermissionAuthorize(PermissionCodes.SalesVoid)]
+    [Consumes("application/json")]
+    [ProducesResponseType<CancelSaleDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> Cancel(Guid saleId,
+        [FromHeader(Name = "Idempotency-Key"), Required] string idempotencyKey,
+        [FromBody] CancelSaleRequest request, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.CancelAsync(actor, saleId,
+            idempotencyKey, request, cancellationToken), Ok);
+    }
 }

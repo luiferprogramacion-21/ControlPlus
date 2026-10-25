@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Cash.Ports;
 using ControlPlus.Application.Sales.Contracts;
 using ControlPlus.Application.Sales.Ports;
 using ControlPlus.Application.Security.Contracts;
@@ -15,12 +16,13 @@ using ControlPlus.Domain.Security.Enums;
 
 namespace ControlPlus.Application.Sales.Services;
 
-public sealed class SalesService(
+public sealed partial class SalesService(
     ISalesRepository repository,
     ISalesTransactionManager transactionManager,
     IUnitOfWork unitOfWork,
     IUserRepository userRepository,
     IAuditRepository auditRepository,
+    ICashRepository cashRepository,
     ILoginAttemptCoordinator loginAttemptCoordinator,
     IPasswordHasher passwordHasher,
     IPermissionChecker permissionChecker,
@@ -467,6 +469,85 @@ public sealed class SalesService(
         if (!canReadAll && !(canReadOwn && sale.UsuarioId == actor.UserId))
             return Result.Failure<SaleDto>(ApplicationError.Forbidden());
         return Result.Success(Map(sale));
+    }
+
+    public async Task<Result<SaleReceiptDto>> GetReceiptAsync(ActorContext actor, Guid saleId,
+        CancellationToken cancellationToken = default)
+    {
+        var authorization = await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
+        if (authorization is null) return Result.Failure<SaleReceiptDto>(ApplicationError.Unauthorized());
+        var sale = await repository.GetSaleAsync(saleId, cancellationToken);
+        if (sale is null) return Result.Failure<SaleReceiptDto>(ApplicationError.NotFound("la venta"));
+        var canReadAll = authorization.PermissionCodes.Contains(PermissionCodes.SalesAllRead, StringComparer.OrdinalIgnoreCase);
+        var canReadOwn = authorization.PermissionCodes.Contains(PermissionCodes.SalesOwnRead, StringComparer.OrdinalIgnoreCase);
+        if (!canReadAll && !(canReadOwn && sale.UsuarioId == actor.UserId))
+            return Result.Failure<SaleReceiptDto>(ApplicationError.Forbidden());
+        if (sale.Estado != "CONFIRMADA")
+            return Result.Failure<SaleReceiptDto>(ApplicationError.Conflict("La venta no está confirmada."));
+        return Result.Success(ToReceipt(sale));
+    }
+
+    public async Task<Result<SaleReprintRequestDto>> RequestReprintAsync(ActorContext actor, Guid saleId,
+        string idempotencyKey, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > 100)
+            return Result.Failure<SaleReprintRequestDto>(Validation("Idempotency-Key debe tener entre 1 y 100 caracteres."));
+        await using var transaction = await transactionManager.BeginAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        var installation = await repository.GetActiveInstallationForUpdateAsync(cancellationToken);
+        if (installation is null) return Result.Failure<SaleReprintRequestDto>(ApplicationError.NotFound("la instalación activa"));
+        var authorization = await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
+        if (authorization is null) return Result.Failure<SaleReprintRequestDto>(ApplicationError.Unauthorized());
+        if (!authorization.PermissionCodes.Contains(PermissionCodes.SalesReprint, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<SaleReprintRequestDto>(ApplicationError.Forbidden());
+        var sale = await repository.GetSaleAsync(saleId, cancellationToken);
+        if (sale is null || sale.InstalacionId != installation.Id)
+            return Result.Failure<SaleReprintRequestDto>(ApplicationError.NotFound("la venta"));
+        var canReadAll = authorization.PermissionCodes.Contains(PermissionCodes.SalesAllRead, StringComparer.OrdinalIgnoreCase);
+        var canReadOwn = authorization.PermissionCodes.Contains(PermissionCodes.SalesOwnRead, StringComparer.OrdinalIgnoreCase);
+        if (!canReadAll && !(canReadOwn && sale.UsuarioId == actor.UserId))
+            return Result.Failure<SaleReprintRequestDto>(ApplicationError.Forbidden());
+        if (sale.Estado != "CONFIRMADA")
+            return Result.Failure<SaleReprintRequestDto>(ApplicationError.Conflict("La venta no está confirmada."));
+        var key = idempotencyKey.Trim();
+        var existing = await repository.GetIdempotencyAsync(installation.Id, key, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.TipoOperacion != "SOLICITAR_REIMPRESION" || existing.UsuarioId != actor.UserId ||
+                existing.EntidadId != saleId || existing.Resultado is null)
+                return Result.Failure<SaleReprintRequestDto>(ApplicationError.Conflict("La clave de idempotencia ya fue utilizada con otra solicitud."));
+            var replay = JsonSerializer.Deserialize<SaleReprintRequestDto>(existing.Resultado);
+            return replay is null
+                ? Result.Failure<SaleReprintRequestDto>(ApplicationError.Conflict("La solicitud anterior no puede recuperarse."))
+                : Result.Success(replay);
+        }
+        var terminal = await repository.GetActiveTerminalAsync(installation.Id, cancellationToken);
+        if (terminal is null) return Result.Failure<SaleReprintRequestDto>(ApplicationError.NotFound("la terminal activa"));
+        var now = clock.UtcNow;
+        var response = new SaleReprintRequestDto(Guid.CreateVersion7(), sale.Id, now, "SOLICITADA");
+        await repository.AddIdempotencyAsync(new OperacionIdempotente
+        {
+            Id = response.RequestId, InstalacionId = installation.Id, TerminalId = terminal.Id,
+            UsuarioId = actor.UserId, ClaveIdempotencia = key, TipoOperacion = "SOLICITAR_REIMPRESION",
+            HashSolicitud = Hash($"{actor.UserId:N}:{saleId:N}"), Entidad = nameof(Venta),
+            EntidadId = saleId, Resultado = JsonSerializer.Serialize(response),
+            CorrelacionId = Guid.CreateVersion7(), FechaRegistro = now.UtcDateTime
+        }, cancellationToken);
+        await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId,
+            AuditAction.SaleReprintRequested, nameof(Venta), saleId,
+            new { response.RequestId, Status = "SOLICITADA" }, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Result.Success(response);
+    }
+
+    private static SaleReceiptDto ToReceipt(Venta sale)
+    {
+        var detail = Map(sale);
+        return new SaleReceiptDto(sale.Id, detail.VisibleNumber, detail.OccurredAtUtc,
+            detail.OperatingDate, sale.TipoVenta, sale.Estado, detail.GrossSubtotal,
+            detail.DiscountTotal, detail.Total, detail.Change, detail.Lines,
+            detail.Payments.Select(x => new SaleReceiptPaymentDto(x.MethodCode, x.AppliedAmount,
+                x.ReceivedAmount, x.Change)).ToArray());
     }
 
     private async Task<(UserAuthorizationSnapshot? Snapshot, ApplicationError? Error)> RequireAsync(

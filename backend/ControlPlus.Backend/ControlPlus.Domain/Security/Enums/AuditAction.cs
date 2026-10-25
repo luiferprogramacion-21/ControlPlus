@@ -91,5 +91,9 @@ public enum AuditAction
     LayawayAuthorizationRejected = 83,
     LayawayPaymentApplied = 84,
     LayawayDelivered = 85,
-    LayawayCancelled = 86
+    LayawayCancelled = 86,
+    SaleReprintRequested = 87,
+    SaleCancelled = 88,
+    SaleCancellationAuthorizationRejected = 89,
+    SaleCancellationReasonsInitialized = 90
 }

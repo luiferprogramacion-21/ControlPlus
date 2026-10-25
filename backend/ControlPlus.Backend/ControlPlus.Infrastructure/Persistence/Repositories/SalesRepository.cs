@@ -75,6 +75,18 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
                  x.Estado == CashConstants.ActiveSessionState,
             cancellationToken);
 
+    public async Task<SesionOperador?> GetActiveOperatorSessionForUpdateAsync(Guid shiftId,
+        Guid terminalId, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.SesionOperador.FromSqlInterpolated($"""
+            SELECT s.* FROM caja.sesion_operador AS s
+            WHERE s.turno_caja_id = {shiftId} AND s.terminal_id = {terminalId}
+              AND s.usuario_id = {userId} AND s.estado = 'ACTIVA'
+            FOR UPDATE
+            """).AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
     public async Task<ConsecutivoDocumento?> GetSaleSequenceForUpdateAsync(
         Guid installationId,
         string series,
@@ -184,4 +196,51 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
             .Include(x => x.PagoVenta).ThenInclude(x => x.MetodoPago)
             .Include(x => x.Credito)
             .SingleOrDefaultAsync(x => x.Id == saleId, cancellationToken);
+
+    public async Task<Venta?> GetSaleForUpdateAsync(Guid saleId, CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Venta.FromSqlInterpolated($"SELECT * FROM ventas.venta WHERE id = {saleId} FOR UPDATE")
+            .AsTracking().ToArrayAsync(cancellationToken);
+        var sale = rows.SingleOrDefault();
+        if (sale is null) return null;
+        await dbContext.Entry(sale).Collection(x => x.DetalleVenta).LoadAsync(cancellationToken);
+        await dbContext.Entry(sale).Collection(x => x.PagoVenta).LoadAsync(cancellationToken);
+        foreach (var payment in sale.PagoVenta)
+            await dbContext.Entry(payment).Reference(x => x.MetodoPago).LoadAsync(cancellationToken);
+        await dbContext.Entry(sale).Reference(x => x.Credito).LoadAsync(cancellationToken);
+        return sale;
+    }
+
+    public async Task<IReadOnlyCollection<MotivoOperacion>> GetCancellationReasonsAsync(Guid establishmentId,
+        string operationType, CancellationToken cancellationToken = default) =>
+        await dbContext.MotivoOperacion.AsNoTracking()
+            .Where(x => x.EstablecimientoId == establishmentId && x.TipoOperacion == operationType)
+            .OrderBy(x => x.OrdenVisual).ThenBy(x => x.Codigo).ToArrayAsync(cancellationToken);
+
+    public Task AddCancellationReasonsAsync(IReadOnlyCollection<MotivoOperacion> reasons,
+        CancellationToken cancellationToken = default) =>
+        dbContext.MotivoOperacion.AddRangeAsync(reasons, cancellationToken);
+
+    public Task AddSaleCancellationAsync(AnulacionVenta cancellation, CancellationToken cancellationToken = default) =>
+        dbContext.AnulacionVenta.AddAsync(cancellation, cancellationToken).AsTask();
+
+    public async Task<IReadOnlyCollection<MovimientoInventario>> GetSaleInventoryMovementsAsync(Guid saleId,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.MovimientoInventario.AsNoTracking()
+            .Where(x => x.VentaId == saleId && x.TipoMovimiento == "VENTA")
+            .OrderBy(x => x.ProductoId).ToArrayAsync(cancellationToken);
+
+    public Task<bool> HasInventoryReversalAsync(Guid movementId, CancellationToken cancellationToken = default) =>
+        dbContext.MovimientoInventario.AnyAsync(x => x.MovimientoRevertidoId == movementId, cancellationToken);
+
+    public Task<MovimientoCaja?> GetOriginalSaleCashMovementAsync(Guid saleId,
+        CancellationToken cancellationToken = default) =>
+        dbContext.MovimientoCaja.AsNoTracking().SingleOrDefaultAsync(x => x.PagoVenta.Any(p => p.VentaId == saleId),
+            cancellationToken);
+
+    public Task<bool> HasCashReversalAsync(Guid movementId, CancellationToken cancellationToken = default) =>
+        dbContext.MovimientoCaja.AnyAsync(x => x.MovimientoRevertidoId == movementId, cancellationToken);
+
+    public Task<int> GetCreditPaymentCountAsync(Guid creditId, CancellationToken cancellationToken = default) =>
+        dbContext.PagoCredito.CountAsync(x => x.CreditoId == creditId, cancellationToken);
 }
