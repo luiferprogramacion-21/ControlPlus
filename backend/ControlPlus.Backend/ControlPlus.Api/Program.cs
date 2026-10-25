@@ -135,6 +135,7 @@ builder.Services.AddScoped<ICashService, CashService>();
 builder.Services.AddScoped<ISalesService, SalesService>();
 builder.Services.AddScoped<IFinancialSalesReportService, FinancialSalesReportService>();
 builder.Services.AddScoped<IDailyCashFlowService, DailyCashFlowService>();
+builder.Services.AddScoped<IDashboardSummaryService, DashboardSummaryService>();
 builder.Services.AddScoped<IDocumentNumberingService, DocumentNumberingService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();

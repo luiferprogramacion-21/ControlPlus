@@ -40,6 +40,7 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<ISalesRepository, EfSalesRepository>();
         services.AddScoped<IFinancialSalesReportRepository, EfFinancialSalesReportRepository>();
         services.AddScoped<IDailyCashFlowRepository, EfDailyCashFlowRepository>();
+        services.AddScoped<IDashboardInstallationRepository, EfDashboardInstallationRepository>();
         services.AddScoped<ISalesTransactionManager, EfSalesTransactionManager>();
         services.AddScoped<IDocumentNumberingRepository, EfDocumentNumberingRepository>();
         services.AddScoped<IDocumentNumberingTransactionManager, EfDocumentNumberingTransactionManager>();

@@ -105,6 +105,87 @@ public sealed class SalesApiFlowTests : IAsyncLifetime
         Assert.Empty(report.Days[1].Payments);
         Assert.Equal(0m, report.Days[1].PaymentTotal);
     }
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task DashboardSummary_UsesActiveInstallationOperatingDateAndPersistedSourcesWithoutDoubleCounting()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await using (var scope = _factory!.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            var active = await db.Instalacion.Include(x => x.Establecimiento).SingleAsync(x => x.Activo);
+            active.Establecimiento.ZonaHoraria = "Pacific/Kiritimati";
+            await db.SaveChangesAsync();
+        }
+        await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "dashboard-mixed-sale",
+            new ConfirmSaleRequest(null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
+                [new("EFECTIVO", 400m, 400m, null),
+                 new("TRANSFERENCIA", 600m, null, "DASHBOARD-REFERENCE")])), HttpStatusCode.Created);
+
+        var adminSession = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Admin.AccessToken,
+            (await GetCurrentAdminIdAsync()).Id);
+        SetBearer(client, scenario.Admin.AccessToken);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
+            "/api/cash/movements/incomes", new CreateCashMovementRequest(25m, "Ingreso dashboard", adminSession.Id))).StatusCode);
+
+        await using var verifyScope = _factory!.Services.CreateAsyncScope();
+        var context = verifyScope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var installation = await context.Instalacion.AsNoTracking().Include(x => x.Establecimiento).SingleAsync(x => x.Activo);
+        var persistedSale = await context.Venta.AsNoTracking().SingleAsync(x => x.Id == sale.Id);
+        var payments = await context.PagoVenta.AsNoTracking().Where(x => x.VentaId == sale.Id).ToArrayAsync();
+        var shift = await context.TurnoCaja.AsNoTracking().SingleAsync(x => x.Id == persistedSale.TurnoCajaId);
+        var linkedMovementId = Assert.Single(payments.Select(x => x.MovimientoCajaId).Distinct());
+        Assert.NotNull(linkedMovementId);
+        var linkedMovement = await context.MovimientoCaja.AsNoTracking().SingleAsync(x => x.Id == linkedMovementId);
+        var manual = await context.MovimientoCaja.AsNoTracking().SingleAsync(x =>
+            x.TurnoCajaId == shift.Id && x.Concepto == "Ingreso dashboard");
+        Assert.Equal(installation.Id, persistedSale.InstalacionId);
+        Assert.Equal(2, payments.Length);
+        Assert.Equal("Pacific/Kiritimati", installation.Establecimiento.ZonaHoraria);
+        var expectedDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(
+            DateTimeOffset.UtcNow, TimeZoneInfo.FindSystemTimeZoneById(installation.Establecimiento.ZonaHoraria)).DateTime);
+        Assert.Equal(expectedDate, shift.FechaOperativa);
+        Assert.Equal(expectedDate, persistedSale.FechaOperativa);
+        Assert.Equal(25m, manual.Valor);
+        Assert.Equal(payments.Sum(x => x.ValorAplicado), linkedMovement.Valor);
+
+        var response = await ReadAsync<DashboardSummary>(await client.GetAsync("/api/dashboard/summary"), HttpStatusCode.OK);
+        Assert.Equal(expectedDate, response.OperatingDate);
+        Assert.Equal(new SalesAmount(1, persistedSale.Total), response.CashSales);
+        Assert.Equal(new SalesAmount(0, 0m), response.CreditSales);
+        Assert.Equal(new SalesAmount(1, persistedSale.Total), response.TotalSales);
+        Assert.Equal(shift.MontoInicial, response.OpeningBalance);
+        Assert.Equal(payments.Sum(x => x.ValorAplicado), response.PaymentTotal);
+        Assert.Equal(manual.Valor, response.ManualTotal);
+        Assert.Equal(payments.Sum(x => x.ValorAplicado) + manual.Valor, response.NetCashFlow);
+
+        var permissionId = await GetPermissionIdAsync(client, PermissionCodes.FinancialReportsRead);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{scenario.Users.Supervisor.Id}/permissions/{permissionId}",
+            new SetUserPermissionRequest(true))).StatusCode);
+        var granted = await LoginAsync(client, SupervisorUser, SupervisorPassword);
+        SetBearer(client, granted.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/dashboard/summary")).StatusCode);
+        SetBearer(client, scenario.Admin.AccessToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{scenario.Users.Supervisor.Id}/permissions/{permissionId}",
+            new SetUserPermissionRequest(false))).StatusCode);
+        var revoked = await LoginAsync(client, SupervisorUser, SupervisorPassword);
+        SetBearer(client, revoked.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/dashboard/summary")).StatusCode);
+
+        async Task<Usuario> GetCurrentAdminIdAsync()
+        {
+            await using var scope = _factory!.Services.CreateAsyncScope();
+            return await scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>()
+                .Usuario.AsNoTracking().SingleAsync(x => x.NombreUsuario == AdminUser);
+        }
+    }
+
     private const string AdminUser = "sales.admin.test";
     private const string AdminPassword = "Sales-Administrator-Test-2026!";
     private const string SupervisorUser = "sales.supervisor.test";
