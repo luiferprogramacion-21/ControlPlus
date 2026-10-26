@@ -64,4 +64,4 @@ Los contratos raíz y anidados rechazan propiedades JSON desconocidas. Los error
 
 La auditoría registra IDs internos, resultado, estado y correlación necesarios. Omite contraseña, JWT, `Idempotency-Key`, referencia electrónica, dirección, correo, observaciones y datos personales o importes innecesarios. Los intentos fallidos de autorización se registran sin credenciales; un fallo de COMMIT revierte la auditoría de éxito junto con la operación.
 
-Permanecen pendientes la cancelación de créditos, reversión o anulación de abonos, intereses, mora, cuotas, límites de crédito, `CREDIT.FUTURE_BLOCK`, cambios/devoluciones de venta, impresión física y operaciones `PUT`, `PATCH` o `DELETE` sobre créditos y abonos. No se hizo eliminación física.
+Permanecen pendientes la cancelación general de créditos, reversión o anulación de abonos, intereses, mora, cuotas, límites de crédito, `CREDIT.FUTURE_BLOCK`, impresión física y operaciones `PUT`, `PATCH` o `DELETE` sobre créditos y abonos. Los ajustes de un crédito pendiente o vencido por cambio posterior de productos se describen en [sales-changes.md](sales-changes.md). No se hizo eliminación física.

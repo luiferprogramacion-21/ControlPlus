@@ -3,8 +3,9 @@
 ## Alcance del primer corte
 
 La anulación posterior se documenta en [sales-cancellation.md](sales-cancellation.md).
+El cambio posterior de productos se documenta en [sales-changes.md](sales-changes.md).
 
-Ventas confirma `CONTADO` y `CREDITO`. Si falta `saleType`, se mantiene `CONTADO` como valor predeterminado. Contado admite cliente opcional, precios minorista y mayorista, y pagos con Efectivo, Transferencia, Nequi o una combinación de estos. Crédito exige cliente activo, vencimiento y autorización, sin pago inicial. Los abonos se describen en [credits.md](credits.md). Apartados, anulaciones, cambios, devoluciones, reembolsos e impresión física permanecen fuera de este corte.
+Ventas confirma `CONTADO` y `CREDITO`. Si falta `saleType`, se mantiene `CONTADO` como valor predeterminado. Contado admite cliente opcional, precios minorista y mayorista, y pagos con Efectivo, Transferencia, Nequi o una combinación de estos. Crédito exige cliente activo, vencimiento y autorización, sin pago inicial. Los abonos se describen en [credits.md](credits.md). La anulación y el cambio posterior tienen cortes propios; la impresión física permanece pendiente.
 
 La numeración usa el registro oficial `configuracion.consecutivo_documento` de tipo `VENTA` para la instalación y serie activas. Si ese consecutivo no existe, la confirmación responde `409`; la API no inventa prefijos ni series.
 

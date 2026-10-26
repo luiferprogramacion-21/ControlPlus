@@ -10,7 +10,7 @@ using ControlPlus.Domain.Security.Enums;
 
 namespace ControlPlus.Application.Numbering.Services;
 
-public sealed class DocumentNumberingService(
+public sealed partial class DocumentNumberingService(
     IDocumentNumberingRepository repository,
     IDocumentNumberingTransactionManager transactionManager,
     IPermissionChecker permissionChecker,

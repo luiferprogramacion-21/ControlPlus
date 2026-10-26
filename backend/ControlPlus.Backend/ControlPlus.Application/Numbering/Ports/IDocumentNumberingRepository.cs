@@ -5,6 +5,9 @@ namespace ControlPlus.Application.Numbering.Ports;
 
 public interface IDocumentNumberingRepository
 {
+    Task<ConsecutivoDocumento?> GetSaleChangeNumberingAsync(
+        Guid installationId, string series, bool forUpdate,
+        CancellationToken cancellationToken = default);
     Task<Instalacion?> GetActiveInstallationAsync(
         bool forUpdate,
         CancellationToken cancellationToken = default);

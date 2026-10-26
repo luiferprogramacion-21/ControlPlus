@@ -95,5 +95,9 @@ public enum AuditAction
     SaleReprintRequested = 87,
     SaleCancelled = 88,
     SaleCancellationAuthorizationRejected = 89,
-    SaleCancellationReasonsInitialized = 90
+    SaleCancellationReasonsInitialized = 90,
+    SaleChangeNumberingCreated = 91,
+    SaleChanged = 92,
+    SaleChangeAuthorizationRejected = 93,
+    SaleChangePolicyUpdated = 94
 }

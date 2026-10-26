@@ -142,6 +142,9 @@ public sealed partial class SalesService
         if (!SaleCancellationEligibility.IsCurrentConfirmedSale(sale.Estado, sale.Version, request.ExpectedVersion) ||
             sale.TipoVenta is not ("CONTADO" or "CREDITO"))
             return Result.Failure<CancelSaleDto>(ApplicationError.Conflict("Solo puede anularse una venta confirmada de contado o crédito."));
+        if (await repository.HasConfirmedChangesAsync(sale.Id, ct))
+            return Result.Failure<CancelSaleDto>(ApplicationError.Conflict(
+                "Una venta con cambios confirmados no admite anulación de la venta original."));
         var reasons = await repository.GetCancellationReasonsAsync(installation.EstablecimientoId,
             "ANULACION_VENTA", ct);
         var reason = reasons.SingleOrDefault(x => x.Id == request.ReasonId && IsApprovedSaleReason(x));

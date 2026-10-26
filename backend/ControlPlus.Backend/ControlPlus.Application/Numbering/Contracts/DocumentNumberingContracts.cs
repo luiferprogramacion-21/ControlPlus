@@ -37,6 +37,11 @@ public sealed record UpdatePurchaseDocumentNumberingRequest(string Prefix, long 
 
 public interface IDocumentNumberingService
 {
+    Task<Result<SalesDocumentNumberingDto>> GetSaleChangesAsync(
+        ActorContext actor, CancellationToken cancellationToken = default);
+    Task<Result<SalesDocumentNumberingDto>> CreateSaleChangesAsync(
+        ActorContext actor, CreateSalesDocumentNumberingRequest request,
+        CancellationToken cancellationToken = default);
     Task<Result<SalesDocumentNumberingDto>> GetLayawaysAsync(
         ActorContext actor, CancellationToken cancellationToken = default);
 

@@ -41,6 +41,8 @@ Los únicos endpoints anónimos son los de salud y los flujos de autenticación 
 | Caja | `/api/cash` | `CASH.*`, `CONFIGURATION.MANAGE` o `USERS.MANAGE` según operación |
 | Ventas | `/api/sales` | `SALES.CREATE`, `SALES.OWN_READ` o `SALES.ALL_READ` según operación |
 | Numeración de Ventas | `/api/document-numbering/sales` | `NUMBERING.MANAGE` |
+| Cambios de venta | `/api/sales/change-search`, `/api/sales/{saleId}/change-preparation`, `/changes` y `/api/sales/change-policy` | Lectura propia/general, `SALES.CREATE` para confirmar y `CONFIGURATION.MANAGE` para plazo; véase [sales-changes.md](sales-changes.md) |
+| Numeración de cambios | `/api/document-numbering/sale-changes` | `NUMBERING.MANAGE`; creación por Administrador |
 | Clientes | `/api/customers` | `CUSTOMERS.BASIC_MANAGE` o `CUSTOMERS.MANAGE` según operación |
 | Proveedores | `/api/suppliers` | Lectura `SUPPLIERS.READ`; escritura Administrador y `SUPPLIERS.MANAGE` efectivos |
 | Compras: registro y recepción | `/api/purchases` | Administrador o Supervisor vigente y `PURCHASES.RECEIVE` efectivo |

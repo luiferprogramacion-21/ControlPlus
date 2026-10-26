@@ -29,6 +29,11 @@ public sealed class EfDocumentNumberingTransactionManager(OfficialControlPlusDbC
 public sealed class EfDocumentNumberingRepository(OfficialControlPlusDbContext dbContext)
     : IDocumentNumberingRepository
 {
+    public Task<ConsecutivoDocumento?> GetSaleChangeNumberingAsync(
+        Guid installationId, string series, bool forUpdate,
+        CancellationToken cancellationToken = default) =>
+        GetLayawaySequenceAsync(installationId, series, "CAMBIO_VENTA", forUpdate, cancellationToken);
+
     public async Task<Instalacion?> GetActiveInstallationAsync(
         bool forUpdate,
         CancellationToken cancellationToken = default)

@@ -96,6 +96,57 @@ public sealed record SaleSummaryDto(
 
 public sealed record SaleListQuery(int Page = 1, int PageSize = 20);
 
+public sealed record SaleChangeLineAvailabilityDto(Guid SaleLineId, Guid ProductId,
+    string ProductCode, string ProductName, int SoldQuantity, int ReturnedQuantity,
+    int RemainingQuantity);
+
+public sealed record SaleChangePreparationDto(Guid SaleId, string VisibleNumber, string SaleType,
+    string SaleState, long SaleVersion, DateOnly OperatingDate, DateOnly ChangeDeadline,
+    DateOnly CurrentLocalDate, bool WithinDeadline, bool CanStartChange,
+    IReadOnlyCollection<SaleChangeLineAvailabilityDto> Lines,
+    Guid? CreditId, long? CreditVersion, decimal? CreditBalance);
+
+public sealed record SaleChangePolicyDto(int Days, long Version);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record UpdateSaleChangePolicyRequest([property: JsonRequired] int Days,
+    [property: JsonRequired] long ExpectedVersion);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record SaleChangeReturnRequest(Guid SaleLineId, int Quantity, bool Resellable);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record SaleChangeDeliveryRequest(Guid ProductId, int Quantity, string PriceType);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record SaleChangePaymentRequest(string MethodCode, decimal Amount,
+    decimal? ReceivedAmount, string? Reference);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ConfirmSaleChangeRequest(
+    [property: JsonRequired] long ExpectedSaleVersion,
+    long? ExpectedCreditVersion,
+    IReadOnlyCollection<SaleChangeReturnRequest> Returned,
+    IReadOnlyCollection<SaleChangeDeliveryRequest> Delivered,
+    string Treatment,
+    IReadOnlyCollection<SaleChangePaymentRequest> Payments,
+    SaleCreditAuthorizationRequest? Authorization,
+    string? Reason = null);
+
+public sealed record SaleChangeDto(Guid Id, Guid SaleId, string VisibleNumber,
+    string State, DateTimeOffset OccurredAtUtc, decimal TotalReturned,
+    decimal TotalDelivered, decimal Difference, string Treatment,
+    decimal CreditAdjustment, decimal PaidOrRefunded, Guid CorrelationId,
+    IReadOnlyCollection<SaleChangeDetailDto> Details,
+    IReadOnlyCollection<SaleChangePaymentDto> Payments);
+
+public sealed record SaleChangeDetailDto(Guid Id, string Type, Guid ProductId,
+    Guid? OriginalSaleLineId, int Quantity, decimal UnitPrice,
+    decimal Discount, decimal NetAmount);
+
+public sealed record SaleChangePaymentDto(Guid Id, string Type, string MethodCode,
+    decimal Amount, decimal? ReceivedAmount, decimal Change, string? Reference);
+
 public sealed record SaleReceiptDto(Guid SaleId, string VisibleNumber, DateTimeOffset OccurredAtUtc,
     DateOnly OperatingDate, string SaleType, string State, decimal GrossSubtotal,
     decimal DiscountTotal, decimal Total, decimal Change,
@@ -120,6 +171,19 @@ public sealed record CancelSaleDto(Guid SaleId, string VisibleNumber, string Sta
 
 public interface ISalesService
 {
+    Task<Result<SaleChangePolicyDto>> GetChangePolicyAsync(ActorContext actor,
+        CancellationToken cancellationToken = default);
+    Task<Result<SaleChangePolicyDto>> UpdateChangePolicyAsync(ActorContext actor,
+        UpdateSaleChangePolicyRequest request, CancellationToken cancellationToken = default);
+    Task<Result<SaleChangePreparationDto>> FindChangeSaleAsync(ActorContext actor,
+        string visibleNumber, CancellationToken cancellationToken = default);
+    Task<Result<SaleChangePreparationDto>> GetChangePreparationAsync(ActorContext actor,
+        Guid saleId, CancellationToken cancellationToken = default);
+    Task<Result<SaleChangeDto>> ConfirmChangeAsync(ActorContext actor, Guid saleId,
+        string idempotencyKey, ConfirmSaleChangeRequest request,
+        CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyCollection<SaleChangeDto>>> ListChangesAsync(ActorContext actor,
+        Guid saleId, CancellationToken cancellationToken = default);
     Task<Result<SaleDto>> ConfirmAsync(
         ActorContext actor,
         string idempotencyKey,

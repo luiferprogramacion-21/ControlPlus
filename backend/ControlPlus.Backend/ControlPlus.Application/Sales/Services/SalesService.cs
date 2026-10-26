@@ -213,6 +213,10 @@ public sealed partial class SalesService(
         }
         if (input.SaleType == "CONTADO" && paymentValidation is not null) return Result.Failure<SaleDto>(paymentValidation);
 
+        if (establishment.DiasLimiteCambio > DateOnly.MaxValue.DayNumber - shift.FechaOperativa.DayNumber)
+            return Result.Failure<SaleDto>(ApplicationError.Conflict(
+                "El plazo de cambio configurado excede el rango de fechas de la venta."));
+
         var now = clock.UtcNow;
         var correlationId = Guid.CreateVersion7();
         sequence.UltimoNumero++;

@@ -21,6 +21,8 @@ public interface ISalesRepository
 {
     Task<Instalacion?> GetActiveInstallationForUpdateAsync(CancellationToken cancellationToken = default);
     Task<Establecimiento?> GetActiveEstablishmentAsync(CancellationToken cancellationToken = default);
+    Task<Establecimiento?> GetActiveEstablishmentForUpdateAsync(
+        CancellationToken cancellationToken = default);
     Task<Terminal?> GetActiveTerminalAsync(Guid installationId, CancellationToken cancellationToken = default);
     Task<TurnoCaja?> GetOpenShiftForUpdateAsync(CancellationToken cancellationToken = default);
     Task<SesionOperador?> GetActiveOperatorSessionAsync(Guid shiftId, Guid terminalId, Guid userId, CancellationToken cancellationToken = default);
@@ -45,6 +47,28 @@ public interface ISalesRepository
 
     Task<PagedResult<Venta>> ListAsync(Guid? userId, SaleListQuery query, CancellationToken cancellationToken = default);
     Task<Venta?> GetSaleAsync(Guid saleId, CancellationToken cancellationToken = default);
+    Task<Venta?> FindSaleByVisibleNumberAsync(string visibleNumber,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<Guid, int>> GetConfirmedReturnedQuantitiesAsync(Guid saleId,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<CambioVenta>> GetChangesAsync(Guid saleId,
+        CancellationToken cancellationToken = default);
+    Task<bool> HasConfirmedChangesAsync(Guid saleId,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<Guid, decimal>> GetConfirmedChangeNetPaymentsByMethodAsync(Guid saleId,
+        CancellationToken cancellationToken = default);
+    Task<ConsecutivoDocumento?> GetChangeSequenceForUpdateAsync(Guid installationId,
+        string series, CancellationToken cancellationToken = default);
+    Task<Credito?> GetSaleCreditForUpdateAsync(Guid saleId,
+        CancellationToken cancellationToken = default);
+    Task AddChangeAsync(CambioVenta change, CancellationToken cancellationToken = default);
+    Task AddChangeDetailsAsync(IReadOnlyCollection<DetalleCambioVenta> details,
+        CancellationToken cancellationToken = default);
+    Task AddChangePaymentsAsync(IReadOnlyCollection<PagoCambioVenta> payments,
+        CancellationToken cancellationToken = default);
+    Task AddCreditChangeAdjustmentAsync(AjusteCreditoCambio adjustment,
+        CancellationToken cancellationToken = default);
+    void MarkSaleChanged(Venta sale);
     Task<Venta?> GetSaleForUpdateAsync(Guid saleId, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<MotivoOperacion>> GetCancellationReasonsAsync(Guid establishmentId,
         string operationType, CancellationToken cancellationToken = default);

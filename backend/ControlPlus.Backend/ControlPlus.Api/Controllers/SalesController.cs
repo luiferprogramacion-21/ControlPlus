@@ -61,6 +61,38 @@ public sealed class SalesController(
         return actor is null ? MissingActor() : FromResult(await salesService.ListAllAsync(actor, query, cancellationToken), Ok);
     }
 
+    /// <summary>Consulta el plazo para futuras ventas; las fechas límite históricas no cambian.</summary>
+    [HttpGet("change-policy")]
+    [PermissionAuthorize(PermissionCodes.ConfigurationManage)]
+    [ProducesResponseType<SaleChangePolicyDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<IActionResult> GetChangePolicy(CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.GetChangePolicyAsync(actor,
+            cancellationToken), Ok);
+    }
+
+    /// <summary>Configura el plazo de cambio para ventas nuevas, con versión y auditoría.</summary>
+    [HttpPut("change-policy")]
+    [PermissionAuthorize(PermissionCodes.ConfigurationManage)]
+    [Consumes("application/json")]
+    [ProducesResponseType<SaleChangePolicyDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> UpdateChangePolicy([FromBody] UpdateSaleChangePolicyRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.UpdateChangePolicyAsync(actor,
+            request, cancellationToken), Ok);
+    }
+
     /// <summary>Consulta una venta si pertenece al actor o si este puede leer el historial general.</summary>
     [HttpGet("{saleId:guid}")]
     [Authorize]
@@ -72,6 +104,71 @@ public sealed class SalesController(
     {
         var actor = await GetActorAsync(cancellationToken);
         return actor is null ? MissingActor() : FromResult(await salesService.GetAsync(actor, saleId, cancellationToken), Ok);
+    }
+
+    /// <summary>Busca por número visible una venta para preparar un cambio de productos.</summary>
+    [HttpGet("change-search")]
+    [Authorize]
+    [ProducesResponseType<SaleChangePreparationDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<IActionResult> FindChangeSale([FromQuery, Required] string visibleNumber,
+        CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.FindChangeSaleAsync(actor,
+            visibleNumber, cancellationToken), Ok);
+    }
+
+    /// <summary>Consulta el plazo y las cantidades pendientes de devolución de una venta.</summary>
+    [HttpGet("{saleId:guid}/change-preparation")]
+    [Authorize]
+    [ProducesResponseType<SaleChangePreparationDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<IActionResult> GetChangePreparation(Guid saleId, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.GetChangePreparationAsync(actor,
+            saleId, cancellationToken), Ok);
+    }
+
+    /// <summary>Consulta el historial confirmado de cambios de productos de una venta.</summary>
+    [HttpGet("{saleId:guid}/changes")]
+    [Authorize]
+    [ProducesResponseType<IReadOnlyCollection<SaleChangeDto>>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<IActionResult> ListChanges(Guid saleId, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.ListChangesAsync(actor,
+            saleId, cancellationToken), Ok);
+    }
+
+    /// <summary>Confirma un cambio autorizado con inventario, Caja y crédito atómicos.</summary>
+    [HttpPost("{saleId:guid}/changes")]
+    [PermissionAuthorize(PermissionCodes.SalesCreate)]
+    [Consumes("application/json")]
+    [ProducesResponseType<SaleChangeDto>(StatusCodes.Status201Created, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> ConfirmChange(Guid saleId,
+        [FromHeader(Name = "Idempotency-Key"), Required] string idempotencyKey,
+        [FromBody] ConfirmSaleChangeRequest request, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        if (actor is null) return MissingActor();
+        var result = await salesService.ConfirmChangeAsync(actor, saleId, idempotencyKey,
+            request, cancellationToken);
+        return FromResult(result, change => CreatedAtAction(nameof(ListChanges), new { saleId }, change));
     }
 
     /// <summary>Obtiene los datos históricos del comprobante de una venta confirmada.</summary>

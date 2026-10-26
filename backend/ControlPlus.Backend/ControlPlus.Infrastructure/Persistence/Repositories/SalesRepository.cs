@@ -45,6 +45,16 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
             .OrderBy(x => x.FechaCreacion).ThenBy(x => x.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<Establecimiento?> GetActiveEstablishmentForUpdateAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Establecimiento.FromSqlRaw("""
+            SELECT e.* FROM configuracion.establecimiento AS e
+            WHERE e.activo ORDER BY e.fecha_creacion, e.id LIMIT 1 FOR UPDATE
+            """).AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
     public Task<Terminal?> GetActiveTerminalAsync(Guid installationId, CancellationToken cancellationToken = default) =>
         dbContext.Terminal.AsNoTracking()
             .Where(x => x.InstalacionId == installationId && x.Activo)
@@ -196,6 +206,104 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
             .Include(x => x.PagoVenta).ThenInclude(x => x.MetodoPago)
             .Include(x => x.Credito)
             .SingleOrDefaultAsync(x => x.Id == saleId, cancellationToken);
+
+    public async Task<Venta?> FindSaleByVisibleNumberAsync(string visibleNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var installation = await dbContext.Instalacion.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Activo, cancellationToken);
+        if (installation is null) return null;
+        var separator = $"-{installation.Serie}-";
+        var boundary = visibleNumber.LastIndexOf(separator, StringComparison.Ordinal);
+        if (boundary <= 0 || !long.TryParse(visibleNumber.AsSpan(boundary + separator.Length),
+                System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture,
+                out var consecutive) || consecutive <= 0)
+            return null;
+        var prefix = visibleNumber[..boundary];
+        var saleId = await dbContext.Venta.AsNoTracking()
+            .Where(x => x.InstalacionId == installation.Id && x.Prefijo == prefix &&
+                x.Serie == installation.Serie && x.Consecutivo == consecutive)
+            .Select(x => (Guid?)x.Id).SingleOrDefaultAsync(cancellationToken);
+        return saleId is Guid id ? await GetSaleAsync(id, cancellationToken) : null;
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, int>> GetConfirmedReturnedQuantitiesAsync(Guid saleId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.DetalleCambioVenta.AsNoTracking()
+            .Where(x => x.DetalleVentaOrigenId != null && x.TipoDetalle == "DEVUELTO" &&
+                x.CambioVenta.VentaId == saleId && x.CambioVenta.Estado == "CONFIRMADO")
+            .GroupBy(x => x.DetalleVentaOrigenId!.Value)
+            .Select(x => new { SaleLineId = x.Key, Quantity = x.Sum(y => y.Cantidad) })
+            .ToArrayAsync(cancellationToken);
+        return rows.ToDictionary(x => x.SaleLineId, x => x.Quantity);
+    }
+
+    public async Task<IReadOnlyCollection<CambioVenta>> GetChangesAsync(Guid saleId,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.CambioVenta.AsNoTracking()
+            .Where(x => x.VentaId == saleId)
+            .Include(x => x.DetalleCambioVenta)
+            .Include(x => x.PagoCambioVenta).ThenInclude(x => x.MetodoPago)
+            .OrderBy(x => x.FechaHora).ThenBy(x => x.Id)
+            .ToArrayAsync(cancellationToken);
+
+    public Task<bool> HasConfirmedChangesAsync(Guid saleId,
+        CancellationToken cancellationToken = default) =>
+        dbContext.CambioVenta.AsNoTracking()
+            .AnyAsync(x => x.VentaId == saleId && x.Estado == "CONFIRMADO", cancellationToken);
+
+    public async Task<IReadOnlyDictionary<Guid, decimal>> GetConfirmedChangeNetPaymentsByMethodAsync(Guid saleId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.PagoCambioVenta.AsNoTracking()
+            .Where(x => x.CambioVenta.VentaId == saleId && x.CambioVenta.Estado == "CONFIRMADO" &&
+                x.Estado == "APLICADO")
+            .GroupBy(x => x.MetodoPagoId)
+            .Select(x => new { MethodId = x.Key, Amount = x.Sum(y =>
+                y.TipoMovimiento == "COBRO" ? y.Valor : -y.Valor) })
+            .ToArrayAsync(cancellationToken);
+        return rows.ToDictionary(x => x.MethodId, x => x.Amount);
+    }
+
+    public async Task<ConsecutivoDocumento?> GetChangeSequenceForUpdateAsync(Guid installationId,
+        string series, CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.ConsecutivoDocumento.FromSqlInterpolated($"""
+            SELECT c.* FROM configuracion.consecutivo_documento AS c
+            WHERE c.instalacion_id = {installationId}
+              AND c.tipo_documento = 'CAMBIO_VENTA' AND c.serie = {series}
+            FOR UPDATE
+            """).AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
+    public async Task<Credito?> GetSaleCreditForUpdateAsync(Guid saleId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Credito.FromSqlInterpolated($"""
+            SELECT c.* FROM ventas.credito AS c WHERE c.venta_id = {saleId} FOR UPDATE
+            """).AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
+    public Task AddChangeAsync(CambioVenta change, CancellationToken cancellationToken = default) =>
+        dbContext.CambioVenta.AddAsync(change, cancellationToken).AsTask();
+
+    public Task AddChangeDetailsAsync(IReadOnlyCollection<DetalleCambioVenta> details,
+        CancellationToken cancellationToken = default) =>
+        dbContext.DetalleCambioVenta.AddRangeAsync(details, cancellationToken);
+
+    public Task AddChangePaymentsAsync(IReadOnlyCollection<PagoCambioVenta> payments,
+        CancellationToken cancellationToken = default) =>
+        dbContext.PagoCambioVenta.AddRangeAsync(payments, cancellationToken);
+
+    public Task AddCreditChangeAdjustmentAsync(AjusteCreditoCambio adjustment,
+        CancellationToken cancellationToken = default) =>
+        dbContext.AjusteCreditoCambio.AddAsync(adjustment, cancellationToken).AsTask();
+
+    public void MarkSaleChanged(Venta sale) =>
+        dbContext.Entry(sale).Property(x => x.Estado).IsModified = true;
 
     public async Task<Venta?> GetSaleForUpdateAsync(Guid saleId, CancellationToken cancellationToken = default)
     {
