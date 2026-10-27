@@ -235,3 +235,37 @@ En la evidencia anterior, la fixture suministró una conexión temporal al proce
 Las claves de seguridad usadas por las pruebas se generan dentro de `Testing`. La contraseña del rol de pruebas se solicita fuera del repositorio y se limpia de la variable de entorno al terminar; la base persistente `controlplus` no se modifica.
 
 Para pruebas manuales use `ControlPlus.Api/ControlPlus.Api.http` o OpenAPI en Development/Testing (`/openapi/v1.json`). Los marcadores no contienen secretos. La suite actual usa bases temporales nativas, sin leer `.env` ni modificar `controlplus`. La suite verifica también los contratos OpenAPI de `cashDifference`, `totalDifference` y estado propio.
+
+## Historial comercial de clientes — focalizadas del 27 de octubre de 2026
+
+La selección contiene **9 Facts: 8 integraciones PostgreSQL y 1 contrato OpenAPI**. Los nombres completos descubiertos por VSTest son:
+
+| Clase (`ControlPlus.Api.Tests.`) | Método |
+| --- | --- |
+| `CustomerHistoryApiFlowTests` | `History_SalesScope_HonorsOwnAllGrantsAndRevocations` |
+| `CustomerHistoryApiFlowTests` | `History_ModulePermissions_FilterCreditsPaymentsAndLayawaysIndependently` |
+| `CustomerHistoryApiFlowTests` | `History_IsolatesInstallationAndCustomerForEveryType` |
+| `CustomerHistoryApiFlowTests` | `History_Pagination_CountsOnlyVisibleOperations` |
+| `CustomerHistoryApiFlowTests` | `History_SameTimestamp_UsesStableTypeAndIdOrdering` |
+| `CustomerHistoryApiFlowTests` | `History_PublicProjection_IsReadOnlyAndOmitsCosts` |
+| `CustomerHistoryApiFlowTests` | `History_CatalogPermission_IsPersistedAssignableAndRevocationWins` |
+| `CustomersApiFlowTests` | `History_RequiresEffectivePermissionAndHidesInactiveCustomers` |
+| `OpenApiCustomerHistoryContractTests` | `History_ExposesProtectedGetPaginationPublicProjectionAndProblemContracts` |
+
+`scripts/Run-CustomerHistoryTests.ps1` es compatible con Windows PowerShell 5.1 y ejecuta exclusivamente esos nueve nombres mediante un filtro de igualdad. Restaura y compila `ControlPlus.Api.Tests` con sus dependencias, descubre los casos y compara la lista completa con el manifiesto antes de solicitar la contraseña del rol `controlplus_test_admin`. La conexión administrativa apunta a `postgres` en `127.0.0.1:5432`; el arnés verifica PostgreSQL 18, `CREATEDB` y ausencia de `SUPERUSER`, y crea/elimina exclusivamente bases propias `controlplus_test_<UUID>`. No se configura ni se abre `controlplus`.
+
+La evidencia se guarda en una carpeta nueva `%TEMP%\ControlPlus-CustomerHistory-<UUID>` con `discovery.txt` y `CustomerHistory.trx`. El script requiere salida 0, resultado `Completed`, `total=executed=passed=9`, cero fallidas/omitidas/abortadas y nueve resultados `Passed` cuyos nombres coincidan exactamente con el manifiesto. Restaura la variable de conexión previa y limpia las referencias a la contraseña al terminar. No modifica `Run-LocalTests.ps1` ni ejecuta la suite completa.
+
+Validación previa realizada por el agente: build serial completo de `ControlPlus.Backend.slnx` con salida 0, 0 errores y 0 advertencias; descubrimiento real de los nueve casos; contrato OpenAPI **1/1**, 0 fallidas y 0 omitidas. El TRX de OpenAPI se conserva en `TestResults/customer-history-focused-20261027/OpenApi.trx`. La sintaxis del script y su verificador TRX se probaron con Windows PowerShell `5.1.26100.9711`: acepta el resultado válido y rechaza nombres o conteos incompatibles. La comprobación de traducción de EF/Npgsql generó `UNION ALL`, filtros, orden y paginación SQL sin abrir una conexión. No hubo acceso a la base persistente ni migración nueva de permisos.
+
+### Correcciones del arnés y del corredor focalizado
+
+La validación inicial en Windows detectó siete fallos en el alta de producto del bootstrap, antes de consultar el historial: faltaba `Idempotency-Key` para registrar las existencias iniciales. Se corrigió el arnés para utilizar su helper de POST idempotente y se amplió la aserción HTTP con método, ruta y campos públicos del problema, sin volcar respuestas de autenticación.
+
+El script imprime ruta del TRX, resultado, contadores y nombres de casos no aprobados antes de validar el éxito. Un resultado global `Failed` termina con error y conserva visibles esos diagnósticos. El parámetro opcional `-FailedOnlyFromTrx <ruta>` selecciona exclusivamente los nombres `Failed` del informe anterior, exige que pertenezcan al manifiesto de las nueve focalizadas y rechaza duplicados. Sin ese parámetro selecciona nueve. Ambos modos descubren y verifican los nombres y exigen un TRX completo con el conteo exacto de su selección. Cada ejecución genera su propia carpeta de evidencia.
+
+Validación de las correcciones realizada por el agente: build serial completo con salida 0, 0 errores y 0 advertencias; descubrimiento VSTest de los nueve nombres; sintaxis y funciones del script comprobadas en Windows PowerShell `5.1.26100.9711` contra un TRX fallido y el TRX OpenAPI aprobado. Se comprobó la presentación del conteo y de los siete nombres antes del error, así como las selecciones de repetición y predeterminada de 7 y 9 casos.
+
+### Resultado final comunicado por el usuario
+
+El 27 de octubre de 2026, el usuario comunicó que las focalizadas de historial comercial ejecutadas en Windows mediante `Run-CustomerHistoryTests.ps1` aprobaron **9/9**, con TRX `Completed`, salida `0`, **0 fallidas y 0 omitidas**. Este resultado se registra como evidencia comunicada por el usuario; no corresponde a una ejecución realizada por el agente. No se indicó la ruta del TRX final en ese mensaje. La revisión final del diff comprobó permisos efectivos y alcance de ventas propias, aislamiento por instalación y cliente, conteo posterior al filtro, orden estable, proyección sin costos y contrato OpenAPI. No se ejecutó la suite completa ni se accedió a `controlplus` durante esta revisión.

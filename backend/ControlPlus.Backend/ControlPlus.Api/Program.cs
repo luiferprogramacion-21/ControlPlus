@@ -139,6 +139,7 @@ builder.Services.AddScoped<IDashboardSummaryService, DashboardSummaryService>();
 builder.Services.AddScoped<IDocumentNumberingService, DocumentNumberingService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<ICustomerHistoryService, CustomerHistoryService>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<ICreditsService, CreditsService>();
 builder.Services.AddScoped<ILayawayCreateService, LayawayCreateService>();

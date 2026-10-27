@@ -577,6 +577,52 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         Assert.Equal("Before", persisted.FullName); Assert.Equal(1, persisted.Version);
     }
 
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task History_RequiresEffectivePermissionAndHidesInactiveCustomers()
+    {
+        using var client = CreateClient();
+        var users = await BootstrapAsync(client);
+        SetBearer(client, users.Admin.Token.AccessToken);
+        var customer = await CreateAsync(client, new(null, null, "Historial", null, "Dirección", null, null));
+        var url = $"/api/customers/{customer.Id}/history";
+        var empty = await ReadAsync<PagedResult<CustomerHistoryItem>>(await client.GetAsync(url), HttpStatusCode.OK);
+        Assert.Empty(empty.Items);
+        Assert.Equal(0, empty.TotalCount);
+        var nextPage = await ReadAsync<PagedResult<CustomerHistoryItem>>(
+            await client.GetAsync(url + "?page=2&pageSize=1"), HttpStatusCode.OK);
+        Assert.Empty(nextPage.Items);
+        Assert.Equal(2, nextPage.Page);
+        Assert.Equal(1, nextPage.PageSize);
+        await AssertProblemAsync(await client.GetAsync(url + "?page=0"), HttpStatusCode.BadRequest, "validation.failed");
+        await AssertProblemAsync(await client.GetAsync(url + "?pageSize=101"), HttpStatusCode.BadRequest, "validation.failed");
+        await AssertProblemAsync(await client.GetAsync($"/api/customers/{Guid.NewGuid()}/history"), HttpStatusCode.NotFound, "resource.not_found");
+
+        SetBearer(client, users.Cashier.Token.AccessToken);
+        var cashierPage = await ReadAsync<PagedResult<CustomerHistoryItem>>(await client.GetAsync(url), HttpStatusCode.OK);
+        Assert.Empty(cashierPage.Items);
+        SetBearer(client, users.Admin.Token.AccessToken);
+        var historyPermission = await PermissionIdAsync(client, PermissionCodes.CustomersHistoryRead);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{users.Cashier.User.Id}/permissions/{historyPermission}",
+            new SetUserPermissionRequest(false))).StatusCode);
+        var revoked = await LoginAsync(client, CashierName, _cashierPassword);
+        SetBearer(client, revoked.AccessToken);
+        await AssertProblemAsync(await client.GetAsync(url), HttpStatusCode.Forbidden, "authorization.forbidden");
+
+        SetBearer(client, users.Admin.Token.AccessToken);
+        await SetStatusAsync(client, customer.Id, false, customer.Version);
+        var managePermission = await PermissionIdAsync(client, PermissionCodes.CustomersManage);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{users.Supervisor.User.Id}/permissions/{managePermission}",
+            new SetUserPermissionRequest(false))).StatusCode);
+        var limitedSupervisor = await LoginAsync(client, SupervisorName, _supervisorPassword);
+        SetBearer(client, limitedSupervisor.AccessToken);
+        await AssertProblemAsync(await client.GetAsync(url), HttpStatusCode.NotFound, "resource.not_found");
+        SetBearer(client, users.Admin.Token.AccessToken);
+        Assert.Empty((await ReadAsync<PagedResult<CustomerHistoryItem>>(await client.GetAsync(url), HttpStatusCode.OK)).Items);
+    }
+
     private async Task<TestUsers> BootstrapAsync(HttpClient client)
     {
         using var setup = new HttpRequestMessage(HttpMethod.Post, "/api/auth/setup")

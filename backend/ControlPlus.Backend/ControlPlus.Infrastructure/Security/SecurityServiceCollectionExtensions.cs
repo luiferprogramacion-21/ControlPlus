@@ -46,6 +46,7 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<IDocumentNumberingTransactionManager, EfDocumentNumberingTransactionManager>();
         services.AddScoped<IInventoryRepository, EfInventoryRepository>();
         services.AddScoped<ICustomerRepository, EfCustomerRepository>();
+        services.AddScoped<ICustomerHistoryRepository, EfCustomerHistoryRepository>();
         services.AddScoped<ISupplierRepository, EfSupplierRepository>();
         services.AddScoped<ICreditsRepository, EfCreditsRepository>();
         services.AddScoped<ILayawayCreateRepository, EfLayawayCreateRepository>();

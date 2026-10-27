@@ -231,3 +231,7 @@ La API usa `application/problem+json` para errores conocidos. Los estados más f
 | `503` | Dependencia no disponible, como la base de datos en salud o configuración de instalación no habilitada. |
 
 Para los contratos completos de solicitud y respuesta, use el documento OpenAPI generado. El archivo `ControlPlus.Api/ControlPlus.Api.http` contiene solicitudes manuales con marcadores locales, no con secretos.
+
+### Historial comercial de clientes
+
+`GET /api/customers/{customerId}/history?page=1&pageSize=20` devuelve una página de ventas, créditos, abonos, apartados y pagos de apartado vinculados al cliente en la instalación activa. Orden estable por fecha UTC descendente, tipo ascendente e ID descendente. Cada fila publica `id`, `type`, `parentId`, `number`, `occurredAt`, `status`, `amount` y `outstandingAmount`; no publica costos. Requiere `CUSTOMERS.HISTORY_READ` y permiso de lectura de la ficha. Los tipos se filtran por `SALES.ALL_READ` o ventas propias con `SALES.OWN_READ`, `CREDIT.MANAGE` y `LAYAWAY.MANAGE`. Véase `docs/customers.md` para la semántica completa.
