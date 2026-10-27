@@ -28,6 +28,11 @@ public static class ControlledPreflightRunner
 
         var safeTarget = targetMigration;
 
+        if (string.Equals(targetMigration, InitialProductInventoryPreflightRunner.TargetMigration, StringComparison.Ordinal))
+        {
+            return await InitialProductInventoryPreflightRunner.RunAsync(configuration, targetMigration, cancellationToken);
+        }
+
         if (string.Equals(targetMigration, CustomerSearchMigration, StringComparison.Ordinal))
         {
             return await CustomerSearchPreflightRunner.RunAsync(

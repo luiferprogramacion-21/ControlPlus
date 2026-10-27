@@ -106,3 +106,40 @@ dotnet test ControlPlus.Infrastructure.Tests
 ```
 
 Las pruebas eliminan sus bases temporales al finalizar y nunca usan la base persistente de desarrollo.
+
+## Inventario inicial de producto (preparado, sin aplicar)
+
+La migración `20261026010000_InitialProductInventoryMovementV1` admite
+`INVENTARIO_INICIAL`, añade una restricción para sus cantidades, costos y
+referencias, y un índice único por producto. No modifica movimientos históricos
+ni datos de `controlplus`. Su `Down` rechaza la reversión si ya existen
+movimientos iniciales. Antes de aplicarla a una base persistente, verificar el
+historial completo, realizar y comprobar un respaldo y obtener autorización
+específica. El migrador exige que todas las predecesoras estén aplicadas y que
+esta sea la primera pendiente; no aplicará otras junto con ella. La base local
+podría tener migraciones anteriores pendientes que requieren evaluación y
+autorización separadas. El preflight controlado comprueba el historial de las diez
+predecesoras, la restricción oficial y la ausencia de los dos nombres reservados
+en una transacción `REPEATABLE READ, READ ONLY` que termina con rollback. El usuario
+reportó su validación dentro de las focalizadas API 25/25 en PostgreSQL temporal;
+véase [testing.md](testing.md) para las ejecuciones separadas. Esto no autoriza su
+aplicación a una base persistente.
+
+El DDL y la fila de historial se confirman en la transacción de EF Core; un error
+durante esa transacción los revierte juntos. El corredor también comprueba el
+historial después del commit. Si falla esa comprobación o se pierde la conexión
+durante el commit, el código de fallo no demuestra que la migración se haya
+revertido: su estado queda incierto y debe verificarse en solo lectura antes de
+decidir cualquier reintento, sin volver a ejecutar el destino automáticamente.
+
+La aplicación se hace en un proceso separado de la API local:
+
+```powershell
+$env:CONTROLPLUS_MIGRATIONS_ENABLED = 'true'
+dotnet ControlPlus.Api.dll --preflight-to 20261026010000_InitialProductInventoryMovementV1
+dotnet ControlPlus.Api.dll --migrate-to 20261026010000_InitialProductInventoryMovementV1
+```
+
+La API normal no migra. El comando requiere usar el DLL compilado y la
+configuración de la instalación que se haya autorizado.
+El contrato de alta se describe en [product-initial-stock-design.md](product-initial-stock-design.md).

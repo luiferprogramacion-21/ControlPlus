@@ -1,5 +1,8 @@
 # Productos y Categorías
 
+El contrato de alta con cantidad y costo inicial, su idempotencia y sus permisos
+se describen en [product-initial-stock-design.md](product-initial-stock-design.md).
+
 ## Alcance V1
 
 El módulo implementa alta, consulta, edición, activación e inactivación lógica de Categorías y Productos. No expone borrado físico.

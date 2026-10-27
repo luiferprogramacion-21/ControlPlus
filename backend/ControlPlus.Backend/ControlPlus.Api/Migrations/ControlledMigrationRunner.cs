@@ -11,6 +11,7 @@ public static class ControlledMigrationRunner
 {
     public const int FailedExitCode = 1;
     public const int RejectedExitCode = 2;
+    public const string InitialProductInventoryMigration = "20261026010000_InitialProductInventoryMovementV1";
 
     public static async Task<ControlledMigrationResult> RunAsync(
         IConfiguration configuration,
@@ -98,6 +99,13 @@ public static class ControlledMigrationRunner
                 return Rejected(
                     safeTarget,
                     "Customer search indexes require Inventory as the sixth and last applied migration and can only apply the customer index target");
+            }
+
+            if (string.Equals(targetMigration, InitialProductInventoryMigration, StringComparison.Ordinal) &&
+                (targetIndex != applied.Length || pending.Length == 0 ||
+                 !string.Equals(pending[0], targetMigration, StringComparison.Ordinal)))
+            {
+                return Rejected(safeTarget, "initial product inventory must be the first pending migration and can only apply that target");
             }
 
             var requestedSequence = expectedPending.Take(targetIndex - applied.Length + 1).ToArray();

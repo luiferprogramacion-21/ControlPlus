@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using ControlPlus.Application.Catalog.Contracts;
 using ControlPlus.Application.Catalog.Ports;
 using ControlPlus.Application.Common;
@@ -5,6 +8,7 @@ using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Application.Security.Ports;
 using ControlPlus.Application.Security.Services;
 using ControlPlus.Domain.OfficialModel;
+using ControlPlus.Domain.Purchases;
 using ControlPlus.Domain.Security.Enums;
 
 namespace ControlPlus.Application.Catalog.Services;
@@ -12,6 +16,7 @@ namespace ControlPlus.Application.Catalog.Services;
 public sealed class CatalogService(
     ICatalogRepository repository,
     IPermissionChecker permissionChecker,
+    IUserRepository userRepository,
     IAuditRepository auditRepository,
     IUnitOfWork unitOfWork,
     IClock clock) : ICatalogService
@@ -175,10 +180,59 @@ public sealed class CatalogService(
     }
 
     public async Task<Result<ProductDto>> CreateProductAsync(
-        ActorContext actor, CreateProductRequest request, CancellationToken cancellationToken = default)
+        ActorContext actor, CreateProductRequest request, CancellationToken cancellationToken = default,
+        string? idempotencyKey = null)
     {
+        var key = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim();
+        if (idempotencyKey is not null && (key is null || key.Length > 100))
+            return Result.Failure<ProductDto>(ApplicationError.Validation("Idempotency-Key debe tener entre 1 y 100 caracteres."));
+        if (request.InitialQuantity < 0)
+            return Result.Failure<ProductDto>(ApplicationError.Validation("La existencia inicial no puede ser negativa."));
+        if (request.InitialQuantity > 0 && key is null)
+            return Result.Failure<ProductDto>(ApplicationError.Validation("Idempotency-Key es obligatorio para existencias iniciales."));
+        if (request.InitialQuantity > 0 && request.InitialUnitCost is null)
+            return Result.Failure<ProductDto>(ApplicationError.Validation("El costo inicial es obligatorio cuando hay existencias."));
+        if (request.InitialQuantity == 0 && request.InitialUnitCost is not null)
+            return Result.Failure<ProductDto>(ApplicationError.Validation("El costo inicial requiere existencias positivas."));
+        if (request.InitialUnitCost is decimal cost &&
+            (cost < 0 || cost > PurchaseCostPolicy.MaximumFourPlaceAmount || cost != decimal.Round(cost, 4)))
+            return Result.Failure<ProductDto>(ApplicationError.Validation("El costo inicial debe ser no negativo y tener hasta cuatro decimales dentro de numeric(18,4)."));
+
+        await using var transaction = await repository.BeginTransactionAsync(cancellationToken);
+        Instalacion? installation = null;
+        Terminal? terminal = null;
+        string? requestHash = null;
+        if (key is not null)
+        {
+            installation = await repository.GetActiveInstallationForUpdateAsync(cancellationToken);
+            if (installation is null) return Result.Failure<ProductDto>(ApplicationError.NotFound("la instalación activa"));
+        }
         var error = await RequireAsync(actor, PermissionCodes.ProductsCreate, cancellationToken);
         if (error is not null) return Result.Failure<ProductDto>(error);
+        if (request.InitialQuantity > 0)
+        {
+            var authorization = await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
+            if (authorization is null || !authorization.Roles.Any(role =>
+                    role.Code is RoleCodes.Administrator or RoleCodes.Supervisor))
+                return Result.Failure<ProductDto>(ApplicationError.Forbidden());
+        }
+        if (key is not null)
+        {
+            requestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request))));
+            var existing = await repository.GetIdempotencyAsync(installation!.Id, key, cancellationToken);
+            if (existing is not null)
+            {
+                if (existing.UsuarioId != actor.UserId || existing.TipoOperacion != "CREAR_PRODUCTO" ||
+                    existing.HashSolicitud != requestHash || existing.Entidad != nameof(Producto) ||
+                    existing.EntidadId is null || existing.Resultado is null)
+                    return Result.Failure<ProductDto>(ApplicationError.Conflict("La clave de idempotencia ya fue utilizada con otra solicitud."));
+                var saved = JsonSerializer.Deserialize<ProductDto>(existing.Resultado)!;
+                var canViewCost = await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.ProductCostsRead, cancellationToken);
+                return Result.Success(saved.RestrictCostVisibility(canViewCost));
+            }
+            terminal = await repository.GetActiveTerminalAsync(installation.Id, cancellationToken);
+            if (terminal is null) return Result.Failure<ProductDto>(ApplicationError.NotFound("la terminal activa"));
+        }
         var requestedInternalCode = NormalizeOptional(request.InternalCode)?.ToUpperInvariant();
         var validation = ValidateProduct(requestedInternalCode, request.Name, request.Description, request.Barcode,
             request.BarcodeFormat, request.GenerateBarcode, request.RetailPrice, request.WholesalePrice,
@@ -209,11 +263,46 @@ public sealed class CatalogService(
             actor.UserId, clock.UtcNow, productId);
         product.Categoria = related.Category!;
         product.UnidadMedida = related.Unit!;
+        MovimientoInventario? movement = null;
+        var correlationId = Guid.CreateVersion7();
+        if (request.InitialQuantity > 0)
+        {
+            product.StockActual = request.InitialQuantity;
+            product.CostoPromedio = request.InitialUnitCost;
+            movement = new MovimientoInventario
+            {
+                Id = Guid.CreateVersion7(), ProductoId = product.Id, Producto = product,
+                UsuarioId = actor.UserId, TipoMovimiento = "INVENTARIO_INICIAL",
+                CantidadStock = request.InitialQuantity, CantidadReservada = 0,
+                StockAnterior = 0, StockPosterior = request.InitialQuantity,
+                ReservadoAnterior = 0, ReservadoPosterior = 0,
+                CostoPromedioAnterior = null, CostoPromedioPosterior = request.InitialUnitCost,
+                FechaHora = clock.UtcNow.UtcDateTime, CorrelacionId = correlationId
+            };
+            await repository.AddMovementAsync(movement, cancellationToken);
+        }
         await repository.AddProductAsync(product, cancellationToken);
         await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId, AuditAction.ProductCreated,
-            nameof(Producto), product.Id, new { product.CodigoInterno, product.Nombre, product.CategoriaId }, cancellationToken);
+            nameof(Producto), product.Id, new { product.CodigoInterno, product.Nombre, product.CategoriaId,
+                InitialQuantity = request.InitialQuantity, MovementId = movement?.Id },
+            cancellationToken, correlationId, terminal?.Id);
+        var canSeeCost = await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.ProductCostsRead, cancellationToken);
+        if (key is not null)
+        {
+            var operation = new OperacionIdempotente
+            {
+                Id = Guid.CreateVersion7(), InstalacionId = installation!.Id, TerminalId = terminal!.Id,
+                UsuarioId = actor.UserId, ClaveIdempotencia = key, TipoOperacion = "CREAR_PRODUCTO",
+                HashSolicitud = requestHash!, Entidad = nameof(Producto), EntidadId = product.Id,
+                CorrelacionId = correlationId, FechaRegistro = clock.UtcNow.UtcDateTime,
+                Resultado = JsonSerializer.Serialize(Map(product, canSeeCost))
+            };
+            await repository.AddIdempotencyAsync(operation, cancellationToken);
+        }
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return Result.Success(Map(product, actor.HasPermission(PermissionCodes.ProductCostsRead)));
+        var response = Map(product, canSeeCost);
+        await transaction.CommitAsync(cancellationToken);
+        return Result.Success(response);
     }
 
     public async Task<Result<ProductDto>> UpdateProductAsync(

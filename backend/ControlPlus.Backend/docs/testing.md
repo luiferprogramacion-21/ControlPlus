@@ -1,5 +1,35 @@
 # Pruebas
 
+## Existencia y costo inicial — cierre de revisión
+
+Las siguientes ejecuciones se conservan como evidencias separadas. Los resultados
+de Windows fueron reportados por el usuario; no se ejecutaron de nuevo durante
+la preparación del staging.
+
+| Ejecución | Resultado | Alcance y límite |
+|---|---|---|
+| Focalizadas iniciales en Windows | API 20/20 e Infrastructure 1/1; salida 0 en ambas | Versión anterior a las correcciones de replay y preflight. |
+| Focalizadas de correcciones sin PostgreSQL | 12/12, sin fallidas ni omitidas; salida 0 | Cuatro casos de visibilidad de replay, seis de la expresión del preflight y dos de OpenAPI. |
+| Focalizadas integradas en Windows tras revisión | API 25/25 e Infrastructure 1/1; salida 0 en ambas | Incluyen los cinco casos añadidos de replay, literales SQL y rollback tardío de migración. |
+| Suite API en Windows | 520 casos: 519 aprobados y 1 fallido | Único fallo: `SalesApiFlowTests.OfficialSharedSessionSchemaAndEfModel_RemainUnchanged`; la expectativa de historial no incluía la migración aprobada. |
+| Prueba aislada en Windows tras corregir la expectativa | 1/1 aprobada | Se añadió `20261026010000_InitialProductInventoryMovementV1` al final del historial esperado. Se conservaron la comparación exacta y las aserciones de sesión compartida y modelo EF. |
+
+El proyecto `ControlPlus.Api.Tests` compiló tras esa corrección con 0 errores y
+0 advertencias. El resultado aislado no convierte la ejecución anterior en una
+suite API 520/520 en una sola ejecución. Tampoco acredita una nueva ejecución
+completa exitosa de Domain, Infrastructure y API en conjunto.
+
+Las integraciones del corte usan el rol `controlplus_test_admin`, la base
+administrativa `postgres` y bases temporales `controlplus_test_<UUID>`. No se
+accedió ni se aplicó la migración a `controlplus` durante este trabajo. La
+migración permanece preparada para una aplicación persistente futura con
+respaldo verificado y autorización específica.
+
+El cambio de orquestación de `scripts/Run-LocalTests.ps1` se revisa por separado
+y queda fuera del staging de este corte. Solo tiene validación de sintaxis en
+Windows PowerShell 5.1, seis casos TRX sintéticos y orquestación simulada; no se
+presenta como una ejecución real de las tres suites.
+
 ## Apartados — cortes 1 a 3 (árbol local sin publicar)
 
 Después de los últimos ajustes, la compilación serial de la solución terminó con **0 errores y 0 advertencias**. Las focalizadas sin PostgreSQL terminaron `LayawayPolicyTests` **6/6** y API (`LayawayQueryServiceTests` y `OpenApiLayawayContractTests`) **8/8**; la suite completa Domain terminó **46/46**, sin fallos ni omitidas.

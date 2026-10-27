@@ -4,11 +4,43 @@ using ControlPlus.Application.Common;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Infrastructure.Persistence.Official;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace ControlPlus.Infrastructure.Persistence.Repositories;
 
 public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) : ICatalogRepository
 {
+    public async Task<ICatalogTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
+        new CatalogTransaction(await dbContext.Database.BeginTransactionAsync(cancellationToken));
+
+    public async Task<Instalacion?> GetActiveInstallationForUpdateAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Instalacion.FromSqlRaw(
+            "SELECT i.* FROM configuracion.instalacion AS i WHERE i.activo ORDER BY i.fecha_instalacion, i.id LIMIT 1 FOR UPDATE")
+            .AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
+    public Task<Terminal?> GetActiveTerminalAsync(Guid installationId, CancellationToken cancellationToken = default) =>
+        dbContext.Terminal.AsNoTracking().Where(x => x.InstalacionId == installationId && x.Activo)
+            .OrderBy(x => x.FechaCreacion).ThenBy(x => x.Id).FirstOrDefaultAsync(cancellationToken);
+
+    public Task<OperacionIdempotente?> GetIdempotencyAsync(Guid installationId, string key, CancellationToken cancellationToken = default) =>
+        dbContext.OperacionIdempotente.AsNoTracking().SingleOrDefaultAsync(
+            x => x.InstalacionId == installationId && x.ClaveIdempotencia == key, cancellationToken);
+
+    public Task AddIdempotencyAsync(OperacionIdempotente operation, CancellationToken cancellationToken = default) =>
+        dbContext.OperacionIdempotente.AddAsync(operation, cancellationToken).AsTask();
+
+    public Task AddMovementAsync(MovimientoInventario movement, CancellationToken cancellationToken = default) =>
+        dbContext.MovimientoInventario.AddAsync(movement, cancellationToken).AsTask();
+
+    private sealed class CatalogTransaction(IDbContextTransaction transaction) : ICatalogTransaction
+    {
+        public Task CommitAsync(CancellationToken cancellationToken = default) => transaction.CommitAsync(cancellationToken);
+        public ValueTask DisposeAsync() => transaction.DisposeAsync();
+    }
+
     public async Task<PagedResult<Categoria>> ListCategoriesAsync(
         CategoryListQuery query, CancellationToken cancellationToken = default)
     {

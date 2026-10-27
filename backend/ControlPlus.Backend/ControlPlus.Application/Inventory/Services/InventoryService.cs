@@ -31,7 +31,7 @@ public sealed class InventoryService(
     {
         "COMPRA", "ANULACION_COMPRA", "VENTA", "ANULACION_VENTA", "RESERVA_APARTADO",
         "LIBERACION_APARTADO", "ENTREGA_APARTADO", "CAMBIO_DEVOLUCION", "CAMBIO_ENTREGA",
-        "AJUSTE_ENTRADA", "AJUSTE_SALIDA", "REVERSO"
+        "AJUSTE_ENTRADA", "AJUSTE_SALIDA", "REVERSO", "INVENTARIO_INICIAL"
     };
 
     public async Task<Result<PagedResult<InventoryStockDto>>> ListStockAsync(

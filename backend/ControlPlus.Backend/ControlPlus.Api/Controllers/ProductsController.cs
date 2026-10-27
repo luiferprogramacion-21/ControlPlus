@@ -53,11 +53,12 @@ public sealed class ProductsController(
     [ProducesResponseType<ProductDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> Create([FromBody] CreateProductRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create([FromBody] CreateProductRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey, CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
         if (actor is null) return MissingActor();
-        var result = await catalogService.CreateProductAsync(actor, request, cancellationToken);
+        var result = await catalogService.CreateProductAsync(actor, request, cancellationToken, idempotencyKey);
         return FromResult(result, x => CreatedAtAction(nameof(Get), new { productId = x.Id }, x));
     }
 

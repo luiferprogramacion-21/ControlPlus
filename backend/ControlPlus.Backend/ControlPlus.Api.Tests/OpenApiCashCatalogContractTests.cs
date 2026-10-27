@@ -35,10 +35,18 @@ public sealed class OpenApiCashCatalogContractTests
         var create = schemas.GetProperty("CreateProductRequest");
         Assert.True(create.GetProperty("properties").TryGetProperty("internalCode", out _));
         Assert.DoesNotContain("internalCode", Required(create));
+        Assert.True(create.GetProperty("properties").TryGetProperty("initialQuantity", out _));
+        Assert.True(create.GetProperty("properties").TryGetProperty("initialUnitCost", out _));
+        Assert.DoesNotContain("initialQuantity", Required(create));
+        Assert.DoesNotContain("initialUnitCost", Required(create));
         Assert.Contains("internalCode", Required(schemas.GetProperty("UpdateProductRequest")));
         Assert.Contains("internalCode", Required(schemas.GetProperty("ProductDto")));
         var paths = document.RootElement.GetProperty("paths");
-        Assert.True(paths.GetProperty("/api/products").GetProperty("post").GetProperty("security").GetArrayLength() > 0);
+        var post = paths.GetProperty("/api/products").GetProperty("post");
+        Assert.True(post.GetProperty("security").GetArrayLength() > 0);
+        Assert.Contains(post.GetProperty("parameters").EnumerateArray(), x =>
+            x.GetProperty("name").GetString() == "Idempotency-Key" &&
+            (!x.TryGetProperty("required", out var required) || !required.GetBoolean()));
         Assert.True(paths.GetProperty("/api/products/{productId}").GetProperty("put").GetProperty("security").GetArrayLength() > 0);
     }
 

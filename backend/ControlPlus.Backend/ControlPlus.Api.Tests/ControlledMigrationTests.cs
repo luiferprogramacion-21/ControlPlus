@@ -208,6 +208,35 @@ public sealed class ControlledMigrationTests(ControlledMigrationPostgresFixture 
     }
 
     [Fact]
+    public async Task InitialProductInventory_RejectsEarlierPendingMigrationsAndAppliesOnlyExactTarget()
+    {
+        var connectionString = await postgres.CreateDatabaseAsync();
+        const string previousPurchase = "20261014010000_InventoryMovementRegistrationOrderV1";
+        const string previous = "20261021010000_LayawayCancellationOptionalReasonV1";
+        var target = ControlledMigrationRunner.InitialProductInventoryMigration;
+        await ApplyAsync(connectionString, previousPurchase);
+        var rejected = await RunApiProcessAsync(connectionString, "true",
+            ControlledExecutionCommand.MigrationTargetArgument, target);
+        Assert.Equal(2, rejected.ExitCode);
+        Assert.Contains("first pending migration", rejected.Output, StringComparison.Ordinal);
+        Assert.Equal(8L, await HistoryCountAsync(connectionString));
+        Assert.Equal(0L, await MigrationCountAsync(connectionString, target));
+
+        await ApplyAsync(connectionString, previous);
+        var applied = await RunApiProcessAsync(connectionString, "true",
+            ControlledExecutionCommand.MigrationTargetArgument, target);
+        Assert.Equal(0, applied.ExitCode);
+        Assert.False(applied.HttpPortObserved);
+        Assert.Equal(11L, await HistoryCountAsync(connectionString));
+        Assert.Equal(1L, await MigrationCountAsync(connectionString, target));
+
+        var repeated = await RunApiProcessAsync(connectionString, "true",
+            ControlledExecutionCommand.MigrationTargetArgument, target);
+        Assert.Equal(2, repeated.ExitCode);
+        Assert.Equal(11L, await HistoryCountAsync(connectionString));
+    }
+
+    [Fact]
     public async Task ProviderFailure_ReturnsNonZeroWithoutRevealingConnectionSecret()
     {
         var connectionString = await postgres.CreateDatabaseAsync();

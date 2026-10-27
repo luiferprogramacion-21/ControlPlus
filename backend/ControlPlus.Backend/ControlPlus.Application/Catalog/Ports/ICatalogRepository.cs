@@ -6,6 +6,12 @@ namespace ControlPlus.Application.Catalog.Ports;
 
 public interface ICatalogRepository
 {
+    Task<ICatalogTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
+    Task<Instalacion?> GetActiveInstallationForUpdateAsync(CancellationToken cancellationToken = default);
+    Task<Terminal?> GetActiveTerminalAsync(Guid installationId, CancellationToken cancellationToken = default);
+    Task<OperacionIdempotente?> GetIdempotencyAsync(Guid installationId, string key, CancellationToken cancellationToken = default);
+    Task AddIdempotencyAsync(OperacionIdempotente operation, CancellationToken cancellationToken = default);
+    Task AddMovementAsync(MovimientoInventario movement, CancellationToken cancellationToken = default);
     Task<PagedResult<Categoria>> ListCategoriesAsync(CategoryListQuery query, CancellationToken cancellationToken = default);
     Task<Categoria?> GetCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default);
     Task<bool> CategoryNameExistsAsync(string name, Guid? excludedId = null, CancellationToken cancellationToken = default);
@@ -23,4 +29,9 @@ public interface ICatalogRepository
     Task<bool> ProductInternalCodeExistsAsync(string code, Guid? excludedId = null, CancellationToken cancellationToken = default);
     Task<bool> ProductBarcodeExistsAsync(string barcode, Guid? excludedId = null, CancellationToken cancellationToken = default);
     Task AddProductAsync(Producto product, CancellationToken cancellationToken = default);
+}
+
+public interface ICatalogTransaction : IAsyncDisposable
+{
+    Task CommitAsync(CancellationToken cancellationToken = default);
 }

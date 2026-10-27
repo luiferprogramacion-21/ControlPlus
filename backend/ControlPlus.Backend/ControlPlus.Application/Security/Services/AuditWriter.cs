@@ -15,7 +15,9 @@ internal static class AuditWriter
         string entityType,
         Guid? entityId,
         object? details,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? correlationId = null,
+        Guid? terminalId = null)
     {
         var serializedDetails = details is null ? null : JsonSerializer.Serialize(details);
         var auditRecord = AuditRecord.Create(
@@ -24,7 +26,9 @@ internal static class AuditWriter
             entityType,
             entityId,
             serializedDetails,
-            clock.UtcNow);
+            clock.UtcNow,
+            correlationId?.ToString(),
+            terminalId: terminalId);
 
         return auditRepository.AddAsync(auditRecord, cancellationToken);
     }

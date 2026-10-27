@@ -12,7 +12,11 @@ internal sealed class OptionalProductInternalCodeSchemaTransformer : IOpenApiSch
     {
         // Positional record constructor parameters are otherwise marked required, even when nullable.
         if (context.JsonTypeInfo.Type == typeof(CreateProductRequest))
+        {
             schema.Required?.Remove("internalCode");
+            schema.Required?.Remove("initialQuantity");
+            schema.Required?.Remove("initialUnitCost");
+        }
         return Task.CompletedTask;
     }
 }
