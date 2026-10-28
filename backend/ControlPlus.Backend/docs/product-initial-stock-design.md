@@ -77,6 +77,12 @@ movimiento inicial por producto. Para el procedimiento y sus límites consulte
 [database.md](database.md). Las compras posteriores siguen creando movimientos
 `COMPRA` mediante Compras y Recepciones.
 
+El 28 de octubre de 2026 se confirmó su aplicación en la base local
+`controlplus` mediante un postflight independiente de solo lectura: historial
+exacto de once migraciones, restricciones validadas, índice único parcial válido
+y cero movimientos iniciales en ese momento. La evidencia operativa y la
+incidencia del postflight del script externo están en [database.md](database.md).
+
 ## Política aprobada
 
 Administrador y Supervisor con `PRODUCTS.CREATE` efectivo pueden crear

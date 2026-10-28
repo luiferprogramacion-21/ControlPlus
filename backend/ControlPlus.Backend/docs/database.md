@@ -107,23 +107,17 @@ dotnet test ControlPlus.Infrastructure.Tests
 
 Las pruebas eliminan sus bases temporales al finalizar y nunca usan la base persistente de desarrollo.
 
-## Inventario inicial de producto (preparado, sin aplicar)
+## Inventario inicial de producto (aplicado en la base local)
 
 La migración `20261026010000_InitialProductInventoryMovementV1` admite
 `INVENTARIO_INICIAL`, añade una restricción para sus cantidades, costos y
-referencias, y un índice único por producto. No modifica movimientos históricos
-ni datos de `controlplus`. Su `Down` rechaza la reversión si ya existen
-movimientos iniciales. Antes de aplicarla a una base persistente, verificar el
-historial completo, realizar y comprobar un respaldo y obtener autorización
-específica. El migrador exige que todas las predecesoras estén aplicadas y que
-esta sea la primera pendiente; no aplicará otras junto con ella. La base local
-podría tener migraciones anteriores pendientes que requieren evaluación y
-autorización separadas. El preflight controlado comprueba el historial de las diez
-predecesoras, la restricción oficial y la ausencia de los dos nombres reservados
-en una transacción `REPEATABLE READ, READ ONLY` que termina con rollback. El usuario
-reportó su validación dentro de las focalizadas API 25/25 en PostgreSQL temporal;
-véase [testing.md](testing.md) para las ejecuciones separadas. Esto no autoriza su
-aplicación a una base persistente.
+referencias, y un índice único por producto. No modifica movimientos históricos.
+Su `Down` rechaza la reversión si ya existen movimientos iniciales. El migrador
+exige que las diez predecesoras estén aplicadas y que este objetivo sea el primero
+pendiente. El preflight controlado comprueba ese historial, la restricción oficial
+y la ausencia de los dos nombres reservados en una transacción
+`REPEATABLE READ, READ ONLY` que termina con rollback. Las pruebas focalizadas
+previas figuran en [testing.md](testing.md).
 
 El DDL y la fila de historial se confirman en la transacción de EF Core; un error
 durante esa transacción los revierte juntos. El corredor también comprueba el
@@ -132,14 +126,29 @@ durante el commit, el código de fallo no demuestra que la migración se haya
 revertido: su estado queda incierto y debe verificarse en solo lectura antes de
 decidir cualquier reintento, sin volver a ejecutar el destino automáticamente.
 
-La aplicación se hace en un proceso separado de la API local:
+El 28 de octubre de 2026 el usuario informó que el preflight y el respaldo
+terminaron correctamente antes de la aplicación dirigida en
+`127.0.0.1:5432/controlplus`. Se usó HEAD
+`5ec17b6e088138499edaf74afbdbaec4aa601f94` y la DLL Release cuya huella
+SHA-256 fue `8758826772CC64B7BC240460FD4AB96E37855F45207394D526D296C567859EDC`.
+El respaldo externo al repositorio es
+`C:\Users\luife\ControlPlus-Backups\InitialProductInventory-20261028-011142-5178d185f0a84f6088df56fd0827c82a\controlplus.dump`:
+485285 bytes y SHA-256
+`3AA48A6923931A3040FE381F7B63597D4CCBC4274B3A1902F91039AC295DAF22`.
+La comprobación registrada del respaldo incluyó tamaño positivo y catálogo
+legible; esto no equivale a una restauración de prueba.
 
-```powershell
-$env:CONTROLPLUS_MIGRATIONS_ENABLED = 'true'
-dotnet ControlPlus.Api.dll --preflight-to 20261026010000_InitialProductInventoryMovementV1
-dotnet ControlPlus.Api.dll --migrate-to 20261026010000_InitialProductInventoryMovementV1
-```
+El script externo de aplicación informó éxito del migrador, pero falló su
+consulta de postflight. Una comprobación posterior **independiente**, de solo
+lectura, sí confirmó historial exacto de once migraciones, las dos restricciones
+validadas, el índice único parcial válido y cero movimientos
+`INVENTARIO_INICIAL`. El historial real usa `public."__EFMigrationsHistory"` y
+la columna `"MigrationId"`. El SQL del script externo
+`Apply-InitialProductInventory.ps1` debe corregir sus dos consultas de historial:
+`json_agg(migration_id ORDER BY migration_id)` por
+`json_agg("MigrationId" ORDER BY "MigrationId")`. El fallo de esa consulta no
+invalida el éxito del migrador ni reemplaza la comprobación independiente.
 
-La API normal no migra. El comando requiere usar el DLL compilado y la
-configuración de la instalación que se haya autorizado.
+Esta migración ya está aplicada en la base persistente local: no repetirla ni
+intentar su reversión automática. La API normal no aplica migraciones.
 El contrato de alta se describe en [product-initial-stock-design.md](product-initial-stock-design.md).
