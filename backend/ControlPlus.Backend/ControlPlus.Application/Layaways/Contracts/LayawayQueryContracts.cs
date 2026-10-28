@@ -4,11 +4,11 @@ using ControlPlus.Application.Security.Contracts;
 namespace ControlPlus.Application.Layaways.Contracts;
 
 public sealed record LayawayListQuery(int Page = 1, int PageSize = 20, string? State = null,
-    Guid? CustomerId = null, DateOnly? DueFrom = null, DateOnly? DueTo = null);
+    Guid? CustomerId = null, DateOnly? DueFrom = null, DateOnly? DueTo = null, bool? Overdue = null);
 
 public sealed record LayawayQueryDto(Guid Id, string Number, Guid CustomerId, string CustomerName,
     DateTimeOffset CreatedAtUtc, DateOnly DueOn, decimal Total, decimal InitialPayment,
-    decimal Balance, string State, long Version);
+    decimal Balance, string State, long Version, bool IsOverdue);
 
 public sealed record LayawayLineDto(Guid ProductId, string ProductCode, string ProductName,
     string Unit, int Quantity, decimal UnitPrice, decimal Subtotal);

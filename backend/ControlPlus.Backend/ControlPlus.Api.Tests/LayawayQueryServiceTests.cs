@@ -20,7 +20,7 @@ public sealed class LayawayQueryServiceTests
         var userId = Guid.CreateVersion7();
         var users = Users(userId, hasPermission: false);
         var repository = new QuerySpy();
-        var service = new LayawayQueryService(repository, users);
+        var service = new LayawayQueryService(repository, users, new FixedClock());
         var actor = new ActorContext(userId, RoleLevel.Administrador, [PermissionCodes.LayawayManage]);
 
         var list = await service.ListAsync(actor, new LayawayListQuery());
@@ -39,7 +39,7 @@ public sealed class LayawayQueryServiceTests
     {
         var userId = Guid.CreateVersion7();
         var repository = new QuerySpy();
-        var service = new LayawayQueryService(repository, Users(userId, hasPermission: true));
+        var service = new LayawayQueryService(repository, Users(userId, hasPermission: true), new FixedClock());
 
         var result = await service.ListAsync(new ActorContext(userId, RoleLevel.Cajero),
             new LayawayListQuery(Page: page, PageSize: pageSize));
@@ -53,7 +53,7 @@ public sealed class LayawayQueryServiceTests
     {
         var userId = Guid.CreateVersion7();
         var repository = new QuerySpy();
-        var service = new LayawayQueryService(repository, Users(userId, hasPermission: true));
+        var service = new LayawayQueryService(repository, Users(userId, hasPermission: true), new FixedClock());
 
         var result = await service.ListAsync(new ActorContext(userId, RoleLevel.Cajero),
             new LayawayListQuery(State: "PENDIENTE"));
@@ -95,7 +95,7 @@ public sealed class LayawayQueryServiceTests
             ]
         };
         var repository = new QuerySpy { Detail = layaway };
-        var service = new LayawayQueryService(repository, Users(userId, hasPermission: true));
+        var service = new LayawayQueryService(repository, Users(userId, hasPermission: true), new FixedClock());
 
         var result = await service.GetAsync(new ActorContext(userId, RoleLevel.Cajero), layawayId);
 
@@ -118,7 +118,7 @@ public sealed class LayawayQueryServiceTests
         Assert.Equal(JsonValueKind.Null, detail.GetProperty("cancellation").ValueKind);
         AssertProperties(detail.GetProperty("layaway"), "id", "number", "customerId",
             "customerName", "createdAtUtc", "dueOn", "total", "initialPayment",
-            "balance", "state", "version");
+            "balance", "state", "version", "isOverdue");
         var line = Assert.Single(detail.GetProperty("lines").EnumerateArray());
         AssertProperties(line, "productId", "productCode", "productName", "unit",
             "quantity", "unitPrice", "subtotal");
@@ -182,7 +182,7 @@ public sealed class LayawayQueryServiceTests
             ]
         };
         var service = new LayawayQueryService(new QuerySpy { Detail = layaway },
-            Users(userId, hasPermission: true));
+            Users(userId, hasPermission: true), new FixedClock());
 
         var result = await service.GetAsync(new ActorContext(userId, RoleLevel.Cajero), layawayId);
 
@@ -221,7 +221,7 @@ public sealed class LayawayQueryServiceTests
     {
         var userId = Guid.CreateVersion7();
         var repository = new QuerySpy();
-        var service = new LayawayQueryService(repository, Users(userId, hasPermission: true));
+        var service = new LayawayQueryService(repository, Users(userId, hasPermission: true), new FixedClock());
 
         var result = await service.ListAsync(new ActorContext(userId, RoleLevel.Supervisor),
             new LayawayListQuery(Page: 2, PageSize: 10, State: " pagado "));
@@ -231,6 +231,66 @@ public sealed class LayawayQueryServiceTests
         Assert.Equal(10, repository.LastOffset);
         Assert.Equal(21, result.Value?.TotalCount);
         Assert.Equal(3, result.Value?.TotalPages);
+    }
+
+    [Theory]
+    [InlineData("2026-10-27T04:59:59Z", false)]
+    [InlineData("2026-10-27T05:00:00Z", true)]
+    public async Task Overdue_UsesInstallationLocalDateAndStrictDueBoundary(string now, bool expected)
+    {
+        var userId = Guid.CreateVersion7();
+        var repository = new QuerySpy { Detail = new Apartado
+        {
+            Id = Guid.CreateVersion7(), Cliente = new Cliente { NombreCompleto = "Cliente" },
+            FechaLimite = new DateOnly(2026, 10, 26), Estado = "ACTIVO"
+        } };
+        var service = new LayawayQueryService(repository, Users(userId, true),
+            new FixedClock(DateTimeOffset.Parse(now)));
+
+        var result = await service.GetAsync(new ActorContext(userId, RoleLevel.Cajero), repository.Detail.Id);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(expected, result.Value!.Layaway.IsOverdue);
+    }
+
+    [Theory]
+    [InlineData("ACTIVO", 26, true)]
+    [InlineData("ACTIVO", 27, false)]
+    [InlineData("PAGADO", 26, false)]
+    [InlineData("ENTREGADO", 26, false)]
+    [InlineData("ANULADO", 26, false)]
+    public async Task Overdue_OnlyAppliesToActivePastDue(string state, int day, bool expected)
+    {
+        var userId = Guid.CreateVersion7();
+        var repository = new QuerySpy { Detail = new Apartado
+        {
+            Id = Guid.CreateVersion7(), Cliente = new Cliente { NombreCompleto = "Cliente" },
+            FechaLimite = new DateOnly(2026, 10, day), Estado = state
+        } };
+        var service = new LayawayQueryService(repository, Users(userId, true), new FixedClock());
+
+        var result = await service.GetAsync(new ActorContext(userId, RoleLevel.Cajero), repository.Detail.Id);
+
+        Assert.Equal(expected, result.Value!.Layaway.IsOverdue);
+        Assert.Equal(state, repository.Detail.Estado);
+    }
+
+    [Fact]
+    public async Task List_PassesOverdueFilterWithPaginationAndOperatingDate()
+    {
+        var userId = Guid.CreateVersion7();
+        var repository = new QuerySpy();
+        var service = new LayawayQueryService(repository, Users(userId, true), new FixedClock());
+
+        var result = await service.ListAsync(new ActorContext(userId, RoleLevel.Cajero),
+            new LayawayListQuery(Page: 2, PageSize: 10, Overdue: true));
+
+        Assert.True(result.IsSuccess);
+        Assert.True(repository.LastListQuery!.Overdue);
+        Assert.Equal(10, repository.LastOffset);
+        Assert.Equal(new DateOnly(2026, 10, 27), repository.LastOperatingDate);
+        Assert.Equal(repository.Installation.Id, repository.LastInstallationId);
+        Assert.Equal(21, result.Value!.TotalCount);
     }
 
     private static IUserRepository Users(Guid userId, bool hasPermission)
@@ -253,25 +313,38 @@ public sealed class LayawayQueryServiceTests
                 : throw new InvalidOperationException("Unexpected user repository call.");
     }
 
+    private sealed class FixedClock(DateTimeOffset? now = null) : IClock
+    {
+        public DateTimeOffset UtcNow => now ?? new DateTimeOffset(2026, 10, 27, 12, 0, 0, TimeSpan.Zero);
+    }
+
     private sealed class QuerySpy : ILayawayQueryRepository
     {
+        public Task<LayawayQueryInstallation?> GetActiveInstallationAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<LayawayQueryInstallation?>(Installation);
         public int Calls { get; private set; }
+        public LayawayQueryInstallation Installation { get; } = new(Guid.CreateVersion7(), "America/Bogota");
+        public Guid LastInstallationId { get; private set; }
         public int LastOffset { get; private set; }
+        public DateOnly LastOperatingDate { get; private set; }
         public LayawayListQuery? LastListQuery { get; private set; }
         public Apartado? Detail { get; init; }
 
-        public Task<PagedResult<Apartado>> ListAsync(LayawayListQuery query, int offset,
+        public Task<PagedResult<Apartado>> ListAsync(LayawayListQuery query, int offset, Guid installationId, DateOnly operatingDate,
             CancellationToken cancellationToken = default)
         {
             Calls++;
             LastListQuery = query;
             LastOffset = offset;
+            LastInstallationId = installationId;
+            LastOperatingDate = operatingDate;
             return Task.FromResult(new PagedResult<Apartado>([], query.Page, query.PageSize, 21));
         }
 
-        public Task<Apartado?> GetAsync(Guid layawayId, CancellationToken cancellationToken = default)
+        public Task<Apartado?> GetAsync(Guid layawayId, Guid installationId, CancellationToken cancellationToken = default)
         {
             Calls++;
+            LastInstallationId = installationId;
             return Task.FromResult(Detail);
         }
     }

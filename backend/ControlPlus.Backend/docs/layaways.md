@@ -1,5 +1,45 @@
 # Apartados — cortes 1, 2 y corte 3
 
+## Vencimiento operativo informativo
+
+`GET /api/layaways` y `GET /api/layaways/{id}` incluyen `isOverdue` en cada cabecera. Es `true` exclusivamente cuando `state` es `ACTIVO` y `dueOn` es anterior a la fecha operativa actual de la instalación activa, calculada con su `zona_horaria`. En la propia fecha límite es `false`. La lectura no escribe, no cambia `state` ni libera reservas; se siguen admitiendo abonos de `ACTIVO` vencidos y entrega de `PAGADO` aun después de su fecha límite.
+
+El listado admite `overdue=true|false` como filtro opcional, combinable con estado, cliente y rango de fecha límite. `true` selecciona solo `ACTIVO` vencidos; `false` selecciona los demás apartados. Se filtra antes de contar y paginar. El detalle y el listado se limitan a la instalación activa. Se exige `LAYAWAY.MANAGE` efectivo como en las consultas existentes. No hay ruta nueva ni migración.
+
+### Integración HTTP del indicador y sus filtros
+
+`ControlPlus.Api.Tests.LayawayCreateApiFlowTests.OverdueQueries_Http_UseLocalDateFilterBeforePaginationIsolateInstallationAndRevalidatePermission` es un único caso `[Fact]` en `LayawayOverdueQueryApiFlowTests.cs`. Reutiliza `LocalPostgresDatabase` y el bootstrap HTTP existente, exclusivamente sobre una base temporal `controlplus_test_<UUID>`. Prepara directamente cabeceras de lectura con un detalle de producto y pagos aplicados coherentes con su saldo, sus autorizaciones y contexto de caja, confirmados en una única transacción: siete apartados de la instalación activa y la misma matriz en una instalación histórica. No ejecuta transiciones financieras para construir este escenario de consultas.
+
+El caso verifica listado y detalle, `overdue=true/false`, filtros combinados por estado, total filtrado antes de paginar, páginas sin repetidos y página final vacía, y `404` para todos los IDs de la otra instalación. Fija `America/Bogota` y el reloj en `2026-10-28T04:59:59Z` (27 de octubre local), y lo adelanta explícitamente un segundo para comprobar el cambio de fecha sin escrituras. Compara cabeceras y estado operativo antes y después. Revoca `LAYAWAY.MANAGE` por HTTP: el JWT anterior responde `401` y un JWT nuevo sin el permiso responde `403` en ambas consultas.
+
+### Revisión final y evidencia del corte informativo
+
+El contrato JSON incorpora únicamente el booleano no nulo `items[].isOverdue` en el listado y `layaway.isOverdue` en el detalle; conserva los campos, estados y formatos anteriores. El filtro `overdue` es booleano opcional, con omisión equivalente a no filtrar. La revisión de contratos, metadatos de controladores y configuración OpenAPI confirma que se mantienen las rutas y Bearer, que los esquemas de respuesta usan `LayawayQueryDto` y que el parámetro procede de `LayawayListQuery`. No se agrega un campo obligatorio de solicitud ni una ruta. Esta revisión de OpenAPI es por código; no se atribuye a los TRX una prueba específica de generación OpenAPI que no contienen.
+
+La fecha límite usa comparación estricta `<` con una única fecha local calculada por solicitud a partir de `IClock` y `zona_horaria`. La instalación activa se resuelve en servidor (`activo`, orden por fecha de instalación e ID); listado y detalle filtran por su ID. `overdue=false` es el complemento de `overdue=true`, incluidos los estados distintos de `ACTIVO`; los filtros se aplican antes de `CountAsync` y de `Skip/Take`. La identidad y `LAYAWAY.MANAGE` efectivo se revalidan. Las consultas y las lecturas de autorización usan `AsNoTracking`, no llaman a guardar ni crean auditorías, movimientos o transiciones. La integración compara cabeceras, versiones y estado operativo antes y después de leer.
+
+Se conservan **dos ejecuciones independientes** de Windows, verificadas mediante sus TRX, sin presentarlas como una suite conjunta:
+
+| Ejecución (America/Bogota) | Descubiertas/resultados | Ejecutadas | Aprobadas | Fallidas | Omitidas |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Servicio, 27 de octubre de 2026, 14:03 | 8 | 8 | 8 | 0 | 0 |
+| HTTP, 28 de octubre de 2026, 00:25–00:26 | 1 | 1 | 1 | 0 | 0 |
+
+Ambos TRX tienen `outcome=Completed`, todos sus resultados son `Passed` y los demás contadores de error o ejecución incompleta son cero. La salida 0 corresponde a la ejecución validada por el operador; los contadores se comprobaron leyendo los archivos, sin repetir las pruebas.
+
+- **Servicio 8/8:** `Overdue_UsesInstallationLocalDateAndStrictDueBoundary` (2 casos), `Overdue_OnlyAppliesToActivePastDue` (5 casos) y `List_PassesOverdueFilterWithPaginationAndOperatingDate` (1 caso), de `ControlPlus.Api.Tests.LayawayQueryServiceTests`.
+  TRX: `C:\Users\luife\AppData\Local\Temp\ControlPlus-IsOverdue-83ff885d955d4d43805723208dc1518a\IsOverdue.trx`.
+  SHA-256: `901e80d7b099d30a8c101c5c2a70738231f074a94fe2413daad11eab569946bb`.
+- **HTTP 1/1:** el nombre completo indicado arriba, ejecutado con `scripts/Run-LayawayOverdueHttpTest.ps1`. El runner mantiene el filtro exacto, exige salida 0 y un único resultado aprobado en el TRX; solicita la contraseña de forma oculta, valida el valor recibido por el proceso y restaura la variable de entorno al finalizar. La lectura de la propiedad real del constructor de conexión usa `.psbase.ConnectionString`, también al verificarla, para evitar que PowerShell la interprete como una clave del diccionario. Esa preparación se comprobó en PowerShell 5.1 con seis contraseñas ficticias, sin imprimir contraseñas ni cadenas de conexión y sin abrir PostgreSQL.
+  TRX: `C:\Users\luife\AppData\Local\Temp\ControlPlus-IsOverdue-HTTP-8d4816ea3f984b71bfae0346864de35b\IsOverdueHttp.trx`.
+  SHA-256: `65e8804924acd3c7e0e63d14ea73076a270fe550c02b5c8d36a50185045df665`.
+
+El build serial completo del fixture final terminó con salida 0, **0 errores y 0 advertencias**, con artefactos aislados en `/tmp/controlplus-overdue-http-artifacts`. En esta revisión solo se actualizó documentación; se conservaron las ejecuciones anteriores sin repetirlas. No se ejecutó la suite completa, no se accedió a `controlplus` y no hay migración en este corte. La cancelación o liberación automática y la devolución por vencimiento siguen pendientes de decisión de negocio, conforme a la propuesta siguiente.
+
+### Propuesta pendiente de decisión: cancelación o liberación por vencimiento
+
+Definir si el vencimiento debe generar una tarea explícita de revisión o una cancelación automática, y cuántos días de gracia habrá. Una transición aprobada debería reutilizar la cancelación transaccional existente: Administrador vigente, motivo propio de vencimiento, decisión documentada del importe a devolver (total, parcial o cero), desglose por medio y autorización de otro usuario habilitado. Si se aprueba una tarea automática, se necesita decidir qué identidad ejecuta y autoriza, cómo se maneja una devolución que exige turno o efectivo disponible y cómo se notificará al cliente. Para concurrencia, la ejecución debería exigir `expectedVersion` e idempotencia, bloquear instalación/apartado/productos en el orden existente y volver a comprobar estado, pagos y reserva bajo esos bloqueos; un abono o entrega concurrente debe ganar o producir conflicto sin efectos parciales. Ninguna de estas transiciones forma parte de este corte.
+
 ## Corte 3, bloque 2 — cancelación y reembolsos
 
 `POST /api/layaways/{layawayId}/cancellation` exige JWT vigente, Administrador con permisos efectivos `LAYAWAY.CANCEL` y `LAYAWAY.REFUND_DECIDE`, `Idempotency-Key` y cuerpo `{ expectedVersion, refundAmount, refunds, reasonId?, observation?, authorization: { userName, password } }`. Un Supervisor o Administrador distinto del ejecutor, activo, no bloqueado y con `LAYAWAY.CANCEL` efectivo autoriza mediante contraseña. El resultado `200` contiene estado `ANULADO`, versión nueva, total abonado, devuelto, retenido, momento y usuarios, correlación y reembolsos por medio. Contraseña y hash no figuran en respuesta, idempotencia ni auditoría.

@@ -7,7 +7,7 @@ using ControlPlus.Domain.OfficialModel;
 
 namespace ControlPlus.Application.Layaways.Services;
 
-public sealed class LayawayQueryService(ILayawayQueryRepository layaways, IUserRepository users)
+public sealed class LayawayQueryService(ILayawayQueryRepository layaways, IUserRepository users, IClock clock)
     : ILayawayQueryService
 {
     public async Task<Result<PagedResult<LayawayQueryDto>>> ListAsync(ActorContext actor,
@@ -19,9 +19,12 @@ public sealed class LayawayQueryService(ILayawayQueryRepository layaways, IUserR
         if (offset.Error is not null)
             return Result.Failure<PagedResult<LayawayQueryDto>>(offset.Error);
 
+        var installation = await layaways.GetActiveInstallationAsync(cancellationToken);
+        if (installation is null) return Result.Failure<PagedResult<LayawayQueryDto>>(ApplicationError.NotFound("la instalación activa"));
+        var date = OperatingDate(installation);
         var result = await layaways.ListAsync(query with { State = query.State?.Trim().ToUpperInvariant() },
-            offset.Value, cancellationToken);
-        return Result.Success(new PagedResult<LayawayQueryDto>(result.Items.Select(Map).ToArray(),
+            offset.Value, installation.Id, date, cancellationToken);
+        return Result.Success(new PagedResult<LayawayQueryDto>(result.Items.Select(x => Map(x, date)).ToArray(),
             result.Page, result.PageSize, result.TotalCount));
     }
 
@@ -30,7 +33,10 @@ public sealed class LayawayQueryService(ILayawayQueryRepository layaways, IUserR
     {
         var permission = await RequireManageAsync(actor, cancellationToken);
         if (permission is not null) return Result.Failure<LayawayDetailDto>(permission);
-        var layaway = await layaways.GetAsync(layawayId, cancellationToken);
+        var installation = await layaways.GetActiveInstallationAsync(cancellationToken);
+        if (installation is null) return Result.Failure<LayawayDetailDto>(ApplicationError.NotFound("la instalación activa"));
+        var operatingDate = OperatingDate(installation);
+        var layaway = await layaways.GetAsync(layawayId, installation.Id, cancellationToken);
         if (layaway is null) return Result.Failure<LayawayDetailDto>(ApplicationError.NotFound("el apartado"));
 
         var lines = layaway.DetalleApartado.OrderBy(x => x.NombreProducto, StringComparer.Ordinal)
@@ -42,7 +48,7 @@ public sealed class LayawayQueryService(ILayawayQueryRepository layaways, IUserR
             .Select(x => new LayawayPaymentDto(x.Id, Number(x.Prefijo, x.Serie, x.Consecutivo),
                 x.MetodoPago.Codigo, x.MetodoPago.Nombre, x.ValorAplicado, x.ValorRecibido,
                 x.Cambio, AsUtc(x.FechaHora), x.Estado, x.MovimientoCaja?.CorrelacionId)).ToArray();
-        return Result.Success(new LayawayDetailDto(Map(layaway), layaway.PorcentajeMinimoInicial,
+        return Result.Success(new LayawayDetailDto(Map(layaway, operatingDate), layaway.PorcentajeMinimoInicial,
             lines, payments, MapDelivery(layaway), MapCancellation(layaway)));
     }
 
@@ -112,10 +118,15 @@ public sealed class LayawayQueryService(ILayawayQueryRepository layaways, IUserR
             : ((int)offset, null);
     }
 
-    private static LayawayQueryDto Map(Apartado x) => new(x.Id,
+    private DateOnly OperatingDate(LayawayQueryInstallation installation) =>
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.UtcNow,
+            TimeZoneInfo.FindSystemTimeZoneById(installation.TimeZoneId)).DateTime);
+
+    private static LayawayQueryDto Map(Apartado x, DateOnly operatingDate) => new(x.Id,
         Number(x.Prefijo, x.Serie, x.Consecutivo), x.ClienteId, x.Cliente.NombreCompleto,
         AsUtc(x.FechaHora), x.FechaLimite, x.Total, x.AbonoInicial,
-        x.SaldoPendiente, x.Estado, x.Version);
+        x.SaldoPendiente, x.Estado, x.Version,
+        x.Estado == "ACTIVO" && x.FechaLimite < operatingDate);
 
     private static string Number(string prefix, string series, long consecutive) =>
         $"{prefix}-{series}-{consecutive}";
