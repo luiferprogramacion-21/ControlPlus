@@ -187,6 +187,9 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
     public Task AddIdempotencyAsync(OperacionIdempotente operation, CancellationToken cancellationToken = default) =>
         dbContext.OperacionIdempotente.AddAsync(operation, cancellationToken).AsTask();
 
+    public Task AddReceiptSnapshotAsync(DocumentoEmitido snapshot, CancellationToken cancellationToken = default) =>
+        dbContext.DocumentoEmitido.AddAsync(snapshot, cancellationToken).AsTask();
+
     public async Task<PagedResult<Venta>> ListAsync(
         Guid? userId,
         SaleListQuery query,
@@ -206,6 +209,15 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
             .Include(x => x.PagoVenta).ThenInclude(x => x.MetodoPago)
             .Include(x => x.Credito)
             .SingleOrDefaultAsync(x => x.Id == saleId, cancellationToken);
+
+    public Task<Venta?> GetReceiptSaleHeaderAsync(Guid saleId, CancellationToken cancellationToken = default) =>
+        dbContext.Venta.AsNoTracking().SingleOrDefaultAsync(x => x.Id == saleId, cancellationToken);
+
+    public Task<DocumentoEmitido?> GetReceiptSnapshotAsync(Guid installationId, Guid saleId,
+        CancellationToken cancellationToken = default) =>
+        dbContext.DocumentoEmitido.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.InstalacionId == installationId && x.TipoDocumento == "COMPROBANTE_VENTA" &&
+            x.EntidadId == saleId && x.VersionDocumento == 1, cancellationToken);
 
     public async Task<Venta?> FindSaleByVisibleNumberAsync(string visibleNumber,
         CancellationToken cancellationToken = default)

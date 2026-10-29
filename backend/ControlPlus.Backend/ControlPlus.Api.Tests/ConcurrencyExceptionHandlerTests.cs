@@ -13,21 +13,30 @@ public sealed class ConcurrencyExceptionHandlerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task PostgreSqlCheckViolation_IncludingDeferredCommit_BecomesSanitizedResourceConflict(bool wrapped)
+    public Task PostgreSqlCheckViolation_IncludingDeferredCommit_BecomesSanitizedResourceConflict(bool wrapped) =>
+        AssertSanitizedResourceConflictAsync(wrapped, PostgresErrorCodes.CheckViolation);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task PostgreSqlRaiseException_IncludingDeferredCommit_BecomesSanitizedResourceConflict(bool wrapped) =>
+        AssertSanitizedResourceConflictAsync(wrapped, "P0001");
+
+    private static async Task AssertSanitizedResourceConflictAsync(bool wrapped, string sqlState)
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddProblemDetails();
         using var serviceProvider = services.BuildServiceProvider();
         var context = new DefaultHttpContext { RequestServices = serviceProvider };
-        context.Request.Path = "/api/layaways/00000000-0000-0000-0000-000000000001/cancellation";
+        context.Request.Path = "/api/sales";
         await using var responseBody = new MemoryStream();
         context.Response.Body = responseBody;
         // SaveChanges may wrap this exception; CommitAsync can throw it directly.
-        var postgres = new PostgresException("Forced isolated layaway cancellation commit failure",
-            "ERROR", "ERROR", PostgresErrorCodes.CheckViolation,
-            detail: "internal database detail", schemaName: "ventas", tableName: "apartado",
-            constraintName: "zz_test_fail_cancellation_commit");
+        var postgres = new PostgresException("Forced isolated persistence failure",
+            "ERROR", "ERROR", sqlState,
+            detail: "internal database detail", schemaName: "configuracion", tableName: "documento_emitido",
+            constraintName: "tg_rechazar_snapshot_prueba");
         Exception exception = wrapped ? new DbUpdateException("internal EF detail", postgres) : postgres;
 
         var handled = await new ConcurrencyExceptionHandler().TryHandleAsync(
@@ -45,8 +54,8 @@ public sealed class ConcurrencyExceptionHandlerTests
         Assert.Equal("La operación entra en conflicto con el estado actual del recurso.",
             problem.GetProperty("title").GetString());
         Assert.Equal(context.Request.Path.Value, problem.GetProperty("instance").GetString());
-        foreach (var detail in new[] { "Forced isolated", "internal", "23514", "ventas", "apartado",
-                     "zz_test_fail_cancellation_commit" })
+        foreach (var detail in new[] { "Forced isolated", "internal", sqlState, "configuracion", "documento_emitido",
+                     "tg_rechazar_snapshot_prueba" })
             Assert.DoesNotContain(detail, problem.GetRawText(), StringComparison.OrdinalIgnoreCase);
     }
 

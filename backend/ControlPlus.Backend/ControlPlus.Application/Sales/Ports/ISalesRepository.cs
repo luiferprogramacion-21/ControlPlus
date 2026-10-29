@@ -44,9 +44,13 @@ public interface ISalesRepository
     Task AddCashMovementAsync(MovimientoCaja movement, CancellationToken cancellationToken = default);
     Task AddInventoryMovementsAsync(IReadOnlyCollection<MovimientoInventario> movements, CancellationToken cancellationToken = default);
     Task AddIdempotencyAsync(OperacionIdempotente operation, CancellationToken cancellationToken = default);
+    Task AddReceiptSnapshotAsync(DocumentoEmitido snapshot, CancellationToken cancellationToken = default);
 
     Task<PagedResult<Venta>> ListAsync(Guid? userId, SaleListQuery query, CancellationToken cancellationToken = default);
     Task<Venta?> GetSaleAsync(Guid saleId, CancellationToken cancellationToken = default);
+    Task<Venta?> GetReceiptSaleHeaderAsync(Guid saleId, CancellationToken cancellationToken = default);
+    Task<DocumentoEmitido?> GetReceiptSnapshotAsync(Guid installationId, Guid saleId,
+        CancellationToken cancellationToken = default);
     Task<Venta?> FindSaleByVisibleNumberAsync(string visibleNumber,
         CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<Guid, int>> GetConfirmedReturnedQuantitiesAsync(Guid saleId,

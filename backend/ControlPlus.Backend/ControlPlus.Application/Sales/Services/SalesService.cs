@@ -366,6 +366,16 @@ public sealed partial class SalesService(
         await repository.AddInventoryMovementsAsync(inventoryMovements, cancellationToken);
 
         var response = Map(sale, details, payments, methodsByCode) with { CreditId = credit?.Id };
+        var (snapshotData, snapshotHash) = SaleReceiptSnapshotCodec.Encode(
+            ToReceipt(response, sale.TipoVenta), response.Payments);
+        await repository.AddReceiptSnapshotAsync(new DocumentoEmitido
+        {
+            Id = Guid.CreateVersion7(), InstalacionId = installation.Id, TerminalId = terminal.Id,
+            EmitidoPorId = actor.UserId, TipoDocumento = "COMPROBANTE_VENTA",
+            EntidadTipo = nameof(Venta), EntidadId = sale.Id, NumeroVisible = response.VisibleNumber,
+            VersionDocumento = 1, DatosSnapshot = snapshotData, PlantillaSnapshot = null,
+            HashSnapshot = snapshotHash, FechaEmision = now.UtcDateTime
+        }, cancellationToken);
         await repository.AddIdempotencyAsync(new OperacionIdempotente
         {
             Id = Guid.CreateVersion7(),
@@ -480,7 +490,7 @@ public sealed partial class SalesService(
     {
         var authorization = await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
         if (authorization is null) return Result.Failure<SaleReceiptDto>(ApplicationError.Unauthorized());
-        var sale = await repository.GetSaleAsync(saleId, cancellationToken);
+        var sale = await repository.GetReceiptSaleHeaderAsync(saleId, cancellationToken);
         if (sale is null) return Result.Failure<SaleReceiptDto>(ApplicationError.NotFound("la venta"));
         var canReadAll = authorization.PermissionCodes.Contains(PermissionCodes.SalesAllRead, StringComparer.OrdinalIgnoreCase);
         var canReadOwn = authorization.PermissionCodes.Contains(PermissionCodes.SalesOwnRead, StringComparer.OrdinalIgnoreCase);
@@ -488,7 +498,17 @@ public sealed partial class SalesService(
             return Result.Failure<SaleReceiptDto>(ApplicationError.Forbidden());
         if (sale.Estado != "CONFIRMADA")
             return Result.Failure<SaleReceiptDto>(ApplicationError.Conflict("La venta no está confirmada."));
-        return Result.Success(ToReceipt(sale));
+        var snapshot = await repository.GetReceiptSnapshotAsync(sale.InstalacionId, sale.Id, cancellationToken);
+        if (snapshot is not null)
+            return SaleReceiptSnapshotCodec.TryDecode(snapshot, sale.Id, out var historicalReceipt)
+                ? Result.Success(historicalReceipt!)
+                : Result.Failure<SaleReceiptDto>(ApplicationError.Conflict("El comprobante histórico no está disponible."));
+        var legacySale = await repository.GetSaleAsync(saleId, cancellationToken);
+        return legacySale is null
+            ? Result.Failure<SaleReceiptDto>(ApplicationError.NotFound("la venta"))
+            : legacySale.Estado != "CONFIRMADA"
+                ? Result.Failure<SaleReceiptDto>(ApplicationError.Conflict("La venta no está confirmada."))
+                : Result.Success(ToReceipt(legacySale));
     }
 
     public async Task<Result<SaleReprintRequestDto>> RequestReprintAsync(ActorContext actor, Guid saleId,
@@ -547,12 +567,15 @@ public sealed partial class SalesService(
     private static SaleReceiptDto ToReceipt(Venta sale)
     {
         var detail = Map(sale);
-        return new SaleReceiptDto(sale.Id, detail.VisibleNumber, detail.OccurredAtUtc,
-            detail.OperatingDate, sale.TipoVenta, sale.Estado, detail.GrossSubtotal,
+        return ToReceipt(detail, sale.TipoVenta);
+    }
+
+    private static SaleReceiptDto ToReceipt(SaleDto detail, string saleType) =>
+        new(detail.Id, detail.VisibleNumber, detail.OccurredAtUtc,
+            detail.OperatingDate, saleType, detail.State, detail.GrossSubtotal,
             detail.DiscountTotal, detail.Total, detail.Change, detail.Lines,
             detail.Payments.Select(x => new SaleReceiptPaymentDto(x.MethodCode, x.AppliedAmount,
                 x.ReceivedAmount, x.Change)).ToArray());
-    }
 
     private async Task<(UserAuthorizationSnapshot? Snapshot, ApplicationError? Error)> RequireAsync(
         ActorContext actor, string permission, CancellationToken cancellationToken)

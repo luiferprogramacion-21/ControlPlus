@@ -28,7 +28,7 @@ public partial class DocumentoEmitido
 
     public string DatosSnapshot { get; set; } = null!;
 
-    public string PlantillaSnapshot { get; set; } = null!;
+    public string? PlantillaSnapshot { get; set; }
 
     public string HashSnapshot { get; set; } = null!;
 
