@@ -505,6 +505,18 @@ public sealed partial class CashApiFlowTests
         Assert.Empty(await context.AutorizacionOperacion.ToArrayAsync());
         Assert.Empty(await context.AutorizacionCierreTurno.ToArrayAsync());
         Assert.Empty(await context.DetalleArqueoMedioPago.ToArrayAsync());
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync(
+            $"/api/cash/shifts/{scenario.Shift.Id}/close", request with { Authorization = null })).StatusCode);
+        var selfAuthorization = await context.AutorizacionOperacion.AsNoTracking().SingleAsync();
+        Assert.Equal(scenario.Administrator.User.Id, selfAuthorization.UsuarioSolicitanteId);
+        Assert.Equal(scenario.Administrator.User.Id, selfAuthorization.UsuarioAutorizadorId);
+        Assert.Equal("PASSWORD", selfAuthorization.MetodoAutenticacion);
+        Assert.Null(selfAuthorization.CredencialAutorizadorId);
+        Assert.Contains("sin segundo autorizador", selfAuthorization.DescripcionOperacion);
+        Assert.Single(await context.AutorizacionCierreTurno.AsNoTracking().ToArrayAsync());
+        var closeAudit = await context.EventoAuditoria.AsNoTracking()
+            .SingleAsync(x => x.Accion == "CASHSHIFTCLOSED");
+        Assert.Contains("ADMINISTRATOR_SELF", closeAudit.DatosNuevos);
     }
 
     private async Task<CorrectionScenario> PrepareCorrectionScenarioAsync(decimal initial, bool shared = false)

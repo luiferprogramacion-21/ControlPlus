@@ -34,12 +34,12 @@ public sealed record PurchaseOrderAuthorizationRequest(
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ClosePurchaseOrderRequest([property: JsonRequired] long ExpectedVersion,
     [property: JsonRequired] Guid ReasonId, string? Observation,
-    [property: JsonRequired] PurchaseOrderAuthorizationRequest Authorization);
+    PurchaseOrderAuthorizationRequest? Authorization = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CancelPurchaseOrderRequest([property: JsonRequired] long ExpectedVersion,
     [property: JsonRequired] Guid ReasonId, string? Observation,
-    [property: JsonRequired] PurchaseOrderAuthorizationRequest Authorization);
+    PurchaseOrderAuthorizationRequest? Authorization = null);
 
 public sealed record PurchaseOrderReasonDto(Guid Id, string Code, string Name, int DisplayOrder);
 

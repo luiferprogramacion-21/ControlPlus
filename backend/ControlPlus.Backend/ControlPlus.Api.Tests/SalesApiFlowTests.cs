@@ -265,7 +265,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
     private const string SecondCashierUser = "sales.cashier.two.test";
     private const string SecondCashierPassword = "Sales-Cashier-Two-Test-2026!";
 
-    private static readonly string[] PublishedMigrations =
+    private static readonly string[] ExpectedAppliedMigrations =
     [
         "20260912010000_OfficialPhase4Baseline",
         "20260912011000_SeedApprovedSecurityCatalog",
@@ -278,7 +278,13 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         "20261020010000_LayawayDeliveryWithoutSaleV1",
         "20261021010000_LayawayCancellationOptionalReasonV1",
         "20261026010000_InitialProductInventoryMovementV1",
-        "20261028010000_SaleReceiptDataSnapshotV1"
+        "20261028010000_SaleReceiptDataSnapshotV1",
+        "20261029010000_PermanentProductReferencesV1",
+        "20261102010000_GrantProductCodeAccessV1",
+        "20261102020000_CategoryProductReferencesV1",
+        "20261104010000_AdminSelfSaleCancellationV1",
+        "20261104020000_AdminSelfCashDifferenceV1",
+        "20261105010000_SupervisorLayawayRefundDecisionV1"
     ];
 
     private readonly string _masterKey = RandomSecret(48);
@@ -1031,7 +1037,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         await using var migrationContext = new ControlPlusDbContext(
             new DbContextOptionsBuilder<ControlPlusDbContext>()
                 .UseNpgsql(_postgres.GetConnectionString()).Options);
-        Assert.Equal(PublishedMigrations, await migrationContext.Database.GetAppliedMigrationsAsync());
+        Assert.Equal(ExpectedAppliedMigrations, await migrationContext.Database.GetAppliedMigrationsAsync());
 
         await using var officialContext = new OfficialControlPlusDbContext(
             new DbContextOptionsBuilder<OfficialControlPlusDbContext>()
@@ -1154,7 +1160,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
     private async Task<Products> CreateSalesCatalogAsync(HttpClient client)
     {
         var category = await ReadAsync<CategoryDto>(await client.PostAsJsonAsync(
-            "/api/categories", new CreateCategoryRequest("Categoría aislada de Ventas", null)), HttpStatusCode.Created);
+            "/api/categories", new CreateCategoryRequest("Categoría aislada de Ventas", null, "VNT")), HttpStatusCode.Created);
         var units = await ReadAsync<IReadOnlyCollection<MeasurementUnitDto>>(
             await client.GetAsync("/api/measurement-units"), HttpStatusCode.OK);
         var unit = units.Single(x => x.Code == "UNIDAD");

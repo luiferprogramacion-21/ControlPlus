@@ -338,7 +338,7 @@ public sealed class CustomerHistoryApiFlowTests : IAsyncLifetime
             CashierName, "Cajero historial", _cashierPassword, [roles.Items.Single(x => x.Code == RoleCodes.Cashier).Id])), HttpStatusCode.Created);
         var permissions = await ReadAsync<PagedResult<PermissionDto>>(await client.GetAsync("/api/permissions?pageSize=100"), HttpStatusCode.OK);
         _permissionIds = permissions.Items.ToDictionary(x => x.Code, x => x.Id);
-        var category = await ReadAsync<CategoryDto>(await client.PostAsJsonAsync("/api/categories", new CreateCategoryRequest("Historial", null)), HttpStatusCode.Created);
+        var category = await ReadAsync<CategoryDto>(await client.PostAsJsonAsync("/api/categories", new CreateCategoryRequest("Historial", null, "HIS")), HttpStatusCode.Created);
         var units = await ReadAsync<MeasurementUnitDto[]>(await client.GetAsync("/api/measurement-units"), HttpStatusCode.OK);
         var product = await ReadAsync<ProductDto>(await PostAsync(client, "/api/products", new CreateProductRequest(
             category.Id, units.Single(x => x.Code == "UNIDAD").Id, null, "HISTORY-ITEM", null, null, true,

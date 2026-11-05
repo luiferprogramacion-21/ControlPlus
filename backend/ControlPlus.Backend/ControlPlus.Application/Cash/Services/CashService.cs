@@ -1,3 +1,4 @@
+using ControlPlus.Domain.Security;
 using System.Data;
 using ControlPlus.Application.Cash.Contracts;
 using ControlPlus.Application.Cash.Ports;
@@ -251,6 +252,9 @@ public sealed class CashService(
     {
         var permissionError = await RequireAsync(actor, PermissionCodes.CashShiftManage, cancellationToken);
         if (permissionError is not null) return Result.Failure<CashReconciliationDto>(permissionError);
+        var actorSnapshot = await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
+        var administratorSelfAuthorized = actorSnapshot?.HighestRoleLevel == RoleLevel.Administrador &&
+            request.Authorization is null;
         var shift = await repository.GetShiftForUpdateAsync(shiftId, cancellationToken);
         if (shift is null) return Result.Failure<CashReconciliationDto>(ApplicationError.NotFound("el turno de caja"));
         var correlationId = Guid.CreateVersion7();
@@ -305,6 +309,12 @@ public sealed class CashService(
                 return Result.Failure<CashReconciliationDto>(Validation("Debe seleccionar un motivo para la diferencia."));
             reason = await repository.GetActiveDifferenceReasonAsync(reasonId, cancellationToken);
             if (reason is null) return Result.Failure<CashReconciliationDto>(ApplicationError.NotFound("el motivo activo de diferencia de caja"));
+            if (administratorSelfAuthorized)
+            {
+                authorizer = await repository.GetUserForUpdateAsync(actor.UserId, cancellationToken);
+                if (authorizer is null || !authorizer.IsActive)
+                    return Result.Failure<CashReconciliationDto>(ApplicationError.Forbidden());
+            }
             if (authorizer is null)
                 return await RejectCloseAuthorizationAsync(actor, shift, correlationId,
                     ApplicationError.Forbidden("El cierre con diferencia requiere credenciales de autorización."), cancellationToken);
@@ -318,7 +328,9 @@ public sealed class CashService(
                 PermisoId = permission.Id,
                 TipoOperacion = CashConstants.CashDifferenceAuthorizationType,
                 CorrelacionId = correlationId,
-                DescripcionOperacion = "Autorización de cierre de caja con diferencia.",
+                DescripcionOperacion = administratorSelfAuthorized
+                    ? "Autorización de cierre de caja con diferencia por Administrador sin segundo autorizador."
+                    : "Autorización de cierre de caja con diferencia.",
                 Motivo = reason.Codigo,
                 MetodoAutenticacion = "PASSWORD",
                 Resultado = "EXITOSA",
@@ -332,7 +344,7 @@ public sealed class CashService(
         // Details must be inserted while the shift is still open. These saves are
         // deliberately inside one transaction: deferred validation happens at COMMIT.
         await repository.AddReconciliationDetailsAsync(details, cancellationToken);
-        if (authorizer is not null)
+        if (authorizer is not null && !administratorSelfAuthorized)
         {
             authorizer.RegisterSuccessfulLogin(now);
             await userRepository.UpdateAsync(authorizer, cancellationToken);
@@ -365,10 +377,15 @@ public sealed class CashService(
         await AuditWriter.WriteCashAsync(auditRepository, clock, actor.UserId, AuditAction.CashReconciled,
             nameof(DetalleArqueoMedioPago), shift.Id,
             new { TotalExpected = totalExpected, TotalCounted = totalCounted, CashDifference = shift.Diferencia, TotalDifference = totalDifference,
+                AuthorizationMode = administratorSelfAuthorized && totalDifference != 0 ? "ADMINISTRATOR_SELF" :
+                    authorization is not null ? "OTHER_USER" : "NONE",
                 PaymentMethods = details.Select(x => new { x.MetodoPagoId, x.ValorEsperado, x.ValorContado, x.Diferencia }) },
             correlationId, authorizer?.Id, null, shift.TerminalId, reason?.Codigo, cancellationToken);
         await AuditWriter.WriteCashAsync(auditRepository, clock, actor.UserId, AuditAction.CashShiftClosed,
-            nameof(TurnoCaja), shift.Id, new { shift.FechaOperativa, CashDifference = shift.Diferencia, TotalDifference = totalDifference },
+            nameof(TurnoCaja), shift.Id, new { shift.FechaOperativa, CashDifference = shift.Diferencia,
+                TotalDifference = totalDifference,
+                AuthorizationMode = administratorSelfAuthorized && totalDifference != 0 ? "ADMINISTRATOR_SELF" :
+                    authorization is not null ? "OTHER_USER" : "NONE" },
             correlationId, authorizer?.Id, null, shift.TerminalId, reason?.Codigo, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success(MapReconciliation(shift, expected, counted));
@@ -565,9 +582,12 @@ public sealed class CashService(
             return Result.Failure<Usuario>(ApplicationError.Forbidden("El autorizador debe ser otro usuario Supervisor o Administrador, activo y con permiso vigente."));
 
         user = await repository.GetUserForUpdateAsync(user.Id, cancellationToken) ?? user;
-        if (!user.IsActive || user.Id == actor.UserId || user.HighestRoleLevel < RoleLevel.Supervisor)
+        if (!user.IsActive || user.Id == actor.UserId)
             return Result.Failure<Usuario>(ApplicationError.Forbidden("El autorizador debe ser otro usuario Supervisor o Administrador, activo y con permiso vigente."));
 
+        if (!RoleHierarchy.IsHigherThan(user.HighestRoleLevel,
+            (await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken))!.HighestRoleLevel))
+            return Result.Failure<Usuario>(ApplicationError.AuthorizerRoleInsufficient());
         var now = clock.UtcNow;
         if (!passwordHasher.Verify(request.Password, user.PasswordHash))
         {

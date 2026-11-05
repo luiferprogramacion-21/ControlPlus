@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-11-02",
+  "rehearsalDirectory": "CatalogRehearsal-22eebc2bb624496eae905222f0fec269",
+  "target": "20261029010000_PermanentProductReferencesV1",
+  "clone": "controlplus_test_7d06a60beb414b0ebd9de7d5aaf4f0a1",
+  "backupSha256": "E25D5D1E650DD408C9642325B66AD40CEA0A2BB3715EE2C35A9587911EC9681C",
+  "backupBytes": 488930,
+  "files": [
+    {
+      "name": "approved-check.sql",
+      "sha256": "214D1C2C34CA11D1AEA7B7ACE345FA351FAD89976353A8270CCFA1DDD50366D9",
+      "bytes": 527
+    },
+    {
+      "name": "check-oracle.sql",
+      "sha256": "FCBF18571B53C9629B69CCBD9C7F1B285D4371DBA6281B93C33D39A916852027",
+      "bytes": 2140
+    },
+    {
+      "name": "clone-apply.txt",
+      "sha256": "59E38E138C80DDC7BF9CE0A4623AEFDEFFE925410AF0652AD565275A0FE5E7EF",
+      "bytes": 86
+    },
+    {
+      "name": "clone-barcode-check.txt",
+      "sha256": "F12B54C9113F2A474A57429E91F26D752ACC6CD33414F537F264A0B83ECB504A",
+      "bytes": 1375
+    },
+    {
+      "name": "clone-controlled-preflight.txt",
+      "sha256": "EBD461036DA15343E7E965E91EC4C23722DCCE9BEAF8E583DBBF1B638C62274C",
+      "bytes": 102
+    },
+    {
+      "name": "clone-migrated.jsonl",
+      "sha256": "E2FCFBD402C520C3A976A5D2B488D2C45E1A115ECB747E82B1859DBDA9BBCA09",
+      "bytes": 47351
+    },
+    {
+      "name": "clone-postflight.txt",
+      "sha256": "AB95497718B4B65A6B5A93BF11BEDF1F53D0826BFBB96D6AE6641722419DD00F",
+      "bytes": 5886
+    },
+    {
+      "name": "clone-preflight.txt",
+      "sha256": "9C19715EA2B50E2F5046A4F9CF5D8F0E412BF1779488A2256E6750EE95E02BB2",
+      "bytes": 3245
+    },
+    {
+      "name": "clone-restored.jsonl",
+      "sha256": "F504A38AEE86618820F7C74B8E776C5437CE6E833ADFE4C36AAD5F9C93A59613",
+      "bytes": 45061
+    },
+    {
+      "name": "clone.txt",
+      "sha256": "B05CD350B4CDFC7C15E7E3B8C14FF5D9F3DA015542D4E0D9D5EA3EE18925AB9D",
+      "bytes": 51
+    },
+    {
+      "name": "controlplus-before-catalog.dump",
+      "sha256": "E25D5D1E650DD408C9642325B66AD40CEA0A2BB3715EE2C35A9587911EC9681C",
+      "bytes": 488930
+    },
+    {
+      "name": "dump.sha256",
+      "sha256": "8A530615BFD4A78633EF1A8137B112BDE49416002FF537F733B514C907C1DF93",
+      "bytes": 66
+    },
+    {
+      "name": "dump.toc",
+      "sha256": "6A5AD4157F775991B2DB96A096126A369E6A2C790F2E88A976E67C2F7107BBA9",
+      "bytes": 69158
+    },
+    {
+      "name": "manifest.json",
+      "sha256": "BAC575E964FE12DADE6DCBA7572642EB6455FB059EEA29887A0B7D98436F13C3",
+      "bytes": 74928
+    },
+    {
+      "name": "rehearsal-script.ps1",
+      "sha256": "4BFD442E5DE560C2C38F4F82C3FD384B84CC9F80BA00E5F0D826A122927FDF13",
+      "bytes": 16379
+    },
+    {
+      "name": "restore-verified.txt",
+      "sha256": "F08FC089EC3DFB5C1CFE3FA026AB0B25196C3B128CB30BB3D9C36DBB56C57D40",
+      "bytes": 21
+    },
+    {
+      "name": "result.json",
+      "sha256": "487BE3FA43A5EFD09CA335B72C79D9C00A7938385C6F759A434DB76CB069037C",
+      "bytes": 369
+    },
+    {
+      "name": "source-after-backup.jsonl",
+      "sha256": "E277ACB8C10B89A0760AF90CD8ABAA171C8006CEEAD83767C48FE45ACF15812E",
+      "bytes": 44991
+    },
+    {
+      "name": "source-after-rehearsal.jsonl",
+      "sha256": "E277ACB8C10B89A0760AF90CD8ABAA171C8006CEEAD83767C48FE45ACF15812E",
+      "bytes": 44991
+    },
+    {
+      "name": "source-before.jsonl",
+      "sha256": "E277ACB8C10B89A0760AF90CD8ABAA171C8006CEEAD83767C48FE45ACF15812E",
+      "bytes": 44991
+    },
+    {
+      "name": "source-preflight.jsonl",
+      "sha256": "1752AC2181BA15C3B85AF9E68479ABB3666F00AE9831F60BE9BC269661DC8683",
+      "bytes": 1723
+    },
+    {
+      "name": "upgrade-verified.txt",
+      "sha256": "8D830612464AF791C3DACF492F780085CB3E0B7E16B5A33B7FC7A07DD3A74452",
+      "bytes": 21
+    }
+  ]
+}

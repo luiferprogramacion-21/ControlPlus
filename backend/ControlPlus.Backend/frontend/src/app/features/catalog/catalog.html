@@ -1,0 +1,159 @@
+<section class="catalog">
+  <header class="catalog__header">
+    <div><h2>Catálogo</h2></div>
+    <div class="tabs">
+      @if (session.has('PRODUCTS.READ')) { <button mat-button type="button" [class.active]="tab() === 'products'" (click)="switchTab('products')">Productos</button> }
+      @if (session.has('CATEGORIES.READ')) { <button mat-button type="button" [class.active]="tab() === 'categories'" (click)="switchTab('categories')">Categorías</button> }
+    </div>
+  </header>
+  @if (error() && !selectedProduct()) { <p class="alert alert--error" role="alert">{{ error() }}</p> }
+  @if (notice()) { <p class="alert" role="status">{{ notice() }}</p> }
+
+  @if (tab() === 'products' && session.has('PRODUCTS.READ')) {
+    <div class="panel">
+      <form class="filters" [formGroup]="filters" (ngSubmit)="search()">
+        <mat-form-field appearance="outline"><mat-label>Buscar código, barras o nombre</mat-label><input matInput formControlName="productSearch"></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Categoría</mat-label><mat-select formControlName="categoryId">
+          <mat-option value="">Todas</mat-option>
+          @for (category of categoryOptions(); track category.id) { <mat-option [value]="category.id">{{ category.name }}</mat-option> }
+        </mat-select></mat-form-field>
+        <button mat-flat-button type="submit">Buscar</button>
+        @if (session.has('PRODUCTS.CREATE')) { <button mat-stroked-button type="button" [disabled]="saving() || checkingCreate()" (click)="newProduct()">{{ createOutcomeUncertain() ? 'Retomar alta pendiente' : 'Nuevo producto' }}</button> }
+        @if (session.has('PRODUCTS.SENSITIVE_UPDATE')) { <mat-checkbox formControlName="includeInactiveProducts" (change)="search()">Inactivos</mat-checkbox> }
+        @if (session.has('INVENTORY.READ')) { <mat-checkbox formControlName="includeOutOfStock" (change)="search()">Agotados</mat-checkbox> }
+      </form>
+      @if (loading()) { <div class="loading"><mat-spinner diameter="36"></mat-spinner><span>Cargando productos…</span></div> }
+      @else {
+        <div class="table-scroll">
+          <table><thead><tr><th>N.º de producto</th><th>Código de barras</th><th>Producto</th><th>Categoría</th><th>Precio minorista</th><th>Disponible</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody>
+              @for (product of products()?.items ?? []; track product.id) {
+                <tr>
+                  <td>{{ product.internalCode }}</td><td>{{ product.barcode || '—' }}</td><td><strong>{{ product.name }}</strong></td>
+                  <td>{{ product.categoryName }}</td><td>{{ product.retailPrice }}</td><td>{{ product.availableStock }}</td>
+                  <td>{{ !product.isActive ? 'Inactivo' : product.isOutOfStock ? 'Agotado' : 'Activo' }}</td>
+                  <td>@if (session.has('PRODUCTS.SENSITIVE_UPDATE')) {
+                    <button mat-button type="button" (click)="editProduct(product)">Editar</button>
+                    <button mat-button type="button" [disabled]="saving()" (click)="toggleProduct(product)">{{ product.isActive ? 'Inactivar' : 'Activar' }}</button>
+                  } @if (session.has('PRODUCTS.COSTS_READ')) {
+                    <button mat-button type="button" (click)="showCosts(product)">Costos</button>
+                  }</td>
+                </tr>
+              } @empty { <tr><td colspan="8">No hay productos para estos filtros.</td></tr> }
+            </tbody>
+          </table>
+        </div>
+        <mat-paginator [length]="products()?.totalCount ?? 0" [pageIndex]="productPage()-1" [pageSize]="productPageSize()" [pageSizeOptions]="[10,20,50]" (page)="pageChanged($event)" aria-label="Páginas de productos"></mat-paginator>
+      }
+    </div>
+  }
+
+  @if (costHistory(); as costs) {
+    <section class="panel" aria-label="Historial de costos">
+      <h3>Historial de compra: {{ costProductName() }}</h3>
+      <p>Promedio actual: {{ costs.currentAverageCost ?? 'Sin dato' }} · Último costo: {{ costs.lastConfirmedPurchaseCost ?? 'Sin dato' }}</p>
+      <div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Cantidad</th><th>Costo unitario</th><th>Promedio resultante</th></tr></thead>
+        <tbody>@for (item of costs.history.items; track item.purchaseId) {
+          <tr><td>{{ item.documentDate }}</td><td>{{ item.quantity }}</td><td>{{ item.documentUnitCost }}</td><td>{{ item.resultingAverageCost }}</td></tr>
+        } @empty { <tr><td colspan="4">No hay compras confirmadas.</td></tr> }</tbody>
+      </table></div>
+      <mat-paginator [length]="costs.history.totalCount" [pageIndex]="costs.history.page-1" [pageSize]="20" (page)="showCostsByPage($event)" aria-label="Páginas de costos"></mat-paginator>
+      <button mat-button type="button" (click)="costHistory.set(null)">Cerrar historial</button>
+    </section>
+  }
+
+  @if (tab() === 'categories' && session.has('CATEGORIES.READ')) {
+    <div class="panel">
+      <form class="filters" [formGroup]="filters" (ngSubmit)="search()">
+        <mat-form-field appearance="outline"><mat-label>Buscar categoría</mat-label><input matInput formControlName="categorySearch"></mat-form-field>
+        <button mat-flat-button type="submit">Buscar</button>
+        @if (session.has('CATEGORIES.MANAGE')) { <button mat-stroked-button type="button" (click)="newCategory()">Nueva categoría</button> }
+        <mat-checkbox formControlName="includeInactiveCategories" (change)="search()">Inactivas</mat-checkbox>
+      </form>
+      @if (loading()) { <div class="loading"><mat-spinner diameter="36"></mat-spinner><span>Cargando categorías…</span></div> }
+      @else {
+        <div class="table-scroll"><table><thead><tr><th>Nombre</th><th>Prefijo</th><th>Descripción</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody>@for (category of categories()?.items ?? []; track category.id) {
+            <tr><td><strong>{{ category.name }}</strong></td><td>{{ category.abbreviation || 'Sin configurar' }}</td><td>{{ category.description || '—' }}</td><td>{{ category.isActive ? 'Activa' : 'Inactiva' }}</td>
+              <td>@if (session.has('CATEGORIES.MANAGE')) {
+                <button mat-button type="button" (click)="editCategory(category)">Editar</button>
+                <button mat-button type="button" [disabled]="saving()" (click)="toggleCategory(category)">{{ category.isActive ? 'Inactivar' : 'Activar' }}</button>
+              }</td></tr>
+          } @empty { <tr><td colspan="5">No hay categorías para estos filtros.</td></tr> }</tbody>
+        </table></div>
+        <mat-paginator [length]="categories()?.totalCount ?? 0" [pageIndex]="categoryPage()-1" [pageSize]="categoryPageSize()" [pageSizeOptions]="[10,20,50]" (page)="pageChanged($event)" aria-label="Páginas de categorías"></mat-paginator>
+      }
+    </div>
+  }
+
+  @if (selectedCategory(); as category) {
+    <section class="panel editor" aria-labelledby="category-form-title"><h3 id="category-form-title">{{ category.id ? 'Editar' : 'Nueva' }} categoría</h3>
+      <form [formGroup]="categoryForm" (ngSubmit)="saveCategory()">
+        <mat-form-field appearance="outline"><mat-label>Nombre</mat-label><input matInput formControlName="name" maxlength="100">
+          @if (categoryForm.controls.name.invalid) { <mat-error>Nombre obligatorio, máximo 100 caracteres.</mat-error> }</mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Prefijo</mat-label><input matInput formControlName="abbreviation" maxlength="10" autocapitalize="characters" style="text-transform: uppercase">
+          <mat-hint>Prefijo de la referencia de sus productos: de 2 a 10 letras, por ejemplo PAP para PAP-000001.</mat-hint>
+          @if (categoryForm.controls.abbreviation.invalid) { <mat-error>El prefijo debe tener de 2 a 10 letras de la A a la Z, sin tildes, números ni espacios.</mat-error> }</mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Descripción</mat-label><textarea matInput formControlName="description"></textarea></mat-form-field>
+        <div class="actions"><button mat-flat-button type="submit" [disabled]="saving()">Guardar</button><button mat-button type="button" (click)="cancel()">Cancelar</button></div>
+      </form>
+    </section>
+  }
+
+  @if (selectedProduct(); as product) {
+    <section class="panel editor" aria-labelledby="product-form-title"><h3 id="product-form-title">{{ product.id ? 'Editar' : 'Nuevo' }} producto</h3>
+      <form [formGroup]="productForm" (ngSubmit)="saveProduct()">
+        <mat-form-field appearance="outline"><mat-label>Nombre</mat-label><input matInput formControlName="name" maxlength="200"><mat-error>Nombre obligatorio.</mat-error></mat-form-field>
+        @if (product.id) {
+          <mat-form-field appearance="outline"><mat-label>N.º de producto</mat-label><input matInput formControlName="internalCode" readonly></mat-form-field>
+        }
+        <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Categoría</mat-label><mat-select formControlName="categoryId">
+          @for (category of categoryOptions(); track category.id) {
+            <mat-option [value]="category.id" [disabled]="!product.id && !canCreateProductIn(category)">{{ category.name }}{{ !product.id && !canCreateProductIn(category) ? ' (sin prefijo)' : '' }}</mat-option>
+          }
+        </mat-select>
+          @if (!product.id && hasCategoriesWithoutAbbreviation()) { <mat-hint>Las categorías sin prefijo se configuran en la pestaña Categorías antes de crear productos.</mat-hint> }
+          <mat-error>Selecciona una categoría.</mat-error></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Unidad</mat-label><mat-select formControlName="measurementUnitId">
+          @for (unit of units(); track unit.id) { @if (unit.isActive) { <mat-option [value]="unit.id">{{ unit.name }}</mat-option> } }
+        </mat-select><mat-error>Selecciona una unidad.</mat-error></mat-form-field>
+        @if (session.has('SUPPLIERS.READ')) {
+          <mat-form-field appearance="outline"><mat-label>Proveedor preferido (opcional)</mat-label><mat-select formControlName="supplierId">
+            <mat-option value="">Ninguno</mat-option>
+            @for (supplier of suppliers(); track supplier.id) { <mat-option [value]="supplier.id">{{ supplier.name }}</mat-option> }
+          </mat-select></mat-form-field>
+        }
+        @if (!product.id) {
+          <mat-checkbox [checked]="generateBarcode()" (change)="generateBarcode.set($event.checked)">Generar código</mat-checkbox>
+        }
+        @if (!generateBarcode() || product.id) {
+          <mat-form-field appearance="outline"><mat-label>Código de barras</mat-label><input matInput formControlName="barcode" [readonly]="!!product.id && product.barcodeGenerated"></mat-form-field>
+        }
+        <mat-form-field appearance="outline"><mat-label>Descripción</mat-label><textarea matInput formControlName="description"></textarea></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Precio minorista</mat-label><input matInput type="number" step="1" min="0" formControlName="retailPrice"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Precio mayorista</mat-label><input matInput type="number" step="1" min="0" formControlName="wholesalePrice"></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>IVA %</mat-label><input matInput type="number" step="0.01" formControlName="taxPercentage"></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Stock mínimo</mat-label><input matInput type="number" step="1" min="0" formControlName="minimumStock"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
+        @if (!product.id) {
+          <mat-form-field appearance="outline"><mat-label>Existencia inicial</mat-label><input matInput type="number" step="1" min="0" max="2147483647" formControlName="initialQuantity"><mat-error>Usa un entero entre 0 y 2147483647.</mat-error></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Costo de compra por unidad</mat-label><input matInput type="text" inputmode="decimal" formControlName="initialUnitCost"><mat-hint>Cuánto pagaste al proveedor por cada unidad que estás ingresando</mat-hint><mat-error>Usa un valor de 0 a 14 dígitos enteros y hasta 4 decimales.</mat-error></mat-form-field>
+        }
+        @if (error()) { <div class="alert alert--error form-error" role="alert" aria-live="assertive">
+          @if (createErrorKind() === 'validation') { <strong>Revisa los datos.</strong> }
+          @else if (createErrorKind() === 'unique') { <strong>Ya existe un producto con esos datos.</strong> }
+          @else if (createErrorKind() === 'idempotency') { <strong>La solicitud no coincide con el intento anterior.</strong> }
+          @else if (createErrorKind() === 'uncertain') { <strong>No se pudo confirmar el resultado del alta.</strong> }
+          <span>{{ error() }}</span>
+          @if (createOutcomeUncertain()) {
+            <p>{{ reconcilingCreate() ? 'Consultando el catálogo…' : 'Las coincidencias no confirman el resultado. El alta sigue pendiente; recuperarla envía exclusivamente el contenido y la clave originales.' }}</p>
+            <button mat-button type="button" (click)="recoverCreate()" [disabled]="saving() || checkingCreate()">Recuperar alta original</button>
+            <button mat-button type="button" (click)="reconcileCreate()" [disabled]="reconcilingCreate()">{{ reconcilingCreate() ? 'Consultando…' : 'Consultar posibles coincidencias' }}</button>
+            @if (reconciliationCandidates().length) { <ul>@for (candidate of reconciliationCandidates(); track candidate.id) { <li>{{ candidate.name }} · {{ candidate.internalCode }} · {{ candidate.barcode || 'Sin barras' }}</li> }</ul> }
+            @else if (!reconcilingCreate() && !reconciliationQueryFailed()) { <p>Sin coincidencias en la consulta; esto no demuestra que el alta no se haya guardado.</p> }
+          }
+        </div> }
+        <div class="actions"><button mat-flat-button type="submit" [disabled]="saving() || checkingCreate() || (createOutcomeUncertain() && !product.id)">Guardar</button><button mat-button type="button" (click)="cancel()" [disabled]="saving() || checkingCreate()">{{ createOutcomeUncertain() && !product.id ? 'Cerrar formulario' : 'Cancelar' }}</button></div>
+      </form>
+    </section>
+  }
+</section>

@@ -8,7 +8,6 @@ public static class DefaultPermissionCatalog
     [
         new(PermissionCodes.UsersRead, "Consultar usuarios", "SEGURIDAD"),
         new(PermissionCodes.UsersManage, "Gestionar usuarios", "SEGURIDAD"),
-        new(PermissionCodes.CashierPasswordsReset, "Restablecer contraseñas de Cajeros", "SEGURIDAD"),
         new(PermissionCodes.RolesRead, "Consultar roles", "SEGURIDAD"),
         new(PermissionCodes.RolesManage, "Gestionar plantillas de roles", "SEGURIDAD"),
         new(PermissionCodes.PermissionsRead, "Consultar permisos", "SEGURIDAD"),
@@ -71,7 +70,6 @@ public static class DefaultPermissionCatalog
         {
             [RoleCodes.Administrator] = Permissions.Select(x => x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase),
             [RoleCodes.Supervisor] = Set(
-                PermissionCodes.CashierPasswordsReset,
                 PermissionCodes.ProductsRead, PermissionCodes.ProductsCreate, PermissionCodes.ProductLabelsManage,
                 PermissionCodes.CategoriesRead,
                 PermissionCodes.InventoryRead, PermissionCodes.ReplenishmentAlertsRead,
@@ -82,7 +80,8 @@ public static class DefaultPermissionCatalog
                 PermissionCodes.SalesChangeAuthorize, PermissionCodes.CustomersBasicManage, PermissionCodes.CustomersManage,
                 PermissionCodes.CustomersHistoryRead, PermissionCodes.CreditRequest,
                 PermissionCodes.CreditAuthorize, PermissionCodes.CreditManage, PermissionCodes.CreditFutureBlock,
-                PermissionCodes.LayawayManage, PermissionCodes.LayawayCancel, PermissionCodes.SuppliersRead,
+                PermissionCodes.LayawayManage, PermissionCodes.LayawayCancel,
+                PermissionCodes.LayawayRefundDecide, PermissionCodes.SuppliersRead,
                 PermissionCodes.PurchaseOrdersManage, PermissionCodes.PurchasesReceive,
                 PermissionCodes.OperationalReportsRead, PermissionCodes.PrintTest),
             [RoleCodes.Cashier] = Set(

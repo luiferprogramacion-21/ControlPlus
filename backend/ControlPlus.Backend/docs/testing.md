@@ -1,5 +1,125 @@
 # Pruebas
 
+## Catálogo: activación cerrada y arranque preparado (2 de noviembre)
+
+Evidencia `CatalogActivation-54e8a95787bd408aa2e13e1ee8e47333` revisada:
+CATALOG_ACTIVATION_OK, historial 12→13, Restore/Upgrade/MigratedCopy conformes,
+CHECK aprobado y 45 artefactos coincidentes. Tres productos, ocho alias y hashes
+de referencias P-000001 a P-000003. No repetir migración/ensayo/suites aprobadas.
+[Arranque y comprobación operativa](catalog-reference-startup.md): inspector de
+configuración real sin proceso/conexión y **23 verificaciones** nuevas de helpers
+aprobadas portable 7.5.4. User Secrets existentes usan controlplus_app; sin
+valores secretos en salida. Arranque/HTTP/alias reales pendientes del operador.
+Renderizado pendiente: navegador Linux sin libnspr4.so; no se instaló software
+ni se intentó interoperabilidad. Revisión estática de los cinco puntos de UI
+conforme, sin certificar apariencia renderizada.
+
+## Catálogo: ensayo aprobado y activación preparada (2 de noviembre)
+
+Revisadas las evidencias `CatalogRehearsal-22eebc2bb624496eae905222f0fec269`:
+CLONE_REHEARSAL_OK, respaldo SHA-256 E25D5D1E…EC9681C y 488930 bytes;
+Restore/Upgrade/postflight/CHECK conformes, tres capturas de origen idénticas,
+clon con 3 productos, 8 alias y 13 migraciones. No se repitió el ensayo.
+El [bloque de activación](catalog-reference-activation.md) reutiliza ese respaldo
+solo tras comprobar que el origen actual coincide y que no hay escritores.
+La entrada nueva aprobó validación offline de evidencias y **52 comprobaciones**
+del recorrido con IO simulado, en portable 7.5.4, salida 0. Incluye limpieza de
+credenciales, deriva inicial/inmediata, bloqueos y ausencia de reintentos/éxito
+falso. No se repitieron suites/builds. Aplicación real y prueba nativa del nuevo
+orquestador pendientes del operador; no hubo conexión del agente a PostgreSQL.
+
+## Catálogo: nuevo ensayo del estado actual (2 de noviembre de 2026)
+
+El usuario confirmó `DATA_DRIFT_READONLY_OK`: activación de producto y tres
+inicios de sesión posteriores al respaldo explican la deriva. Autoriza un
+respaldo y clon nuevos, conservando los anteriores. Se revisó el
+[recorrido existente](catalog-reference-clone-rehearsal.md): ambas capturas
+nuevas incluyen relationDetails y Restore usa el helper corregido; no fue
+necesario ajustar código. `Invoke-CloneRehearsal.ps1 -OfflineValidateOnly`
+aprobó en portable 7.5.4, salida 0: 45 artefactos, 278 fuentes y 9 archivos de
+revisión fijados, objetivo y extracción de DDL. No se repitieron diagnóstico,
+focalizadas ni suites/builds aprobados. Nuevo respaldo, restauración y
+migración exclusiva del clon pendientes de ejecución del operador; origen
+solo lectura/respaldo, aplicación real no autorizada.
+
+## Catálogo: equivalencia y continuación del clon conservado (2 de noviembre de 2026)
+
+Para `controlplus_test_08c9dd5e50bd4980be0ca5252e298737`, las lecturas conservadas
+tienen 50 componentes por lado y solo cambia el CHECK de tipos de movimiento,
+con la equivalencia de casts acreditada por el operador. Se conservó el
+comparador acotado existente y se añadió rechazo explícito de expresiones no
+reconocidas o CHECK ausente. Las nuevas focalizadas aprobaron **39** comprobaciones
+del comparador y **23** del plan de continuación, en PowerShell portable 7.5.4.
+El modo offline de continuación verificó respaldo, archivos originales, huellas
+y doce predecesoras archivadas sin conectar. Posteriormente el operador acreditó
+39/23 nativas; la continuación se detuvo antes de Apply por cambios posteriores
+al respaldo. El diagnóstico de deriva quedó cerrado y la autorización vigente
+es el ensayo nuevo descrito al inicio; el
+[bloque antiguo](testing/catalog-existing-clone-resume-20261102.md) no se reanuda.
+No se ejecutaron suites de aplicación, builds, consultas PostgreSQL ni migraciones.
+
+## Catálogo: diagnóstico del clon detenido (31 de octubre de 2026)
+
+Se leyeron las evidencias `CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c`:
+fallo en CloneRestore al comparar origen/clon. De 199 registros solo difiere
+`shape:compras.movimiento_inventario.relationsHash`; las dos capturas del origen
+son idénticas, los conteos/huellas de datos de las 62 tablas coinciden y el
+historial del clon conserva 12 predecesoras sin el objetivo. El SHA-256 del dump
+coincide. Error reproducido offline con el comparador existente, sin cambiarlo
+ni omitir controles. Se prepararon solo lecturas de catálogo por objeto para
+determinar la causa interna; no se repitieron ensayo ni migraciones.
+[Diagnóstico y punto retenido](testing/catalog-clone-restore-difference-20261031.md).
+
+## Catálogo: respaldo y ensayo preparados (31 de octubre de 2026)
+
+El usuario confirmó el preflight real de lectura, `PREFLIGHT_LECTURA_OK`, con
+12 predecesoras completas y objetivo pendiente. Se preparó
+[el ensayo sobre un clon nuevo](catalog-reference-clone-rehearsal.md), sin
+ejecutarlo por el agente: incluye respaldo SHA-256, restauración comparada,
+aplicación exclusiva al clon y contraste exacto del CHECK mediante tabla TEMP
+con rollback. El plan nuevo aprobó 23 comprobaciones offline portables y su
+validación de huellas/extracción del DDL terminó con salida 0. La prueba
+focalizada del cambio existente de PGOPTIONS aprobó 18 comprobaciones en host
+portable; su marcador no acredita una ejecución nativa Windows de esta revisión.
+No se repitieron suites de aplicación ni builds. Respaldo/ensayo real y aplicación
+persistente siguen pendientes; el bloque no aplica nada sobre `controlplus`.
+
+## Catálogo: preflight offline (31 de octubre de 2026)
+
+Intento posterior de lectura comunicado por el usuario: fallo genérico, sin
+código de salida ni stderr conservados. Se añadieron diagnósticos seguros;
+las nuevas focalizadas portables aprobaron 27 comprobaciones y la regresión
+del helper otras 27, sin repetir suites de aplicación. Confirmación nativa de
+esta revisión pendiente. [Diagnóstico y repetición preparada](testing/catalog-preflight-diagnostic-20261031.md).
+
+Helpers iniciales: el usuario comunicó `OFFLINE_WINDOWS_PS51_OK checks=27`.
+Incorporaciones del preflight y aislamiento nuevo de libpq: 374 comprobaciones
+portables aprobadas; el usuario confirmó además la ejecución nativa en Windows
+PowerShell 5.1 con `PREFLIGHT_OFFLINE_WINDOWS_PS51_OK checks=374`. Se conciliaron
+45 archivos de artefactos, cuatro DLL/PDB y 278 fuentes propias; los TRX no
+aportan hashes históricos. No se repitieron suites aprobadas ni se abrió la
+base real. [Informe y bloque único de lectura](testing/catalog-reference-preflight-offline-20261031.md).
+
+## Catálogo: referencias permanentes (29 de octubre de 2026)
+
+El procedimiento focalizado está en `scripts/Run-CatalogReferenceTests.ps1` y
+[referencias permanentes](permanent-product-references.md). Solicita contraseña
+oculta del rol exclusivo `controlplus_test_admin`, configura temporalmente la
+conexión a `postgres` y valida TRX de las bases temporales. La preparación única
+del rol sigue siendo la de la sección PostgreSQL local de este documento.
+
+Ejecutado sin PostgreSQL: Domain **70/70**, API pura/OpenAPI **12/12**, generación
+SQL **1/1**, Angular catálogo **32/32**; backend compilado con **0 errores y 0
+advertencias**, frontend producción con **salida 0** y tres advertencias de
+presupuesto detalladas en el informe. Integración y actualización de esquema
+temporal: **acreditadas posteriormente en Windows**, CatalogMigration **6/6** y
+CatalogApi **49/49**, ambas `Completed` sin errores ni omisiones; Domain
+**70/70** en la misma carpeta. TRX leídos el 30 de octubre, sin repetir pruebas.
+[Huellas, alcance y consolidación de frontend](testing/catalog-references-20261029.md).
+El [procedimiento de aplicación](catalog-reference-maintenance.md) se preparó
+sin ejecutar conexiones reales; respaldo/restauración y aplicación siguen pendientes.
+No se aplicó ninguna migración a `controlplus` ni se ejecutaron altas reales.
+
 ## Existencia y costo inicial — cierre de revisión
 
 Las siguientes ejecuciones se conservan como evidencias separadas. Los resultados
@@ -55,6 +175,89 @@ CREATE ROLE controlplus_test_admin LOGIN CREATEDB;
 Después ejecute `\password controlplus_test_admin` en la misma sesión de `psql` y defina una contraseña propia; el comando la solicita sin mostrarla. No asigne `CREATEDB` a `controlplus_app` ni comparta su clave. Si el rol ya existe, omita `CREATE ROLE` y use `\password` solo si necesita cambiarla.
 
 Cada fixture crea una base con prefijo `controlplus_test_` y un UUID aleatorio, aplica allí las migraciones necesarias y elimina solamente sus bases al terminar. El código exige el rol `controlplus_test_admin`, la base administrativa `postgres`, PostgreSQL 18 y el host local. No lee la cadena de la API ni permite que las pruebas creen o borren la base persistente `controlplus`. El rol debe poder conectarse a la base `postgres` con su contraseña.
+
+### Diagnóstico de autenticación antes de repetir Catálogo
+
+Los cinco fallos `CatalogMigration` anteriores comunicados con SQLSTATE `28P01` se producen
+en `LocalPostgresDatabase.StartAsync`, al abrir la conexión administrativa, antes
+de crear una base temporal o ejecutar migraciones. No acreditan un defecto del
+esquema ni distinguen por sí solos contraseña incorrecta de rol inexistente.
+Son un antecedente: la ejecución posterior de la carpeta
+`ControlPlus-Catalog-d7ab5ed4f0f248589eaf4e65d1907716` tiene **6/6** de migración
+y **49/49** de API aprobadas. No se vuelve a diagnosticar ni repetir esa ejecución.
+
+`Run-CatalogReferenceTests.ps1` fija servidor `127.0.0.1`, puerto `5432`, usuario
+`controlplus_test_admin` y base `postgres`. El fixture valida esos valores antes
+de `OpenAsync`. La contraseña entra por `Read-Host -AsSecureString`, se obtiene
+mediante `PSCredential.GetNetworkCredential().Password` y se asigna como valor
+del diccionario `DbConnectionStringBuilder['Password']`. No se interpola, recorta
+ni concatena. El builder aplica el escape de cadena de conexión; caracteres
+como espacios, `;`, `=`, comillas, `$`, acento grave, `&` y barra inversa no
+deben escaparse manualmente ni rodearse de comillas al escribir la contraseña.
+La variable de conexión es temporal y se restaura en `finally`.
+
+Primero compruebe **solo el inicio de sesión y una lectura** desde PowerShell
+5.1 de Windows. `-W` solicita la contraseña sin mostrarla, `-X` omite archivos
+de inicio de psql y los argumentos no contienen contraseñas. El bloque no
+ejecuta pruebas, no crea bases ni aplica migraciones; solo muestra los cuatro
+campos de destino y los confirma desde la conexión autenticada:
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$pgTool = 'C:\Program Files\PostgreSQL\18\bin\psql.exe'
+if (-not (Test-Path -LiteralPath $pgTool -PathType Leaf)) {
+    throw 'No se encontro psql de PostgreSQL 18 en la ruta documentada.'
+}
+[pscustomobject]@{
+    Servidor = '127.0.0.1'
+    Puerto = 5432
+    Usuario = 'controlplus_test_admin'
+    Base = 'postgres'
+} | Format-List
+
+& $pgTool -X -W -h 127.0.0.1 -p 5432 -U controlplus_test_admin -d postgres `
+    -v ON_ERROR_STOP=1 -P pager=off --single-transaction `
+    -c 'SET TRANSACTION READ ONLY; SELECT inet_server_addr()::text AS servidor, inet_server_port() AS puerto, current_user AS usuario, current_database() AS base;'
+if ($LASTEXITCODE -ne 0) {
+    throw 'Conexion de pruebas no validada. Revisar el rol antes de repetir la suite.'
+}
+Write-Host 'CONEXION_PRUEBAS_OK'
+```
+
+Si falla, un administrador PostgreSQL comprueba el rol en **la misma dirección,
+puerto y base administrativa**; `-W` pide ahora la contraseña de `postgres`
+oculta. No use el usuario de la aplicación:
+
+```powershell
+& 'C:\Program Files\PostgreSQL\18\bin\psql.exe' -X -W -h 127.0.0.1 -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1
+```
+
+Dentro de esa sesión de psql:
+
+```sql
+SELECT rolname, rolcanlogin, rolcreatedb, rolsuper
+FROM pg_roles WHERE rolname = 'controlplus_test_admin';
+```
+
+Sin filas, falta la preparación única descrita arriba:
+`CREATE ROLE controlplus_test_admin LOGIN CREATEDB;`. Si existe, no repetir
+CREATE: debe tener `rolcanlogin=true`, `rolcreatedb=true` y `rolsuper=false`.
+Si necesita corregir esos atributos, el administrador puede ejecutar
+explícitamente `ALTER ROLE controlplus_test_admin LOGIN CREATEDB NOSUPERUSER;`.
+No se cambian atributos automáticamente como consecuencia de un `28P01`.
+
+Para asignar o restablecer exclusivamente la contraseña del rol de pruebas,
+ejecute `\password controlplus_test_admin` en psql: solicita el nuevo valor
+oculto y su confirmación. No escriba `ALTER ROLE ... PASSWORD '...'` ni ponga la
+contraseña en argumentos, archivos, historial o el chat. Salga con `\q` y repita
+el primer bloque como `controlplus_test_admin`, usando su contraseña propia.
+
+Solo después de obtener `CONEXION_PRUEBAS_OK` repetiremos
+`Run-CatalogReferenceTests.ps1`; esa repetición no forma parte del diagnóstico
+de autenticación. Si psql autentica y el script todavía recibe `28P01`, queda
+por contrastar la captura/construcción en Windows y la instancia efectiva antes
+de cambiar credenciales otra vez. El builder puede comprobarse por comparación
+ordinal de ida/vuelta en memoria, sin imprimir la contraseña o la cadena.
 
 Desde `C:\ControlPlus\backend\ControlPlus.Backend` ejecute:
 
@@ -269,3 +472,108 @@ Validación de las correcciones realizada por el agente: build serial completo c
 ### Resultado final comunicado por el usuario
 
 El 27 de octubre de 2026, el usuario comunicó que las focalizadas de historial comercial ejecutadas en Windows mediante `Run-CustomerHistoryTests.ps1` aprobaron **9/9**, con TRX `Completed`, salida `0`, **0 fallidas y 0 omitidas**. Este resultado se registra como evidencia comunicada por el usuario; no corresponde a una ejecución realizada por el agente. No se indicó la ruta del TRX final en ese mensaje. La revisión final del diff comprobó permisos efectivos y alcance de ventas propias, aislamiento por instalación y cliente, conteo posterior al filtro, orden estable, proyección sin costos y contrato OpenAPI. No se ejecutó la suite completa ni se accedió a `controlplus` durante esta revisión.
+# Prueba focalizada de permisos de catálogo (2 de noviembre de 2026)
+
+La migración `20261102010000_GrantProductCodeAccessV1` fue aplicada una vez a `controlplus` por el operador el 2 de noviembre de 2026. La prueba `ProductCodeAccessMigrationTests` inspecciona el SQL generado sin conexión. Una reproducción de búsqueda y alta bajo un rol nuevo exige `CREATEROLE` o un cluster aislado: el rol temporal de pruebas `controlplus_test_admin` solo tiene `CREATEDB`, por lo que no se debe alterar el rol global existente. Véase [product-code-access.md](product-code-access.md).
+
+Verificación focalizada en Linux el 2 de noviembre: restauración desde caché local correcta; build serial de la solución, 0 errores y 0 advertencias; `ProductCodeAccessMigrationTests` 1/1 aprobado. Dos intentos previos de build fallaron por entorno (directorio de inicio .NET de solo lectura y assets NuGet de Windows); se corrigió la configuración local de la ejecución, sin cambiar el repositorio para ocultar el fallo. No se ejecutó una prueba PostgreSQL ni HTTP real, por la limitación de roles indicada.
+
+Continuación: se agregó `ProductCodeAccessDatabaseTests` sobre una base temporal creada por `LocalPostgresDatabase`. La compilación inicial falló por un `using` faltante; corregido, el build serial final terminó con 0 errores y 0 advertencias. La prueba de SQL volvió a pasar 1/1. La prueba de integración se intentó una vez y **falló antes de abrir PostgreSQL**: falta `CONTROLPLUS_TEST_ADMIN_CONNECTION`; resultado 0/1. Aun con esa conexión, el rol de pruebas sin `CREATEROLE` permite comprobar aplicación e ACL en base temporal si existe `controlplus_app`, pero no reproducir una sesión de búsqueda/alta como un rol nuevo. No se accedió a `controlplus`.
+
+El primer intento nativo Windows de compilar con `--no-restore` informado por el operador falló con NETSDK1064 para tres paquetes analizadores. Los `obj/project.assets.json` inspeccionados todavía apuntan a `/tmp/controlplus-dotnet/.nuget/packages/` por el restore anterior desde Linux. Corresponde restaurar la solución en Windows con `--force` antes del build; no se modifican paquetes versionados ni se elimina trabajo del repositorio.
+
+El operador confirmó después en Windows `dotnet restore ControlPlus.Backend.slnx --force -m:1 /p:BuildInParallel=false` correcto en 2,6 s y build serial `--no-restore` correcto en 16,3 s para los siete proyectos. Falta ejecutar y reportar la prueba focalizada de base temporal; no interpretar este build como resultado de integración.
+
+El operador confirmó luego `ProductCodeAccessDatabaseTests` en Windows: 1 total, 1 aprobada, 0 errores, 0 omitidas, duración 5,8 s; salida de `dotnet test` correcta en 6,3 s. La prueba aplica el historial en una base temporal y comprueba permisos después de la compensatoria cuando el rol de aplicación existe. Esta evidencia no incluye una búsqueda HTTP ni un alta autenticada con `controlplus_app`, y no acredita la aplicación en `controlplus`.
+
+Tras la autorización expresa del operador para continuar, se revisó el bloque de aplicación en `docs/product-code-access.md` y su sintaxis se validó en Windows PowerShell 5.1 con `Parser.ParseInput`: `POWERSHELL_SYNTAX_OK`, salida 0. La validación solo analizó texto; no ejecutó el bloque ni abrió PostgreSQL. La aplicación real y el postflight continúan pendientes de la ejecución del operador.
+
+El primer preflight del operador se detuvo antes de crear respaldo o invocar el migrador: `psql.exe -c $pre` desde PowerShell 5.1 entregó el identificador `public."__EFMigrationsHistory"` sin comillas a PostgreSQL, que buscó `public.__efmigrationshistory` y reportó relación inexistente. El bloque se corrigió para escribir el SQL sin BOM en un archivo temporal y pasarlo con `psql -f`, conservando comillas e identificadores. No se interpreta el error como ausencia de la tabla real ni como migración aplicada.
+
+Con el bloque corregido, el operador informó respaldo verificado en `C:\Users\luife\ControlPlus-Backups\ProductCodeGrant-bef2a240c5954cb7afc7a0627bd70fd6\controlplus-before-grant.dump` (SHA-256 `78670E1FE27CA66BDB727144499CF1903BB9BB89E4B742EFDD930F8FD8DF60B9`), migrador exitoso para el objetivo exacto y `PRODUCT_CODE_GRANT_OK`. Este marcador incluye el postflight SQL de historial y ACL. La verificación HTTP posterior del listado y búsqueda usando la API con `controlplus_app` está registrada debajo.
+
+El bloque focalizado de GET para listado, `QA-20261028-01` y `P-000001` se validó sintácticamente en Windows PowerShell 5.1: `RUNTIME_BLOCK_SYNTAX_OK`, salida 0. No se ejecutó HTTP desde el agente. El bloque inicia sesión como operador normal (con su auditoría habitual), no crea productos y reporta códigos HTTP y conteos sin exponer token ni contraseña.
+
+El operador ejecutó el bloque HTTP: `LISTADO_GET_OK status=200 total=2`, `QA_GET_OK status=200 total=1`, `REFERENCIA_GET_OK status=200 total=1` y `PRODUCT_CODE_RUNTIME_GET_OK`. La consulta directa por `QA-20261028-01` ya no produce 500 y encuentra un producto; el listado sin búsqueda también responde 200. No se ejecutó alta ni edición real, por la instrucción de preservar los datos.
+
+## Revisión de Seguridad y Categorías (3 de noviembre de 2026)
+
+El usuario confirmó en Windows, con `controlplus_test_admin` y una base temporal, `SecurityApiFlowTests` **16/16**, 0 fallidas y 0 omitidas. Incluye niveles de rol numéricos en JSON, protección de los cuatro permisos críticos y el catálogo efectivo con 230 permisos activos y 5 inactivos. No se recibió ruta de TRX para esa ejecución; no se atribuye al agente.
+
+Se actualizaron otras pruebas de API que creaban categorías sin la abreviatura ahora obligatoria. Se añadió un caso de `PUT` con abreviatura nula histórica y la comprobación del código uniforme `resource.conflict` en abreviatura duplicada. No se cambió código de producción. Comandos ejecutados en Linux, sin conexión a `controlplus`:
+
+```bash
+DOTNET_CLI_HOME=/tmp/controlplus-dotnet dotnet restore ControlPlus.Backend.slnx -p:ArtifactsPath=/tmp/controlplus-review-artifacts -p:IncludeProjectNameInArtifactsPaths=true -p:NuGetAudit=false -p:RestoreSources=/home/luifer/.nuget/packages -m:1 /p:BuildInParallel=false -v quiet
+DOTNET_CLI_HOME=/tmp/controlplus-dotnet dotnet build ControlPlus.Backend.slnx --no-restore -m:1 /p:BuildInParallel=false -p:ArtifactsPath=/tmp/controlplus-review-artifacts -p:IncludeProjectNameInArtifactsPaths=true -v quiet
+DOTNET_CLI_HOME=/tmp/controlplus-dotnet dotnet test ControlPlus.Domain.Tests/ControlPlus.Domain.Tests.csproj --no-build --no-restore -m:1 /p:BuildInParallel=false --logger 'trx;LogFileName=Domain-20261103.trx' --results-directory TestResults/security-category-20261103 -v quiet
+DOTNET_CLI_HOME=/tmp/controlplus-dotnet dotnet test ControlPlus.Infrastructure.Tests/ControlPlus.Infrastructure.Tests.csproj --no-build --no-restore -m:1 /p:BuildInParallel=false -p:ArtifactsPath=/tmp/controlplus-review-artifacts -p:IncludeProjectNameInArtifactsPaths=true --logger 'trx;LogFileName=Infrastructure-20261103.trx' --results-directory TestResults/security-category-20261103 -v quiet
+DOTNET_CLI_HOME=/tmp/controlplus-dotnet dotnet test ControlPlus.Api.Tests/ControlPlus.Api.Tests.csproj --no-build --no-restore -m:1 /p:BuildInParallel=false -p:ArtifactsPath=/tmp/controlplus-review-artifacts -p:IncludeProjectNameInArtifactsPaths=true --logger 'trx;LogFileName=Api-20261103.trx' --results-directory TestResults/security-category-20261103 -v quiet
+```
+
+Restauración y build aislado: salida 0, 0 errores y 0 advertencias. Domain: **74/74**, 0 fallidas, 0 omitidas. Infrastructure: **6/72** aprobadas, 66 fallidas. API: **175/552** aprobadas, 377 fallidas. Los TRX están en `TestResults/security-category-20261103/{Domain,Infrastructure,Api}-20261103.trx`. Todas las 443 fallas de Infrastructure/API registran `InvalidOperationException: Configure CONTROLPLUS_TEST_ADMIN_CONNECTION` en `LocalPostgresDatabase.cs`, antes de crear una base temporal. La variable no está configurada en esta sesión; estas suites no acreditan las integraciones ni indican fallas funcionales. Deben repetirse en Windows con el rol de pruebas, sin usar `controlplus`.
+
+## Continuación de suites completas (3 de noviembre de 2026)
+
+El usuario informó una ejecución anterior de `scripts/Run-LocalTests.ps1` en Windows con bases temporales: Domain **74/74**, Infrastructure **71/72** y API **549/552**. Los cuatro casos fallidos eran expectativas de prueba anteriores a las migraciones de referencias y categoría: `OfficialSchemaIntegrationTests` contaba 61 tablas/PK en lugar de 62; `SalesApiFlowTests.OfficialSharedSessionSchemaAndEfModel_RemainUnchanged` omitía dos migraciones publicadas; `LayawayCreateApiFlowTests.Delivery_PaidLayawayWithoutOpenShiftOrSession_DecreasesStockAndReservationOnceWithoutFinancialEffects` esperaba el código enviado en vez de la referencia `APA-…`; `PurchasesApiFlowTests.Cancel_HistoricalPurchaseFromPreviousMigration_RejectsWithoutAnyEffects` creaba un producto por la API actual sobre un esquema histórico. El usuario confirmó correcciones solo de pruebas y compilación con 0 errores y 0 advertencias. No se comunicaron rutas de TRX de esa ejecución.
+
+En esta continuación se sustituyó la abreviatura aleatoria de las categorías de `PurchasesApiFlowTests` por un contador de letras determinista. Se ejecutó `dotnet restore ControlPlus.Backend.slnx -m:1 /p:BuildInParallel=false` y `dotnet build ControlPlus.Backend.slnx --no-restore -m:1 /p:BuildInParallel=false`, ambos con `ArtifactsPath=/tmp/controlplus-followup-artifacts` e `IncludeProjectNameInArtifactsPaths=true`; salida 0, build con 0 errores y 0 advertencias. `dotnet test ControlPlus.Domain.Tests/ControlPlus.Domain.Tests.csproj --no-build --no-restore -m:1 /p:BuildInParallel=false` con los mismos artefactos aprobó **74/74**, 0 fallidas y 0 omitidas, salida 0. TRX: `TestResults/security-category-followup-20261103/Domain-20261103-followup.trx`.
+
+No se repitieron las cuatro focalizadas ni las suites completas Infrastructure/API: `CONTROLPLUS_TEST_ADMIN_CONNECTION` no está configurada en la sesión Linux. `LocalPostgresDatabase` exige esa variable antes de crear una base `controlplus_test_*`; no se obtuvo ni mostró contraseña ni se accedió a `controlplus`. Las correcciones siguen pendientes de validación de integración en Windows. En particular, el caso histórico de Compras puede revelar otra dependencia del esquema nuevo después de crear el borrador; no hay ejecución que identifique una consulta o columna adicional y no se modificó producción.
+
+## Suite Windows posterior: un fallo de preflight (4 de noviembre de 2026)
+
+El operador comunicó una nueva ejecución de `scripts/Run-LocalTests.ps1`. En `C:\Users\luife\AppData\Local\Temp\ControlPlus-Suite-6ab43bd747924fbb9fdf722e907de6e2`, los TRX acreditan Domain **74/74** e Infrastructure **72/72**, ambos `Completed`, y API **551/552** aprobadas, una fallida, cero omitidas, 552 ejecutadas. El único fallo es `ControlledPreflightTests.EveryReservedCashStructure_IsRejectedWithoutApplyingTarget`, en `ControlledMigrationTests.cs:813`, para el índice reservado `ventas.ix_pago_cambio_movimiento_caja`. El proceso de preflight devolvió el mensaje sanitizado `failed without changing the database` (código 1), mientras la prueba exigía rechazo controlado (código 2). El caso duró 3 min 50 s; ejecuciones históricas de este mismo caso aprobaron en unos 38–45 s. No se atribuye todavía a esquema, código o carga del entorno: el runner oculta deliberadamente la excepción interna y el TRX no la conserva.
+
+La lectura del log PostgreSQL del intervalo no identificó un error SQL específico de ese índice. Los errores genéricos de lectura de `__EFMigrationsHistory` y las autenticaciones fallidas de contraseñas centinela corresponden también a otras pruebas concurrentes; no demuestran la causa de este fallo. Se requiere repetir **solo** el caso en una nueva base temporal con `controlplus_test_admin`, guardar su TRX y decidir con ese resultado si hay un defecto reproducible. No se cambió código de producción ni se accedió a `controlplus`.
+
+La repetición del operador quedó en `C:\Users\luife\AppData\Local\Temp\ControlPlus-CashPreflight-d0a44f5db9fa417f937d71ea882f15c1`. Se ejecutó primero `dotnet test ControlPlus.Api.Tests --no-build --no-restore -m:1 /p:BuildInParallel=false --filter 'FullyQualifiedName=ControlPlus.Api.Tests.ControlledPreflightTests.EveryReservedCashStructure_IsRejectedWithoutApplyingTarget' --logger 'trx;LogFileName=Preflight.trx'`: **1/1**, `Completed`, sin fallidas ni omitidas. Después, `dotnet test ControlPlus.Api.Tests --no-build --no-restore -m:1 /p:BuildInParallel=false --logger 'trx;LogFileName=Api.trx'`: **552/552**, `Completed`, sin fallidas ni omitidas; duración comunicada 1426,2 s. Ambos TRX se leyeron y sus contadores coinciden. El fallo anterior del preflight no se reprodujo. El bloque de comandos llegó al prompt sin excepción, por lo que ambas invocaciones devolvieron salida 0. Junto con los TRX Domain **74/74** e Infrastructure **72/72** de la ejecución inmediatamente anterior, la validación de las tres suites queda completa. No fue necesario modificar código de producción ni repetir migraciones en `controlplus`.
+
+## Consulta limitada de Cajeros (4 de noviembre de 2026)
+
+Tras aprobación del usuario, `GET /api/users/cashiers` lista únicamente cuentas con rol base Cajero activo. Exige Supervisor o Administrador y `USERS.CASHIER_PASSWORD_RESET` efectivo; `USERS.READ` sigue protegiendo el listado general. La consulta proyecta solo id, usuario, nombre y estado; filtra antes de contar y paginar. La prueba nueva `SecurityApiFlowTests.Supervisor_CanFindOnlyCashiersForPasswordReset_WithPaginationAndRevocation` cubre paginación, búsqueda, estados, campos limitados, acceso de Administrador, negación al Cajero incluso con concesión individual y revocación del Supervisor. No crea migraciones.
+
+Restauración aislada en Linux: salida 0. El primer build terminó con dos errores CS0246 en `SecurityApiFlowTests.cs` por un `using` faltante de `PagedResult<>`; se corrigió. El build serial repetido terminó con salida 0, **0 errores y 0 advertencias**, usando `/tmp/controlplus-cashier-lookup-artifacts`. La prueba HTTP requiere `CONTROLPLUS_TEST_ADMIN_CONNECTION`, ausente en esta sesión; su resultado de integración sigue pendiente. No se accedió a `controlplus`.
+
+El operador ejecutó después en Windows `dotnet restore` y `dotnet build` seriales con artefactos aislados en `%TEMP%\ControlPlus-CashierLookup-Artifacts`, seguidos del caso focalizado en una base temporal del rol `controlplus_test_admin`. El TRX `%TEMP%\ControlPlus-CashierLookup-9fb9209fff4e40b2a055874040f8aad3\CashierLookup.trx` fue leído: `Completed`, **1/1** aprobada, 0 fallidas, 0 errores y 0 omitidas. La duración comunicada fue 14,5 s; el comando terminó sin excepción. Esta evidencia valida el endpoint nuevo sin volver a ejecutar las 552 pruebas API anteriores.
+
+El operador indicó que inicia la API local con `dotnet run --project ControlPlus.Api --launch-profile http`. Tras la instrucción de reiniciarla, comunicó `CAJEROS_ENDPOINT_OK` al leer `http://localhost:5000/openapi/v1.json` y encontrar `/api/users/cashiers`. Esta comprobación acredita publicación de la ruta en la API en ejecución; no es una prueba HTTP autenticada sobre la base persistente ni acredita una operación de migración.
+
+## Retiro del restablecimiento de Cajeros por Supervisor (4 de noviembre de 2026)
+
+La comprobación `CAJEROS_ENDPOINT_OK` quedó sin vigencia: `GET /api/users/cashiers` fue retirado. Build serial de la solución: 0 errores y 0 advertencias. La prueba `OnlyAdministrator_CanResetOtherUsersPasswords_SupervisorCannot` reemplaza a las dos pruebas anteriores de Supervisor/Cajeros, pero **no se ejecutó**: requiere `CONTROLPLUS_TEST_ADMIN_CONNECTION` y el agente no dispone de ella. Pendiente de ejecución en Windows con el rol de pruebas.
+
+Revisión posterior: ninguna prueba de Domain, Infrastructure o API menciona `USERS.CASHIER_PASSWORD_RESET`; solo lo conserva la migración publicada e inmutable `20260912012000_HybridPermissionsV1`. La prueba nueva verifica al Supervisor con la plantilla predeterminada, pero no al Supervisor con `USERS.MANAGE` concedido individualmente. `ChangePasswordAsync` y `CanManageUser` aún permiten en ese caso restablecer la contraseña de un Cajero; queda pendiente corregir esa incompatibilidad con la decisión antes de dar por cerrada la verificación.
+
+Ejecución Windows comunicada por el operador el 4 de noviembre: `scripts/Run-LocalTests.ps1` generó `%TEMP%\ControlPlus-Suite-8354903e26b64c49b90117da79e96db6`. Se leyeron los tres TRX: Domain `Completed` **74/74**, Infrastructure `Completed` **72/72** y API `Failed` **538/553**, con 15 fallidas, 0 errores y 0 omitidas; salida final del script **1**. Todas las fallidas son de `LayawayCreateApiFlowTests`. Trece se deben a pruebas que aún envían `authorization` en altas de Administrador y reciben `400 validation.failed`; se corrigieron las solicitudes en los casos afectados, conservando las credenciales exigidas al Cajero. `AdministratorWithoutSecondAuthorizer_IsRecordedAsSelfAuthorized_AndReplaysWithoutWrites` recibe `409 resource.conflict`; `ConcurrentReservations_AllowOnlyAvailableStock_AndReplayHasNoSecondEffects` recibe dos respuestas `409` en vez de una creación y un conflicto. El TRX solo contiene el error público, pero la comparación del código y del script oficial identifica una incompatibilidad concreta: `LayawayCreateService` persistía `metodo_autenticacion = ROL_ADMINISTRADOR`, mientras `ck_autorizacion_metodo` solo acepta `PASSWORD` o `CODIGO_BARRAS_PIN`. La decisión posterior aprobada es conservar el esquema y usar `PASSWORD` con una descripción y auditoría explícitas para la autoautorización; no se crea ni aplica migración. La regresión de contraseña se amplió para conceder `USERS.MANAGE` individualmente al Supervisor y verificar que sigue recibiendo `403`; el servicio ahora exige rol Administrador para restablecer otra cuenta. Estas correcciones aún no tienen resultado de pruebas nuevo.
+
+Intentos portables del 4 de noviembre: `dotnet test ControlPlus.Domain.Tests --no-restore` terminó con salida 1 antes de ejecutar pruebas porque el SDK no pudo escribir su sentinel bajo `/home/luifer/.dotnet`. Con `DOTNET_CLI_HOME=/tmp/controlplus-dotnet-cli`, terminó con salida 1 porque `obj/Debug/net10.0` es de solo lectura en este entorno. El intento `--no-build --no-restore` terminó con salida 1 y TRX abortado en `/tmp/controlplus-password-decision/PasswordDecisionDomain.trx`: VSTest no pudo abrir su socket local (`SocketException (13): Permission denied`). Estos intentos no acreditan resultados de pruebas. Seguridad, CustomerHistory y las suites completas siguen pendientes en Windows con el rol de pruebas y bases temporales.
+
+Validación focalizada de creación de Apartados comunicada por el operador el 4 de noviembre: el primer intento con artefactos aislados compiló, pero los 42 casos se detuvieron antes de crear sus bases temporales con `28P01` para `controlplus_test_admin`; TRX `C:\Users\luife\AppData\Local\Temp\ControlPlus-LayawayCreate-c583ba3c815b4449a0e1ee1f3a1f0b93\results\LayawayCreate.trx`. Tras corregir la credencial de pruebas, la repetición terminó con salida 0 y TRX `C:\Users\luife\AppData\Local\Temp\ControlPlus-LayawayCreate-778d3a6adf5c44c49af60b0f394120df\results\LayawayCreate.trx`: `ResultSummary=Completed`, **42/42 ejecutadas y aprobadas**, 0 fallidas, 0 errores, 0 omitidas y 0 abortadas. La lectura independiente del TRX confirmó 42 resultados `Passed`. El operador informó duración de pruebas 138,6 s y del comando 139,1 s. Esta evidencia valida la clase focalizada `LayawayCreateApiFlowTests`, incluida la fila de autoautorización del Administrador; no equivale a repetir toda la suite API.
+
+La suite API completa posterior produjo 559 resultados `Passed` de 559, sin casos fallidos u omitidos, pero `ResultSummary=Failed` y salida 1 por un error de limpieza de la colección `Controlled migration local PostgreSQL`. El TRX `C:\Users\luife\AppData\Local\Temp\ControlPlus-Api-b078eb1eed2b4c0bb9378ecbc6a7e452\results\Api.trx` registra `NpgsqlException: Exception while reading from stream`, con `TimeoutException: Timeout during reading attempt` al ejecutar `DROP DATABASE` en `LocalPostgresDatabase.cs:83`. No se acredita la suite como completada. Se ajustó solo el fixture para abrir conexión nueva por intento, usar `DROP DATABASE IF EXISTS ... WITH (FORCE)` y reintentar hasta dos veces el timeout; conserva la validación estricta del prefijo e identificador de cada base temporal. Restauración aislada y build serial portable: salida 0, 0 errores y 0 advertencias. En ese momento la prueba focalizada de limpieza PostgreSQL seguía pendiente de ejecución Windows con el rol dedicado; no se accedió a `controlplus`.
+
+El operador ejecutó después en Windows la clase `ControlledMigrationTests` con el fixture corregido y bases temporales del rol dedicado. TRX `C:\Users\luife\AppData\Local\Temp\ControlPlus-ControlledMigration-5863cf072ace4b3d9adbe42e52735fa2\results\ControlledMigration.trx`: `ResultSummary=Completed`, **14/14 ejecutadas y aprobadas**, 0 fallidas, 0 errores, 0 omitidas y 0 abortadas; 14 resultados `Passed` y ningún `RunInfo` de error. La salida comunicada fue 0. Esta ejecución acredita la limpieza de esa colección en el recorrido focalizado; la suite API completa anterior conserva su salida 1 histórica y no se presenta como una ejecución global aprobada.
+
+Cierre de la suite API completa comunicado por el operador el 4 de noviembre: restore y build serial con artefactos aislados en `%TEMP%`, seguido de `dotnet test ControlPlus.Api.Tests --no-build --no-restore -m:1 /p:BuildInParallel=false` sobre bases temporales del rol dedicado. Salida **0**. TRX `C:\Users\luife\AppData\Local\Temp\ControlPlus-ApiFinal-eafa05da93454a938049c06447303409\results\ApiFinal.trx`: `ResultSummary=Completed`, **559/559 ejecutadas y aprobadas**, 0 fallidas, 0 errores, 0 timeout, 0 abortadas y 0 omitidas; 559 resultados individuales `Passed` y ningún `RunInfo` de error. La lectura independiente del TRX confirmó los contadores. Duración de pruebas comunicada: 1861,6 s. Esta ejecución reemplaza la anterior con salida 1 como evidencia de cierre global de API; el fallo histórico de limpieza permanece documentado arriba.
+
+## Excepciones de Administrador en anulación de venta y cierre de Caja (4 de noviembre de 2026)
+
+Tras añadir las migraciones compensatorias `20261104010000_AdminSelfSaleCancellationV1` y `20261104020000_AdminSelfCashDifferenceV1`, el build serial de la solución terminó con 0 errores y 0 advertencias. La prueba focalizada de Domain aprobó 7/7 y la suite completa de Domain aprobó 74/74. El primer intento de integración focalizada falló antes de los casos (0/7) porque el proceso de pruebas no recibió `CONTROLPLUS_TEST_ADMIN_CONNECTION`; el segundo TRX `AdminSelfRetry.trx`, bajo `%TEMP%\ControlPlus-AdminSelf-38bbdb572404442bb3bce97f91dc1f13\results`, terminó `Completed`, 7/7 aprobadas, salida 0.
+
+El operador ejecutó después Infrastructure 72/72 (`Completed`, salida 0) y API 558/559 (salida 1), en bases temporales. La única falla API fue `SalesApiFlowTests.OfficialSharedSessionSchemaAndEfModel_RemainUnchanged` en `SalesApiFlowTests.cs:1037`: su lista fija de 15 migraciones omitía las dos nuevas. Se actualizó únicamente la expectativa de historial a 17 entradas, conservando el orden completo y las verificaciones del modelo y esquema compartido. El build serial posterior de `ControlPlus.Api.Tests` terminó con 0 errores y 0 advertencias.
+
+El operador repitió el caso de historial: `AdminSelfHistoria.trx` acredita `Completed`, 1/1 aprobada, sin errores. Después ejecutó API completa: salida 0, duración de pruebas comunicada 1836,7 s. `AdminSelfApiFinal.trx` acredita `Completed`, **559/559 ejecutadas y aprobadas**, 0 fallidas, 0 errores, 0 omitidas y ningún `RunInfo` de error. Los TRX están en `C:\Users\luife\AppData\Local\Temp\ControlPlus-AdminSelf-38bbdb572404442bb3bce97f91dc1f13\results`; sus contadores y 559 resultados individuales `Passed` se leyeron independientemente. Junto con Domain 74/74 e Infrastructure 72/72, quedan aprobadas las suites compiladas para ese árbol. No se accedió a `controlplus` ni se aplicaron migraciones persistentes.
+
+Para comprobar también los cuatro scripts SQL separados se añadió `AdminSelfAuthorizationMigrationTests.PreflightAndPostflight_ValidateEachCompensatingMigration_OnDisposableDatabase`: crea una base `controlplus_test_*`, ejecuta cada script de solo lectura en su etapa, aplica las dos migraciones y verifica los marcadores y el historial. Su build aislado en Linux terminó con 0 errores y 0 advertencias. El operador la ejecutó después en Windows: salida 0, `AdminSelfMigrationScripts.trx` bajo la misma carpeta de resultados, `Completed`, **1/1 aprobada**, 0 fallidas, 0 errores, 0 omitidas y ningún `RunInfo` de error, verificado mediante lectura independiente. La acreditación Infrastructure 72/72 anterior no incluye este caso añadido; junto a ella, el ensayo nuevo cubre las cuatro etapas SQL y las dos migraciones en una base temporal. No se accedió a `controlplus` ni se aplicaron allí migraciones.
+
+## Excepciones de Administrador y Supervisor: cierre de pruebas (5 de noviembre de 2026)
+
+La implementación amplió la autorización propia de Administrador a crédito, ajuste de inventario, cambio posterior de venta, cancelación de apartado, anulación de compra, cierre/anulación de pedido y recepción excepcional. Supervisor puede crear apartado y crédito sin segundo autorizador; su cancelación de apartado exige otro autorizador y la concesión de `LAYAWAY.REFUND_DECIDE` mediante `20261105010000_SupervisorLayawayRefundDecisionV1`. Esta migración quedó preparada, sin aplicación a `controlplus`. El build serial aislado terminó con 0 errores y 0 advertencias; las pruebas unitarias de `LayawayCreateServiceTests` aprobaron 5/5 y Domain 74/74 en el entorno portable.
+
+El operador ejecutó pruebas Windows con `controlplus_test_admin` y bases temporales `controlplus_test_*`. `Phase1Migration.trx` acreditó `Completed`, 1/1; `Phase1ApiRetry.trx` acreditó `Completed`, 85/85. El primer recorrido API completo tuvo 563/565: `LayawayQueryServiceTests.Detail_ProjectsDeliveryFromInventoryMovementsWithoutCosts` halló los dígitos `777` dentro de un UUID pese a no exponer costos, y la prueba nueva de replay de inventario comparó marcas de tiempo con distinta precisión de submicrosegundo. Se corrigieron solo las aserciones: el JSON se inspecciona por valores numéricos y el replay conserva igualdad de todos los campos con tiempo equivalente a microsegundos. El build posterior terminó con 0 errores y 0 advertencias; `LayawayQueryServiceTests` aprobó 16/16 en el entorno portable.
+
+La repetición Windows de los dos casos corregidos quedó en `C:\Users\luife\AppData\Local\Temp\ControlPlus-ApiFinalRetry-ae0b73a023e84818a437db6c29f66b42\results\TwoCorrections.trx`: `Completed`, 2/2, sin fallas, errores ni omitidas. En la misma carpeta, `ApiFinalRetry.trx` registra salida 0 y `Completed`, **565/565 resultados individuales aprobados**, 0 fallas, 0 errores y 0 omitidas; duración de pruebas comunicada 1891,5 s. La lectura independiente de ambos TRX confirmó contadores y resultados individuales. `InfrastructureFinal.trx`, en `C:\Users\luife\AppData\Local\Temp\ControlPlus-Phase1Retry-df4c3311a2a94ed1a45cb28a4ba98a91\results`, acredita `Completed`, **73/73**, sin fallas, errores ni omitidas. No se accedió a `controlplus` ni se aplicaron migraciones a bases persistentes.
+
+El 5 de noviembre se ejecutó `npm.cmd test -- --watch=false` desde el frontend con Node Windows 24.20.0 y las dependencias de Windows: salida 0, **210/210** pruebas en 30 archivos. `npm.cmd run build` terminó con salida 0 y tres advertencias de presupuesto existentes: bundle inicial, `cash.scss` y `sales.scss`. El intento Linux previo no llegó a ejecutar pruebas porque su Node 22.22.1 era inferior al mínimo de Angular CLI y las dependencias `esbuild` instaladas eran para Windows. No se alteró el frontend para sortear el entorno. Se actualizaron únicamente las reglas documentadas de la ventana de autorización.
+
+Se prepararon `SupervisorRefundPreflight.sql` y `SupervisorRefundPostflight.sql`, ambos de solo lectura y con `ROLLBACK`, para `20261105010000_SupervisorLayawayRefundDecisionV1`, y se extendió `AdminSelfAuthorizationMigrationTests` para ejecutar los seis scripts y las tres migraciones en orden sobre una base `controlplus_test_*`. El build serial posterior terminó con 0 errores y 0 advertencias. El operador ejecutó la prueba ampliada en Windows con `CONTROLPLUS_TEST_ADMIN_CONNECTION`: salida 0, `ThreeMigrations.trx` en `C:\Users\luife\AppData\Local\Temp\ControlPlus-SupervisorRefund-c2f255dbca1343329260feb34279f436\results`, `Completed`, **1/1 aprobada**, 0 fallas, 0 errores y 0 omitidas. La lectura independiente confirmó el resultado individual `Passed`. La acreditación anterior 1/1 cubría solo las dos migraciones de Administrador; esta nueva ejecución cubre las tres en una base temporal. No se accedió a `controlplus` ni se aplicaron migraciones a bases persistentes.

@@ -200,3 +200,5 @@ El commit `f75bc7bf14e71fb54e9babb595d221f38cf53017` fue publicado y la imagen A
 `/api/health`, `/api/health/database` y `/openapi/v1.json` respondieron HTTP `200`. El OpenAPI desplegado expuso las cinco operaciones de `/api/purchases` y las tres de `/api/document-numbering/purchases`, sin `DELETE` en ninguna de ambas rutas.
 
 La configuración operativa de `COMPRA` siguió esta secuencia: `GET` inicial `404`, un único `POST` autorizado con `prefix=CMP` y `firstNumber=1`, y una certificación posterior mediante un único `GET` de solo lectura. El resultado certificado fue `prefix=CMP`, `lastNumber=0`, `nextNumber=1` y `version=1`. No se usaron SQL directo, migraciones, `PUT`, `DELETE`, borradores ni confirmaciones de compras. La configuración de `COMPRA` fue el único cambio funcional autorizado en PostgreSQL persistente durante esta fase operativa.
+
+**Jerarquía de autorización (5 de noviembre de 2026):** con credenciales, el autorizador debe tener rol base estrictamente superior al ejecutor: Cajero → Supervisor o Administrador; Supervisor → Administrador. Las autoautorizaciones aprobadas conservan sus condiciones. El permiso efectivo sigue siendo obligatorio.

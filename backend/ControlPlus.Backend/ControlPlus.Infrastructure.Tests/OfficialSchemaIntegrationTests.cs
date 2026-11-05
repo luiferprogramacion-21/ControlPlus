@@ -42,7 +42,7 @@ public sealed class OfficialSchemaIntegrationTests
         await context.Database.MigrateAsync();
         await context.Database.OpenConnectionAsync();
 
-        Assert.Equal(61L, await ScalarAsync(context.Database.GetDbConnection(),
+        Assert.Equal(62L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*)
             FROM information_schema.tables
@@ -50,7 +50,7 @@ public sealed class OfficialSchemaIntegrationTests
               AND table_schema IN ('seguridad','configuracion','catalogo','caja','ventas','compras','auditoria')
             """));
 
-        Assert.Equal(61L, await ScalarAsync(context.Database.GetDbConnection(),
+        Assert.Equal(62L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*)
             FROM information_schema.table_constraints

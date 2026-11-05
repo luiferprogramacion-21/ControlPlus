@@ -1,3 +1,4 @@
+using ControlPlus.Domain.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -120,9 +121,11 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             }
             return saved is null ? Result.Failure<PurchaseDto>(ApplicationError.Conflict("La anulación original no es recuperable.")) : Result.Success(saved);
         }
-        if (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-            string.IsNullOrWhiteSpace(request.Authorization.Password))
-            return Invalid<PurchaseDto>("Las credenciales del autorizador son obligatorias para una nueva anulación.");
+        if (request.Authorization is not null &&
+            (string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
+             string.IsNullOrWhiteSpace(request.Authorization.Password)))
+            return Invalid<PurchaseDto>("Si envía authorization, incluya usuario y contraseña.");
+        var administratorSelfAuthorized = request.Authorization is null;
         var purchase = await repository.GetForUpdateAsync(id, ct);
         if (purchase is null) return Result.Failure<PurchaseDto>(ApplicationError.NotFound("la compra"));
         if (purchase.Version != request.ExpectedVersion) return Stale();
@@ -170,35 +173,52 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                 CostoPromedioAnterior = product.CostoPromedio, CostoPromedioPosterior = detail.CostoPromedioAnterior,
                 FechaHora = now, CorrelacionId = correlation });
         }
-        var authorizer = await users.GetByUserNameAsync(request.Authorization.UserName.Trim(), ct);
-        if (authorizer is null)
+        Usuario? authorizer;
+        if (administratorSelfAuthorized)
         {
-            await WriteRejectedAuthorizationAsync(actor, id, correlation, terminal.Id, ct);
-            return Result.Failure<PurchaseDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            authorizer = await repository.GetUserForUpdateAsync(actor.UserId, ct);
+            if (authorizer is null || !authorizer.IsActive)
+                return Denied<PurchaseDto>();
         }
-        authorizer = await repository.GetUserForUpdateAsync(authorizer.Id, ct) ?? authorizer;
-        if (!authorizer.IsActive || !await CanCancelUserAsync(authorizer.Id, ct))
-            return Result.Failure<PurchaseDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
-        if (!passwords.Verify(request.Authorization.Password, authorizer.PasswordHash))
+        else
         {
-            var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
-            await users.UpdateAsync(authorizer, ct);
-            if (locked)
-                await AuditWriter.WriteAsync(audit, clock, authorizer.Id, AuditAction.UserLocked,
-                    nameof(Usuario), authorizer.Id,
-                    new { authorizer.Id, authorizer.FailedLoginAttempts }, ct);
-            await WriteRejectedAuthorizationAsync(actor, id, correlation, terminal.Id, ct);
-            return Result.Failure<PurchaseDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            authorizer = await users.GetByUserNameAsync(request.Authorization!.UserName.Trim(), ct);
+            if (authorizer is null)
+            {
+                await WriteRejectedAuthorizationAsync(actor, id, correlation, terminal.Id, ct);
+                return Result.Failure<PurchaseDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            }
+            authorizer = await repository.GetUserForUpdateAsync(authorizer.Id, ct) ?? authorizer;
+            if (!authorizer.IsActive || !await CanCancelUserAsync(authorizer.Id, ct) ||
+                !RoleHierarchy.IsHigherThan(authorizer.HighestRoleLevel,
+                    (await users.GetAuthorizationSnapshotAsync(actor.UserId, ct))!.HighestRoleLevel))
+                return Result.Failure<PurchaseDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            if (!passwords.Verify(request.Authorization.Password, authorizer.PasswordHash))
+            {
+                var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
+                await users.UpdateAsync(authorizer, ct);
+                if (locked)
+                    await AuditWriter.WriteAsync(audit, clock, authorizer.Id, AuditAction.UserLocked,
+                        nameof(Usuario), authorizer.Id,
+                        new { authorizer.Id, authorizer.FailedLoginAttempts }, ct);
+                await WriteRejectedAuthorizationAsync(actor, id, correlation, terminal.Id, ct);
+                return Result.Failure<PurchaseDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            }
         }
         var permission = await permissions.GetByCodeAsync(PermissionCodes.PurchasesCancel, ct);
         if (permission is null || !permission.Activo)
             return Result.Failure<PurchaseDto>(ApplicationError.Conflict("El permiso de anulación no está disponible."));
-        authorizer.RegisterSuccessfulLogin(clock.UtcNow);
-        await users.UpdateAsync(authorizer, ct);
+        if (!administratorSelfAuthorized)
+        {
+            authorizer.RegisterSuccessfulLogin(clock.UtcNow);
+            await users.UpdateAsync(authorizer, ct);
+        }
         var authorization = new AutorizacionOperacion { Id = Guid.CreateVersion7(),
             UsuarioSolicitanteId = actor.UserId, UsuarioAutorizadorId = authorizer.Id, PermisoId = permission.Id,
             TipoOperacion = "ANULAR_COMPRA", CorrelacionId = correlation,
-            DescripcionOperacion = "Autorización de anulación de compra.", Motivo = reason.Codigo,
+            DescripcionOperacion = administratorSelfAuthorized
+                ? "Autorización de anulación de compra por Administrador sin segundo autorizador."
+                : "Autorización de anulación de compra.", Motivo = reason.Codigo,
             MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA", Estado = "UTILIZADA",
             FechaSolicitud = now, FechaExpiracion = now.AddMinutes(5), FechaUtilizacion = now };
         await repository.AddAuthorizationAsync(authorization, ct);
@@ -228,7 +248,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             nameof(Compra), id, new { PurchaseId = id, From = "CONFIRMADA", To = "ANULADA",
                 ReasonId = reason.Id, AuthorizationId = authorization.Id, Version = purchase.Version,
                 ProductIds = details.Select(x => x.ProductoId).ToArray(), CorrelationId = correlation,
-                Result = "SUCCESS" }, correlation, authorizer.Id, null, terminal.Id, null, ct);
+                Result = "SUCCESS", AuthorizationMode = administratorSelfAuthorized ? "ADMINISTRATOR_SELF" : "OTHER_USER" },
+            correlation, authorizer.Id, null, terminal.Id, null, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return Result.Success(response);
     }
@@ -597,21 +618,29 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             (long)byLine[x.OrderLineId].CantidadRecibida + x.Quantity > byLine[x.OrderLineId].CantidadSolicitada);
         var correlation = Guid.CreateVersion7();
         AutorizacionOperacion? authorization = null;
+        var administratorSelfAuthorized = false;
         if (exceptional)
         {
-            if (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-                string.IsNullOrWhiteSpace(request.Authorization.Password))
+            administratorSelfAuthorized = request.Authorization is null &&
+                await CanReceiveExceptionAsync(actor.UserId, ct);
+            if (!administratorSelfAuthorized &&
+                (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
+                 string.IsNullOrWhiteSpace(request.Authorization.Password)))
                 return Invalid<PurchaseReceiptDto>("La recepción excepcional exige credenciales de Administrador.");
-            var authorizer = await users.GetByUserNameAsync(request.Authorization.UserName.Trim(), ct);
+            var authorizer = administratorSelfAuthorized
+                ? await repository.GetUserForUpdateAsync(actor.UserId, ct)
+                : await users.GetByUserNameAsync(request.Authorization!.UserName.Trim(), ct);
             if (authorizer is null)
             {
                 await RejectReceiptAuthorizationAsync(actor.UserId, orderId, correlation, terminal.Id, ct);
                 return Result.Failure<PurchaseReceiptDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
             }
             authorizer = await repository.GetUserForUpdateAsync(authorizer.Id, ct) ?? authorizer;
-            if (!authorizer.IsActive || !await CanReceiveExceptionAsync(authorizer.Id, ct))
+            if (!authorizer.IsActive || !await CanReceiveExceptionAsync(authorizer.Id, ct) ||
+                (!administratorSelfAuthorized && !RoleHierarchy.IsHigherThan(authorizer.HighestRoleLevel,
+                    (await users.GetAuthorizationSnapshotAsync(actor.UserId, ct))!.HighestRoleLevel)))
                 return Result.Failure<PurchaseReceiptDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
-            if (!passwords.Verify(request.Authorization.Password, authorizer.PasswordHash))
+            if (!administratorSelfAuthorized && !passwords.Verify(request.Authorization!.Password, authorizer.PasswordHash))
             {
                 var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
                 await users.UpdateAsync(authorizer, ct);
@@ -623,13 +652,18 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             var permission = await permissions.GetByCodeAsync(PermissionCodes.PurchasesReceiveExceptions, ct);
             if (permission is null)
                 return Result.Failure<PurchaseReceiptDto>(ApplicationError.Conflict("El permiso de excepciones no está disponible."));
-            authorizer.RegisterSuccessfulLogin(clock.UtcNow);
-            await users.UpdateAsync(authorizer, ct);
+            if (!administratorSelfAuthorized)
+            {
+                authorizer.RegisterSuccessfulLogin(clock.UtcNow);
+                await users.UpdateAsync(authorizer, ct);
+            }
             var authTime = clock.UtcNow.UtcDateTime;
             authorization = new AutorizacionOperacion { Id = Guid.CreateVersion7(),
                 UsuarioSolicitanteId = actor.UserId, UsuarioAutorizadorId = authorizer.Id, PermisoId = permission.Id,
                 TipoOperacion = "EXCEPCION_RECEPCION_COMPRA", CorrelacionId = correlation,
-                DescripcionOperacion = "Autorización de exceso o sustitución en recepción de pedido.",
+                DescripcionOperacion = administratorSelfAuthorized
+                    ? "Autorización de recepción excepcional por Administrador sin segundo autorizador."
+                    : "Autorización de exceso o sustitución en recepción de pedido.",
                 Motivo = "EXCESO_O_SUSTITUCION", MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA",
                 Estado = "UTILIZADA", FechaSolicitud = authTime, FechaExpiracion = authTime.AddMinutes(5),
                 FechaUtilizacion = authTime };
@@ -715,7 +749,9 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         await AuditWriter.WriteCashAsync(audit, clock, actor.UserId, AuditAction.PurchaseOrderReceived,
             nameof(Compra), purchase.Id, new { PurchaseId = purchase.Id, OrderId = order.Id,
                 OrderState = order.Estado, OrderVersion = order.Version, ProductIds = products.Select(x => x.Id).Order().ToArray(),
-                AuthorizationId = authorization?.Id, CorrelationId = correlation }, correlation,
+                AuthorizationId = authorization?.Id, CorrelationId = correlation,
+                AuthorizationMode = authorization is null ? "NONE" :
+                    administratorSelfAuthorized ? "ADMINISTRATOR_SELF" : "OTHER_USER" }, correlation,
             authorization?.UsuarioAutorizadorId, null, terminal.Id, null, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return Result.Success(response);

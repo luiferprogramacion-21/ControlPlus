@@ -1,0 +1,72 @@
+:host { display:block; min-width:0; }
+.prototype-operation { display:flex; flex-direction:column; gap:14px; min-width:0; min-height:100%; font-size:14px; }
+.module-heading { gap:16px; }
+.cash-heading-actions { display:flex; align-items:center; gap:8px; }
+.module-heading .button { min-height:38px; padding:0 14px; font-size:12px; }
+.opening-grid,.closing-grid,.cash-open-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(300px,.8fr); align-items:start; gap:18px; }
+.cash-open-grid { grid-template-columns:minmax(0,1.35fr) minmax(300px,.8fr); }
+.opening-form,.closing-form,.terminal-card,.cash-operations { min-width:0; }
+.panel-heading h2 { margin:0 0 4px; font-size:18px; font-weight:500; }
+.form-grid { display:grid; gap:16px; }
+.field-label { display:block; margin:0 0 5px; color:var(--cp-text-secondary); font-size:13px; font-weight:500; }
+.field-label span { color:var(--cp-text-muted); font-weight:400; }
+.field-label--spaced { margin-top:16px; }
+.text-field,.money-field { width:100%; min-height:42px; border:1px solid var(--cp-control-border); border-radius:8px; background:var(--cp-surface); color:var(--cp-text); }
+.text-field { padding:9px 11px; }
+.textarea { min-height:68px; resize:vertical; }
+.money-field input { height:38px; text-align:right; }
+.money-field b { font-size:11px; }
+.form-actions .button { min-height:42px; }
+.status-list { margin:10px 8px 0; }
+.status-list div { min-height:48px; gap:12px; }
+.cash-shift-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:15px; padding-bottom:12px; border-bottom:1px solid var(--cp-border); }
+.cash-shift-heading h3,.movement-form h3,.cash-movements h3 { margin:0 0 4px; font-size:17px; font-weight:500; }
+.cash-shift-heading p { margin:0; color:var(--cp-text-secondary); font-size:13px; }
+.cash-operations { display:flex; flex-direction:column; gap:14px; }
+.cash-session { display:flex; align-items:flex-end; gap:12px; padding:12px; border-radius:9px; background:var(--cp-surface-alt); }
+.cash-session .field-label { flex:1; margin:0; }
+.cash-inline { display:flex; flex:1; gap:8px; }
+.cash-inline .text-field { flex:1; }
+.cash-inline .button,.cash-session > .button { min-height:40px; padding:0 14px; font-size:12px; }
+.movement-form { padding:14px; border:1px solid var(--cp-border); border-radius:10px; background:var(--cp-surface-alt); }
+.movement-form__fields { display:grid; grid-template-columns:minmax(130px,.8fr) minmax(150px,1fr) minmax(160px,1.3fr) auto; align-items:end; gap:10px; }
+.movement-form__fields .field-label { margin:0; }
+.movement-form__fields .button { min-height:42px; padding:0 13px; font-size:12px; }
+.cash-movements { display:flex; flex:1; flex-direction:column; min-height:160px; }
+.cash-movements .table-wrap { max-height:290px; margin-top:8px; }
+.cash-movements table { min-width:520px; }
+.cash-movements th,.cash-movements td { padding:10px 11px; border-bottom:1px solid var(--cp-border); font-size:12px; }
+.cash-movements th { position:sticky; top:0; background:var(--cp-table-head); color:var(--cp-text-secondary); }
+.cash-movements tr:last-child td { border-bottom:0; }
+.cash-movements .align-right { text-align:right; }
+.expected-cash-card { display:flex; flex-direction:column; gap:4px; margin:14px 0; padding:16px 18px; border:2px solid var(--cp-primary); border-radius:11px; background:var(--cp-primary-soft); }
+.expected-cash-card span { color:var(--cp-text-secondary); font-size:12px; font-weight:800; letter-spacing:.04em; }
+.expected-cash-card strong { color:var(--cp-primary); font-size:30px; font-weight:600; }
+.cash-count-list { display:grid; max-height:38vh; overflow:auto; border-top:1px solid var(--cp-border); }
+.cash-count-row { display:grid; grid-template-columns:minmax(120px,1fr) minmax(155px,1fr) minmax(125px,auto); align-items:center; gap:12px; padding:10px 2px; border-bottom:1px solid var(--cp-border); }
+.cash-count-row > div:first-child strong,.cash-count-row > div:first-child small { display:block; }
+.cash-count-row > div:first-child small { margin-top:4px; color:var(--cp-text-muted); font-size:11px; }
+.cash-count-input { display:grid; gap:4px; color:var(--cp-text-secondary); font-size:11px; }
+.cash-count-input .money-field { min-height:37px; }
+.cash-count-input .money-field input { height:33px; }
+.closure-live-difference { display:flex; flex-direction:column; align-items:flex-end; gap:3px; padding:5px 9px; border-radius:8px; background:var(--cp-table-head); }
+.closure-live-difference span { color:var(--cp-text-muted); font-size:10px; }
+.closure-live-difference strong { font-size:13px; }
+.closure-live-difference--negative { background:var(--cp-error-soft); color:var(--cp-error); }
+.closure-live-difference--positive { background:var(--cp-success-soft); color:var(--cp-success); }
+.cash-total-difference { display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding:12px 14px; border-radius:9px; background:var(--cp-table-head); font-weight:700; }
+.cash-total-difference strong { font-size:20px; }
+.cash-authorization { display:grid; gap:7px; margin-top:14px; padding:14px; border:1px solid var(--cp-border); border-radius:10px; background:var(--cp-surface-alt); }
+.cash-authorization .field-label { margin:0; }
+.cash-authorization .field-label--spaced { margin-top:6px; }
+.cash-authorization .form-grid { gap:10px; }
+.cash-authorization .field-error { margin:0; color:var(--cp-error); font-size:12px; }
+.cash-authorization .small-action { justify-self:start; min-height:30px; border:0; background:none; color:var(--cp-primary); font-size:12px; font-weight:700; }
+.closing-actions { margin-top:18px; }
+.closing-actions .button { min-width:170px; }
+.cash-message { max-width:760px; display:flex; flex-direction:column; align-items:flex-start; gap:12px; }
+.cash-message p { margin:0; }
+.notice { display:flex; flex-direction:column; gap:5px; padding:13px 15px; border-radius:9px; background:var(--cp-warning-soft); color:var(--cp-warning); font-size:13px; }
+.inline-feedback { flex:0 0 auto; }
+@media(max-width:1050px) { .opening-grid,.closing-grid,.cash-open-grid { grid-template-columns:minmax(0,1fr); } .terminal-card { order:-1; } }
+@media(max-width:720px) { .module-heading { align-items:flex-start; } .cash-heading-actions { flex-direction:column-reverse; align-items:stretch; } .opening-form,.closing-form,.terminal-card,.cash-operations { padding:14px; } .form-grid--two,.movement-form__fields { grid-template-columns:minmax(0,1fr); } .cash-count-row { grid-template-columns:minmax(0,1fr) minmax(135px,1fr); } .cash-count-row .closure-live-difference { grid-column:1/-1; flex-direction:row; justify-content:space-between; align-items:center; } .cash-session,.cash-inline { align-items:stretch; flex-direction:column; } .closing-actions .button { width:100%; } }

@@ -77,7 +77,7 @@ public sealed record CreateInventoryAdjustmentRequest(
     Guid ReasonId,
     long ExpectedVersion,
     string? Observation,
-    InventoryAdjustmentAuthorizationRequest Authorization);
+    InventoryAdjustmentAuthorizationRequest? Authorization = null);
 
 public interface IInventoryService
 {

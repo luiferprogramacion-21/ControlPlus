@@ -213,7 +213,7 @@ public sealed class LayawayQueryServiceTests
                 .EnumerateObject().Select(x => x.Name).Order(StringComparer.Ordinal));
         Assert.DoesNotContain("cost", json.RootElement.GetRawText(), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("costo", json.RootElement.GetRawText(), StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("777", json.RootElement.GetRawText(), StringComparison.Ordinal);
+        Assert.False(ContainsNumericValue(json.RootElement, 777m));
     }
 
     [Fact]
@@ -291,6 +291,17 @@ public sealed class LayawayQueryServiceTests
         Assert.Equal(new DateOnly(2026, 10, 27), repository.LastOperatingDate);
         Assert.Equal(repository.Installation.Id, repository.LastInstallationId);
         Assert.Equal(21, result.Value!.TotalCount);
+    }
+
+    private static bool ContainsNumericValue(JsonElement element, decimal value)
+    {
+        if (element.ValueKind == JsonValueKind.Number)
+            return element.TryGetDecimal(out var number) && number == value;
+        if (element.ValueKind == JsonValueKind.Object)
+            return element.EnumerateObject().Any(property => ContainsNumericValue(property.Value, value));
+        if (element.ValueKind == JsonValueKind.Array)
+            return element.EnumerateArray().Any(item => ContainsNumericValue(item, value));
+        return false;
     }
 
     private static IUserRepository Users(Guid userId, bool hasPermission)

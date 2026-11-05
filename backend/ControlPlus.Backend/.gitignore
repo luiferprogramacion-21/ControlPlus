@@ -11,6 +11,9 @@ appsettings.Local.json
 # Build and IDE artifacts
 **/bin/
 **/obj/
+**/node_modules/
+**/.angular/
+frontend/dist/
 .vs/
 *.user
 *.suo

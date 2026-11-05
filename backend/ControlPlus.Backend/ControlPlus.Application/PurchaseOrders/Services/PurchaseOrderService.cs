@@ -1,3 +1,4 @@
+using ControlPlus.Domain.Security;
 using ControlPlus.Application.Common;
 using ControlPlus.Application.PurchaseOrders.Contracts;
 using ControlPlus.Application.PurchaseOrders.Ports;
@@ -210,19 +211,22 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
         bool cancel, CancellationToken ct)
     {
         if (id == Guid.Empty || version <= 0 || reasonId == Guid.Empty || observation?.Length > 500 ||
-            credentials is null || string.IsNullOrWhiteSpace(credentials.UserName) || string.IsNullOrWhiteSpace(credentials.Password))
-            return Invalid<PurchaseOrderDto>("Versión, motivo y credenciales son obligatorios.");
+            (credentials is not null &&
+             (string.IsNullOrWhiteSpace(credentials.UserName) || string.IsNullOrWhiteSpace(credentials.Password))))
+            return Invalid<PurchaseOrderDto>("Versión, motivo y credenciales enviadas deben ser válidos.");
         var permissionCode = cancel ? PermissionCodes.PurchaseOrdersCancel : PermissionCodes.PurchaseOrdersManage;
         if (!await AllowedAsync(actor.UserId, permissionCode,
             cancel ? RoleLevel.Administrador : RoleLevel.Supervisor, ct))
             return Denied<PurchaseOrderDto>();
-        return await loginAttempts.ExecuteAsync(credentials.UserName.Trim().ToUpperInvariant(), token =>
+        if (credentials is null && !await AllowedAsync(actor.UserId, permissionCode, RoleLevel.Administrador, ct))
+            return Invalid<PurchaseOrderDto>("El Supervisor debe enviar authorization para cerrar el pedido.");
+        return await loginAttempts.ExecuteAsync(credentials?.UserName.Trim().ToUpperInvariant() ?? actor.UserId.ToString("N"), token =>
             ChangeStatusWithinTransactionAsync(actor, id, version, reasonId, observation?.Trim(),
                 credentials, cancel, permissionCode, token), ct);
     }
 
     private async Task<Result<PurchaseOrderDto>> ChangeStatusWithinTransactionAsync(ActorContext actor,
-        Guid id, long version, Guid reasonId, string? observation, PurchaseOrderAuthorizationRequest credentials,
+        Guid id, long version, Guid reasonId, string? observation, PurchaseOrderAuthorizationRequest? credentials,
         bool cancel, string permissionCode, CancellationToken ct)
     {
         var installation = await repository.GetActiveInstallationForUpdateAsync(ct);
@@ -243,7 +247,10 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
         if (!Approved(reason, type)) return Conflict<PurchaseOrderDto>("El motivo no conserva la configuración aprobada.");
         if (reason.Codigo == "OTRO" && string.IsNullOrWhiteSpace(observation))
             return Invalid<PurchaseOrderDto>("La observación es obligatoria para OTRO.");
-        var authorizer = await users.GetByUserNameAsync(credentials.UserName.Trim(), ct);
+        var administratorSelfAuthorized = credentials is null;
+        var authorizer = administratorSelfAuthorized
+            ? await repository.GetUserForUpdateAsync(actor.UserId, ct)
+            : await users.GetByUserNameAsync(credentials!.UserName.Trim(), ct);
         var correlation = Guid.CreateVersion7();
         if (authorizer is null)
         {
@@ -251,9 +258,11 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
             return Result.Failure<PurchaseOrderDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
         }
         authorizer = await repository.GetUserForUpdateAsync(authorizer.Id, ct) ?? authorizer;
-        if (!authorizer.IsActive || !await AllowedAsync(authorizer.Id, permissionCode, RoleLevel.Administrador, ct))
+        if (!authorizer.IsActive || !await AllowedAsync(authorizer.Id, permissionCode, RoleLevel.Administrador, ct) ||
+            (!administratorSelfAuthorized && !RoleHierarchy.IsHigherThan(authorizer.HighestRoleLevel,
+                (await users.GetAuthorizationSnapshotAsync(actor.UserId, ct))!.HighestRoleLevel)))
             return Result.Failure<PurchaseOrderDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
-        if (!passwords.Verify(credentials.Password, authorizer.PasswordHash))
+        if (!administratorSelfAuthorized && !passwords.Verify(credentials!.Password, authorizer.PasswordHash))
         {
             var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
             await users.UpdateAsync(authorizer, ct);
@@ -265,11 +274,17 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
         var permission = await permissions.GetByCodeAsync(permissionCode, ct);
         if (permission is null) return Conflict<PurchaseOrderDto>("El permiso de autorización no está disponible.");
         var now = clock.UtcNow.UtcDateTime;
-        authorizer.RegisterSuccessfulLogin(clock.UtcNow);
-        await users.UpdateAsync(authorizer, ct);
+        if (!administratorSelfAuthorized)
+        {
+            authorizer.RegisterSuccessfulLogin(clock.UtcNow);
+            await users.UpdateAsync(authorizer, ct);
+        }
         var authorization = new AutorizacionOperacion { Id = Guid.CreateVersion7(),
             UsuarioSolicitanteId = actor.UserId, UsuarioAutorizadorId = authorizer.Id, PermisoId = permission.Id,
-            TipoOperacion = type, CorrelacionId = correlation, DescripcionOperacion = "Autorización de pedido de compra.",
+            TipoOperacion = type, CorrelacionId = correlation,
+            DescripcionOperacion = administratorSelfAuthorized
+                ? "Autorización de pedido de compra por Administrador sin segundo autorizador."
+                : "Autorización de pedido de compra.",
             Motivo = reason.Codigo, MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA",
             Estado = "UTILIZADA", FechaSolicitud = now, FechaExpiracion = now.AddMinutes(5), FechaUtilizacion = now };
         await repository.AddAuthorizationAsync(authorization, ct);
@@ -295,7 +310,8 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
         await AuditWriter.WriteAsync(audit, clock, actor.UserId,
             cancel ? AuditAction.PurchaseOrderCancelled : AuditAction.PurchaseOrderClosed,
             nameof(PedidoCompra), id, new { OrderId = id, State = order.Estado, ReasonId = reason.Id,
-                AuthorizationId = authorization.Id, Version = order.Version, CorrelationId = correlation }, ct);
+                AuthorizationId = authorization.Id, Version = order.Version, CorrelationId = correlation,
+                AuthorizationMode = administratorSelfAuthorized ? "ADMINISTRATOR_SELF" : "OTHER_USER" }, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return Result.Success(Map(order));
     }

@@ -18,6 +18,9 @@ public sealed record ApplicationError(string Code, string Message)
     public static ApplicationError Forbidden(string message = "No tiene permiso para realizar esta acción.") =>
         new("authorization.forbidden", message);
 
+    public static ApplicationError AuthorizerRoleInsufficient() =>
+        Forbidden("El autorizador debe tener un rol estrictamente superior al del ejecutor.");
+
     public static ApplicationError Unauthorized(string message = "No está autenticado.") =>
         new("authentication.unauthorized", message);
 }

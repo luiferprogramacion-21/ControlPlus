@@ -287,6 +287,100 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
     }
 
     [Fact, Trait("Category", "Integration")]
+    public async Task AdministratorWithoutSecondAuthorizer_IsRecordedAsSelfAuthorized_AndReplaysWithoutWrites()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client, sharedShift: false);
+        var request = Request(scenario, [new("EFECTIVO", 201m, 201m, null)]) with { Authorization = null };
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await PostAsync(client, "cashier-no-authorizer", request)).StatusCode);
+        SetBearer(client, scenario.Admin.AccessToken);
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(client, "admin-with-credentials",
+            request with { Authorization = new(SupervisorName, SupervisorPassword) })).StatusCode);
+        var created = await ReadAsync<CreatedLayawayDto>(
+            await PostAsync(client, "admin-self-authorized", request), HttpStatusCode.Created);
+        var beforeReplay = await CaptureAsync(scenario);
+        var replay = await ReadAsync<CreatedLayawayDto>(
+            await PostAsync(client, "admin-self-authorized", request), HttpStatusCode.Created);
+        Assert.Equal(created.Id, replay.Id);
+        Assert.Equal(created.VisibleNumber, replay.VisibleNumber);
+        Assert.Equal(beforeReplay, await CaptureAsync(scenario));
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var layaway = await db.Apartado.AsNoTracking().SingleAsync(x => x.Id == created.Id);
+        var authorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.Id == layaway.AutorizacionOperacionId);
+        Assert.Equal(scenario.Admin.User.Id, authorization.UsuarioSolicitanteId);
+        Assert.Equal(scenario.Admin.User.Id, authorization.UsuarioAutorizadorId);
+        Assert.Equal("PASSWORD", authorization.MetodoAutenticacion);
+        Assert.Null(authorization.CredencialAutorizadorId);
+        Assert.Equal("UTILIZADA", authorization.Estado);
+        Assert.Equal("EXITOSA", authorization.Resultado);
+        Assert.NotNull(authorization.FechaUtilizacion);
+        Assert.Equal("Autorización de creación de apartado por Administrador sin segundo autorizador.",
+            authorization.DescripcionOperacion);
+        var audit = Assert.Single(await db.EventoAuditoria.AsNoTracking()
+            .Where(x => x.EntidadId == created.Id && x.Accion == "LAYAWAYCREATED").ToArrayAsync());
+        Assert.Contains("ADMINISTRATOR_SELF", audit.DatosNuevos);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task AdministratorAuthorizationRow_PassesOfficialDatabaseChecks()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client, sharedShift: false);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var created = await ReadAsync<CreatedLayawayDto>(await PostAsync(client,
+            "admin-authorization-checks", Request(scenario, [new("EFECTIVO", 201m, 201m, null)])
+                with { Authorization = null }), HttpStatusCode.Created);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var authorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.ApartadoAutorizacionOperacion != null &&
+                x.ApartadoAutorizacionOperacion.Id == created.Id);
+        Assert.Equal("PASSWORD", authorization.MetodoAutenticacion);
+        Assert.Null(authorization.CredencialAutorizadorId);
+        Assert.Equal(authorization.UsuarioSolicitanteId, authorization.UsuarioAutorizadorId);
+        Assert.Equal("UTILIZADA", authorization.Estado);
+        Assert.Equal("EXITOSA", authorization.Resultado);
+        Assert.NotNull(authorization.FechaUtilizacion);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task SupervisorWithoutSecondAuthorizer_CreatesAndReplaysWithOwnAuditMark()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        _ = await StartSessionAsync(client, scenario, scenario.Supervisor);
+        var request = Request(scenario, [new("EFECTIVO", 201m, 201m, null)]) with { Authorization = null };
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        var created = await ReadAsync<CreatedLayawayDto>(await PostAsync(client,
+            "supervisor-self-layaway", request), HttpStatusCode.Created);
+        var beforeReplay = await CaptureAsync(scenario);
+        var replay = await ReadAsync<CreatedLayawayDto>(await PostAsync(client,
+            "supervisor-self-layaway", request), HttpStatusCode.Created);
+        Assert.Equal(JsonSerializer.Serialize(created), JsonSerializer.Serialize(replay));
+        Assert.Equal(beforeReplay, await CaptureAsync(scenario));
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var layaway = await db.Apartado.AsNoTracking().SingleAsync(x => x.Id == created.Id);
+        var authorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.Id == layaway.AutorizacionOperacionId);
+        Assert.Equal(scenario.Supervisor.User.Id, authorization.UsuarioSolicitanteId);
+        Assert.Equal(scenario.Supervisor.User.Id, authorization.UsuarioAutorizadorId);
+        Assert.Equal("PASSWORD", authorization.MetodoAutenticacion);
+        Assert.Null(authorization.CredencialAutorizadorId);
+        Assert.Contains("Supervisor sin segundo autorizador", authorization.DescripcionOperacion);
+        var audit = await db.EventoAuditoria.AsNoTracking().SingleAsync(x =>
+            x.Accion == "LAYAWAYCREATED" && x.EntidadId == created.Id);
+        Assert.Contains("SUPERVISOR_SELF", audit.DatosNuevos);
+    }
+
+    [Fact, Trait("Category", "Integration")]
     public async Task InactiveCustomerOrMissingContact_CannotCreateOrConsumeSession()
     {
         using var client = CreateClient();
@@ -449,7 +543,7 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
         var scenario = await BootstrapAsync(setupClient, sharedShift: false, stock: 1);
         using var firstClient = CreateClient(scenario.Admin.AccessToken);
         using var secondClient = CreateClient(scenario.Admin.AccessToken);
-        var request = Request(scenario, [new("EFECTIVO", 201m, 201m, null)]);
+        var request = Request(scenario, [new("EFECTIVO", 201m, 201m, null)]) with { Authorization = null };
 
         var responses = await Task.WhenAll(
             PostAsync(firstClient, "layaway-stock-race-first", request),
@@ -528,7 +622,7 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
             new CreateUserRequest(CashierName, "Cajero ficticio de apartados",
                 CashierPassword, [cashierRoleId])), HttpStatusCode.Created);
         var category = await ReadAsync<CategoryDto>(await client.PostAsJsonAsync("/api/categories",
-            new CreateCategoryRequest("Categoría de apartados aislada", null)), HttpStatusCode.Created);
+            new CreateCategoryRequest("Categoría de apartados aislada", null, "APA")), HttpStatusCode.Created);
         var units = await ReadAsync<IReadOnlyCollection<MeasurementUnitDto>>(
             await client.GetAsync("/api/measurement-units"), HttpStatusCode.OK);
         var unitId = units.Single(x => x.Code == "UNIDAD").Id;
@@ -560,7 +654,7 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
         var supervisor = await LoginAsync(client, SupervisorName, SupervisorPassword);
         var cashier = await LoginAsync(client, CashierName, CashierPassword);
         return new Scenario(admin, supervisor, cashier, supervisorUser, cashierUser,
-            product.Id, customerId, shift);
+            product.Id, product.InternalCode, customerId, shift);
     }
 
     private async Task<Guid> SeedProductCustomerAndSettingsAsync(
@@ -602,7 +696,7 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
     {
         SetBearer(client, scenario.Admin.AccessToken);
         var credential = await ReadAsync<IssuedOperatorCredentialDto>(await client.PostAsJsonAsync(
-            $"/api/cash/operator-credentials/{scenario.Cashier.User.Id}",
+            $"/api/cash/operator-credentials/{(cashier ?? scenario.Cashier).User.Id}",
             new IssueOperatorCredentialRequest(null)), HttpStatusCode.Created);
         SetBearer(client, (cashier ?? scenario.Cashier).AccessToken);
         return await ReadAsync<OperatorSessionDto>(await client.PostAsJsonAsync(
@@ -734,7 +828,7 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
 
     private sealed record Scenario(
         AuthenticationResult Admin, AuthenticationResult Supervisor, AuthenticationResult Cashier,
-        UserDto SupervisorUser, UserDto CashierUser, Guid ProductId, Guid CustomerId,
+        UserDto SupervisorUser, UserDto CashierUser, Guid ProductId, string ProductCode, Guid CustomerId,
         CashShiftDto Shift);
 
     private sealed record LayawayState(

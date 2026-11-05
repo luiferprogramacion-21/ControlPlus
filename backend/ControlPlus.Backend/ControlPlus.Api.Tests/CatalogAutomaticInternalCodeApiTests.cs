@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using ControlPlus.Application.Catalog.Contracts;
 using ControlPlus.Application.Security.Contracts;
+using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Tests;
 using ControlPlus.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
@@ -72,7 +73,7 @@ public sealed partial class CatalogAutomaticInternalCodeApiTests : IAsyncLifetim
         Assert.NotNull(authentication);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authentication.AccessToken);
 
-        var categoryResponse = await client.PostAsJsonAsync("/api/categories", new CreateCategoryRequest("Categoría temporal", null));
+        var categoryResponse = await client.PostAsJsonAsync("/api/categories", new CreateCategoryRequest("Categoría temporal", null, "CAT"));
         Assert.Equal(HttpStatusCode.Created, categoryResponse.StatusCode);
         var category = await categoryResponse.Content.ReadFromJsonAsync<CategoryDto>();
         Assert.NotNull(category);
@@ -105,7 +106,7 @@ public sealed partial class CatalogAutomaticInternalCodeApiTests : IAsyncLifetim
         var products = responses.Select(result => Assert.IsType<ProductDto>(result.product)).ToArray();
         var codes = products.Select(product => product.InternalCode).ToArray();
         Assert.Equal(codes.Length, codes.Distinct(StringComparer.Ordinal).Count());
-        Assert.All(codes, code => Assert.Matches(new Regex("^PRD-[0-9A-F]{32}$", RegexOptions.CultureInvariant), code));
+        Assert.All(codes, code => Assert.Matches(new Regex("^CAT-[0-9]{6,}$", RegexOptions.CultureInvariant), code));
 
         var generatedBarcodeResponse = await client.PostAsJsonAsync("/api/products", new
         {
@@ -126,7 +127,7 @@ public sealed partial class CatalogAutomaticInternalCodeApiTests : IAsyncLifetim
         var generatedBarcodeProduct = await generatedBarcodeResponse.Content.ReadFromJsonAsync<ProductDto>();
         Assert.NotNull(generatedBarcodeProduct);
         Assert.Equal("CODE128", generatedBarcodeProduct.BarcodeFormat);
-        Assert.NotEqual(generatedBarcodeProduct.InternalCode, generatedBarcodeProduct.Barcode);
+        Assert.Equal(ProductCode.GenerateOwnedBarcode(generatedBarcodeProduct.InternalCode), generatedBarcodeProduct.Barcode);
     }
 
     private static string RandomSecret(int length)

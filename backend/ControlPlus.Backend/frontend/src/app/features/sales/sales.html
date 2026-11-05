@@ -1,0 +1,87 @@
+<section class="prototype-operation">
+  @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert"><span>!</span>{{ error() }}</div> }
+  @if (sale(); as result) {
+    <div class="inline-feedback inline-feedback--success" role="status"><span>✓</span><strong>Venta {{ result.visibleNumber }}</strong><span>{{ result.state }} · {{ result.total | currency:'COP':'symbol':'1.0-0' }} · Cambio {{ result.change | currency:'COP':'symbol':'1.0-0' }}</span><button class="button button--secondary" type="button" (click)="consult()" [disabled]="busy()">Consultar</button><small>Ticket pendiente de impresión.</small></div>
+  }
+
+  @if (!checkoutMode()) {
+    <div class="pos-grid">
+      <section class="panel pos-main">
+        <div class="pos-heading"><div><h2>{{ saleType() === 'CREDITO' ? 'Nueva venta a crédito' : 'Nueva venta' }}</h2><p><strong>Operador: {{ session.user()?.displayName }}</strong>@if (cashState()?.currentShift?.openedAtUtc; as openedAt) { · Caja abierta desde {{ openedAt | date:'shortTime' }} }</p></div><span class="badge badge--info">{{ cashState()?.requiresOperatorSession ? 'Turno compartido' : 'Turno individual' }}</span></div>
+
+        <div class="search-area">
+          <form class="scanner" (submit)="$event.preventDefault(); find()">
+            <label class="field-label" for="product-search">Buscar producto o leer código de barras</label>
+            <div class="scanner__field"><input #productSearch id="product-search" name="search" [(ngModel)]="search" (keydown.enter)="$event.preventDefault(); find()" placeholder="Escanee o escriba código, nombre o referencia" autocomplete="off" autofocus>
+              <button class="catalog-toggle" type="button" (click)="find()" [disabled]="loading()">Ver productos</button><button class="scanner-submit" type="submit" [disabled]="loading() || !search.trim()">Agregar · Enter</button><kbd>F2</kbd>
+            </div>
+          </form>
+          @if (loading()) { <p class="field-hint" role="status">Buscando…</p> }
+          @if (results().length) { <div class="search-results" aria-label="Resultados de búsqueda">@for (product of results(); track product.id) { <button class="catalog-result" type="button" (click)="add(product)"><span><strong>{{ product.name }}</strong><small>{{ product.internalCode }} · {{ product.categoryName }} · Disponible {{ product.availableStock }}</small></span><b>{{ product.retailPrice | currency:'COP':'symbol':'1.0-0' }}</b></button> }</div> }
+        </div>
+
+        <div class="table-wrap cart-table" role="region" aria-label="Productos de la venta" tabindex="0">
+          <table aria-label="Carrito de venta"><thead><tr><th>Producto</th><th class="align-right">Cant.</th><th class="align-right">Precio</th><th class="align-right">Desc.</th><th class="align-right">Subtotal</th></tr></thead>
+            <tbody>@for (line of cart(); track line.product.id) {
+              <tr tabindex="0" [class.is-selected]="selectedProductId() === line.product.id" (click)="selectedProductId.set(line.product.id)" (focusin)="selectedProductId.set(line.product.id)"><td><strong>{{ line.product.name }}</strong><small>{{ line.product.internalCode }} · {{ line.product.measurementUnitCode }}</small></td>
+                <td class="align-right"><span class="quantity-control"><input type="number" min="1" step="1" [max]="line.product.availableStock" [(ngModel)]="line.quantity" (ngModelChange)="update()" [attr.aria-label]="'Cantidad de ' + line.product.name" [disabled]="locked"></span></td>
+                <td class="align-right"><select class="pos-select" [(ngModel)]="line.priceType" (ngModelChange)="line.discountPercent = 0; update()" [disabled]="locked"><option value="MINORISTA">{{ line.product.retailPrice | currency:'COP':'symbol':'1.0-0' }}</option>@if (line.product.wholesalePrice) { <option value="MAYORISTA">{{ line.product.wholesalePrice | currency:'COP':'symbol':'1.0-0' }}</option> }</select></td>
+                <td class="align-right numeric">@if (line.discountPercent) { {{ (price(line) * line.quantity * line.discountPercent / 100) | currency:'COP':'symbol':'1.0-0' }} } @else { — }</td>
+                <td class="align-right numeric"><strong>{{ (price(line) * line.quantity * (1 - line.discountPercent / 100)) | currency:'COP':'symbol':'1.0-0' }}</strong></td>
+              </tr>
+            } @empty { <tr class="empty-row"><td colspan="5"><span aria-hidden="true">▤</span><strong>La venta está vacía</strong><small>Escanea un código o busca un producto.</small></td></tr> }</tbody>
+          </table>
+        </div>
+
+        <footer class="pos-footer">
+          <div class="cart-actions"><button class="button button--secondary" type="button" (click)="focusQuantity()" [disabled]="!cart().length">Cantidad · F4</button>@if (session.has('SALES.DISCOUNT_APPLY')) { <button class="button button--secondary" type="button" (click)="lineDiscountMode.set(!lineDiscountMode())" [disabled]="!cart().length || generalDiscountPercent > 0 || locked">Desc. producto</button>
+            <label class="discount-total-control">Desc. venta total <input type="number" min="0" max="80" step="1" [ngModel]="generalDiscountPercent" (ngModelChange)="applyGeneralDiscount($event)" [disabled]="!cart().length || locked || lineDiscountMode()"></label> }
+            <button class="button button--secondary" type="button" (click)="removeSelected()" [disabled]="!cart().length || locked">Quitar · Supr</button>
+          </div>
+          @if (lineDiscountMode() && !generalDiscountPercent) { <div class="line-discounts">@for (line of cart(); track line.product.id) { @if (line.priceType === 'MINORISTA') { <label>{{ line.product.name }} · descuento % <input type="number" min="0" max="80" step="1" [(ngModel)]="line.discountPercent" (ngModelChange)="update()" [disabled]="locked"></label> } }</div> }
+          @if (discounts > 0) { <label class="discount-reason">Motivo del descuento <input [(ngModel)]="discountReason" maxlength="500" [disabled]="locked"></label> }
+          @if (session.has('CUSTOMERS.BASIC_MANAGE') || session.has('CUSTOMERS.MANAGE')) { <div class="customer-row">
+            <label class="field-label" for="customer-search">Cliente <span>{{ saleType() === 'CREDITO' ? '(obligatorio para crédito)' : '(opcional para venta de contado)' }}</span></label>
+            <div class="customer-search"><input id="customer-search" [(ngModel)]="customerSearch" (ngModelChange)="customerId = ''; customers.set([])" placeholder="Nombre o número de documento" [disabled]="locked"><button class="button button--secondary" type="button" (click)="findCustomers()" [disabled]="locked || !customerSearch.trim()">Buscar</button></div>
+            @if (customerSearch.trim() && !loading() && !customers().length) { <p class="field-hint">No hay clientes activos para esta búsqueda.</p> }
+            @if (customers().length) { <select class="text-field" [(ngModel)]="customerId" [disabled]="locked"><option value="">Consumidor final</option>@for (customer of customers(); track customer.id) { @if (customer.isActive) { <option [value]="customer.id">{{ customer.fullName }} · {{ customer.documentNumber || customer.phone }}</option> } }</select> }
+          </div> }
+        </footer>
+      </section>
+
+      <aside class="panel summary-card">
+        <div class="panel-heading"><h2>Resumen</h2></div>
+        <dl class="totals-list"><div><dt>Subtotal</dt><dd>{{ subtotal | currency:'COP':'symbol':'1.0-0' }}</dd></div><div><dt>Descuentos</dt><dd class="success-text">-{{ discounts | currency:'COP':'symbol':'1.0-0' }}</dd></div></dl>
+        <div class="grand-total"><span>TOTAL</span><strong>{{ estimate | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+        <div class="summary-units"><strong>{{ cart().length }} productos</strong><span>Precios según catálogo</span></div>
+        <button class="button button--primary button--full summary-card__charge" type="button" (click)="startCheckout()" [disabled]="!cart().length || !canSell || locked">{{ saleType() === 'CREDITO' ? 'Continuar crédito' : 'Cobrar · F9' }}</button>
+        @if (canRequestCredit) { <div class="summary-card__alternatives"><button class="button button--secondary" type="button" (click)="startCreditSale()" [disabled]="!cart().length || !canSell || locked">Registrar crédito</button>@if (saleType() === 'CREDITO') { <button class="button button--secondary" type="button" (click)="startCashSale()" [disabled]="locked">Venta de contado</button> }</div> }
+      </aside>
+    </div>
+  } @else {
+    <div class="checkout-grid">
+      <section class="panel panel--padded checkout-main">
+        <div class="checkout-heading"><div class="panel-heading"><h2>{{ saleType() === 'CREDITO' ? 'Venta a crédito' : 'Cobro de la venta' }}</h2></div><div class="amount-due"><span>{{ saleType() === 'CREDITO' ? 'Total del crédito' : 'Total a cobrar' }}</span><strong>{{ estimate | currency:'COP':'symbol':'1.0-0' }}</strong></div></div>
+        @if (saleType() === 'CREDITO') {
+          <div class="credit-checkout-fields"><label class="field-label" for="credit-due-date">Fecha de vencimiento</label><input id="credit-due-date" class="text-field" type="date" [min]="minimumDueDate" [max]="maximumDueDate" [(ngModel)]="dueDate" [disabled]="locked || busy()"></div>
+        } @else {
+        <div class="change-highlight" [class.change-highlight--active]="change > 0" role="status" aria-live="polite"><span>CAMBIO A DEVOLVER</span><strong>{{ change | currency:'COP':'symbol':'1.0-0' }}</strong><small>{{ change > 0 ? 'Entregar al cliente' : 'Sin cambio' }}</small></div>
+        <div class="payment-toolbar"><span class="badge" [class.badge--success]="remaining === 0" [class.badge--warning]="remaining !== 0">{{ remaining >= 0 ? 'Faltante' : 'Excede' }} {{ (remaining < 0 ? -remaining : remaining) | currency:'COP':'symbol':'1.0-0' }}</span><button class="button button--secondary" type="button" (click)="addPayment()" [disabled]="activePayments().length >= 3 || busy()">+ Pago mixto</button></div>
+        <div class="payment-list">
+          @for (payment of activePaymentRows; track payment.code) {
+            <fieldset class="payment-card" [disabled]="busy() || locked"><legend>Medio {{ $index + 1 }}</legend><div class="payment-card__grid">
+              <div><label class="field-label" [for]="'method-' + payment.code">Medio</label><select class="text-field" [id]="'method-' + payment.code" [value]="payment.code" (change)="setPaymentMethod(payment.code, $any($event.target).value)"><option value="EFECTIVO" [disabled]="paymentUsed('EFECTIVO') && payment.code !== 'EFECTIVO'">Efectivo</option><option value="TRANSFERENCIA" [disabled]="paymentUsed('TRANSFERENCIA') && payment.code !== 'TRANSFERENCIA'">Transferencia</option><option value="NEQUI" [disabled]="paymentUsed('NEQUI') && payment.code !== 'NEQUI'">Nequi</option></select></div>
+              @if (payment.code === 'EFECTIVO') { <div><label class="field-label" for="cash-received">Efectivo entregado</label><div class="money-field"><span>$</span><input id="cash-received" type="number" min="0" step="1" [ngModel]="cashReceived" (ngModelChange)="onCashReceived($event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('EFECTIVO')">Efectivo exacto</button><div class="payment-result"><span>Aporta a la venta</span><strong>{{ cashApplied | currency:'COP':'symbol':'1.0-0' }}</strong><small>Cambio: {{ change | currency:'COP':'symbol':'1.0-0' }}</small></div></div> }
+              @if (payment.code === 'TRANSFERENCIA') { <div><label class="field-label" for="transfer-applied">Monto con este medio</label><div class="money-field"><span>$</span><input id="transfer-applied" type="number" min="0" step="1" [(ngModel)]="transferApplied"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('TRANSFERENCIA')">Usar saldo pendiente</button></div><div class="payment-card__wide"><label class="field-label" for="transfer-reference">Referencia de transferencia</label><input id="transfer-reference" class="text-field" [(ngModel)]="transferReference" maxlength="100"></div> }
+              @if (payment.code === 'NEQUI') { <div><label class="field-label" for="nequi-applied">Monto con este medio</label><div class="money-field"><span>$</span><input id="nequi-applied" type="number" min="0" step="1" [(ngModel)]="nequiApplied"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('NEQUI')">Usar saldo pendiente</button></div><div class="payment-card__wide"><label class="field-label" for="nequi-reference">Referencia de Nequi</label><input id="nequi-reference" class="text-field" [(ngModel)]="nequiReference" maxlength="100"></div> }
+            </div>@if (activePayments().length > 1) { <button class="payment-card__remove" type="button" (click)="removePayment(payment.code)">Quitar medio</button> }</fieldset>
+          }
+        </div>
+        }
+        <div class="checkout-actions"><button class="button button--secondary" type="button" (click)="returnToSale()" [disabled]="busy()">Volver a la venta</button><button class="button button--primary checkout-confirm" type="button" (click)="confirm()" [disabled]="!canConfirm">{{ busy() ? 'Procesando…' : locked ? 'Reintentar confirmación' : saleType() === 'CREDITO' ? 'Confirmar crédito' : 'Confirmar venta' }}</button></div>
+        @if (locked) { <p class="field-hint">Los datos y la clave de este intento se conservan para reintentar.</p><button class="link-button" type="button" (click)="discardPending()" [disabled]="busy()">Descartar intento pendiente</button> }
+      </section>
+      <aside class="panel panel--padded review-card"><div class="panel-heading"><h2>Resumen de la venta</h2></div><dl class="review-list"><div><dt>Subtotal</dt><dd>{{ subtotal | currency:'COP':'symbol':'1.0-0' }}</dd></div><div><dt>Descuento</dt><dd>-{{ discounts | currency:'COP':'symbol':'1.0-0' }}</dd></div><div class="review-list__total"><dt>Total</dt><dd>{{ estimate | currency:'COP':'symbol':'1.0-0' }}</dd></div></dl><dl class="review-meta"><div><dt>Cliente</dt><dd>{{ selectedCustomerName }}</dd></div><div><dt>Operador</dt><dd>{{ session.user()?.displayName }}</dd></div><div><dt>Saldo pendiente</dt><dd>{{ (saleType() === 'CREDITO' ? estimate : remaining) | currency:'COP':'symbol':'1.0-0' }}</dd></div></dl></aside>
+    </div>
+  }
+</section>

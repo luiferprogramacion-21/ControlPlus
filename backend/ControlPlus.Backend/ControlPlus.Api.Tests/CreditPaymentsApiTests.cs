@@ -718,7 +718,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
             new CreateUserRequest(CashierName, "Cajero ficticio de Créditos", _cashierPassword,
                 [cashierRole])), HttpStatusCode.Created);
         var category = await ReadAsync<CategoryDto>(await client.PostAsJsonAsync("/api/categories",
-            new CreateCategoryRequest("Categoría ficticia de Créditos", null)), HttpStatusCode.Created);
+            new CreateCategoryRequest("Categoría ficticia de Créditos", null, "CRF")), HttpStatusCode.Created);
         var units = await ReadAsync<IReadOnlyCollection<MeasurementUnitDto>>(
             await client.GetAsync("/api/measurement-units"), HttpStatusCode.OK);
         var product = await ReadAsync<ProductDto>(await client.PostAsJsonAsync("/api/products",

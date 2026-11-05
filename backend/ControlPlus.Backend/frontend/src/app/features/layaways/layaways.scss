@@ -1,0 +1,31 @@
+.layaway-filters { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.layaway-filters > div { min-width: 140px; flex: 1 1 140px; }
+.layaway-filters .text-field { width: 100%; height: 56px; box-sizing: border-box; }
+.layaway-customer-filter { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.layaway-customer-filter .field-label { width: 100%; }
+.layaway-customer-filter .text-field { max-width: 290px; }
+.layaway-matches { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.layaway-overdue { margin-left: 6px; }
+.layaway-detail { margin-top: 16px; }
+.layaway-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.layaway-summary > div { display: flex; flex-direction: column; gap: 4px; }
+.layaway-summary span { color: var(--cp-text-muted); font-size: 12px; }
+.layaway-summary strong { font-size: 18px; }
+.layaway-detail-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.layaway-payment-row { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--cp-border); }
+.layaway-payment-row .table-action { margin-top: 10px; }
+.layaway-totals { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.layaway-totals span { display: flex; flex-direction: column; }
+.layaway-totals strong { font-size: 22px; }
+.layaway-change strong { font-size: 28px; }
+@media (max-width: 700px) { .layaway-summary { grid-template-columns: repeat(2, 1fr); } }
+
+.layaway-create-sheet { width: min(980px, 100%); }
+.layaway-create-sheet h3 { margin: 18px 0 8px; }
+.layaway-qty { width: 90px; }
+.layaway-due { max-width: 220px; }
+.layaway-total { display: flex; justify-content: flex-end; gap: 10px; align-items: baseline; margin: 12px 0 0; }
+.layaway-total strong { font-size: 22px; }
+.layaway-cancel-action { color: var(--cp-error); }
+td small { display: block; color: var(--cp-text-muted); }
+.form-hint { margin: 6px 0 12px; color: var(--cp-text-muted); font-size: 13px; }

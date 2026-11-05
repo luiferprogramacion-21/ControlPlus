@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <CatalogArtifactsDirectory Condition="'$(CatalogArtifactsDirectory)' == ''">$(MSBuildThisFileDirectory)../../../ControlPlus.Api/bin/Debug/net10.0</CatalogArtifactsDirectory>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="ControlPlus.Api"><HintPath>$(CatalogArtifactsDirectory)/ControlPlus.Api.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="ControlPlus.Infrastructure"><HintPath>$(CatalogArtifactsDirectory)/ControlPlus.Infrastructure.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Microsoft.EntityFrameworkCore"><HintPath>$(CatalogArtifactsDirectory)/Microsoft.EntityFrameworkCore.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Microsoft.EntityFrameworkCore.Relational"><HintPath>$(CatalogArtifactsDirectory)/Microsoft.EntityFrameworkCore.Relational.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Npgsql.EntityFrameworkCore.PostgreSQL"><HintPath>$(CatalogArtifactsDirectory)/Npgsql.EntityFrameworkCore.PostgreSQL.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

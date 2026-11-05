@@ -1,0 +1,108 @@
+<section class="module-page directory-page">
+  <div class="module-heading">
+    <div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="settings" /></span><div><h2>Administración</h2></div></div>
+    <div class="tabs">
+      @if (canReadUsers) { <button mat-button type="button" [class.active]="tab() === 'users'" (click)="switchTab('users')">Usuarios</button> }
+      @if (canReadRoles) { <button mat-button type="button" [class.active]="tab() === 'roles'" (click)="switchTab('roles')">Roles</button> }
+    </div>
+  </div>
+  @if (error() && !mode()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
+  @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
+
+  @if (tab() === 'users' && canReadUsers) {
+    <section class="panel module-panel">
+      <div class="module-toolbar"><h3>Usuarios</h3>
+        <form class="directory-filters" (submit)="$event.preventDefault(); find()">
+          <label class="sr-only" for="user-search">Buscar usuario</label><input id="user-search" class="text-field" name="search" [(ngModel)]="search" placeholder="Usuario o nombre">
+          <select class="text-field" name="status" [(ngModel)]="status" aria-label="Estado" (ngModelChange)="find()"><option value="all">Todos</option><option value="active">Activos</option><option value="inactive">Inactivos</option><option value="locked">Bloqueados</option></select>
+          <button class="button button--secondary" type="submit">Buscar</button>
+          @if (canChooseRole) { <button class="button button--primary" type="button" (click)="create()">Nuevo usuario</button> }
+        </form>
+      </div>
+      @if (loading()) { <p class="muted" role="status">Cargando usuarios…</p> }
+      <div class="table-wrap module-table-wrap"><table><thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Último ingreso</th><th class="align-right">Acciones</th></tr></thead>
+        <tbody>
+          @for (user of users()?.items ?? []; track user.id) {
+            <tr>
+              <td><strong>{{ user.userName }}</strong></td><td>{{ user.displayName }}</td>
+              <td>{{ user.roles.length ? user.roles[0].name : 'Sin rol' }}</td>
+              <td><span class="status-pill" [class.status-pill--warning]="!user.isActive || user.isLocked">{{ stateLabel(user) }}</span></td>
+              <td>{{ user.lastLoginAtUtc ? (user.lastLoginAtUtc | date:'dd/MM/yyyy HH:mm') : '—' }}</td>
+              <td class="align-right">@if (canManageUsers) {
+                <button class="table-action" type="button" (click)="edit(user)">Editar</button>
+                @if (canChooseRole) { <button class="table-action" type="button" (click)="changeRole(user)">Rol</button> }
+                <button class="table-action" type="button" (click)="resetPassword(user)">Contraseña</button>
+                @if (canManageUserPermissions) { <button class="table-action" type="button" (click)="openPermissions(user)">Permisos</button> }
+                @if (user.isLocked) { <button class="table-action" type="button" [disabled]="saving()" (click)="unlock(user)">Reactivar acceso</button> }
+                <button class="table-action" type="button" [disabled]="saving() || isSelf(user)" (click)="toggle(user)">{{ user.isActive ? 'Inactivar' : 'Activar' }}</button>
+              }</td>
+            </tr>
+          } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="6"><span aria-hidden="true">◇</span><strong>Sin usuarios</strong><small>No hay usuarios para esta búsqueda.</small></td></tr> } }
+        </tbody></table></div>
+      @if (users(); as pageResult) { <mat-paginator [length]="pageResult.totalCount" [pageIndex]="page - 1" [pageSize]="pageSize" [pageSizeOptions]="[10,20,50]" (page)="pageChanged($event)" aria-label="Páginas de usuarios" /> }
+    </section>
+  }
+
+  @if (tab() === 'roles' && canReadRoles) {
+    <section class="panel module-panel">
+      <div class="module-toolbar"><h3>Roles de la tienda</h3></div>
+      <p class="form-hint">Son los tres roles base de ControlPlus. {{ canEditTemplates ? 'Elige un rol para consultar o editar su plantilla de permisos.' : 'Aquí se consultan sus permisos; solo un Administrador edita las plantillas.' }}</p>
+      <div class="table-wrap module-table-wrap"><table><thead><tr><th>Rol</th><th>Nivel</th><th>Permisos</th><th>Estado</th><th class="align-right">Acciones</th></tr></thead>
+        <tbody>
+          @for (role of roles(); track role.id) {
+            <tr>
+              <td><strong>{{ role.name }}</strong></td><td>{{ levelName(role.level) }}</td><td>{{ role.permissions.length }}</td>
+              <td><span class="status-pill" [class.status-pill--warning]="!role.isActive">{{ role.isActive ? 'Activo' : 'Inactivo' }}</span></td>
+              <td class="align-right"><button class="table-action" type="button" [attr.aria-expanded]="viewedRole()?.id === role.id" (click)="viewRole(role)">{{ viewedRole()?.id === role.id ? 'Ocultar permisos' : canEditTemplates ? 'Editar permisos' : 'Ver permisos' }}</button></td>
+            </tr>
+          } @empty { <tr class="empty-row"><td colspan="5"><span aria-hidden="true">◇</span><strong>Sin roles</strong><small>No se encontraron roles.</small></td></tr> }
+        </tbody></table></div>
+      @if (viewedRole(); as role) {
+        @if (canEditTemplates) { <cp-role-template [role]="role" [catalog]="catalog()" (updated)="roleUpdated($event)" /> }
+        @else {
+        <div class="role-permissions" aria-label="Permisos del rol">
+          <h3>Permisos de {{ role.name }}</h3>
+          @for (group of permissionModules(role); track group.module) {
+            <h4>{{ group.module }}</h4>
+            <ul>@for (permission of group.permissions; track permission.id) { <li>{{ permission.name }} <small>({{ permission.code }})</small></li> }</ul>
+          } @empty { <p class="muted">Este rol no tiene permisos asignados.</p> }
+        </div>
+        }
+      }
+    </section>
+  }
+
+  @if (mode(); as currentMode) {
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="admin-form-title"><div class="module-form-sheet__backdrop" (click)="close()"></div>
+      <form class="panel panel--padded module-form" (submit)="$event.preventDefault(); save()">
+        <div class="panel-heading"><h2 id="admin-form-title">{{ currentMode === 'create' ? 'Nuevo usuario' : currentMode === 'edit' ? 'Editar usuario' : currentMode === 'role' ? 'Cambiar rol' : 'Cambiar contraseña' }}</h2></div>
+        @if (currentMode !== 'create' && selected(); as user) { <p class="muted">{{ user.displayName }} · {{ user.userName }}</p> }
+        @if (currentMode === 'create') {
+          <label class="field-label" for="admin-user-name">Usuario de acceso</label><input id="admin-user-name" class="text-field" name="userName" [(ngModel)]="form.userName" required autocomplete="off" autofocus>
+        }
+        @if (currentMode === 'create' || currentMode === 'edit') {
+          <label class="field-label field-label--spaced" for="admin-display-name">Nombre visible</label><input id="admin-display-name" class="text-field" name="displayName" [(ngModel)]="form.displayName" required autocomplete="off">
+        }
+        @if (currentMode === 'create' || currentMode === 'role') {
+          <label class="field-label field-label--spaced" for="admin-role">Rol</label>
+          <select id="admin-role" class="text-field" name="roleId" [(ngModel)]="form.roleId" required>
+            <option value="" disabled>Selecciona un rol</option>
+            @for (role of roles(); track role.id) { @if (role.isActive) { <option [value]="role.id">{{ role.name }}</option> } }
+          </select>
+          <p class="form-hint">Cada usuario tiene un solo rol base.</p>
+        }
+        @if (currentMode === 'password' && selected() && isSelf(selected()!)) {
+          <label class="field-label field-label--spaced" for="admin-current-password">Contraseña actual</label><input id="admin-current-password" class="text-field" type="password" name="currentPassword" [(ngModel)]="form.currentPassword" autocomplete="current-password" autofocus>
+        }
+        @if (currentMode === 'create' || currentMode === 'password') {
+          <label class="field-label field-label--spaced" for="admin-password">{{ currentMode === 'create' ? 'Contraseña' : 'Nueva contraseña' }}</label><input id="admin-password" class="text-field" type="password" name="password" [(ngModel)]="form.password" autocomplete="new-password">
+          <label class="field-label field-label--spaced" for="admin-confirm">Confirmar contraseña</label><input id="admin-confirm" class="text-field" type="password" name="confirmPassword" [(ngModel)]="form.confirmPassword" autocomplete="new-password">
+        }
+        @if (currentMode === 'password') { <p class="form-hint">Al cambiar la contraseña se registra la operación en la auditoría.</p> }
+        @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+        <div class="form-actions"><button class="button button--secondary" type="button" (click)="close()">Cancelar</button><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button></div>
+      </form>
+    </div>
+  }
+  @if (permissionUser(); as target) { <cp-user-permissions [user]="target" [catalog]="catalog()" (closed)="closePermissions()" /> }
+</section>

@@ -1,0 +1,47 @@
+<div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="layaway-create-title"><div class="module-form-sheet__backdrop" (click)="closed.emit()"></div>
+  <form class="panel panel--padded module-form layaway-create-sheet" (submit)="$event.preventDefault(); confirm()">
+    <div class="panel-heading"><h2 id="layaway-create-title">Nuevo apartado</h2></div>
+    <p class="muted">Requiere un turno de Caja abierto. {{ selfAuthorized ? 'Como Administrador no necesitas un segundo autorizador.' : 'Otro Supervisor o Administrador distinto de ti debe autorizarlo.' }}</p>
+
+    <h3>Cliente</h3>
+    @if (customer(); as selected) {
+      <p><strong>{{ selected.fullName }}</strong> · {{ selected.documentNumber || selected.phone || selected.address }} <button class="table-action" type="button" (click)="clearCustomer()">Cambiar</button></p>
+    } @else {
+      @if (canFindCustomers) {
+        <div class="layaway-customer-filter"><label class="sr-only" for="create-customer">Buscar cliente</label><input id="create-customer" class="text-field" name="customerSearch" [(ngModel)]="customerSearch" placeholder="Nombre, documento o teléfono" (keydown.enter)="$event.preventDefault(); findCustomer()"><button class="table-action" type="button" (click)="findCustomer()">Buscar cliente</button></div>
+        @if (customerMatches().length) { <div class="layaway-matches">@for (customer of customerMatches(); track customer.id) { <button class="table-action" type="button" (click)="selectCustomer(customer)">{{ customer.fullName }} · {{ customer.documentNumber || customer.phone || customer.address }}</button> }</div> }
+      } @else { <p class="muted">No tienes permiso para buscar clientes.</p> }
+    }
+
+    <h3>Productos</h3>
+    <div class="layaway-customer-filter"><label class="sr-only" for="create-product">Buscar producto</label><input id="create-product" class="text-field" name="productSearch" [(ngModel)]="productSearch" placeholder="Código, barras o nombre" (keydown.enter)="$event.preventDefault(); findProduct()"><button class="table-action" type="button" (click)="findProduct()">Buscar producto</button></div>
+    @if (results().length) {
+      <div class="layaway-matches">@for (product of results(); track product.id) { <button class="table-action" type="button" (click)="add(product)">{{ product.internalCode }} · {{ product.name }} · {{ money(product.retailPrice) }} · disp. {{ product.availableStock }}</button> }</div>
+    }
+    <div class="table-wrap module-table-wrap"><table><thead><tr><th>Producto</th><th class="align-right">Cantidad</th><th>Precio</th><th class="align-right">Unitario</th><th class="align-right">Subtotal</th><th class="align-right"></th></tr></thead><tbody>
+      @for (line of lines(); track line.product.id) {
+        <tr>
+          <td><strong>{{ line.product.name }}</strong><small>{{ line.product.internalCode }} · disp. {{ line.product.availableStock }}</small></td>
+          <td class="align-right"><input class="text-field layaway-qty" type="number" min="1" step="1" [max]="line.product.availableStock" [name]="'qty-' + line.product.id" [attr.aria-label]="'Cantidad de ' + line.product.name" [(ngModel)]="line.quantity" (ngModelChange)="update()"></td>
+          <td><select class="text-field" [name]="'price-' + line.product.id" [attr.aria-label]="'Tipo de precio de ' + line.product.name" [ngModel]="line.priceType" (ngModelChange)="setPriceType(line, $event)"><option value="MINORISTA">Minorista</option><option value="MAYORISTA" [disabled]="!line.product.wholesalePrice">Mayorista</option></select></td>
+          <td class="align-right numeric">{{ money(unitPrice(line)) }}</td><td class="align-right numeric">{{ money(unitPrice(line) * line.quantity) }}</td>
+          <td class="align-right"><button class="table-action" type="button" (click)="remove(line)">Quitar</button></td>
+        </tr>
+      } @empty { <tr class="empty-row"><td colspan="6">Busca y agrega los productos que el cliente separa.</td></tr> }
+    </tbody></table></div>
+    <p class="layaway-total">Total del apartado <strong>{{ money(total()) }}</strong></p>
+
+    <h3>Fecha límite</h3>
+    <label class="field-label" for="create-due">Fecha límite <span>(opcional)</span></label>
+    <input id="create-due" class="text-field layaway-due" type="date" name="dueDate" [(ngModel)]="dueDate">
+    <p class="form-hint">Si la dejas vacía, el servidor aplica el plazo configurado.</p>
+
+    <h3>Pago inicial</h3>
+    <p class="form-hint">El servidor exige el pago inicial mínimo configurado (20 % por defecto).</p>
+    <cp-payment-methods [drafts]="drafts" mode="payment" idPrefix="create" />
+    <div class="layaway-totals"><span>Pago inicial <strong>{{ money(initialPayment) }}</strong></span><span class="layaway-change">Cambio <strong>{{ money(change) }}</strong></span></div>
+
+    @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+    <div class="form-actions"><button class="button button--secondary" type="button" (click)="closed.emit()" [disabled]="saving()">Cancelar</button><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Creando…' : selfAuthorized ? 'Crear apartado' : 'Continuar a la autorización' }}</button></div>
+  </form>
+</div>

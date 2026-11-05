@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ControlPlus.Application.Catalog.Contracts;
+using ControlPlus.Application.Common;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Infrastructure.Persistence;
@@ -469,6 +470,65 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SecurityDtos_SerializeRoleLevelsAsNumbers()
+    {
+        using var client = _factory!.CreateClient();
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+
+        using var roles = JsonDocument.Parse(await (await client.GetAsync("/api/roles")).Content.ReadAsStringAsync());
+        var adminRole = roles.RootElement.GetProperty("items").EnumerateArray()
+            .Single(x => x.GetProperty("code").GetString() == RoleCodes.Administrator);
+        Assert.Equal(JsonValueKind.Number, adminRole.GetProperty("level").ValueKind);
+        Assert.Equal(3, adminRole.GetProperty("level").GetInt32());
+
+        using var users = JsonDocument.Parse(await (await client.GetAsync("/api/users")).Content.ReadAsStringAsync());
+        var adminUser = users.RootElement.GetProperty("items").EnumerateArray().Single();
+        var summary = adminUser.GetProperty("roles").EnumerateArray().Single();
+        Assert.Equal(JsonValueKind.Number, summary.GetProperty("level").ValueKind);
+        Assert.Equal(3, summary.GetProperty("level").GetInt32());
+    }
+
+    [Fact]
+    public async Task EffectivePermissions_ReturnsEveryActivePermissionBeyondOnePageOf200()
+    {
+        using var client = _factory!.CreateClient();
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+
+        const int syntheticActive = 230;
+        const int syntheticInactive = 5;
+        int activeTotal;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            var now = DateTimeOffset.UtcNow;
+            for (var index = 1; index <= syntheticActive + syntheticInactive; index++)
+            {
+                var permission = Permiso.Create($"ZZTEST.P{index:000}", $"Permiso de prueba {index}", null, "ZZTEST", now);
+                if (index > syntheticActive) permission.Deactivate(now);
+                context.Permiso.Add(permission);
+            }
+            await context.SaveChangesAsync();
+            activeTotal = await context.Permiso.AsNoTracking().CountAsync(x => x.Activo);
+        }
+        Assert.True(activeTotal > 200, "El escenario debe superar una página de 200 permisos.");
+
+        var effective = await GetEffectivePermissionsAsync(client, administrator.User.Id);
+
+        Assert.Equal(activeTotal, effective.Count);
+        Assert.Equal(effective.Count, effective.Select(x => x.Id).Distinct().Count());
+        Assert.Equal(effective.OrderBy(x => x.Code, StringComparer.Ordinal).Select(x => x.Code), effective.Select(x => x.Code));
+        Assert.Equal(syntheticActive, effective.Count(x => x.Code.StartsWith("ZZTEST.", StringComparison.Ordinal)));
+        Assert.DoesNotContain(effective, x => x.Code == $"ZZTEST.P{syntheticActive + 1:000}");
+        AssertPermission(effective, "ZZTEST.P001", false, "ROL", null);
+        AssertPermission(effective, $"ZZTEST.P{syntheticActive:000}", false, "ROL", null);
+        AssertPermission(effective, PermissionCodes.UsersManage, true, "ROL", null);
+    }
+
+    [Fact]
     public async Task RoleTemplate_CanBeRestoredAndLastSecurityAdministratorIsProtected()
     {
         using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -495,10 +555,20 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
             $"/api/permissions/{usersManageId}/deactivate", null)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsync(
             $"/api/users/{administrator.User.Id}/deactivate", null)).StatusCode);
+        foreach (var code in new[] { PermissionCodes.UsersManage, PermissionCodes.RolesManage,
+                     PermissionCodes.PermissionsManage, PermissionCodes.UserPermissionsManage })
+        {
+            var permissionId = await GetPermissionIdAsync(client, administrator.AccessToken, code);
+            Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync(
+                $"/api/users/{administrator.User.Id}/permissions/{permissionId}",
+                new SetUserPermissionRequest(false))).StatusCode);
+            Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync(
+                $"/api/roles/{administratorRoleId}/permissions/{permissionId}")).StatusCode);
+        }
     }
 
     [Fact]
-    public async Task Supervisor_CanResetCashierPasswordButNotAnotherSupervisorPassword()
+    public async Task OnlyAdministrator_CanResetOtherUsersPasswords_SupervisorCannot()
     {
         using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
@@ -507,32 +577,43 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
 
         var supervisorRoleId = await GetRoleIdAsync(client, RoleCodes.Supervisor);
         var cashierRoleId = await GetRoleIdAsync(client, RoleCodes.Cashier);
-        var supervisorResponse = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
-            "password.supervisor.test", "Supervisor ficticio", "Supervisor-Test-Password-2026!", [supervisorRoleId]));
-        var supervisor = await supervisorResponse.Content.ReadFromJsonAsync<UserDto>();
-        Assert.Equal(HttpStatusCode.Created, supervisorResponse.StatusCode);
-        Assert.NotNull(supervisor);
-
-        var otherSupervisorResponse = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
-            "password.supervisor.two.test", "Segundo supervisor ficticio", "Supervisor-Two-Test-Password-2026!", [supervisorRoleId]));
-        var otherSupervisor = await otherSupervisorResponse.Content.ReadFromJsonAsync<UserDto>();
-        Assert.Equal(HttpStatusCode.Created, otherSupervisorResponse.StatusCode);
-        Assert.NotNull(otherSupervisor);
-
-        var cashierResponse = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
-            "password.cashier.test", "Cajero ficticio", "Cashier-Old-Test-Password-2026!", [cashierRoleId]));
-        var cashier = await cashierResponse.Content.ReadFromJsonAsync<UserDto>();
-        Assert.Equal(HttpStatusCode.Created, cashierResponse.StatusCode);
-        Assert.NotNull(cashier);
+        var supervisor = (await (await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "password.supervisor.test", "Supervisor ficticio", "Supervisor-Test-Password-2026!", [supervisorRoleId])))
+            .Content.ReadFromJsonAsync<UserDto>())!;
+        var otherSupervisor = (await (await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "password.supervisor.two.test", "Segundo supervisor ficticio", "Supervisor-Two-Test-Password-2026!", [supervisorRoleId])))
+            .Content.ReadFromJsonAsync<UserDto>())!;
+        var cashier = (await (await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "password.cashier.test", "Cajero ficticio", "Cashier-Old-Test-Password-2026!", [cashierRoleId])))
+            .Content.ReadFromJsonAsync<UserDto>())!;
 
         var supervisorSession = await LoginAsync(client, supervisor.UserName, "Supervisor-Test-Password-2026!");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", supervisorSession.AccessToken);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync(
             $"/api/users/{cashier.Id}/password",
             new ChangePasswordRequest(string.Empty, "Cashier-New-Test-Password-2026!"))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync(
             $"/api/users/{otherSupervisor.Id}/password",
             new ChangePasswordRequest(string.Empty, "Forbidden-Test-Password-2026!"))).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        var usersManageId = await GetPermissionIdAsync(client, administrator.AccessToken, PermissionCodes.UsersManage);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{supervisor.Id}/permissions/{usersManageId}",
+            new SetUserPermissionRequest(true))).StatusCode);
+        supervisorSession = await LoginAsync(client, supervisor.UserName, "Supervisor-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", supervisorSession.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync(
+            $"/api/users/{cashier.Id}/password",
+            new ChangePasswordRequest(string.Empty, "Forbidden-Test-Password-2026!"))).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{cashier.Id}/password",
+            new ChangePasswordRequest(string.Empty, "Cashier-New-Test-Password-2026!"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{otherSupervisor.Id}/password",
+            new ChangePasswordRequest(string.Empty, "Supervisor-New-Test-Password-2026!"))).StatusCode);
 
         var cashierSession = await LoginAsync(client, cashier.UserName, "Cashier-New-Test-Password-2026!");
         Assert.Equal(cashier.Id, cashierSession.User.Id);
@@ -548,7 +629,7 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
 
         var categoryResponse = await client.PostAsJsonAsync(
             "/api/categories",
-            new CreateCategoryRequest("Categoría ficticia", "Uso exclusivo de pruebas integradas"));
+            new CreateCategoryRequest("Categoría ficticia", "Uso exclusivo de pruebas integradas", "FIC"));
         var category = await categoryResponse.Content.ReadFromJsonAsync<CategoryDto>();
         Assert.Equal(HttpStatusCode.Created, categoryResponse.StatusCode);
         Assert.NotNull(category);
@@ -733,7 +814,7 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
 
         var categoryResponse = await client.PostAsJsonAsync(
             "/api/categories",
-            new CreateCategoryRequest("Categoría para costos", null));
+            new CreateCategoryRequest("Categoría para costos", null, "COS"));
         var category = await categoryResponse.Content.ReadFromJsonAsync<CategoryDto>();
         Assert.Equal(HttpStatusCode.Created, categoryResponse.StatusCode);
         Assert.NotNull(category);
@@ -865,7 +946,7 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
 
         var categoryResponse = await client.PostAsJsonAsync(
             "/api/categories",
-            new CreateCategoryRequest("Categoría de visibilidad", null));
+            new CreateCategoryRequest("Categoría de visibilidad", null, "VIS"));
         var category = await categoryResponse.Content.ReadFromJsonAsync<CategoryDto>();
         Assert.Equal(HttpStatusCode.Created, categoryResponse.StatusCode);
         Assert.NotNull(category);

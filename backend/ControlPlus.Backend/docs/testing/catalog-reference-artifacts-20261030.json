@@ -1,0 +1,1913 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-10-30",
+  "artifactDirectory": "ControlPlus.Api/bin/Debug/net10.0",
+  "headForContext": "25b7a88769f1307bf52abef74dffb838226b0898",
+  "headIsNotBuildProof": true,
+  "reviewFiles": [
+    {"name":"Maintenance.Helpers.ps1","sha256":"85D060DC88D820CC28D87BF4C207A6BCD530EB394E277304ACA9110F623964F8"},
+    {"name":"Preflight.Assertions.ps1","sha256":"DEFFF9F5EFAA6110191587F408F4C6F9E752384C55EB392C746221DE14A48F98"},
+    {"name":"Preflight.Report.sql","sha256":"E78948CEFA22532AF126A881630F7DF51202842EB0A380EA98D3B5EA039695EC"},
+    {"name":"Invoke-ReadOnlyPreflight.ps1","sha256":"0575CD74ABB764502E7908A52EB646CD44CB7075241332B0267C5B84B7FE0B71"},
+    {"name":"Preflight.sql","sha256":"3AE7C59539E3A3C5A5A55BDC5A3448DBE1B148DE399E24BFB1C21B0C8D4A8E86"},
+    {"name":"Snapshot.sql","sha256":"0B644BED62880176330E03684005340B02F19ADCFA9507B254EC8AAB7AC82953"},
+    {"name":"Postflight.sql","sha256":"98147AE53A7F9DED744F508C8F471C17A219F4162A20267F7D244DAAAEBDC701"},
+    {"name":"Invoke-CloneRehearsal.ps1","sha256":"6F070D153240E5054527A44DA8B560BB0239EF366169CC1B37DC472D8C3C5C41"},
+    {"name":"Resume-ExistingCatalogClone.ps1","sha256":"A8BF6DBDCD6A4C911A9ADCF6B451C1C9196B8574AD1F255149B66948424D815D"}
+  ],
+  "files": [
+    {
+      "name": "ControlPlus.Api.deps.json",
+      "sha256": "6EB5EB1A92F82ACA4BDC1472768578C87DD8F551896C968A76AAFB9EE69407F0"
+    },
+    {
+      "name": "ControlPlus.Api.dll",
+      "sha256": "E719017189D1A519EFC431A2FEDA31C42832C298DFD41AE199D483AC0627151F"
+    },
+    {
+      "name": "ControlPlus.Api.pdb",
+      "sha256": "2C91BF2E80A9CA6F46FE85B280A6057DC7CFCCA7B08C667A660140D98CC4519A"
+    },
+    {
+      "name": "ControlPlus.Api.runtimeconfig.json",
+      "sha256": "5A26DE741A59E2654C7BADFE3D6D9A134BF09FE67F621F584E7746147C9D2686"
+    },
+    {
+      "name": "ControlPlus.Application.dll",
+      "sha256": "4EF0AE03278CF8BF5AD742FD869597ED5CA62341171E1F03A433A8FAACDCE575"
+    },
+    {
+      "name": "ControlPlus.Application.pdb",
+      "sha256": "7B337DE59637374AD056CC6F5F86E58DAFCB886025DC411B94594E5095AEE8D0"
+    },
+    {
+      "name": "ControlPlus.Domain.dll",
+      "sha256": "E38D602EBCC5709540AB63B6200B3E5FFC57C56AC3A858480A86181516C5C3E6"
+    },
+    {
+      "name": "ControlPlus.Domain.pdb",
+      "sha256": "0662283E2D66BC84930140A88CEB201BC195A0ABE13A3636EBE01C293FFB4083"
+    },
+    {
+      "name": "ControlPlus.Infrastructure.dll",
+      "sha256": "2B12F3FF70F1761D923FB4EB53F0A1722DC3366D1CE0252302C55EFE7C3B37E6"
+    },
+    {
+      "name": "ControlPlus.Infrastructure.pdb",
+      "sha256": "94FE173D4F92F29DFB5E840010424EA671F07CA399125AC7AF57511BD35A19BE"
+    },
+    {
+      "name": "Humanizer.dll",
+      "sha256": "D6853075547D7E303EFD60354D911A2FF18EDBA582CDA2FA59D91A2E5DCF9E98"
+    },
+    {
+      "name": "Microsoft.AspNetCore.Authentication.JwtBearer.dll",
+      "sha256": "A27586987AD45CB33EB9ECE6F3E96C49455CDF6129FFB34DA9F16C739A35693A"
+    },
+    {
+      "name": "Microsoft.AspNetCore.OpenApi.dll",
+      "sha256": "BC4E4DDF1607B64202437B1F11AFF533EAC124C155DE617B8AB7600E0306CA3C"
+    },
+    {
+      "name": "Microsoft.Bcl.Cryptography.dll",
+      "sha256": "91C6BAB93638C268569A38BC87770A5E3EF9932676F5B7A6D47AEF4208062925"
+    },
+    {
+      "name": "Microsoft.Build.Framework.dll",
+      "sha256": "1A7C784AEFD2DF26A77A4F8E8B46722DA73B82578ECA1E1CB6EDEE54E5BF6061"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.CSharp.Workspaces.dll",
+      "sha256": "BF30FB9AAFCD99C4A74B9D6733774ABCBF82C4A836C5A94FAE6D91C45523F085"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.CSharp.dll",
+      "sha256": "36F5AC8DA30A6107F53A2CA6509B61E284C08EB59AA1B22956D4E200E4514AA5"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.ExternalAccess.RazorCompiler.dll",
+      "sha256": "5092CC2CEE3F241A2BF3ABEC35096B0669CB181720A3CF463CDDF7F6A45C1A0B"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.Workspaces.MSBuild.dll",
+      "sha256": "746A9474ED7F0F6A5102B88379C3312EDC41ECA664A8B3B7717BA31B1CEDE73F"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.Workspaces.dll",
+      "sha256": "79498055635572590009A4781A6E3EE1E2E70E3085B2EA3CE161820F809B0B2B"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.dll",
+      "sha256": "10F489DB67B8AC7489E58D392166C928302BA5698506DD652311DA5D89F0A0F8"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Abstractions.dll",
+      "sha256": "84B1761D9958C208B48C0B028C54EDDB4F17803039EB420C642CC71442E66A09"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Design.dll",
+      "sha256": "0C3AD3A7B85B6F56DA73701AF9686AB1B8293B437096CB65D69AFD10B97F6B3F"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Relational.dll",
+      "sha256": "187EAAD6B4ED168A3217677B8E9D325B7AEB94ACF3A713F4D9556FA0057A526A"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.dll",
+      "sha256": "F90D2AAC4E9923FDEB518D70D8143B3A45F5D44BC9B6F2EFEB06F98376BC715F"
+    },
+    {
+      "name": "Microsoft.Extensions.DependencyModel.dll",
+      "sha256": "3F94DDE7F68B1C10B99D154D72CCBE6228ADF597D1D27BB0F5148600C46DB65D"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Abstractions.dll",
+      "sha256": "F0D349D3B696B871D7988F8E13F9873F463EDD1A31D367B22AAA39CDB071B186"
+    },
+    {
+      "name": "Microsoft.IdentityModel.JsonWebTokens.dll",
+      "sha256": "7CDCC830F1E3C3AE4BE44A67E37568495D02642955C7D21C1DC5D9947F67E891"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Logging.dll",
+      "sha256": "A4476867E60D666DAA22233F954672939861F2292CC699DF88093056042F6C48"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Protocols.OpenIdConnect.dll",
+      "sha256": "7921AEF6FA1DA2E563A237DDA129B12407AC6C56448BB0EB7EEBC59BB6C6BABB"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Protocols.dll",
+      "sha256": "40ADA0B98384788970117CADF63863EDD99BD5BD6FB8076F6DA68D65F6DBDA4F"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Tokens.dll",
+      "sha256": "16C33E63BFFFF90F1B8698F899F96F3311329F26E940B8F031B1F26D82BC41B1"
+    },
+    {
+      "name": "Microsoft.OpenApi.dll",
+      "sha256": "B3D74EA12D9215319AA9138FB1450ED8CF96B07719C1B3D68DB3AAA16917891E"
+    },
+    {
+      "name": "Microsoft.VisualStudio.SolutionPersistence.dll",
+      "sha256": "A1150F4A162D9C9992B6E99B2949E2DE092017182264218B7B5666CEEBBC16D4"
+    },
+    {
+      "name": "Mono.TextTemplating.dll",
+      "sha256": "E9F742D672C8F567471974FCB7163F955D1E1F01060BB15D067AC220361D23CB"
+    },
+    {
+      "name": "Newtonsoft.Json.dll",
+      "sha256": "22C649F75FCE5BE7C7CCDA8880473B634EF69ECF33F5D1AB8AD892CAF47D5A07"
+    },
+    {
+      "name": "Npgsql.EntityFrameworkCore.PostgreSQL.dll",
+      "sha256": "94FCF66E8E953FDB02C40C72CA89821DD5EED5324D4C0F12A7219EA8CD3D5A5E"
+    },
+    {
+      "name": "Npgsql.dll",
+      "sha256": "E2BCAFE1660FE4543FE9DFCABED972EC8D32259E5EA8009462CE1DE23C7034C2"
+    },
+    {
+      "name": "System.CodeDom.dll",
+      "sha256": "BFB75074AC26C7632BBE9FFC1063CECA9A56AAE86AC4913481D6BBA88C4C4A34"
+    },
+    {
+      "name": "System.Composition.AttributedModel.dll",
+      "sha256": "D4F1EC85E742B77CDA48F709210DAAF34D8B4A7E1E540F353EFF741DCC058128"
+    },
+    {
+      "name": "System.Composition.Convention.dll",
+      "sha256": "BE95F480449AB3236315BEB321CE598A61382D64479DDF500E7434637345F474"
+    },
+    {
+      "name": "System.Composition.Hosting.dll",
+      "sha256": "2C8F10923C3B60FD1B16D89F2661712A9BE112E697990BEDBD6FAB9DBAABB1B6"
+    },
+    {
+      "name": "System.Composition.Runtime.dll",
+      "sha256": "148012DB7DDAFC76D28BBEAA0BAEA3E2351E7BC195E9031D57F107989C2E0EAA"
+    },
+    {
+      "name": "System.Composition.TypedParts.dll",
+      "sha256": "EBC942C358D997E41635C9A365DB542A3FD2A05F301F602D5D6A8B0D5DD42071"
+    },
+    {
+      "name": "System.IdentityModel.Tokens.Jwt.dll",
+      "sha256": "A5F81E39B551DF6D0E8D7EC10EE5FB1666055CADE57BE8B6121D349EBCC230BE"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "ControlPlus.Api/Authorization/PermissionAuthorizationHandler.cs",
+      "algorithm": "SHA256",
+      "sha": "0D258D9A0CC203866778DAF011153C3B36998D65153A6DA5A1D2BA1E11B88DBA"
+    },
+    {
+      "path": "ControlPlus.Api/Authorization/PermissionAuthorizationPolicyProvider.cs",
+      "algorithm": "SHA256",
+      "sha": "B4DBB5F82C24E325E8F5FC506457175AD137AC97D54DDDDEBAF7D3BBE81BC569"
+    },
+    {
+      "path": "ControlPlus.Api/Authorization/PermissionAuthorizeAttribute.cs",
+      "algorithm": "SHA256",
+      "sha": "43395E97937A394A52511F5951E964863FE8D61BB8092587738EF137A5B31589"
+    },
+    {
+      "path": "ControlPlus.Api/Authorization/PermissionRequirement.cs",
+      "algorithm": "SHA256",
+      "sha": "EDE42C167BBE614359E3F6F8D30EF0F965A25541AED2B909A3FEE14E1ED22923"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/ApiControllerBase.cs",
+      "algorithm": "SHA256",
+      "sha": "D6A16803EEB5F8D9F8F1339A052686258CAC0859D5828E7828ACE525CCF15BC0"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/AuditRecordsController.cs",
+      "algorithm": "SHA256",
+      "sha": "17DA840480ADF94FE036D3B2501BEA5CAE237BB8C17DE914288F780707D9794B"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/AuthenticationController.cs",
+      "algorithm": "SHA256",
+      "sha": "DDEB09692CA3ABEB6C8FE02183FEA1023F6C53B5AD0E80C10460FACA82B4AE34"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/CashController.cs",
+      "algorithm": "SHA256",
+      "sha": "0EE964238E812197E234287079C0310D5B829FF1EFA5F02C73AB2CFF7A7A42D0"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/CategoriesController.cs",
+      "algorithm": "SHA256",
+      "sha": "A7D51348BD7D2560BD95D4592FA21E6A0E096712091E0E7EF5F97D9A0825F612"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/CreditPaymentNumberingController.cs",
+      "algorithm": "SHA256",
+      "sha": "4CF7A263B4AA8F5C7CC0ECD2F7CC4451C425A502688668432A194AF93C23D7C9"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/CreditsController.cs",
+      "algorithm": "SHA256",
+      "sha": "42BBAB99978A1BD2E2F489DC7A553568701DD2CA02D03538C35B80C2D3D9887B"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/CustomerHistoryController.cs",
+      "algorithm": "SHA256",
+      "sha": "83B43B5FA8B88CDFAA00455498B99C73DDECB35D9D3E905A604116B03B732EF7"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/CustomersController.cs",
+      "algorithm": "SHA256",
+      "sha": "1908D6CBBEAB0772D2DF20E7152422B26054F0792058A859D1E30AC7D7BAFEDF"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/DashboardController.cs",
+      "algorithm": "SHA256",
+      "sha": "C08F1FC62E4183607390D7D4C3815741043C575D868CAF2CB7F0DE1C84A59C4F"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/DocumentNumberingController.cs",
+      "algorithm": "SHA256",
+      "sha": "AB425F940130E43F5D949E3E414A8EE79D04DF4445B9E97BF3F9F7EC411EFAE8"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/HealthController.cs",
+      "algorithm": "SHA256",
+      "sha": "8F3CEE79461C263815E7117E81A82BDFFC87AE5C8ED5D84778AA16DA5DA4E569"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/InventoryController.cs",
+      "algorithm": "SHA256",
+      "sha": "0B7FA868FCB355407F1C3B899DAC12645D1FA4DC52EA662329C78607699D2A95"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/LayawayCancellationController.cs",
+      "algorithm": "SHA256",
+      "sha": "962FD26AA0045A7EAE2FBF8A37626907371A81461D48136B3046C56CBC8D87A6"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/LayawayCreateController.cs",
+      "algorithm": "SHA256",
+      "sha": "77492C51094F1922B567316E3B3D41D87F745BB6C8E36C232F4E1D09425CDBBE"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/LayawayDeliveryController.cs",
+      "algorithm": "SHA256",
+      "sha": "765F3A43CFF8EDDD26A0DCC176C95DD6BD71BBF095A9F8B240F3D777ADB2A352"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/LayawayDocumentNumberingController.cs",
+      "algorithm": "SHA256",
+      "sha": "533502036DC83973A3FCBA63ED5F707F3C5BE3891CC978C02E5DD053FB92F883"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/LayawayPaymentNumberingController.cs",
+      "algorithm": "SHA256",
+      "sha": "613AA413855D39C36E8D76743DF5836ACAE5A11586F37888B2FB1E2EE99FFD84"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/LayawayPaymentsController.cs",
+      "algorithm": "SHA256",
+      "sha": "780AFFA11AA6BED4D81BAE9680F66572BE075D4406211C06570767118AC0F3DB"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/LayawayQueriesController.cs",
+      "algorithm": "SHA256",
+      "sha": "FBF4623AC830A0BDE662658C15BC686F15AA324630E799E8A6F20EDCF0F805A4"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/PermissionsController.cs",
+      "algorithm": "SHA256",
+      "sha": "84CAEEA0DE475EBC587F4D0AEC728FBF69B1BE8EEB799A380C09E6E1EAFF2EE6"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/ProductsController.cs",
+      "algorithm": "SHA256",
+      "sha": "5E12D8A129E4F8F93F527A76A7BBC89DA49BAC34445C7A6072C2FB9A10C16319"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/PurchaseDocumentNumberingController.cs",
+      "algorithm": "SHA256",
+      "sha": "F81181E244E978E0A929CF507F6A23B351922E4561C6A5ED21A55E63A9F86685"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/PurchaseOrdersController.cs",
+      "algorithm": "SHA256",
+      "sha": "F43930C1F2F1BEC782850185540E3D86CF54EC76070C0E763D9FC6120BEF96B7"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/PurchasesController.cs",
+      "algorithm": "SHA256",
+      "sha": "0ACB79E14AA4882448A0223706063E162957BEBEE2FECF72842867E23DB8D352"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/ReportsController.cs",
+      "algorithm": "SHA256",
+      "sha": "1E8C8EAED7948121ADC408BCD9B36898D836F722B7627239E510904CED967C48"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/RolesController.cs",
+      "algorithm": "SHA256",
+      "sha": "EABA701DBA5A666174FF3629F5FD79B4798B6BCD4FBDB6386CD7FFEB2051BDD1"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/SaleChangeNumberingController.cs",
+      "algorithm": "SHA256",
+      "sha": "17E6BE84A198CAF8A164CAE9D112D93BA127CE28BD23C2589446FF0E5E2C6A01"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/SalesController.cs",
+      "algorithm": "SHA256",
+      "sha": "0B3D85C5EE5E5678C3AA8D5B18D0BE97888E93F69E31B96CD54B1B51EAD7B5C3"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/SuppliersController.cs",
+      "algorithm": "SHA256",
+      "sha": "8DAB744CDFDC54129D401DDF52BEF70186FA0A4D9B19A9BC7716E7CD0BABE9A7"
+    },
+    {
+      "path": "ControlPlus.Api/Controllers/UsersController.cs",
+      "algorithm": "SHA256",
+      "sha": "B88C4C8DDC778121C3801593095AEC393BE7FBAE40C5646CBAF87EEC9E9E474B"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/CashRegisterPreflightManifest.cs",
+      "algorithm": "SHA256",
+      "sha": "AAF8B4A713247D0AD05F24A42DCC758004304F32B746C29F0C58FA4F180FB553"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/ControlledExecutionCommand.cs",
+      "algorithm": "SHA256",
+      "sha": "9CD809947D9F965A48304B3BC75E107567036E3D2B2B7D70A2C90028492D135B"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/ControlledMigrationRunner.cs",
+      "algorithm": "SHA256",
+      "sha": "25AAD9AB496A4AAB47FC25A7E069B7D13F2A2787464BF052F2D6B1F05EDB69C8"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/ControlledPostflightRunner.cs",
+      "algorithm": "SHA256",
+      "sha": "E674A71995E61C55B510EB3B790465795DA2C1971E520BB696F0D7CE366F45EB"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/ControlledPreflightRunner.cs",
+      "algorithm": "SHA256",
+      "sha": "6C164FB892C0EBE4585FF6490EE978461DEC38F46B7A1687917DCBD41C6B34FA"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/CustomerSearchDatabaseValidation.cs",
+      "algorithm": "SHA256",
+      "sha": "1AB6EF48D21843DF75666941DFD0318E44527FA24C49D26736BF1F31F58CC487"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/CustomerSearchMigrationManifest.cs",
+      "algorithm": "SHA256",
+      "sha": "3C3383A603A2A1671912121EC11033D654F2BE238885EF0A68D65AE0CC1C6040"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/CustomerSearchPostflightRunner.cs",
+      "algorithm": "SHA256",
+      "sha": "C02544C67F338FE3EB2AE6A7CF01E6ED01D20141BB79A5F5D18A55C359C3880D"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/CustomerSearchPreflightRunner.cs",
+      "algorithm": "SHA256",
+      "sha": "186E4D79E0C64B32AA214E2752E4E736AEA157886A6A240EFEE3AE195B7F824E"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/InitialProductInventoryPreflightRunner.cs",
+      "algorithm": "SHA256",
+      "sha": "2965E1322E0BAE2B955857CDC30A70F9EBC7016DC00B130FC19C861AC8E4C825"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/InventoryDatabaseValidation.cs",
+      "algorithm": "SHA256",
+      "sha": "7DF4E3F2526BF26469775A77A121D7D96EA37863F86EEBB1A3EC69266A79D088"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/InventoryMigrationManifest.cs",
+      "algorithm": "SHA256",
+      "sha": "02639947019B86F5DC0510F44B6A1D67448B9ED0FBE792DF09E1B0335BC15629"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/InventoryPreflightRunner.cs",
+      "algorithm": "SHA256",
+      "sha": "C77AE819825EB14889680518424E9E04888F1839CF9549D1907F56BB64292283"
+    },
+    {
+      "path": "ControlPlus.Api/Migrations/PermanentProductReferencesPreflightRunner.cs",
+      "algorithm": "SHA256",
+      "sha": "26E271B8430FF64B1D7E7A6B170BAC0F0CD906818F48E70F3B7A42C650B7202E"
+    },
+    {
+      "path": "ControlPlus.Api/OpenApi/ControlPlusOpenApiSecurityTransformer.cs",
+      "algorithm": "SHA256",
+      "sha": "18A174162AE294B310227FA647CD639EEBAD73575C360345A198B386F42C0E76"
+    },
+    {
+      "path": "ControlPlus.Api/OpenApi/OptionalProductInternalCodeSchemaTransformer.cs",
+      "algorithm": "SHA256",
+      "sha": "C076576DEF4DC987A6E9DAD9EADFCEC649F58147C25BE5914717B8A617A47017"
+    },
+    {
+      "path": "ControlPlus.Api/Program.cs",
+      "algorithm": "SHA256",
+      "sha": "54C81F1F5308F90F80B2F105D38C949E700A34002047CBE344F70B9725D89562"
+    },
+    {
+      "path": "ControlPlus.Api/Security/BootstrapAccessValidator.cs",
+      "algorithm": "SHA256",
+      "sha": "AA974CC7964FA23361907EC50C4F6FC7EFCC7BF03E9978085CA0F50A0C980A99"
+    },
+    {
+      "path": "ControlPlus.Api/Security/CashMoneyExceptionHandler.cs",
+      "algorithm": "SHA256",
+      "sha": "0EA560D50E8F1A1C69FD798D4F2A9A50787FD221507AF856E5A165ABA50282C0"
+    },
+    {
+      "path": "ControlPlus.Api/Security/ConcurrencyExceptionHandler.cs",
+      "algorithm": "SHA256",
+      "sha": "FFFDC3443FDD9F6B8BCA1DF2435F3F99A359FB37A61AF3E7D7E48E344A94ECE7"
+    },
+    {
+      "path": "ControlPlus.Api/Security/CurrentActorContextResolver.cs",
+      "algorithm": "SHA256",
+      "sha": "D2E87637983BCFED45E13117D39B81F6A4E17FECB80B9742FB69485EA8268E14"
+    },
+    {
+      "path": "ControlPlus.Api/Security/JwtAuthenticationExtensions.cs",
+      "algorithm": "SHA256",
+      "sha": "2F1260435FB82700750339DF0EAD4B3A4E37E0B097233292357184C5341643EC"
+    },
+    {
+      "path": "ControlPlus.Api/Security/StartupSecurityConfiguration.cs",
+      "algorithm": "SHA256",
+      "sha": "CA08C72D96C85E155B0F7C6585D25425EEAE2C89B8CDA955281B6DCAE61773A9"
+    },
+    {
+      "path": "ControlPlus.Application/Cash/Contracts/CashContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "3CBE056B3D8311AA93ABB061BA38416565A742A0268F424D6E3335C3E8B08FE8"
+    },
+    {
+      "path": "ControlPlus.Application/Cash/Ports/ICashRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "D4C726230DD89412C7E3616CF2D0EDBAD02FD81A1349B64BBAC3A50E57941BA1"
+    },
+    {
+      "path": "ControlPlus.Application/Cash/Services/CashService.cs",
+      "algorithm": "SHA256",
+      "sha": "2851DA5FA77EB34D95F49F3D9DCF7EFFE6F070563C04BE6EF5891D8CDB29C2F0"
+    },
+    {
+      "path": "ControlPlus.Application/Catalog/Contracts/CatalogContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "B886991C69E0D3A906AEB93CDB697A9BDDBA94B5B373BF3E75F141FEAACD1C10"
+    },
+    {
+      "path": "ControlPlus.Application/Catalog/Ports/ICatalogRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "794C1F3DC9A0E4C0B0D6BE102EB658A2BE6E605BFEC72E9CF72683630068E7BB"
+    },
+    {
+      "path": "ControlPlus.Application/Catalog/Services/CatalogService.cs",
+      "algorithm": "SHA256",
+      "sha": "BDB24556678CA95E4FE7768C189A6C51ED3210ECAFFBAE29E59034B4B57F6C2B"
+    },
+    {
+      "path": "ControlPlus.Application/Common/ApplicationError.cs",
+      "algorithm": "SHA256",
+      "sha": "E3A4245350C19FCE53E9191D3C1FE484BBE17A1EF026F4F83DD3CBD9F4B42A27"
+    },
+    {
+      "path": "ControlPlus.Application/Common/PagedResult.cs",
+      "algorithm": "SHA256",
+      "sha": "18A77ECC88CD73C9CDE8F0FD0F10B50F127D48EE86D5DDC2962D5E1341B48366"
+    },
+    {
+      "path": "ControlPlus.Application/Common/Result.cs",
+      "algorithm": "SHA256",
+      "sha": "F13D47A14A7B8CD888F0835916A687FE51A3709EC52E3703A465364337B4F00B"
+    },
+    {
+      "path": "ControlPlus.Application/Credits/Contracts/CreditContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "8CB19D748A4230724601D338DF13FAF696C8B3ED92FA158D7056CD562A1A5792"
+    },
+    {
+      "path": "ControlPlus.Application/Credits/Ports/ICreditsRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "D0506D077972D765CC93CEAEE1862C7A84CFE7D124E74B92E68663CF36909520"
+    },
+    {
+      "path": "ControlPlus.Application/Credits/Services/CreditsService.cs",
+      "algorithm": "SHA256",
+      "sha": "3F82534A857212518C8D05AD2961A7E7007D3A2F6CE77B5AE2543DE81CEF3E5F"
+    },
+    {
+      "path": "ControlPlus.Application/Customers/Contracts/CustomerContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "81E28DBF85E3C879A02CEFA5DA60907FA34BE43E925C9EE1DFDCAE3097BA81B8"
+    },
+    {
+      "path": "ControlPlus.Application/Customers/Contracts/CustomerHistoryContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "E4351D6E6E6DC46EA11F5E2019BF2F66F9B1DC80A6C10623D7B1E41F08664F53"
+    },
+    {
+      "path": "ControlPlus.Application/Customers/Ports/ICustomerHistoryRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "D9F4E9B6CE84ACF989DA350465ECD079F06B112B91228C0F2589991B63AC1D83"
+    },
+    {
+      "path": "ControlPlus.Application/Customers/Ports/ICustomerRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "EE6B8D712C90015C8EA05D55CD1F5623E706E24385562BCED2C5056FB3E8C144"
+    },
+    {
+      "path": "ControlPlus.Application/Customers/Services/CustomerHistoryService.cs",
+      "algorithm": "SHA256",
+      "sha": "741E0E55454B5400BB83B9AE308736646907196FFE105735414F0164A7F0CA54"
+    },
+    {
+      "path": "ControlPlus.Application/Customers/Services/CustomerService.cs",
+      "algorithm": "SHA256",
+      "sha": "9C94831D5723D5C86E2148767B8721392E758557F06D4684EAD474884128D630"
+    },
+    {
+      "path": "ControlPlus.Application/Inventory/Contracts/InventoryContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "9FDD6EBE774F436D3E1065D34932057289F239AAABAEAFAEF3AC67D9098AB87C"
+    },
+    {
+      "path": "ControlPlus.Application/Inventory/Ports/IInventoryRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "B2594D25C7242A4180FE95173750041C7F41333E8A0E010FE06D8B1008D1EE11"
+    },
+    {
+      "path": "ControlPlus.Application/Inventory/Services/InventoryService.cs",
+      "algorithm": "SHA256",
+      "sha": "AE85B51E7D741ED866207BE59A9D50918621F5FFA1A257248C33AD7958C78F1D"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Contracts/LayawayCancellationContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "F146BE0587F4A33DAB54CCB943F9ED96AA960F9951222547847E783B97C985C7"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Contracts/LayawayCreateContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "0C1935E8A26A49CE52024B138FA30A28FD95F60E615261DFEA9EE0E5BB39FCC7"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Contracts/LayawayDeliveryContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "54A2A882BD6C38C184B665B859227992346C590935CA184FB69C2BB9AF96EB71"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Contracts/LayawayPaymentContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "A028C3309C1707DA4E6EF508C596B64910068058F98074E2A07B53F941014672"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Contracts/LayawayQueryContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "234D6CCD37716D76EE6B4D234D33A5159CE873A2890EBDDAD6CD7B24706B28DA"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Ports/ILayawayCancellationRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "7F20D1DFD3B88748969A8DE12D99B49613888D8BD061D9DF8B37F37DF8E8BFCD"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Ports/ILayawayCreateRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "56BBDA7BEF1516161B6A9875D328F05277E867CFC64E710E926FDDCB750B5516"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Ports/ILayawayDeliveryRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "680E9AA7C56E0BFA87E1351BB00B4BFF345EFF455C97249C6EED3FD40570A7DC"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Ports/ILayawayPaymentRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "24F1C264B305DC17F55580056AD50D2BFFA9446AEE97F0108607A1D4B00EB226"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Ports/ILayawayQueryRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "8AEFF8383C6C1364782E0F6F425555E72981DBF943D61694A017F6CAD093D146"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Services/LayawayCancellationService.cs",
+      "algorithm": "SHA256",
+      "sha": "93F7756AE5CBBBD322A5EB7870AB65B7A0AF5C4836279DD352D0DB9C706BC8DC"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Services/LayawayCreateService.cs",
+      "algorithm": "SHA256",
+      "sha": "5DF6F1C4351BF02E3FE2D441B42E6B72DD48739B6C10DBA7F34021866FE160C7"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Services/LayawayDeliveryService.cs",
+      "algorithm": "SHA256",
+      "sha": "63506C3574B098F6DF26873C971468DB4B18470658D6B3172FF16FB4A0F68C7A"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Services/LayawayPaymentService.cs",
+      "algorithm": "SHA256",
+      "sha": "FE5AE027A8229A2325BF79300E81444AB8F3C24C14647D3DFAF2B61E3FF91009"
+    },
+    {
+      "path": "ControlPlus.Application/Layaways/Services/LayawayQueryService.cs",
+      "algorithm": "SHA256",
+      "sha": "9EB60491276F196B44A715FE55DA19194F8A54AA740A6CEECBB2F282185516CC"
+    },
+    {
+      "path": "ControlPlus.Application/Numbering/Contracts/DocumentNumberingContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "9EAA483BA7BEA1093EEB4812D7D1681B6AE7A047E43AB476853551A9D4A05C14"
+    },
+    {
+      "path": "ControlPlus.Application/Numbering/Ports/IDocumentNumberingRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "54ABAC95EF4873121F767A12B229FE09A13970EDF74CB94AD294F99574FC87A0"
+    },
+    {
+      "path": "ControlPlus.Application/Numbering/Services/DocumentNumberingService.cs",
+      "algorithm": "SHA256",
+      "sha": "61CC9C1A22BCB9A2540B4CD7689E75F92A2CFC2B227873F13E0C1E3EC6547AAF"
+    },
+    {
+      "path": "ControlPlus.Application/Numbering/Services/SaleChangeNumberingService.cs",
+      "algorithm": "SHA256",
+      "sha": "5CBBD191DE7086D7B39DED56913828121101D6040D399D7D2A586CF901C1D169"
+    },
+    {
+      "path": "ControlPlus.Application/PurchaseOrders/Contracts/PurchaseOrderContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "04C382A96DED019BB2DFA345DE31F2128E5464588B03699DD2F07058ABE879B6"
+    },
+    {
+      "path": "ControlPlus.Application/PurchaseOrders/Ports/IPurchaseOrderRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "0552CE7236F6CDD2A177AF8264DB48C388ECAC06FBE4EC8063747228AF1093C3"
+    },
+    {
+      "path": "ControlPlus.Application/PurchaseOrders/Services/PurchaseOrderService.cs",
+      "algorithm": "SHA256",
+      "sha": "F87CB7205F11FBC9E1B65786F23151E33A5D08A05E235E8B62C42CBD38F8C41D"
+    },
+    {
+      "path": "ControlPlus.Application/Purchases/Contracts/PurchaseContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "D71C574F8A1A55FACAADD528D6A8D97FD0A3387D341FE350197F3B3C7F152BD8"
+    },
+    {
+      "path": "ControlPlus.Application/Purchases/Ports/IPurchaseRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "A14742670C5327138B86985B20E7E491961CE55AEC3C2E1ECEE077C66B4E9325"
+    },
+    {
+      "path": "ControlPlus.Application/Purchases/Services/PurchaseService.cs",
+      "algorithm": "SHA256",
+      "sha": "FDA27D759E22A7F1680D221F9A268AC2C55A71633CC8E91A7FCBEEA61CC2E261"
+    },
+    {
+      "path": "ControlPlus.Application/Reports/DailyCashFlowReport.cs",
+      "algorithm": "SHA256",
+      "sha": "9F17AB799BCC7C9AAAC70441906D1E368CB956FD027BF43A661982A2CCE5D011"
+    },
+    {
+      "path": "ControlPlus.Application/Reports/DailyCashFlowService.cs",
+      "algorithm": "SHA256",
+      "sha": "39AB4C2B1316B46C8BAB56F1CF4E4E0FFCEB4A974875D369852B493443843532"
+    },
+    {
+      "path": "ControlPlus.Application/Reports/DashboardSummary.cs",
+      "algorithm": "SHA256",
+      "sha": "D7C7E7A9993142276D931DAA8D7C5E4344F0F3430DC5F40A96261522AD3E936C"
+    },
+    {
+      "path": "ControlPlus.Application/Reports/FinancialSalesReport.cs",
+      "algorithm": "SHA256",
+      "sha": "37FA3FA17FC9274B089B5407E42D62E904FF278A4ADA2CD78D415C9800F40D89"
+    },
+    {
+      "path": "ControlPlus.Application/Reports/FinancialSalesReportService.cs",
+      "algorithm": "SHA256",
+      "sha": "2994502AD0BA6A3E78D83B3AFD20640C8B342E158272D17CEAA0AD1DA75CF828"
+    },
+    {
+      "path": "ControlPlus.Application/Sales/Contracts/SalesContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "E230CDC691C6A1FA67E9065D527EE00381BC36AF2264B90775C58A45111139F3"
+    },
+    {
+      "path": "ControlPlus.Application/Sales/Ports/ISalesRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "22B53A4B8E355014C63806FADEA01D369E60CEF1426756185D008B80521AEC64"
+    },
+    {
+      "path": "ControlPlus.Application/Sales/Services/SaleReceiptSnapshotCodec.cs",
+      "algorithm": "SHA256",
+      "sha": "79B1619DF2088900F2FFA6B8B561793E7CE815FFF387F3EABA1EF013D6B49C29"
+    },
+    {
+      "path": "ControlPlus.Application/Sales/Services/SalesCancellationService.cs",
+      "algorithm": "SHA256",
+      "sha": "89519C437983133F13C723033B8AF9A61A5C0CE5C22238789758D5351E32F85A"
+    },
+    {
+      "path": "ControlPlus.Application/Sales/Services/SalesChangePolicyService.cs",
+      "algorithm": "SHA256",
+      "sha": "680503E5C45DFC69581B3CF02406C5BD3D0B293CBAFB311F38CEFCF1DCE8CE81"
+    },
+    {
+      "path": "ControlPlus.Application/Sales/Services/SalesChangeReadService.cs",
+      "algorithm": "SHA256",
+      "sha": "2998E49029B983AA74071783A3CCD90B5459DC98D8323D42DE1C1D47C0F36BB2"
+    },
+    {
+      "path": "ControlPlus.Application/Sales/Services/SalesChangeService.cs",
+      "algorithm": "SHA256",
+      "sha": "5B257D4DAB9B15BC8E78B89A46048B6F8D1E724B050412819A1E851AF516752C"
+    },
+    {
+      "path": "ControlPlus.Application/Sales/Services/SalesChangeService.Helpers.cs",
+      "algorithm": "SHA256",
+      "sha": "DB65FCD908C793D5673605E49BFDFD801AA9C7DDB6CD7239F6F3BAD61E696099"
+    },
+    {
+      "path": "ControlPlus.Application/Sales/Services/SalesService.cs",
+      "algorithm": "SHA256",
+      "sha": "D1563A62A8C52FF35A5F3F2D02B12F4287A50695D6AB91148A3BE91F7CA41134"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Contracts/ActorContext.cs",
+      "algorithm": "SHA256",
+      "sha": "207764DC52E488CC29E3EE2E65693DA815F2D3F5973EA26545C4A6B59B832744"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Contracts/AuditContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "B51A1926D2EFD09BE6044ECE67E727FC43982072B71FAB629BBF6B3A9A141A89"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Contracts/AuthenticationContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "168EC4BDEA235CD64C3970F972F82F12275299AFF0E749B4EF9347DEF12CD898"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Contracts/AuthorizationSnapshot.cs",
+      "algorithm": "SHA256",
+      "sha": "40852EC789DF76D9AFB41D9163E3BFE7140831BE9FB9484DA1B2AD831B5F2BE7"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Contracts/CurrentUserSessionContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "F10CF4D98A814A4C311E4AAF9C4C8326B269E6DD0894FD212E77AC16BD1EC1BA"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Contracts/DefaultPermissionCatalog.cs",
+      "algorithm": "SHA256",
+      "sha": "853F70FA9E43BCC555AEF4AFEEF7C0A4F27AE9C1ABCF6C84BF6E331651D01360"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Contracts/RoleContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "907CE40E4ABAB1BA84B823F7D7CAB78F76F0CEF8458F28F03435CD5432A04A3B"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Contracts/SecurityConstants.cs",
+      "algorithm": "SHA256",
+      "sha": "5EF3A41CDA059B413D4893831FF8A6337650C7D4C6E468F742DF72E4A3DB6EA8"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Contracts/UserContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "73749F3EC76CDBF747E58E1522EC3175DB4ED568CF263B6DD13819C7C7487C31"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Ports/IAuditRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "0BE16B8AF5118D480D83280C78977CB716F585EE1723279A0F3D7DC0A9963E64"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Ports/IClock.cs",
+      "algorithm": "SHA256",
+      "sha": "242BFAA5DB94BA45491DEC44112AA70560B179948152102B50A1250A6F8FBA74"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Ports/ILoginAttemptCoordinator.cs",
+      "algorithm": "SHA256",
+      "sha": "CF814EDA00B89722E3F7350A34B4389EF28C9E85798154A606203C61D25F2411"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Ports/IPasswordHasher.cs",
+      "algorithm": "SHA256",
+      "sha": "FE766A05C161F31D81858FE2EA22EBD4A187BD9213A5E6AE92990045168A8691"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Ports/IPermissionRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "393FC4EA7CFECE1A829D26198917E4B3488011B8115180A4F4E8EDBF86D5106B"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Ports/IRoleRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "D86F75A5C630A15283C4A49474AE3BF2F6E4E1100435A5854FF94212617EAB8C"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Ports/ITokenIssuer.cs",
+      "algorithm": "SHA256",
+      "sha": "71C38289E90BA7EE234210D76998E9250F2E2C793F5579935BD76D30A22D830E"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Ports/IUnitOfWork.cs",
+      "algorithm": "SHA256",
+      "sha": "90BBCE7E48E26BC88079FFD495D181BA7F1D90E7020F4672C91136D10E7D2801"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Ports/IUserRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "B93FF6EEAF0091D0797C256D39A0350A018C952C1E69A499B3EF62E851858899"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Services/AuditQueryService.cs",
+      "algorithm": "SHA256",
+      "sha": "D2562ED60F99076190D2F7564308CBF65018F5E3FA0DA75F49A5C85EFE9BCBBD"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Services/AuditWriter.cs",
+      "algorithm": "SHA256",
+      "sha": "7C63B620DE0AD37F0043687A12887126D9575BE13BDF48CED25280ADA472D2DA"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Services/AuthenticationService.cs",
+      "algorithm": "SHA256",
+      "sha": "84F676D75326093E3DEF665A437389A8E0BC41F7A045BE2D46B9F23A99B416CE"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Services/AuthorizationGuard.cs",
+      "algorithm": "SHA256",
+      "sha": "7D388671FCFF263E650A2A3F7EAAF519F181D9497732CF02E4E15A70A7D4C172"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Services/CurrentUserSessionValidator.cs",
+      "algorithm": "SHA256",
+      "sha": "1641A5E00255BBAF4275F27A2D005CC4B9499A15EEEFEE5E693818F07363A30C"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Services/PermissionChecker.cs",
+      "algorithm": "SHA256",
+      "sha": "CA5E4B0F3A8267A1F43AF4223676AE9F43DDDEE02159D5AAE2FC8EA500111B32"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Services/RoleManagementService.cs",
+      "algorithm": "SHA256",
+      "sha": "F8C8142A357183F353029E7D4D5723556887A3BF656BB26C63133FBB54774C6F"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Services/SecurityErrors.cs",
+      "algorithm": "SHA256",
+      "sha": "C94F012AACE0461FAF8F61CD08C66F321ACCE3004A680A9D951C6D6581C4CC72"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Services/SecurityInput.cs",
+      "algorithm": "SHA256",
+      "sha": "C71FA2630E4F8EA897D9B13CBBC730DA8FC0795B1EE5B98EBB98D126B9CBD767"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Services/SecurityMappings.cs",
+      "algorithm": "SHA256",
+      "sha": "72ABD3F39723738BA8D4FF27ADE03CBD013EA1E17F0C404B72A31B7FB2F46BE6"
+    },
+    {
+      "path": "ControlPlus.Application/Security/Services/UserManagementService.cs",
+      "algorithm": "SHA256",
+      "sha": "C4069731541EA5D84EDBE1E90CC72AF50A880368C0DCB25756925E75ECC4CC01"
+    },
+    {
+      "path": "ControlPlus.Application/Suppliers/Contracts/SupplierContracts.cs",
+      "algorithm": "SHA256",
+      "sha": "4377B8580CC5B269E49551001F24A6B382E9F24B69C2250CA16EB82104B37B8A"
+    },
+    {
+      "path": "ControlPlus.Application/Suppliers/Ports/ISupplierRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "A864C847F88A4909B0EEDF98F93707DCE9BEB034F1919DF80C1B3E2E58F4DC12"
+    },
+    {
+      "path": "ControlPlus.Application/Suppliers/Services/SupplierService.cs",
+      "algorithm": "SHA256",
+      "sha": "C4ECC811200562D9255C2F58E208B0586D471BEF748C94187F1655E60534909F"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/ControlPlusDbContext.cs",
+      "algorithm": "SHA256",
+      "sha": "3B7B33D36F20FB85C11025BBE6125353814B5CCB7F9C8BA8446F032CA91CF8C2"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/ControlPlusDbContextFactory.cs",
+      "algorithm": "SHA256",
+      "sha": "AEBEB7DDEA2CD53647804092C7A9E3FE626D66794B9B1361A91176738373A194"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20260912010000_OfficialPhase4Baseline.cs",
+      "algorithm": "SHA256",
+      "sha": "8A15B851CD8F056C86F326168ECFD5129DF9F56E29D29CA2A53011E567D7674E"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20260912011000_SeedApprovedSecurityCatalog.cs",
+      "algorithm": "SHA256",
+      "sha": "DD8AF39067F526617DD90E41FD666C44836344298BB3EBA473141AB1CA58D24E"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20260912012000_HybridPermissionsV1.cs",
+      "algorithm": "SHA256",
+      "sha": "706809F681DFE622D2FAB992A6337EC0A7DA0E2B9A7393D112625809E2C21B5D"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20260913010000_SeedMeasurementUnitsV1.cs",
+      "algorithm": "SHA256",
+      "sha": "F91B6F5B4239D23715CCE68E48D4775B6C2EB61C4A5EFDF234F371D8AB412083"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20260913020000_CashRegisterModuleV1.cs",
+      "algorithm": "SHA256",
+      "sha": "9A9402CDC04075F94ADF9FD9BE35BCDAF42DB482EAD60A3E056FC9944CC4920B"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20260930010000_SeedInventoryAdjustmentReasonsV1.cs",
+      "algorithm": "SHA256",
+      "sha": "CB8D5E4E5E38920C8F3F2181A2968C266A6696DBB4A708C6D4DB87DD68FE2F40"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20261005010000_CustomerSearchIndexesV1.cs",
+      "algorithm": "SHA256",
+      "sha": "360005D11D40A236F4321510969D547683A3579E5C2B5C71625B486CAF4AAF53"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20261014010000_InventoryMovementRegistrationOrderV1.cs",
+      "algorithm": "SHA256",
+      "sha": "E99CD66AA85B3E2395ABBFCA76747E1173F0B34A27749BE73C2CBF67CD230126"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20261020010000_LayawayDeliveryWithoutSaleV1.cs",
+      "algorithm": "SHA256",
+      "sha": "4D771F6F0E8115523A5CC497CB8560FB866AC713F2EE0974C3C24B6A75878AA7"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20261021010000_LayawayCancellationOptionalReasonV1.cs",
+      "algorithm": "SHA256",
+      "sha": "7803C77A58626535B0668C45A264721D83DBCFFD3E66175B933124D90BD6AE07"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20261026010000_InitialProductInventoryMovementV1.cs",
+      "algorithm": "SHA256",
+      "sha": "ED142B3BEAB2BF02A453E360283D3D2B0C6A659088BC900EA65C793D0962D28C"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20261028010000_SaleReceiptDataSnapshotV1.cs",
+      "algorithm": "SHA256",
+      "sha": "85C592C34A433F8932615F7F8DF96F3306A87712384202BBF6032F1ACFD69038"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/20261029010000_PermanentProductReferencesV1.cs",
+      "algorithm": "SHA256",
+      "sha": "9D9D6B0C1C06E1A4FFC23A9540316FC80269844DE6A038884C50877F0EC66B24"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Migrations/OfficialDatabaseScript.cs",
+      "algorithm": "SHA256",
+      "sha": "3E81449FEC0919984AE54CBF47D86EC5B170DC93D1F6484BC56D001F503B6D23"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Official/OfficialConcurrencyConfiguration.cs",
+      "algorithm": "SHA256",
+      "sha": "1879A7BAFCBB7CB5BF364FFF87AAAECF164796EE20DD9B186BBEC676A9B61E62"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Official/OfficialControlPlusDbContext.cs",
+      "algorithm": "SHA256",
+      "sha": "966DF3EE40978A271D333BC5FD60B4291D09AEF821F26CC0C85ADB736626722D"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Official/OfficialControlPlusDbContext.Extensions.cs",
+      "algorithm": "SHA256",
+      "sha": "66303D35735F6C2A7080961FAE07BA9111953704D6AA969BC8F5388A619D34CC"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/CashRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "B6200B4E040A966BF26535E850EAF911343B7A88D8A5A2C8EC0318843C1BAF4B"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/CatalogRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "8759B40841CC96111196AE946D83703BCB514A4257843E79B62FFC8BB9E7C525"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/CreditsRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "DE1629F997DE7DCBD13DCF0FBC419D1805F5998BC8A44F4240B8CC6CD5F0D754"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/CustomerHistoryRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "018BDDDD4038DF14BBDA2ED5042562D39DD949D1AEA5B5E4FC87DD53EB4EDD32"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/CustomerRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "7F414425840415E9619D596812B1842ED9E66A80EC91E6F4FA6B3D07187F5CAA"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/DailyCashFlowRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "DCD3299A4D251F3AF3F3B252F26ACC920B2DCCD357022946D9C1D740DB5D683E"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/DashboardInstallationRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "92B3FCEF7CD0BFF08121497A5D21FA32951E92BC385178593BF392A28363880A"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/DocumentNumberingRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "41E931D3F03D1A20725540820FA56092F8199294BB71C7E942083B38BCCA8E3F"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/FinancialSalesReportRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "26500DE6C98BC783DCCE277162FB062E27A827552AC753AC6168B9EF763275E9"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/InventoryRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "44D059BAC77F104052AAEEC4AE2CC4D4A1FF2DC7DDB929FACC1A7BB169BD2E28"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/LayawayCancellationRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "688D9221EB8DB6C2243BFED204775BBF71E1D0850FF8B04AC7D9FE32A15778C3"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/LayawayCreateRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "D5C2E8CC65BF8124D0C1501DE3C6255A735AC7BD3200A233AF3905A68E15D342"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/LayawayDeliveryRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "59B6D44FC240DE71A2E83663100436A60E08CCE073BDD936DD6662256ADF9995"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/LayawayPaymentRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "A3830117B3BE8B5F20F49566EFF239E9E2DBDA43427ABEFEF745325FF14D1505"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/LayawayQueryRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "F55377CF1960B6D570B7C0252E14DB42371829CA40E3249E2B26313C83BD1201"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/PurchaseOrderRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "3BC58478A7203C31B6576C3F6415BE24A0999DF432BBE808D2505528FCF3A8FE"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/PurchaseRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "4810D13386997011BF5FB11FDCC7E055B5587640700F17DF6F403AA1BEC2DFA0"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/SalesRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "B781D402870EFF6A19DCF5ED0D55EEF491635EA5DCA54B4804AEF0CD423B77B9"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/SecurityRepositories.cs",
+      "algorithm": "SHA256",
+      "sha": "1D55326A5906C11D5870E545B3438A0BA52C1AEF1ECF1DB05E58C77CA0312387"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/Repositories/SupplierRepository.cs",
+      "algorithm": "SHA256",
+      "sha": "FE7D5B356E65C7BE8D5FE0FC155ACE141D1CCF90761393B447579C510F89AB1B"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Persistence/ServiceCollectionExtensions.cs",
+      "algorithm": "SHA256",
+      "sha": "D6B65A2838C9B46FCFF683FB5170B57863A4C76FE7A2BC5B231D1B128DC173D1"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Security/InstallationBootstrapper.cs",
+      "algorithm": "SHA256",
+      "sha": "CF7DAF741E4CA8105E8CCBEFAF7C783E5D483F4B1A94072539F3B51AABED5A7B"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Security/JwtOptions.cs",
+      "algorithm": "SHA256",
+      "sha": "171A4D0D50DDC31BB3353F17D1F47C1479ADAE2D20DFCA5671A6832AD58D6C10"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Security/JwtTokenIssuer.cs",
+      "algorithm": "SHA256",
+      "sha": "6FE671E3629F4CF34216D768CE784DC5B198BFEA7EF5A8263650F98BBE05B1DD"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Security/PasswordHasher.cs",
+      "algorithm": "SHA256",
+      "sha": "95A4FB48E5B9E3ED2D6BBB793E30AAFC194BB204749B9250F7A83EB2A46C9388"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Security/PostgreSqlLoginAttemptCoordinator.cs",
+      "algorithm": "SHA256",
+      "sha": "9CED5D2591E0FFB4A8E46425886D467012BA63A2B3CFBE7FE9CF15BC5E3B2C8D"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Security/SecurityCatalogSeeder.cs",
+      "algorithm": "SHA256",
+      "sha": "5E0CFB9757AEC6E0A7FEE41AE9E5C84A48AF4D5F5913D1A1A189666D58C0822D"
+    },
+    {
+      "path": "ControlPlus.Infrastructure/Security/SecurityServiceCollectionExtensions.cs",
+      "algorithm": "SHA256",
+      "sha": "7A9B46B5A85FD3DB3BAD995AAF78D271161134FA523DEF9F4DE2FC6623041AF0"
+    },
+    {
+      "path": "ControlPlus.Domain/Common/DomainGuard.cs",
+      "algorithm": "SHA256",
+      "sha": "A6A9801FEC7F35CC3DFFD92E69968841A5B916D6B22385265C2F041401E34F17"
+    },
+    {
+      "path": "ControlPlus.Domain/Common/DomainRuleViolationException.cs",
+      "algorithm": "SHA256",
+      "sha": "B52A071EED952061425784B4D2DC20263AD1D1AEA4D80A5F5264A47F92D4504D"
+    },
+    {
+      "path": "ControlPlus.Domain/Inventory/InventoryAdjustmentPolicy.cs",
+      "algorithm": "SHA256",
+      "sha": "944EDA16E9E8C8501E365B8FFF08F13AD05D8606C94FD66093E053B51AD44B92"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/AjusteCreditoCambio.cs",
+      "algorithm": "SHA256",
+      "sha": "2BDA69C93A5878AD3194C9D654BC775276CB3549A94DBAE5742E11683270DEE5"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/AnulacionVenta.cs",
+      "algorithm": "SHA256",
+      "sha": "D0B7D1DE78962433D8AFFD8CEFAF80F4EB6FB0A42AAC354272A57E353FA87E06"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Apartado.cs",
+      "algorithm": "SHA256",
+      "sha": "5CBB1BE3267A026884082446943BC81D3BAA6E1C4B47022FF4DA13A14889C7AE"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/AutorizacionCierreTurno.cs",
+      "algorithm": "SHA256",
+      "sha": "9ED253D76C659FD2C42D87462D1CF595B7B417C836143574974CAF24FF2A4C9A"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/AutorizacionOperacion.cs",
+      "algorithm": "SHA256",
+      "sha": "BF5212E7254AF191CCC0B0884A3EF8E56C53644586FF54C6BD81079086696DEC"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/BorradorVenta.cs",
+      "algorithm": "SHA256",
+      "sha": "7AF923093A591AE988BA4E2486B4688C85E30A13BF436CC4FFD6D541732839A4"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Caja.cs",
+      "algorithm": "SHA256",
+      "sha": "A8731CB8A7D673F5A1A9566A24E73A5A0185144CE120EDD83A8008A76DC80305"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/CambioVenta.cs",
+      "algorithm": "SHA256",
+      "sha": "40E158743C5CACE3F893B9472A8BA0405FC9F031E0783186BB8DE3FC4C268006"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/CashBehavior.cs",
+      "algorithm": "SHA256",
+      "sha": "69DF8A14C14AC72CB8492378F4C0FC8CAF54B9CE259DFE788AC3CEEF11124F13"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/CashMoney.cs",
+      "algorithm": "SHA256",
+      "sha": "A00FE3465D906CE0D52A9C4B3305BE537C2662819EA515CE0BE1646E7DCE4091"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/CatalogBehavior.cs",
+      "algorithm": "SHA256",
+      "sha": "39A8B18B174886BDB7FB5688511ACD44E923AE80D02766F45904F87E9BEAE0F1"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Categoria.cs",
+      "algorithm": "SHA256",
+      "sha": "EC32862316C5ABBBD720EE98B5550E05C69C0A8378F2EC4F69A712CF53B8DB32"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Cliente.cs",
+      "algorithm": "SHA256",
+      "sha": "7B7EFE299C5F14A588E11D5B3BE639B242A30E1E8739C98D9388443CD162B71A"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Compra.cs",
+      "algorithm": "SHA256",
+      "sha": "A5B9693FAB382D684BE026A67B52898BF10C32E462E1B0FD2A3B29E2C1ADF920"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/ConsecutivoDocumento.cs",
+      "algorithm": "SHA256",
+      "sha": "374A7DB37BA9D7C7EB643264296A44B65AACF2883508E146AC89B08266597EBC"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/CopiaRespaldo.cs",
+      "algorithm": "SHA256",
+      "sha": "7DC96171D3619AC0A18E623916799E8A3D2A7A1FB634DF53635D534F0AA59C7B"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/CredencialUsuario.cs",
+      "algorithm": "SHA256",
+      "sha": "A0AF631245A6CFBE4703EB23D1A134080682FA0FD6AF7632E14B4D64A0D1BF4C"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Credito.cs",
+      "algorithm": "SHA256",
+      "sha": "3882FC8344722AD1273AF06BBD39B2717BB1C1EC9D4D8353167079056B342E37"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/DestinoRespaldo.cs",
+      "algorithm": "SHA256",
+      "sha": "85DD62F7C9CD8D422EB27ED93DD66FB903E6B1174E7BFE05A3B39C8A6BEAE1B8"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/DetalleApartado.cs",
+      "algorithm": "SHA256",
+      "sha": "1D67A5CCEC636D3E6B40CFB5F91659ED05CFE764F6AA5D6FCCBEAE5C08A2176E"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/DetalleArqueoMedioPago.cs",
+      "algorithm": "SHA256",
+      "sha": "29BD3BEC87CA6CA353038A7B831C2A9D24C532E46B0B0A2398CC871A7EB850D3"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/DetalleBorradorVenta.cs",
+      "algorithm": "SHA256",
+      "sha": "86B7590ADFBEB6F4E57FBA235F5EC8F04AE968FA737BD63FCF9573EE6C1A64A9"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/DetalleCambioVenta.cs",
+      "algorithm": "SHA256",
+      "sha": "78D3C96A8F204D0225FB91342FBA0359F373893A0911E087082895995EEBA123"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/DetalleCompra.cs",
+      "algorithm": "SHA256",
+      "sha": "F078890E70F0147CB11A43DD901BD2DB01F35AD60488D011332513C1EC83109E"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/DetallePedidoCompra.cs",
+      "algorithm": "SHA256",
+      "sha": "5A7EA2A1E35BCF9D95492AF6F4F05DEB733084DD6B31C7402DCA18B970C0372A"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/DetalleVenta.cs",
+      "algorithm": "SHA256",
+      "sha": "762B23140E907706767B460666EA04D7C4D14E7E732A4B611112630F187EE164"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/DocumentoEmitido.cs",
+      "algorithm": "SHA256",
+      "sha": "3F90EAE05899D75FFF0C1A926B4418F771230A40EB84B75C28D95971AA808A70"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/EjecucionRespaldo.cs",
+      "algorithm": "SHA256",
+      "sha": "3A4BB78169AB6BFEFC472F9DB4878628DD6222E32FED2A66F28D9F019C621160"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Establecimiento.cs",
+      "algorithm": "SHA256",
+      "sha": "B6CD6297FA50E7FBD133286B0364F749C1064F4BD5740BAD2698F2DC07E6401F"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/EventoAuditoria.cs",
+      "algorithm": "SHA256",
+      "sha": "5B53BCA6646A02D84B3387D4351AB5AB0690A595FFF7D40B565178B6ACED12ED"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Instalacion.cs",
+      "algorithm": "SHA256",
+      "sha": "8AB72DF943A8429EF3897BB7D513D491C967577AB9A5BEEF3683A470A01007C5"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/LimiteOperacionRol.cs",
+      "algorithm": "SHA256",
+      "sha": "39BAC145594DD958F9F5BAF5B3FED37C3C4CBB5D9D0D180600167E193E7D2558"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/MetodoPago.cs",
+      "algorithm": "SHA256",
+      "sha": "22EF61B6A4CD023584D8B12AE77B200BE8AE6480729166DEB219D627F76C6378"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/MotivoOperacion.cs",
+      "algorithm": "SHA256",
+      "sha": "4F6B9E06C9225E5AE9C5FFE0E4585356A10E358EE4D05D8366350F5A88324978"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/MovimientoCaja.cs",
+      "algorithm": "SHA256",
+      "sha": "97BA420565CA89BA7B43003E407E10EA4CDF51590ADE9E4F3371CCFB95B2215E"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/MovimientoInventario.cs",
+      "algorithm": "SHA256",
+      "sha": "F3857D64B803F028407ED1CA35736F4EF4D5181751D9549984F40C0D584AF5A3"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/OperacionIdempotente.cs",
+      "algorithm": "SHA256",
+      "sha": "2F81AF281EE8677D18AE72F62ACFC4C9985AAC762920B5738776DF30BAFC7411"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/PagoApartado.cs",
+      "algorithm": "SHA256",
+      "sha": "4D8CE4191F31C079EC9CD78308B2704C7C8E216CF1E073F71A69A2AD73A89F42"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/PagoCambioVenta.cs",
+      "algorithm": "SHA256",
+      "sha": "F0DB3575BB8F12305E4CA91C328D8AB371DC3B32CD831945A5C09E4C0A5385C3"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/PagoCredito.cs",
+      "algorithm": "SHA256",
+      "sha": "54B97F16A85FD0155B2956212D19B77E4EAE9E557D39D27E048553C27BD11664"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/PagoVenta.cs",
+      "algorithm": "SHA256",
+      "sha": "3B6B94C2C3F263416FB2F01D44BDFDBC9727519B4F8E304D1DD63F8E6C5F18E6"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/PedidoCompra.cs",
+      "algorithm": "SHA256",
+      "sha": "714396E9F66DCC9A6437740080FECC44974594508944EAF4FF1A8774BDEB45CC"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/PerfilImpresora.cs",
+      "algorithm": "SHA256",
+      "sha": "1DC5ED617E965B7D8AEFA153AD97F14F59E274F02CC7D241A22BE86C6C4E982D"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Permiso.cs",
+      "algorithm": "SHA256",
+      "sha": "7E567E0898561D62C723AF4118B96AA38FC74A7890326C610E4CB5AF5FD916EA"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/PlantillaImpresion.cs",
+      "algorithm": "SHA256",
+      "sha": "8C4F5D7377822AE6B285ECE512EBEA660F716CD615202DD38344E2C9A8A642E0"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Producto.cs",
+      "algorithm": "SHA256",
+      "sha": "104DB15B063C9C348D91088246B285B0D04C484C2C93341674AC61EBB0F0D243"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/ProductoCodigo.cs",
+      "algorithm": "SHA256",
+      "sha": "9F324F7A8AE145539F9B8367524DC99B467D177BCF24ACA9E97940AB3A7F47DE"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Proveedor.cs",
+      "algorithm": "SHA256",
+      "sha": "8D517C568277B449184E6385301BA0C6648E139AA4F9F8B56C55D1AD3BFF4E77"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/PruebaRestauracion.cs",
+      "algorithm": "SHA256",
+      "sha": "53E6B3EC8B3F413D95F68A4BFBF3D9F0A1A0E4F49AC5B3CC88D6F9BF0F775ECC"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/ReembolsoApartado.cs",
+      "algorithm": "SHA256",
+      "sha": "D32E73F315D23F33EA7605B913E9289DEDDBF80DB0069452D724750D737E5386"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Rol.cs",
+      "algorithm": "SHA256",
+      "sha": "8B4EEAFB0ACA100E8EA31EAFBB76B63FD5ED96CFB7DB39852B385AC2166F2DD3"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/RolClaim.cs",
+      "algorithm": "SHA256",
+      "sha": "E94000157574A1D22F865EA767DADAB82A6042EF93EC9CABB37E1BA19C2EF72F"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/RolPermiso.cs",
+      "algorithm": "SHA256",
+      "sha": "3E7C0188957E21F1D2C2EF15A75FF22189F16251C90EEDD7A61B09D52270B41C"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/SecurityBehavior.cs",
+      "algorithm": "SHA256",
+      "sha": "9F18338F94E0C3DAD4C9C7AF8B7079356066C56183476C2BAE9F529A2978AD36"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/SesionOperador.cs",
+      "algorithm": "SHA256",
+      "sha": "CEC7C4B4279F3FEC126C6FEE181A896EB9B2958CBFDDF2B36F2962A4B45FB41A"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Terminal.cs",
+      "algorithm": "SHA256",
+      "sha": "9FB19999FBA9DE7C23B6F71079C8EAF62C9BA44DAC7212594094A606D22108D3"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/TrabajoImpresion.cs",
+      "algorithm": "SHA256",
+      "sha": "64D042F80FC52D47EEDA1E290C675C59D2809CC4BC6C88910A71F3749C1D4A1B"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/TurnoCaja.cs",
+      "algorithm": "SHA256",
+      "sha": "3A7F3BFD29CBCCA908998396D6E05879F4E7D7C754A533EEEDB4C66724D38F53"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/UnidadMedida.cs",
+      "algorithm": "SHA256",
+      "sha": "88D649966EDD3794D92D6D5D161FF4DBED296E8A3E553934CA9F5D75B697C7F0"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Usuario.cs",
+      "algorithm": "SHA256",
+      "sha": "0AC8776DA417AC383C3B298D1CB49E82F7BEEF630595FB4E13923768206C8465"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/UsuarioClaim.cs",
+      "algorithm": "SHA256",
+      "sha": "37BB231D2B3083291D7853686403F4A9644B84E5272A3633A5541712768203E2"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/UsuarioLogin.cs",
+      "algorithm": "SHA256",
+      "sha": "BACC7540D3B4DACC44322C336BEB47B2F762B32318AE89D7D505190BE208325B"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/UsuarioPermiso.cs",
+      "algorithm": "SHA256",
+      "sha": "07E22B730D62E98A519C53006CC9D67401BD499D05871FC0EC73F22426C5B002"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/UsuarioRol.cs",
+      "algorithm": "SHA256",
+      "sha": "1A06C56A67461B56AB4DA684C1543CE7163FAEEFE1C7E81EE1553DAE043404FF"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/UsuarioToken.cs",
+      "algorithm": "SHA256",
+      "sha": "3CD3D750B94E1C3A20FB83090A5845489D19BAF547595257F0754144CC5392A9"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/Venta.cs",
+      "algorithm": "SHA256",
+      "sha": "A404C9C858B3367B6264F5513495FADC6AD72F9DA6B79ECCBE6D657A08B438B7"
+    },
+    {
+      "path": "ControlPlus.Domain/OfficialModel/VwNecesidadReposicion.cs",
+      "algorithm": "SHA256",
+      "sha": "837211025435A586158FF84B03F1E7C8E04402E285EAA15C665DE56D5026C8BC"
+    },
+    {
+      "path": "ControlPlus.Domain/Purchases/PurchaseCostPolicy.cs",
+      "algorithm": "SHA256",
+      "sha": "4D60FCDD09B3A2F3D828D27D78541BDEBE3BC0AC5A1491A0CABB1C4B323DFA09"
+    },
+    {
+      "path": "ControlPlus.Domain/Sales/LayawayPolicy.cs",
+      "algorithm": "SHA256",
+      "sha": "039D6C713E6D1D6E883E145C3BE15AB5E3E76E83FC297E11BB651797C5E6BF68"
+    },
+    {
+      "path": "ControlPlus.Domain/Sales/SaleCancellationEligibility.cs",
+      "algorithm": "SHA256",
+      "sha": "6B534E3F4FD116634BBEF4B918B67340FE1F340F5D66224B06EE92DE7ECD3609"
+    },
+    {
+      "path": "ControlPlus.Domain/Sales/SaleChangeAvailability.cs",
+      "algorithm": "SHA256",
+      "sha": "2FC946BF961A82F8A7A80ABC06F395ADEF5360CC05282E0AB9F50CCB3EC8BDEC"
+    },
+    {
+      "path": "ControlPlus.Domain/Sales/SalePricingPolicy.cs",
+      "algorithm": "SHA256",
+      "sha": "F0269E41D7BADED85A86654B6C7431F4D41492AEE02BFE5462C76D62D3C07733"
+    },
+    {
+      "path": "ControlPlus.Domain/Security/AuditRecord.cs",
+      "algorithm": "SHA256",
+      "sha": "FB5A194FF0E530CA50B4129489422966518A94AAEC2174D0C8B7CF962CF319A9"
+    },
+    {
+      "path": "ControlPlus.Domain/Security/CommercialAuthorizationPolicy.cs",
+      "algorithm": "SHA256",
+      "sha": "075E0ED9A0172CA44D8DC67408AD7A6CB57A67061A62D4F7B886E312F119072A"
+    },
+    {
+      "path": "ControlPlus.Domain/Security/Enums/AuditAction.cs",
+      "algorithm": "SHA256",
+      "sha": "03CA9D2C2E467ADFAAC61350F8DFB19D0D449B6DA1A0C7D4B477815EBFFE55B0"
+    },
+    {
+      "path": "ControlPlus.Domain/Security/Enums/RoleLevel.cs",
+      "algorithm": "SHA256",
+      "sha": "CA355933046D2297EFC1E52C4FB9AEBFA8B93E9C880B0B1777B86DE2EEB1CC23"
+    },
+    {
+      "path": "ControlPlus.Domain/Security/Enums/UserStatus.cs",
+      "algorithm": "SHA256",
+      "sha": "7A7FDF35F03625FBCB1CD89BA4C38D8DF1295C7A2B4A72911EFCD76567EB1F72"
+    },
+    {
+      "path": "ControlPlus.Domain/Security/RoleHierarchy.cs",
+      "algorithm": "SHA256",
+      "sha": "D1F0B84795E18714CB29D64E75E9BF4DBF7D530FBEFA9A53FC00BDF8DABCB62B"
+    }
+  ],
+  "assemblies": [
+    {
+      "name": "ControlPlus.Api",
+      "sha256": "E719017189D1A519EFC431A2FEDA31C42832C298DFD41AE199D483AC0627151F",
+      "testCopySame": true,
+      "pdbBound": true,
+      "pdbSha256": "2C91BF2E80A9CA6F46FE85B280A6057DC7CFCCA7B08C667A660140D98CC4519A",
+      "mvid": "719efe6b-9c63-4ded-bc20-f07835ce8bf4",
+      "lastWriteUtc": "2026-10-29T18:32:51.0824844Z",
+      "matched": 58,
+      "diverged": 0,
+      "generated": 5,
+      "external": 0
+    },
+    {
+      "name": "ControlPlus.Application",
+      "sha256": "4EF0AE03278CF8BF5AD742FD869597ED5CA62341171E1F03A433A8FAACDCE575",
+      "testCopySame": true,
+      "pdbBound": true,
+      "pdbSha256": "7B337DE59637374AD056CC6F5F86E58DAFCB886025DC411B94594E5095AEE8D0",
+      "mvid": "763613ed-7f0d-4b06-a745-a3aa1a1ad031",
+      "lastWriteUtc": "2026-10-29T18:07:30.4550135Z",
+      "matched": 92,
+      "diverged": 0,
+      "generated": 3,
+      "external": 0
+    },
+    {
+      "name": "ControlPlus.Infrastructure",
+      "sha256": "2B12F3FF70F1761D923FB4EB53F0A1722DC3366D1CE0252302C55EFE7C3B37E6",
+      "testCopySame": true,
+      "pdbBound": true,
+      "pdbSha256": "94FE173D4F92F29DFB5E840010424EA671F07CA399125AC7AF57511BD35A19BE",
+      "mvid": "9f74f60d-c0a6-4a19-bb58-27b7b2eed050",
+      "lastWriteUtc": "2026-10-29T18:32:48.2648784Z",
+      "matched": 47,
+      "diverged": 0,
+      "generated": 3,
+      "external": 0
+    },
+    {
+      "name": "ControlPlus.Domain",
+      "sha256": "E38D602EBCC5709540AB63B6200B3E5FFC57C56AC3A858480A86181516C5C3E6",
+      "testCopySame": true,
+      "pdbBound": true,
+      "pdbSha256": "0662283E2D66BC84930140A88CEB201BC195A0ABE13A3636EBE01C293FFB4083",
+      "mvid": "85bbcf1b-356a-4594-a637-8ec91db18664",
+      "lastWriteUtc": "2026-10-29T18:07:26.2215015Z",
+      "matched": 81,
+      "diverged": 0,
+      "generated": 3,
+      "external": 0
+    }
+  ],
+  "runtimeInspection": {
+    "migrations": [
+      "20260912010000_OfficialPhase4Baseline",
+      "20260912011000_SeedApprovedSecurityCatalog",
+      "20260912012000_HybridPermissionsV1",
+      "20260913010000_SeedMeasurementUnitsV1",
+      "20260913020000_CashRegisterModuleV1",
+      "20260930010000_SeedInventoryAdjustmentReasonsV1",
+      "20261005010000_CustomerSearchIndexesV1",
+      "20261014010000_InventoryMovementRegistrationOrderV1",
+      "20261020010000_LayawayDeliveryWithoutSaleV1",
+      "20261021010000_LayawayCancellationOptionalReasonV1",
+      "20261026010000_InitialProductInventoryMovementV1",
+      "20261028010000_SaleReceiptDataSnapshotV1",
+      "20261029010000_PermanentProductReferencesV1"
+    ],
+    "predecessorCount": 12,
+    "preflightAccepted": true,
+    "postflightRejected": true,
+    "sqlSha256": "E87931A7A46A8DE75E941F3623C335C44AB88630AF97004BF060926432EAE98A",
+    "containsRegistry": true,
+    "humanizerLoaded": false,
+    "efDesignLoaded": false,
+    "connectionOpened": false
+  },
+  "dependencyComparison": [
+    {
+      "name": "ControlPlus.Api.dll",
+      "sha256": "E719017189D1A519EFC431A2FEDA31C42832C298DFD41AE199D483AC0627151F",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "ControlPlus.Application.dll",
+      "sha256": "4EF0AE03278CF8BF5AD742FD869597ED5CA62341171E1F03A433A8FAACDCE575",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "ControlPlus.Domain.dll",
+      "sha256": "E38D602EBCC5709540AB63B6200B3E5FFC57C56AC3A858480A86181516C5C3E6",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "ControlPlus.Infrastructure.dll",
+      "sha256": "2B12F3FF70F1761D923FB4EB53F0A1722DC3366D1CE0252302C55EFE7C3B37E6",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Humanizer.dll",
+      "sha256": "D6853075547D7E303EFD60354D911A2FF18EDBA582CDA2FA59D91A2E5DCF9E98",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "Microsoft.AspNetCore.Authentication.JwtBearer.dll",
+      "sha256": "A27586987AD45CB33EB9ECE6F3E96C49455CDF6129FFB34DA9F16C739A35693A",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.AspNetCore.OpenApi.dll",
+      "sha256": "BC4E4DDF1607B64202437B1F11AFF533EAC124C155DE617B8AB7600E0306CA3C",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.Bcl.Cryptography.dll",
+      "sha256": "91C6BAB93638C268569A38BC87770A5E3EF9932676F5B7A6D47AEF4208062925",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.Build.Framework.dll",
+      "sha256": "1A7C784AEFD2DF26A77A4F8E8B46722DA73B82578ECA1E1CB6EDEE54E5BF6061",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.CSharp.Workspaces.dll",
+      "sha256": "BF30FB9AAFCD99C4A74B9D6733774ABCBF82C4A836C5A94FAE6D91C45523F085",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.CSharp.dll",
+      "sha256": "36F5AC8DA30A6107F53A2CA6509B61E284C08EB59AA1B22956D4E200E4514AA5",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.ExternalAccess.RazorCompiler.dll",
+      "sha256": "5092CC2CEE3F241A2BF3ABEC35096B0669CB181720A3CF463CDDF7F6A45C1A0B",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.Workspaces.MSBuild.dll",
+      "sha256": "746A9474ED7F0F6A5102B88379C3312EDC41ECA664A8B3B7717BA31B1CEDE73F",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.Workspaces.dll",
+      "sha256": "79498055635572590009A4781A6E3EE1E2E70E3085B2EA3CE161820F809B0B2B",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.dll",
+      "sha256": "10F489DB67B8AC7489E58D392166C928302BA5698506DD652311DA5D89F0A0F8",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Abstractions.dll",
+      "sha256": "84B1761D9958C208B48C0B028C54EDDB4F17803039EB420C642CC71442E66A09",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Design.dll",
+      "sha256": "0C3AD3A7B85B6F56DA73701AF9686AB1B8293B437096CB65D69AFD10B97F6B3F",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Relational.dll",
+      "sha256": "187EAAD6B4ED168A3217677B8E9D325B7AEB94ACF3A713F4D9556FA0057A526A",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.dll",
+      "sha256": "F90D2AAC4E9923FDEB518D70D8143B3A45F5D44BC9B6F2EFEB06F98376BC715F",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.Extensions.DependencyModel.dll",
+      "sha256": "3F94DDE7F68B1C10B99D154D72CCBE6228ADF597D1D27BB0F5148600C46DB65D",
+      "testCopyExists": true,
+      "testCopySame": false
+    },
+    {
+      "name": "Microsoft.IdentityModel.Abstractions.dll",
+      "sha256": "F0D349D3B696B871D7988F8E13F9873F463EDD1A31D367B22AAA39CDB071B186",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.IdentityModel.JsonWebTokens.dll",
+      "sha256": "7CDCC830F1E3C3AE4BE44A67E37568495D02642955C7D21C1DC5D9947F67E891",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.IdentityModel.Logging.dll",
+      "sha256": "A4476867E60D666DAA22233F954672939861F2292CC699DF88093056042F6C48",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.IdentityModel.Protocols.OpenIdConnect.dll",
+      "sha256": "7921AEF6FA1DA2E563A237DDA129B12407AC6C56448BB0EB7EEBC59BB6C6BABB",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.IdentityModel.Protocols.dll",
+      "sha256": "40ADA0B98384788970117CADF63863EDD99BD5BD6FB8076F6DA68D65F6DBDA4F",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.IdentityModel.Tokens.dll",
+      "sha256": "16C33E63BFFFF90F1B8698F899F96F3311329F26E940B8F031B1F26D82BC41B1",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.OpenApi.dll",
+      "sha256": "B3D74EA12D9215319AA9138FB1450ED8CF96B07719C1B3D68DB3AAA16917891E",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Microsoft.VisualStudio.SolutionPersistence.dll",
+      "sha256": "A1150F4A162D9C9992B6E99B2949E2DE092017182264218B7B5666CEEBBC16D4",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "Mono.TextTemplating.dll",
+      "sha256": "E9F742D672C8F567471974FCB7163F955D1E1F01060BB15D067AC220361D23CB",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "Newtonsoft.Json.dll",
+      "sha256": "22C649F75FCE5BE7C7CCDA8880473B634EF69ECF33F5D1AB8AD892CAF47D5A07",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Npgsql.EntityFrameworkCore.PostgreSQL.dll",
+      "sha256": "94FCF66E8E953FDB02C40C72CA89821DD5EED5324D4C0F12A7219EA8CD3D5A5E",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "Npgsql.dll",
+      "sha256": "E2BCAFE1660FE4543FE9DFCABED972EC8D32259E5EA8009462CE1DE23C7034C2",
+      "testCopyExists": true,
+      "testCopySame": true
+    },
+    {
+      "name": "System.CodeDom.dll",
+      "sha256": "BFB75074AC26C7632BBE9FFC1063CECA9A56AAE86AC4913481D6BBA88C4C4A34",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "System.Composition.AttributedModel.dll",
+      "sha256": "D4F1EC85E742B77CDA48F709210DAAF34D8B4A7E1E540F353EFF741DCC058128",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "System.Composition.Convention.dll",
+      "sha256": "BE95F480449AB3236315BEB321CE598A61382D64479DDF500E7434637345F474",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "System.Composition.Hosting.dll",
+      "sha256": "2C8F10923C3B60FD1B16D89F2661712A9BE112E697990BEDBD6FAB9DBAABB1B6",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "System.Composition.Runtime.dll",
+      "sha256": "148012DB7DDAFC76D28BBEAA0BAEA3E2351E7BC195E9031D57F107989C2E0EAA",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "System.Composition.TypedParts.dll",
+      "sha256": "EBC942C358D997E41635C9A365DB542A3FD2A05F301F602D5D6A8B0D5DD42071",
+      "testCopyExists": false,
+      "testCopySame": false
+    },
+    {
+      "name": "System.IdentityModel.Tokens.Jwt.dll",
+      "sha256": "A5F81E39B551DF6D0E8D7EC10EE5FB1666055CADE57BE8B6121D349EBCC230BE",
+      "testCopyExists": true,
+      "testCopySame": true
+    }
+  ],
+  "limits": [
+    "TRX does not record historical assembly hashes.",
+    "File timestamps are corroboration, not proof.",
+    "Generated build inputs are not tied to this evidence as completely as the 278 handwritten source checksums.",
+    "Native Windows PS5.1 validation reported by user: OFFLINE_WINDOWS_PS51_OK checks=27 and PREFLIGHT_OFFLINE_WINDOWS_PS51_OK checks=374. These are offline checks, not evidence of a database preflight."
+  ]
+}

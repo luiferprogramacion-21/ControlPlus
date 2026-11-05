@@ -1,3 +1,4 @@
+using ControlPlus.Domain.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -36,7 +37,7 @@ public sealed class LayawayCreateService(
             return Result.Failure<CreatedLayawayDto>(normalized.Error);
 
         return await loginAttempts.ExecuteAsync(
-            normalized.AuthorizerUserName!,
+            normalized.AuthorizerUserName ?? actor.UserId.ToString("N"),
             token => CreateWithinTransactionAsync(actor, normalized, token),
             cancellationToken);
     }
@@ -51,12 +52,24 @@ public sealed class LayawayCreateService(
         if (snapshot is null) return Fail(ApplicationError.Unauthorized());
         if (!snapshot.PermissionCodes.Contains(PermissionCodes.LayawayManage, StringComparer.OrdinalIgnoreCase))
             return Fail(ApplicationError.Forbidden());
+        var administratorSelfAuthorized = snapshot.HighestRoleLevel == RoleLevel.Administrador &&
+            input.AuthorizerUserName is null;
+        var supervisorSelfAuthorized = snapshot.HighestRoleLevel == RoleLevel.Supervisor &&
+            input.AuthorizerUserName is null;
+        var selfAuthorized = administratorSelfAuthorized || supervisorSelfAuthorized;
+        if (snapshot.HighestRoleLevel == RoleLevel.Administrador && input.AuthorizerUserName is not null)
+            return Fail(ApplicationError.Validation("El Administrador debe omitir authorization al crear un apartado."));
+        if (!selfAuthorized && input.AuthorizerUserName is null)
+            return Fail(ApplicationError.Validation("La autorización de otro Supervisor o Administrador es obligatoria."));
+        var requestHash = supervisorSelfAuthorized
+            ? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(input.Hash + "|SUPERVISOR_SELF")))
+            : input.Hash;
 
         var previous = await sales.GetIdempotencyAsync(installation.Id, input.Key!, cancellationToken);
         if (previous is not null)
         {
             if (previous.UsuarioId != actor.UserId || previous.TipoOperacion != "CREAR_APARTADO" ||
-                previous.HashSolicitud != input.Hash || string.IsNullOrEmpty(previous.Resultado))
+                previous.HashSolicitud != requestHash || string.IsNullOrEmpty(previous.Resultado))
                 return Fail(ApplicationError.Conflict("La clave de idempotencia ya fue utilizada con otra solicitud."));
             var replay = JsonSerializer.Deserialize<CreatedLayawayDto>(previous.Resultado);
             return replay is null
@@ -105,29 +118,33 @@ public sealed class LayawayCreateService(
             string.IsNullOrWhiteSpace(customer.Telefono))
             return Fail(ApplicationError.Validation("El cliente requiere documento completo o teléfono para apartar."));
 
-        var candidate = await users.GetByUserNameAsync(input.AuthorizerUserName!, cancellationToken);
-        if (candidate is null) return Fail(ApplicationError.Forbidden());
-        var authorizer = await sales.GetUserForUpdateAsync(candidate.Id, cancellationToken);
-        if (authorizer is null || !authorizer.IsActive || authorizer.Id == actor.UserId ||
-            authorizer.HighestRoleLevel < RoleLevel.Supervisor)
-            return Fail(ApplicationError.Forbidden());
-        if (!passwordHasher.Verify(input.AuthorizerPassword!, authorizer.PasswordHash))
+        Usuario? authorizer = null;
+        if (!selfAuthorized)
         {
-            var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
-            await users.UpdateAsync(authorizer, cancellationToken);
-            if (locked)
-                await AuditWriter.WriteAsync(audits, clock, authorizer.Id, AuditAction.UserLocked,
-                    nameof(Usuario), authorizer.Id,
-                    new { authorizer.Id, authorizer.FailedLoginAttempts }, cancellationToken);
-            await AuditWriter.WriteCashFailureAsync(audits, clock, actor.UserId,
-                AuditAction.LayawayAuthorizationRejected, nameof(Apartado), null,
-                new { Reason = "INVALID_AUTHORIZER_CREDENTIALS" }, Guid.CreateVersion7(),
-                terminal.Id, null, cancellationToken);
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-            return Fail(ApplicationError.Forbidden());
+            var candidate = await users.GetByUserNameAsync(input.AuthorizerUserName!, cancellationToken);
+            if (candidate is null) return Fail(ApplicationError.Forbidden());
+            authorizer = await sales.GetUserForUpdateAsync(candidate.Id, cancellationToken);
+            if (authorizer is null || !authorizer.IsActive || authorizer.Id == actor.UserId ||
+                !RoleHierarchy.IsHigherThan(authorizer.HighestRoleLevel, snapshot.HighestRoleLevel))
+                return Fail(ApplicationError.Forbidden());
+            if (!passwordHasher.Verify(input.AuthorizerPassword!, authorizer.PasswordHash))
+            {
+                var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
+                await users.UpdateAsync(authorizer, cancellationToken);
+                if (locked)
+                    await AuditWriter.WriteAsync(audits, clock, authorizer.Id, AuditAction.UserLocked,
+                        nameof(Usuario), authorizer.Id,
+                        new { authorizer.Id, authorizer.FailedLoginAttempts }, cancellationToken);
+                await AuditWriter.WriteCashFailureAsync(audits, clock, actor.UserId,
+                    AuditAction.LayawayAuthorizationRejected, nameof(Apartado), null,
+                    new { Reason = "INVALID_AUTHORIZER_CREDENTIALS" }, Guid.CreateVersion7(),
+                    terminal.Id, null, cancellationToken);
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                return Fail(ApplicationError.Forbidden());
+            }
+            if (!await permissions.HasPermissionAsync(authorizer.Id, PermissionCodes.LayawayManage, cancellationToken))
+                return Fail(ApplicationError.Forbidden());
         }
-        if (!await permissions.HasPermissionAsync(authorizer.Id, PermissionCodes.LayawayManage, cancellationToken))
-            return Fail(ApplicationError.Forbidden());
 
         // Installation and shift are already locked. Sequence locks are acquired in a fixed order.
         var layawaySequence = await layaways.GetSequenceForUpdateAsync(
@@ -297,10 +314,15 @@ public sealed class LayawayCreateService(
         var authorization = new AutorizacionOperacion
         {
             Id = layaway.AutorizacionOperacionId, UsuarioSolicitanteId = actor.UserId,
-            UsuarioAutorizadorId = authorizer.Id, PermisoId = permission.Id,
+            UsuarioAutorizadorId = authorizer?.Id ?? actor.UserId, PermisoId = permission.Id,
             TipoOperacion = "CREAR_APARTADO", CorrelacionId = correlationId,
-            DescripcionOperacion = "Autorización de creación de apartado.",
-            MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA", Estado = "UTILIZADA",
+            DescripcionOperacion = administratorSelfAuthorized
+                ? "Autorización de creación de apartado por Administrador sin segundo autorizador."
+                : supervisorSelfAuthorized
+                    ? "Autorización de creación de apartado por Supervisor sin segundo autorizador."
+                    : "Autorización de creación de apartado por otro usuario.",
+            MetodoAutenticacion = "PASSWORD",
+            Resultado = "EXITOSA", Estado = "UTILIZADA",
             FechaSolicitud = now.UtcDateTime, FechaExpiracion = now.AddMinutes(5).UtcDateTime,
             FechaUtilizacion = now.UtcDateTime
         };
@@ -318,8 +340,11 @@ public sealed class LayawayCreateService(
                 methods.Single(m => m.Id == x.MetodoPagoId).Codigo,
                 x.ValorAplicado, x.ValorRecibido, x.Cambio)).ToArray());
 
-        authorizer.RegisterSuccessfulLogin(now);
-        await users.UpdateAsync(authorizer, cancellationToken);
+        if (authorizer is not null)
+        {
+            authorizer.RegisterSuccessfulLogin(now);
+            await users.UpdateAsync(authorizer, cancellationToken);
+        }
         await sales.AddAuthorizationAsync(authorization, cancellationToken);
         await layaways.AddAsync(layaway, details, paymentRows, inventoryMovements, cancellationToken);
         await sales.AddCashMovementAsync(movement, cancellationToken);
@@ -328,16 +353,19 @@ public sealed class LayawayCreateService(
             Id = Guid.CreateVersion7(), InstalacionId = installation.Id, TerminalId = terminal.Id,
             UsuarioId = actor.UserId, SesionOperadorId = session?.Id,
             ClaveIdempotencia = input.Key!, TipoOperacion = "CREAR_APARTADO",
-            HashSolicitud = input.Hash!, Entidad = nameof(Apartado), EntidadId = layaway.Id,
+            HashSolicitud = requestHash!, Entidad = nameof(Apartado), EntidadId = layaway.Id,
             Resultado = JsonSerializer.Serialize(response), CorrelacionId = correlationId,
             FechaRegistro = now.UtcDateTime
         }, cancellationToken);
         await AuditWriter.WriteCashAsync(audits, clock, actor.UserId, AuditAction.LayawayCreated,
             nameof(Apartado), layaway.Id,
-            new { layaway.Id, layaway.Estado, AuthorizerId = authorizer.Id,
+            new { layaway.Id, layaway.Estado,
+                AuthorizationMode = administratorSelfAuthorized ? "ADMINISTRATOR_SELF" :
+                    supervisorSelfAuthorized ? "SUPERVISOR_SELF" : "OTHER_USER",
+                AuthorizerId = authorizer?.Id ?? actor.UserId,
                 ProductIds = prepared.Select(x => x.Product.Id).ToArray(),
                 PaymentMethods = input.Payments.Select(x => x.MethodCode).ToArray() },
-            correlationId, authorizer.Id, session?.Id, terminal.Id, null, cancellationToken);
+            correlationId, authorizer?.Id ?? actor.UserId, session?.Id, terminal.Id, null, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         if (session is not null)
         {
@@ -356,9 +384,10 @@ public sealed class LayawayCreateService(
         if (string.IsNullOrWhiteSpace(key) || key.Trim().Length > 100 || request is null ||
             request.CustomerId == Guid.Empty || request.Lines is null || request.Lines.Count == 0 ||
             request.Payments is null || request.Payments.Count is < 1 or > 3 ||
-            request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-            string.IsNullOrWhiteSpace(request.Authorization.Password))
-            return NormalizedCreate.Fail("Cliente, líneas, pagos, autorizador e Idempotency-Key son obligatorios.");
+            (request.Authorization is not null &&
+             (string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
+              string.IsNullOrWhiteSpace(request.Authorization.Password))))
+            return NormalizedCreate.Fail("Cliente, líneas, pagos e Idempotency-Key son obligatorios; si envía authorization, incluya usuario y contraseña.");
 
         var lines = new List<CreateLayawayLineRequest>();
         foreach (var line in request.Lines)
@@ -405,16 +434,22 @@ public sealed class LayawayCreateService(
         }
         if (payments.Select(x => x.MethodCode).Distinct().Count() != payments.Count)
             return NormalizedCreate.Fail("No se puede repetir un método de pago.");
-        var authorizerUserName = request.Authorization.UserName.Trim().ToUpperInvariant();
+        var authorizerUserName = request.Authorization?.UserName.Trim().ToUpperInvariant();
         var sortedPayments = payments.OrderBy(x => x.MethodCode).ToArray();
-        var canonical = JsonSerializer.Serialize(new
-        {
-            request.CustomerId, request.DueDate, Lines = lines,
-            Payments = sortedPayments, AuthorizerUserName = authorizerUserName
-        });
+        var canonical = authorizerUserName is null
+            ? JsonSerializer.Serialize(new
+            {
+                request.CustomerId, request.DueDate, Lines = lines,
+                Payments = sortedPayments, AuthorizationMode = "ADMINISTRATOR_SELF"
+            })
+            : JsonSerializer.Serialize(new
+            {
+                request.CustomerId, request.DueDate, Lines = lines,
+                Payments = sortedPayments, AuthorizerUserName = authorizerUserName
+            });
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
         return new NormalizedCreate(key.Trim(), request.CustomerId, lines.ToArray(), sortedPayments,
-            request.DueDate, authorizerUserName, request.Authorization.Password, hash, null);
+            request.DueDate, authorizerUserName, request.Authorization?.Password, hash, null);
     }
 
     private static Result<CreatedLayawayDto> Fail(ApplicationError error) => Result.Failure<CreatedLayawayDto>(error);

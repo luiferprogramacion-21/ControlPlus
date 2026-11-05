@@ -4,6 +4,16 @@ namespace ControlPlus.Domain.OfficialModel;
 
 public partial class Categoria
 {
+    public static string NormalizeAbbreviation(string value)
+    {
+        var normalized = DomainGuard.RequiredText(value, nameof(value)).ToUpperInvariant();
+        if (normalized.Length is < 2 or > 10 || normalized.Any(c => c is < 'A' or > 'Z'))
+            throw new DomainRuleViolationException("La abreviatura debe contener de 2 a 10 letras ASCII.");
+        return normalized;
+    }
+
+    public void SetAbbreviation(string value) => Abreviatura = NormalizeAbbreviation(value);
+
     public static Categoria Create(string name, string? description, Guid actorUserId, DateTimeOffset createdAtUtc) => new()
     {
         Id = Guid.CreateVersion7(),
@@ -107,6 +117,12 @@ public partial class Producto
         Guid actorUserId,
         DateTimeOffset changedAtUtc)
     {
+        if (CodigoInterno != DomainGuard.NormalizeCode(internalCode, nameof(internalCode)))
+            throw new DomainRuleViolationException("El N.º de producto es permanente.");
+        if (barcodeGenerated != CodigoBarrasGenerado ||
+            (CodigoBarrasGenerado && (NormalizeOptional(barcode) != CodigoBarras ||
+                NormalizeOptional(barcodeFormat)?.ToUpperInvariant() != FormatoCodigoBarras)))
+            throw new DomainRuleViolationException("El código generado y sus metadatos deben conservarse.");
         CategoriaId = categoryId;
         UnidadMedidaId = measurementUnitId;
         ProveedorId = supplierId;

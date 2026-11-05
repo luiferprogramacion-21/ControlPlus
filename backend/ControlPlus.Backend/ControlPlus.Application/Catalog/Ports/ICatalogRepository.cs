@@ -6,6 +6,9 @@ namespace ControlPlus.Application.Catalog.Ports;
 
 public interface ICatalogRepository
 {
+    Task<string> AllocateProductReferenceAsync(Guid categoryId, CancellationToken cancellationToken = default);
+    Task<bool> CategoryAbbreviationExistsAsync(string abbreviation, Guid? excludedId = null, CancellationToken cancellationToken = default);
+    Task AddProductCodeAliasAsync(Guid productId, string code, CancellationToken cancellationToken = default);
     Task<ICatalogTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
     Task<Instalacion?> GetActiveInstallationForUpdateAsync(CancellationToken cancellationToken = default);
     Task<Terminal?> GetActiveTerminalAsync(Guid installationId, CancellationToken cancellationToken = default);

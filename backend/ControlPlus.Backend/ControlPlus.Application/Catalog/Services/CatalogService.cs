@@ -53,11 +53,19 @@ public sealed class CatalogService(
         if (error is not null) return Result.Failure<CategoryDto>(error);
         var validation = ValidateCategory(request.Name, request.Description);
         if (validation is not null) return Result.Failure<CategoryDto>(validation);
+        if (InvalidAbbreviation(request.Abbreviation))
+            return Result.Failure<CategoryDto>(ApplicationError.Validation("La abreviatura debe tener de 2 a 10 letras ASCII."));
         var name = request.Name.Trim();
         if (await repository.CategoryNameExistsAsync(name, null, cancellationToken))
             return Result.Failure<CategoryDto>(ApplicationError.Conflict("Ya existe una categoría con ese nombre."));
 
         var category = Categoria.Create(name, request.Description, actor.UserId, clock.UtcNow);
+        if (string.IsNullOrWhiteSpace(request.Abbreviation))
+            return Result.Failure<CategoryDto>(ApplicationError.Validation("La abreviatura es obligatoria."));
+        var abbreviation = Categoria.NormalizeAbbreviation(request.Abbreviation);
+        if (await repository.CategoryAbbreviationExistsAsync(abbreviation, null, cancellationToken))
+            return Result.Failure<CategoryDto>(ApplicationError.Conflict("La abreviatura ya está asignada."));
+        category.SetAbbreviation(abbreviation);
         await repository.AddCategoryAsync(category, cancellationToken);
         await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId, AuditAction.CategoryCreated,
             nameof(Categoria), category.Id, new { category.Nombre }, cancellationToken);
@@ -72,12 +80,22 @@ public sealed class CatalogService(
         if (error is not null) return Result.Failure<CategoryDto>(error);
         var validation = ValidateCategory(request.Name, request.Description);
         if (validation is not null) return Result.Failure<CategoryDto>(validation);
+        if (request.Abbreviation is not null && InvalidAbbreviation(request.Abbreviation))
+            return Result.Failure<CategoryDto>(ApplicationError.Validation("La abreviatura debe tener de 2 a 10 letras ASCII."));
         var category = await repository.GetCategoryAsync(categoryId, cancellationToken);
         if (category is null) return Result.Failure<CategoryDto>(ApplicationError.NotFound("la categoría"));
         if (category.Version != request.Version) return Result.Failure<CategoryDto>(VersionConflict);
         var name = request.Name.Trim();
         if (await repository.CategoryNameExistsAsync(name, category.Id, cancellationToken))
             return Result.Failure<CategoryDto>(ApplicationError.Conflict("Ya existe una categoría con ese nombre."));
+
+        if (!string.IsNullOrWhiteSpace(request.Abbreviation))
+        {
+            var abbreviation = Categoria.NormalizeAbbreviation(request.Abbreviation);
+            if (await repository.CategoryAbbreviationExistsAsync(abbreviation, category.Id, cancellationToken))
+                return Result.Failure<CategoryDto>(ApplicationError.Conflict("La abreviatura ya está asignada."));
+            category.SetAbbreviation(abbreviation);
+        }
 
         category.Update(name, request.Description, actor.UserId, clock.UtcNow);
         await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId, AuditAction.CategoryUpdated,
@@ -241,21 +259,18 @@ public sealed class CatalogService(
         if (validation is not null) return Result.Failure<ProductDto>(validation);
         var related = await ValidateRelationsAsync(request.CategoryId, request.MeasurementUnitId, request.SupplierId, cancellationToken);
         if (related.Error is not null) return Result.Failure<ProductDto>(related.Error);
+        if (string.IsNullOrWhiteSpace(related.Category!.Abreviatura))
+            return Result.Failure<ProductDto>(ApplicationError.Validation("Configure la abreviatura de la categoría antes de crear productos."));
 
         if (requestedInternalCode is not null &&
             await repository.ProductInternalCodeExistsAsync(requestedInternalCode, null, cancellationToken))
             return Result.Failure<ProductDto>(ApplicationError.Conflict("Ya existe un producto con ese código interno."));
-        var barcode = request.GenerateBarcode ? await GenerateBarcodeAsync(cancellationToken) : NormalizeOptional(request.Barcode);
+        var internalCode = await repository.AllocateProductReferenceAsync(request.CategoryId, cancellationToken);
+        var barcode = request.GenerateBarcode ? ProductCode.GenerateOwnedBarcode(internalCode) : NormalizeOptional(request.Barcode);
         if (barcode is not null && await repository.ProductBarcodeExistsAsync(barcode, null, cancellationToken))
-            return Result.Failure<ProductDto>(ApplicationError.Conflict("Ya existe un producto con ese código de barras."));
+            return Result.Failure<ProductDto>(ApplicationError.Conflict("El código ya identifica otro producto."));
         var format = request.GenerateBarcode ? "CODE128" : NormalizeOptional(request.BarcodeFormat)?.ToUpperInvariant();
         var productId = Guid.CreateVersion7();
-        var internalCode = requestedInternalCode ?? GenerateInternalCode(productId);
-        if (requestedInternalCode is null &&
-            await repository.ProductInternalCodeExistsAsync(internalCode, null, cancellationToken))
-        {
-            return Result.Failure<ProductDto>(ApplicationError.Conflict("No se pudo asignar un código interno único. Intente crear el producto nuevamente."));
-        }
 
         var product = Producto.Create(request.CategoryId, request.MeasurementUnitId, request.SupplierId,
             internalCode, barcode, format, request.GenerateBarcode, request.Name.Trim(), request.Description,
@@ -300,6 +315,8 @@ public sealed class CatalogService(
             await repository.AddIdempotencyAsync(operation, cancellationToken);
         }
         await unitOfWork.SaveChangesAsync(cancellationToken);
+        if (requestedInternalCode is not null)
+            await repository.AddProductCodeAliasAsync(product.Id, requestedInternalCode, cancellationToken);
         var response = Map(product, canSeeCost);
         await transaction.CommitAsync(cancellationToken);
         return Result.Success(response);
@@ -317,6 +334,11 @@ public sealed class CatalogService(
         var product = await repository.GetProductAsync(productId, cancellationToken);
         if (product is null) return Result.Failure<ProductDto>(ApplicationError.NotFound("el producto"));
         if (product.Version != request.Version) return Result.Failure<ProductDto>(VersionConflict);
+        if (!string.Equals(product.CodigoInterno, request.InternalCode.Trim(), StringComparison.Ordinal))
+            return Result.Failure<ProductDto>(ApplicationError.Validation("El N.º de producto es permanente y no puede cambiarse."));
+        if (request.BarcodeGenerated != product.CodigoBarrasGenerado ||
+            (product.CodigoBarrasGenerado && (request.Barcode != product.CodigoBarras || request.BarcodeFormat != product.FormatoCodigoBarras)))
+            return Result.Failure<ProductDto>(ApplicationError.Validation("La edición debe conservar el código generado y sus metadatos."));
         var related = await ValidateRelationsAsync(request.CategoryId, request.MeasurementUnitId, request.SupplierId, cancellationToken);
         if (related.Error is not null) return Result.Failure<ProductDto>(related.Error);
         var internalCode = request.InternalCode.Trim().ToUpperInvariant();
@@ -375,22 +397,19 @@ public sealed class CatalogService(
         return (category, unit, null);
     }
 
-    private async Task<string> GenerateBarcodeAsync(CancellationToken cancellationToken)
-    {
-        for (var attempt = 0; attempt < 5; attempt++)
-        {
-            var candidate = $"CP{Guid.CreateVersion7():N}"[..22].ToUpperInvariant();
-            if (!await repository.ProductBarcodeExistsAsync(candidate, null, cancellationToken)) return candidate;
-        }
-        throw new InvalidOperationException("No se pudo generar un código de barras único.");
-    }
-
     private static ApplicationError? ValidateCategory(string? name, string? description)
     {
         if (string.IsNullOrWhiteSpace(name)) return ApplicationError.Validation("El nombre de la categoría es obligatorio.");
         if (name.Trim().Length > 100) return ApplicationError.Validation("El nombre de la categoría no puede superar 100 caracteres.");
         if (description?.Trim().Length > 500) return ApplicationError.Validation("La descripción de la categoría no puede superar 500 caracteres.");
         return null;
+    }
+
+    private static bool InvalidAbbreviation(string? value)
+    {
+        var normalized = value?.Trim().ToUpperInvariant();
+        return normalized is null || normalized.Length is < 2 or > 10 ||
+            normalized.Any(c => c is < 'A' or > 'Z');
     }
 
     private static ApplicationError? ValidateProduct(
@@ -415,8 +434,9 @@ public sealed class CatalogService(
         if (!(allowGeneratedBarcodeWithoutValue && barcodeGenerated && normalizedBarcode is null))
         {
             if (normalizedBarcode?.Length > 100) return ApplicationError.Validation("El código de barras no puede superar 100 caracteres.");
-            if ((normalizedBarcode is null) != (normalizedFormat is null))
-                return ApplicationError.Validation("El código de barras y su formato deben informarse juntos.");
+            if (normalizedBarcode is null && normalizedFormat is not null ||
+                barcodeGenerated && normalizedBarcode is not null && normalizedFormat is null)
+                return ApplicationError.Validation("Un código generado requiere formato; un código externo puede tener formato desconocido.");
             if (normalizedFormat is not null && !BarcodeFormats.Contains(normalizedFormat))
                 return ApplicationError.Validation("El formato de código de barras no es válido.");
         }
@@ -428,10 +448,8 @@ public sealed class CatalogService(
             ? ApplicationError.Validation("La página debe ser mayor que cero y el tamaño debe estar entre 1 y 200.")
             : null;
 
-    private static string GenerateInternalCode(Guid productId) => $"PRD-{productId:N}".ToUpperInvariant();
-
     private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private static CategoryDto Map(Categoria x) => new(x.Id, x.Nombre, x.Descripcion, x.Activo, x.Version);
+    private static CategoryDto Map(Categoria x) => new(x.Id, x.Nombre, x.Descripcion, x.Activo, x.Version, x.Abreviatura);
     private static MeasurementUnitDto Map(UnidadMedida x) => new(x.Id, x.Codigo, x.Nombre, x.Simbolo, x.Activo);
     private static ProductDto Map(Producto x, bool canViewCost) => new(
         x.Id, x.CategoriaId, x.Categoria.Nombre, x.UnidadMedidaId, x.UnidadMedida.Codigo, x.ProveedorId,

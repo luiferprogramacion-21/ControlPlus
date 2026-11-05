@@ -10,6 +10,14 @@ namespace ControlPlus.Infrastructure.Persistence.Repositories;
 
 public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) : ICatalogRepository
 {
+    public Task<string> AllocateProductReferenceAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        dbContext.Database.SqlQuery<string>($"SELECT catalogo.siguiente_referencia_producto({categoryId}) AS \"Value\"").SingleAsync(cancellationToken);
+
+    public Task<bool> CategoryAbbreviationExistsAsync(string abbreviation, Guid? excludedId = null, CancellationToken cancellationToken = default) =>
+        dbContext.Categoria.AnyAsync(x => x.Abreviatura == abbreviation && (excludedId == null || x.Id != excludedId), cancellationToken);
+
+    public async Task AddProductCodeAliasAsync(Guid productId, string code, CancellationToken cancellationToken = default) =>
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"SELECT catalogo.reservar_codigo_producto({code}, {productId})", cancellationToken);
     public async Task<ICatalogTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
         new CatalogTransaction(await dbContext.Database.BeginTransactionAsync(cancellationToken));
 
@@ -94,8 +102,11 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
         {
             var term = query.Search!.Trim();
             var pattern = $"%{term}%";
-            products = products.Where(x => x.CodigoInterno == term.ToUpper() || x.CodigoBarras == term ||
-                EF.Functions.ILike(x.Nombre, pattern));
+            var exactId = await dbContext.ProductoCodigo.Where(c => c.Codigo == term.ToUpper())
+                .Select(c => (Guid?)c.ProductoId).SingleOrDefaultAsync(cancellationToken);
+            products = exactId is not null ? products.Where(x => x.Id == exactId) :
+                products.Where(x => EF.Functions.ILike(x.Nombre, pattern) ||
+                    dbContext.ProductoCodigo.Any(c => c.ProductoId == x.Id && EF.Functions.ILike(c.Codigo, pattern)));
         }
         var count = await products.CountAsync(cancellationToken);
         var items = await products.OrderBy(x => x.Nombre).ThenBy(x => x.CodigoInterno)
@@ -133,11 +144,11 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
 
     public Task<bool> ProductInternalCodeExistsAsync(
         string code, Guid? excludedId = null, CancellationToken cancellationToken = default) =>
-        dbContext.Producto.AnyAsync(x => x.CodigoInterno == code && (excludedId == null || x.Id != excludedId), cancellationToken);
+        dbContext.ProductoCodigo.AnyAsync(x => x.Codigo == code.Trim().ToUpper() && (excludedId == null || x.ProductoId != excludedId), cancellationToken);
 
     public Task<bool> ProductBarcodeExistsAsync(
         string barcode, Guid? excludedId = null, CancellationToken cancellationToken = default) =>
-        dbContext.Producto.AnyAsync(x => x.CodigoBarras == barcode && (excludedId == null || x.Id != excludedId), cancellationToken);
+        dbContext.ProductoCodigo.AnyAsync(x => x.Codigo == barcode.Trim().ToUpper() && (excludedId == null || x.ProductoId != excludedId), cancellationToken);
 
     public Task AddProductAsync(Producto product, CancellationToken cancellationToken = default) =>
         dbContext.Producto.AddAsync(product, cancellationToken).AsTask();

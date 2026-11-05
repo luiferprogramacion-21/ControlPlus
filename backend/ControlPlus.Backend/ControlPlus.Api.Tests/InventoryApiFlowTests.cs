@@ -73,6 +73,34 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
+    public async Task AdministratorAdjustmentWithoutSecondAuthorizer_PersistsOwnAuthorizationAndReplays()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client, 10);
+        var reason = (await ReadAsync<IReadOnlyCollection<InventoryAdjustmentReasonDto>>(
+            await GetWithBearerAsync(client, "/api/inventory/adjustment-reasons", scenario.Admin.AccessToken),
+            HttpStatusCode.OK)).Single(x => x.Code == "CONTEO_FISICO");
+        var request = new CreateInventoryAdjustmentRequest(
+            scenario.ProductId, 1, reason.Id, scenario.ProductVersion, "Conteo propio", null);
+        var created = await ReadAsync<InventoryMovementDto>(await PostAdjustmentAsync(client,
+            scenario.Admin.AccessToken, "inventory-admin-self", request), HttpStatusCode.Created);
+        var repeated = await ReadAsync<InventoryMovementDto>(await PostAdjustmentAsync(client,
+            scenario.Admin.AccessToken, "inventory-admin-self", request), HttpStatusCode.Created);
+        Assert.Equal(created.OccurredAtUtc.UtcTicks / 10, repeated.OccurredAtUtc.UtcTicks / 10);
+        Assert.Equal(created with { OccurredAtUtc = repeated.OccurredAtUtc }, repeated);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var authorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.Id == created.AuthorizationId);
+        Assert.Equal(authorization.UsuarioSolicitanteId, authorization.UsuarioAutorizadorId);
+        Assert.Equal("PASSWORD", authorization.MetodoAutenticacion);
+        Assert.Null(authorization.CredencialAutorizadorId);
+        Assert.Contains("sin segundo autorizador", authorization.DescripcionOperacion);
+        Assert.Equal(1, await db.MovimientoInventario.CountAsync(x => x.AutorizacionOperacionId == authorization.Id));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
     public async Task Adjustment_UsesEffectivePermissionDoubleControlAndIdempotency()
     {
         using var client = CreateClient();
@@ -544,7 +572,7 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
         var supervisorUser = await ReadAsync<UserDto>(await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
             SupervisorUser, "Supervisor ficticio de Inventario", SupervisorPassword, [supervisorRole])), HttpStatusCode.Created);
         var category = await ReadAsync<CategoryDto>(await client.PostAsJsonAsync(
-            "/api/categories", new CreateCategoryRequest("Categoría aislada de Inventario", null)), HttpStatusCode.Created);
+            "/api/categories", new CreateCategoryRequest("Categoría aislada de Inventario", null, "INV")), HttpStatusCode.Created);
         var units = await ReadAsync<IReadOnlyCollection<MeasurementUnitDto>>(
             await client.GetAsync("/api/measurement-units"), HttpStatusCode.OK);
         var product = await ReadAsync<ProductDto>(await client.PostAsJsonAsync("/api/products", new CreateProductRequest(

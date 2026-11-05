@@ -21,4 +21,10 @@
   <ItemGroup>
     <Compile Include="..\LocalPostgresDatabase.cs" Link="LocalPostgresDatabase.cs" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\scripts\admin-self-authorization\*.sql"
+             Link="admin-self-authorization\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

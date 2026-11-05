@@ -39,7 +39,7 @@ public sealed partial class SalesApiFlowTests
             [new(setup.Products.ResidueA, 1, "MINORISTA")], "AUTO",
             [new("EFECTIVO", 400m, null, null),
                 new("TRANSFERENCIA", 499m, null, "CHANGE-REFUND")],
-            new(SupervisorUser, SupervisorPassword), "Cambio de prueba");
+            null, "Cambio de prueba");
         SetBearer(client, setup.Admin.AccessToken);
         var change = await ReadAsync<SaleChangeDto>(await PostChangeAsync(client, sale.Id,
             "cash-change-replay", request), HttpStatusCode.Created);
@@ -58,6 +58,12 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(1, before.Changes);
         Assert.Equal(2, before.ChangePayments);
         Assert.Equal(2, before.ChangeInventoryMovements);
+        var ownAuthorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.TipoOperacion == "CAMBIO_VENTA");
+        Assert.Equal(ownAuthorization.UsuarioSolicitanteId, ownAuthorization.UsuarioAutorizadorId);
+        Assert.Equal("PASSWORD", ownAuthorization.MetodoAutenticacion);
+        Assert.Null(ownAuthorization.CredencialAutorizadorId);
+        Assert.Contains("sin segundo autorizador", ownAuthorization.DescripcionOperacion);
         Assert.Equal(100, before.ReturnedStock);
         Assert.Equal(99, before.DeliveredStock);
         Assert.Equal(1, before.Sales);

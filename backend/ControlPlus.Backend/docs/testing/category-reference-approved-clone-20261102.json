@@ -1,0 +1,907 @@
+{
+  "schemaVersion": 1,
+  "target": "20261102020000_CategoryProductReferencesV1",
+  "clone": "controlplus_test_594a1c44e1d348e5800e044426608053",
+  "sourceHistory": 14,
+  "cloneHistory": 15,
+  "evidenceFiles": [
+    {
+      "group": "rehearsal",
+      "name": "source-before.jsonl",
+      "bytes": 47998,
+      "sha256": "8EBC415F5AC6401300FC80FE51785B031E5CD5AC22049ADA838942414E77D683"
+    },
+    {
+      "group": "rehearsal",
+      "name": "source-after-backup.jsonl",
+      "bytes": 47998,
+      "sha256": "8EBC415F5AC6401300FC80FE51785B031E5CD5AC22049ADA838942414E77D683"
+    },
+    {
+      "group": "rehearsal",
+      "name": "clone-restored.jsonl",
+      "bytes": 48068,
+      "sha256": "043411BE8AF78911E851BBCDAE2B67024513467AE6A68504355BB94715D3C6CA"
+    },
+    {
+      "group": "rehearsal",
+      "name": "controlplus-before-category-reference.dump",
+      "bytes": 498204,
+      "sha256": "E417C1FDAB5D90FB3B13C03EFF2AC31F8AB098EDFED7B5F276DD8665B61A1C4A"
+    },
+    {
+      "group": "rehearsal",
+      "name": "dump.sha256",
+      "bytes": 66,
+      "sha256": "58829D482C56AD0CE4811DD26FE42505975728263DB93E7A1B96EAB3F6A08DE5"
+    },
+    {
+      "group": "rehearsal",
+      "name": "artifact-hashes.txt",
+      "bytes": 132,
+      "sha256": "C45F0A3F93667D6D3296CD2CB68959F605CC9C50ED160B07BE538D0EFC9DDFAF"
+    },
+    {
+      "group": "rehearsal",
+      "name": "category-before.txt",
+      "bytes": 69,
+      "sha256": "BB08012BC15DD906E055E5C51188A8BD1EDB6E6B7D74D9A4F5112E873AC890EB"
+    },
+    {
+      "group": "continuation",
+      "name": "clone-apply.txt",
+      "bytes": 85,
+      "sha256": "5B87A521C53FF1B38728B0B13E779B9461A63B5B1FC93FFAB2504510910CDC21"
+    },
+    {
+      "group": "continuation",
+      "name": "clone-postflight.txt",
+      "bytes": 3,
+      "sha256": "9E8B03EA3B48312F8E3A15BEC7AA85C96A362E2776AC6BC3DFD74A40022BCC8A"
+    },
+    {
+      "group": "continuation",
+      "name": "clone-migrated.jsonl",
+      "bytes": 48376,
+      "sha256": "56C95E06B639232574BB482CCE2C1CDF2FA6B731B5D7ECF03B53919D0969EB90"
+    },
+    {
+      "group": "continuation",
+      "name": "category-after.txt",
+      "bytes": 69,
+      "sha256": "BB08012BC15DD906E055E5C51188A8BD1EDB6E6B7D74D9A4F5112E873AC890EB"
+    },
+    {
+      "group": "finish",
+      "name": "result.json",
+      "bytes": 291,
+      "sha256": "A09040A453478B7DCC9B72886B2A9AAA0ED08AEF013F8A803389454100A444F9"
+    },
+    {
+      "group": "finish",
+      "name": "source-final.jsonl",
+      "bytes": 47998,
+      "sha256": "8EBC415F5AC6401300FC80FE51785B031E5CD5AC22049ADA838942414E77D683"
+    },
+    {
+      "group": "finish",
+      "name": "clone-final.jsonl",
+      "bytes": 48376,
+      "sha256": "56C95E06B639232574BB482CCE2C1CDF2FA6B731B5D7ECF03B53919D0969EB90"
+    },
+    {
+      "group": "finish",
+      "name": "source-preflight.txt",
+      "bytes": 3,
+      "sha256": "9E8B03EA3B48312F8E3A15BEC7AA85C96A362E2776AC6BC3DFD74A40022BCC8A"
+    },
+    {
+      "group": "finish",
+      "name": "clone-postflight.txt",
+      "bytes": 3,
+      "sha256": "9E8B03EA3B48312F8E3A15BEC7AA85C96A362E2776AC6BC3DFD74A40022BCC8A"
+    }
+  ],
+  "artifactFiles": [
+    {
+      "name": "BuildHost-net472/Microsoft.Build.Locator.dll",
+      "bytes": 34848,
+      "sha256": "286DB396B2B8500AAD8BC188E41A11CBBBCB3BFFC5598B464C683C1C04C9BF60"
+    },
+    {
+      "name": "BuildHost-net472/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.exe",
+      "bytes": 458088,
+      "sha256": "290C7A60C566CAD597C04711E73166E52108DC81FE8A1EE250B8BCBBF4BD5800"
+    },
+    {
+      "name": "BuildHost-net472/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.exe.config",
+      "bytes": 3572,
+      "sha256": "A35B103E28015DEDBB1FF5B3EB552A4F351881D69D64FED3F68AEB5643C52CDA"
+    },
+    {
+      "name": "BuildHost-net472/Microsoft.IO.Redist.dll",
+      "bytes": 131880,
+      "sha256": "2ABBA74A23E680BA613BAAD9D510428EDD913E09F90509D248B85665A03F5014"
+    },
+    {
+      "name": "BuildHost-net472/Newtonsoft.Json.dll",
+      "bytes": 722304,
+      "sha256": "404844DA53DAB572BD8FCF085FDD7BFCF9653523F168BE31086A499EF1D203D9"
+    },
+    {
+      "name": "BuildHost-net472/System.Buffers.dll",
+      "bytes": 23856,
+      "sha256": "3AF1E07305BED0ABE0CF32D9854E0A7F5F470216ADEE1B87D02350BE09D31B35"
+    },
+    {
+      "name": "BuildHost-net472/System.Collections.Immutable.dll",
+      "bytes": 259360,
+      "sha256": "77D705FE51F224D77B25FC06EDE39E2921F08B46A961A027D6EE49A4BB19C127"
+    },
+    {
+      "name": "BuildHost-net472/System.CommandLine.dll",
+      "bytes": 155680,
+      "sha256": "9BB860C2CBB3B4AE768E87F0AE6DD0FE75676DA1242EFD7C772F50454723E39D"
+    },
+    {
+      "name": "BuildHost-net472/System.Memory.dll",
+      "bytes": 145192,
+      "sha256": "B8FE216AFF0F6D162F8EEFE7BE1712162B7D8199E20CE2E70FFAC36C7CE20A4C"
+    },
+    {
+      "name": "BuildHost-net472/System.Numerics.Vectors.dll",
+      "bytes": 110344,
+      "sha256": "22C84BE385FE8BA6D0E0138952748F28D781FCE36078B5A7AED91A6104BCD99B"
+    },
+    {
+      "name": "BuildHost-net472/System.Runtime.CompilerServices.Unsafe.dll",
+      "bytes": 19224,
+      "sha256": "2D6F419D641682D8EFC4A40E850D2E85DE519D6823B93DAF2AEEE63206D4E32D"
+    },
+    {
+      "name": "BuildHost-net472/System.Threading.Tasks.Extensions.dll",
+      "bytes": 27944,
+      "sha256": "692C324C02A922F890AAF5948C54EC9758F5AB7019B8E8AB169C106DDD3231F4"
+    },
+    {
+      "name": "BuildHost-net472/cs/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "4398D7A61CDB21F347658EA6C359FCC6C60A93271416DA122FC049A561E1A5B8"
+    },
+    {
+      "name": "BuildHost-net472/de/System.CommandLine.resources.dll",
+      "bytes": 18984,
+      "sha256": "E92E0C99FBF961DE8EEF358FD7500F48101B88FDA41C8FA16CFF9328F92E66DD"
+    },
+    {
+      "name": "BuildHost-net472/es/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "2881A3E89C45F73E43316F95E6EE50820E24B6C4F0DFA747905B309BBE6315AC"
+    },
+    {
+      "name": "BuildHost-net472/fr/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "C7AD731706AE14460D9D73743484AA1CF99C24916F7913167F1EAB476537A2EF"
+    },
+    {
+      "name": "BuildHost-net472/it/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "69E61040A5C78F0CA6A8CC14262E43B537ED38E2FA79F45BD549F97EB706006D"
+    },
+    {
+      "name": "BuildHost-net472/ja/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "FD715C26E69D38025988C824C82775492DA66712C5D50D0F6A390AE47CDFB881"
+    },
+    {
+      "name": "BuildHost-net472/ko/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "FB4BCE92DE4CFC69AA787656E46AEAAD6A07C7927BDA802583191418EA9BCE68"
+    },
+    {
+      "name": "BuildHost-net472/pl/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "6B919BB42E933607D0BE4E25EA87133D27030B248A527F89D3CC5E44B4D47921"
+    },
+    {
+      "name": "BuildHost-net472/pt-BR/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "C42621DF554CA60D6D2B906629A2D4542CEEC138E70AFC3D54E3003597550803"
+    },
+    {
+      "name": "BuildHost-net472/ru/System.CommandLine.resources.dll",
+      "bytes": 19488,
+      "sha256": "B259E4629BEE7F045A1AAA3798AE743E7798EEC168618F72F95B2507448DB16B"
+    },
+    {
+      "name": "BuildHost-net472/tr/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "0115F660C410B79DF176772C8159F47BA8B0E316BE7DBB8D8F355E0F728614F6"
+    },
+    {
+      "name": "BuildHost-net472/zh-Hans/System.CommandLine.resources.dll",
+      "bytes": 18984,
+      "sha256": "F4F951E177B0F6423372EE873F64366CEA81C2F2C4F75F0A769FB668E64BE483"
+    },
+    {
+      "name": "BuildHost-net472/zh-Hant/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "BE202E67817D8828EA77661C91E67DC5708CB979A3CE298E5364FF407CAB2692"
+    },
+    {
+      "name": "BuildHost-netcore/Microsoft.Build.Locator.dll",
+      "bytes": 50720,
+      "sha256": "FCC85336217BE226F90A5DDFA55151DC84FCB2A76FE242F5274535C6B878AA30"
+    },
+    {
+      "name": "BuildHost-netcore/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.deps.json",
+      "bytes": 6240,
+      "sha256": "B9393E7AA080DAC70E46E26EE03250CEB1A38B7DB378513BC52FF361E0FD9145"
+    },
+    {
+      "name": "BuildHost-netcore/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.dll",
+      "bytes": 450320,
+      "sha256": "0759822B08AD9B94CE0976E08A16E9B9D26082F23981DFFE81C0A6DE8A6EA3B2"
+    },
+    {
+      "name": "BuildHost-netcore/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.runtimeconfig.json",
+      "bytes": 369,
+      "sha256": "7F19D83A3F514EEBE09A06EC35E45613715B2430B1EB3C35F904740A9C6086B3"
+    },
+    {
+      "name": "BuildHost-netcore/Newtonsoft.Json.dll",
+      "bytes": 722776,
+      "sha256": "22DD598354AF159A0FC171197D161D2C698C24D82DC594FBAB332A254622E479"
+    },
+    {
+      "name": "BuildHost-netcore/System.Collections.Immutable.dll",
+      "bytes": 251160,
+      "sha256": "33D310036FEC4D1A78F75C885EA091C0E054AD08D50C424CC8DB8042544AAB3C"
+    },
+    {
+      "name": "BuildHost-netcore/System.CommandLine.dll",
+      "bytes": 151584,
+      "sha256": "A25AFFC775BCD2748AFE731EA1375276FAB76BC5791F642FF5052D73766404A4"
+    },
+    {
+      "name": "BuildHost-netcore/cs/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "B8C186AE3578DF09DAC1EC5C22858C878715C4414941C78E37702826E668B3B0"
+    },
+    {
+      "name": "BuildHost-netcore/de/System.CommandLine.resources.dll",
+      "bytes": 18984,
+      "sha256": "BFF326512A54D81C47EA7096E54EC405655664EDEBB6F58D77E3EB53A01F5F8D"
+    },
+    {
+      "name": "BuildHost-netcore/es/System.CommandLine.resources.dll",
+      "bytes": 18984,
+      "sha256": "1D2955BDB812D4BCC76C5BA46F70662B965B748C37CB9717877CFE99E8350BBD"
+    },
+    {
+      "name": "BuildHost-netcore/fr/System.CommandLine.resources.dll",
+      "bytes": 18984,
+      "sha256": "FE53ADDE742442E1085A647B63B407DECA78E6EC44AAB224B7E6E953A65E937A"
+    },
+    {
+      "name": "BuildHost-netcore/it/System.CommandLine.resources.dll",
+      "bytes": 18992,
+      "sha256": "0A4B913DF4E43A18CE48B55FF1E2DCE5F4371FD9889B7C563B3605F4922DA6E6"
+    },
+    {
+      "name": "BuildHost-netcore/ja/System.CommandLine.resources.dll",
+      "bytes": 18984,
+      "sha256": "85C768F66CA5C4FC1AD07CBD8B69F43E6C43D49418F235756B159345AF668C0F"
+    },
+    {
+      "name": "BuildHost-netcore/ko/System.CommandLine.resources.dll",
+      "bytes": 18984,
+      "sha256": "363CDC4FE9A35E9A4F933E173AA1A1DE374938B9DD9CCDACDD1FD6EA2C305738"
+    },
+    {
+      "name": "BuildHost-netcore/pl/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "383A9174A103136BB603E434DC79FF1FA58B61427F708C5D796018EC49692BE3"
+    },
+    {
+      "name": "BuildHost-netcore/pt-BR/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "010FFD4355B5D1C5A18385684545B65F48F0912371BD65515505D326BD5DB602"
+    },
+    {
+      "name": "BuildHost-netcore/ru/System.CommandLine.resources.dll",
+      "bytes": 19488,
+      "sha256": "15E8A9DA46D636E4E7BA8F7E7DB6954C7A81A9E21CFB07933446AF861717AEF3"
+    },
+    {
+      "name": "BuildHost-netcore/tr/System.CommandLine.resources.dll",
+      "bytes": 18984,
+      "sha256": "62C19AFE4EDD861333916C9578A769F5C02C8F9C27A1194247422BD6077DB534"
+    },
+    {
+      "name": "BuildHost-netcore/zh-Hans/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "75090410C555765A0CF27FEB29D5A6F6ACC8A51B0DE19611D1326A65EB25A7DD"
+    },
+    {
+      "name": "BuildHost-netcore/zh-Hant/System.CommandLine.resources.dll",
+      "bytes": 18976,
+      "sha256": "C386BCAB9894FC6664BAD9DCDCE19DB7FC720249883D276AF545E981816341FC"
+    },
+    {
+      "name": "ControlPlus.Api",
+      "bytes": 78872,
+      "sha256": "934BAAF46280C5281D9712971B443627C9BB7A6ECB8DF8F37182E08024CBA4B8"
+    },
+    {
+      "name": "ControlPlus.Api.deps.json",
+      "bytes": 34993,
+      "sha256": "6EB5EB1A92F82ACA4BDC1472768578C87DD8F551896C968A76AAFB9EE69407F0"
+    },
+    {
+      "name": "ControlPlus.Api.dll",
+      "bytes": 438784,
+      "sha256": "EE48C4308242690D42CA14249A687951000F8068F4F9B1BCEBB60B081D8DF3D4"
+    },
+    {
+      "name": "ControlPlus.Api.exe",
+      "bytes": 162304,
+      "sha256": "DF6A46C5ECAFA7739A18531A721A437F778C2E98C095D8935533E2799015DB4E"
+    },
+    {
+      "name": "ControlPlus.Api.pdb",
+      "bytes": 110060,
+      "sha256": "07EF3B27A335D8186B6152091811AC256F8819DF55ED80768934E5619015912E"
+    },
+    {
+      "name": "ControlPlus.Api.runtimeconfig.json",
+      "bytes": 488,
+      "sha256": "5A26DE741A59E2654C7BADFE3D6D9A134BF09FE67F621F584E7746147C9D2686"
+    },
+    {
+      "name": "ControlPlus.Api.staticwebassets.endpoints.json",
+      "bytes": 51,
+      "sha256": "EB6525C892AFDA953A2560F151F9C5E5BC6E79EF6741D886488AC450262C91E3"
+    },
+    {
+      "name": "ControlPlus.Application.dll",
+      "bytes": 1478656,
+      "sha256": "5DADE8394E0ED290A41681BFB0CAC605A04FEC4129EE2FD4AC7B706E429B9284"
+    },
+    {
+      "name": "ControlPlus.Application.pdb",
+      "bytes": 246032,
+      "sha256": "322234E648238BE06183441B098347A728B8550081546DBFE174A9B4038F6DCD"
+    },
+    {
+      "name": "ControlPlus.Domain.dll",
+      "bytes": 240128,
+      "sha256": "A7427BEF09257D992AB3DD49E3483167B36985F708A4DE8ADD54095EFF30349D"
+    },
+    {
+      "name": "ControlPlus.Domain.pdb",
+      "bytes": 91732,
+      "sha256": "46A781D5DF9883B7FA7B8FA67538BCB2A003FB333445F7A68C1F9BB924DE2B68"
+    },
+    {
+      "name": "ControlPlus.Infrastructure.dll",
+      "bytes": 20504064,
+      "sha256": "09852C868CC4E5D3462434D89B350C4FF39693169472B4AF76E9C346990669F5"
+    },
+    {
+      "name": "ControlPlus.Infrastructure.pdb",
+      "bytes": 89324,
+      "sha256": "269B92D2341D087C27D969C310C1AB72F40129D9BAFACDF6798CADF780D355E1"
+    },
+    {
+      "name": "Humanizer.dll",
+      "bytes": 355944,
+      "sha256": "D6853075547D7E303EFD60354D911A2FF18EDBA582CDA2FA59D91A2E5DCF9E98"
+    },
+    {
+      "name": "Microsoft.AspNetCore.Authentication.JwtBearer.dll",
+      "bytes": 52008,
+      "sha256": "A27586987AD45CB33EB9ECE6F3E96C49455CDF6129FFB34DA9F16C739A35693A"
+    },
+    {
+      "name": "Microsoft.AspNetCore.OpenApi.dll",
+      "bytes": 193320,
+      "sha256": "BC4E4DDF1607B64202437B1F11AFF533EAC124C155DE617B8AB7600E0306CA3C"
+    },
+    {
+      "name": "Microsoft.Bcl.Cryptography.dll",
+      "bytes": 19248,
+      "sha256": "91C6BAB93638C268569A38BC87770A5E3EF9932676F5B7A6D47AEF4208062925"
+    },
+    {
+      "name": "Microsoft.Build.Framework.dll",
+      "bytes": 269608,
+      "sha256": "1A7C784AEFD2DF26A77A4F8E8B46722DA73B82578ECA1E1CB6EDEE54E5BF6061"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.CSharp.Workspaces.dll",
+      "bytes": 944904,
+      "sha256": "BF30FB9AAFCD99C4A74B9D6733774ABCBF82C4A836C5A94FAE6D91C45523F085"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.CSharp.dll",
+      "bytes": 6839608,
+      "sha256": "36F5AC8DA30A6107F53A2CA6509B61E284C08EB59AA1B22956D4E200E4514AA5"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.ExternalAccess.RazorCompiler.dll",
+      "bytes": 21256,
+      "sha256": "5092CC2CEE3F241A2BF3ABEC35096B0669CB181720A3CF463CDDF7F6A45C1A0B"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.Workspaces.MSBuild.dll",
+      "bytes": 141576,
+      "sha256": "746A9474ED7F0F6A5102B88379C3312EDC41ECA664A8B3B7717BA31B1CEDE73F"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.Workspaces.dll",
+      "bytes": 4230448,
+      "sha256": "79498055635572590009A4781A6E3EE1E2E70E3085B2EA3CE161820F809B0B2B"
+    },
+    {
+      "name": "Microsoft.CodeAnalysis.dll",
+      "bytes": 3059000,
+      "sha256": "10F489DB67B8AC7489E58D392166C928302BA5698506DD652311DA5D89F0A0F8"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Abstractions.dll",
+      "bytes": 34848,
+      "sha256": "84B1761D9958C208B48C0B028C54EDDB4F17803039EB420C642CC71442E66A09"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Design.dll",
+      "bytes": 631328,
+      "sha256": "0C3AD3A7B85B6F56DA73701AF9686AB1B8293B437096CB65D69AFD10B97F6B3F"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Relational.dll",
+      "bytes": 2193952,
+      "sha256": "187EAAD6B4ED168A3217677B8E9D325B7AEB94ACF3A713F4D9556FA0057A526A"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.dll",
+      "bytes": 2825760,
+      "sha256": "F90D2AAC4E9923FDEB518D70D8143B3A45F5D44BC9B6F2EFEB06F98376BC715F"
+    },
+    {
+      "name": "Microsoft.Extensions.DependencyModel.dll",
+      "bytes": 85264,
+      "sha256": "3F94DDE7F68B1C10B99D154D72CCBE6228ADF597D1D27BB0F5148600C46DB65D"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Abstractions.dll",
+      "bytes": 19256,
+      "sha256": "F0D349D3B696B871D7988F8E13F9873F463EDD1A31D367B22AAA39CDB071B186"
+    },
+    {
+      "name": "Microsoft.IdentityModel.JsonWebTokens.dll",
+      "bytes": 174384,
+      "sha256": "7CDCC830F1E3C3AE4BE44A67E37568495D02642955C7D21C1DC5D9947F67E891"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Logging.dll",
+      "bytes": 38200,
+      "sha256": "A4476867E60D666DAA22233F954672939861F2292CC699DF88093056042F6C48"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Protocols.OpenIdConnect.dll",
+      "bytes": 137016,
+      "sha256": "7921AEF6FA1DA2E563A237DDA129B12407AC6C56448BB0EB7EEBC59BB6C6BABB"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Protocols.dll",
+      "bytes": 54112,
+      "sha256": "40ADA0B98384788970117CADF63863EDD99BD5BD6FB8076F6DA68D65F6DBDA4F"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Tokens.dll",
+      "bytes": 408352,
+      "sha256": "16C33E63BFFFF90F1B8698F899F96F3311329F26E940B8F031B1F26D82BC41B1"
+    },
+    {
+      "name": "Microsoft.OpenApi.dll",
+      "bytes": 566584,
+      "sha256": "B3D74EA12D9215319AA9138FB1450ED8CF96B07719C1B3D68DB3AAA16917891E"
+    },
+    {
+      "name": "Microsoft.VisualStudio.SolutionPersistence.dll",
+      "bytes": 172072,
+      "sha256": "A1150F4A162D9C9992B6E99B2949E2DE092017182264218B7B5666CEEBBC16D4"
+    },
+    {
+      "name": "Mono.TextTemplating.dll",
+      "bytes": 177664,
+      "sha256": "E9F742D672C8F567471974FCB7163F955D1E1F01060BB15D067AC220361D23CB"
+    },
+    {
+      "name": "Newtonsoft.Json.dll",
+      "bytes": 712464,
+      "sha256": "22C649F75FCE5BE7C7CCDA8880473B634EF69ECF33F5D1AB8AD892CAF47D5A07"
+    },
+    {
+      "name": "Npgsql.EntityFrameworkCore.PostgreSQL.dll",
+      "bytes": 679424,
+      "sha256": "94FCF66E8E953FDB02C40C72CA89821DD5EED5324D4C0F12A7219EA8CD3D5A5E"
+    },
+    {
+      "name": "Npgsql.dll",
+      "bytes": 1478656,
+      "sha256": "E2BCAFE1660FE4543FE9DFCABED972EC8D32259E5EA8009462CE1DE23C7034C2"
+    },
+    {
+      "name": "System.CodeDom.dll",
+      "bytes": 184944,
+      "sha256": "BFB75074AC26C7632BBE9FFC1063CECA9A56AAE86AC4913481D6BBA88C4C4A34"
+    },
+    {
+      "name": "System.Composition.AttributedModel.dll",
+      "bytes": 20248,
+      "sha256": "D4F1EC85E742B77CDA48F709210DAAF34D8B4A7E1E540F353EFF741DCC058128"
+    },
+    {
+      "name": "System.Composition.Convention.dll",
+      "bytes": 54040,
+      "sha256": "BE95F480449AB3236315BEB321CE598A61382D64479DDF500E7434637345F474"
+    },
+    {
+      "name": "System.Composition.Hosting.dll",
+      "bytes": 56072,
+      "sha256": "2C8F10923C3B60FD1B16D89F2661712A9BE112E697990BEDBD6FAB9DBAABB1B6"
+    },
+    {
+      "name": "System.Composition.Runtime.dll",
+      "bytes": 27424,
+      "sha256": "148012DB7DDAFC76D28BBEAA0BAEA3E2351E7BC195E9031D57F107989C2E0EAA"
+    },
+    {
+      "name": "System.Composition.TypedParts.dll",
+      "bytes": 65816,
+      "sha256": "EBC942C358D997E41635C9A365DB542A3FD2A05F301F602D5D6A8B0D5DD42071"
+    },
+    {
+      "name": "System.IdentityModel.Tokens.Jwt.dll",
+      "bytes": 91976,
+      "sha256": "A5F81E39B551DF6D0E8D7EC10EE5FB1666055CADE57BE8B6121D349EBCC230BE"
+    },
+    {
+      "name": "appsettings.Development.json",
+      "bytes": 127,
+      "sha256": "73F95F9E0CEB205FC1C4DC50C07697FCFA29D7087868C2AEF1D504CB38C771EC"
+    },
+    {
+      "name": "appsettings.json",
+      "bytes": 286,
+      "sha256": "2961B479626C8A40812AECDA2E3F95F6971EE7ED1AC383DD332A899D3478AB2E"
+    },
+    {
+      "name": "cs/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17680,
+      "sha256": "BE261586E5F90C7EBDC8B5E12D41F2F493BB18F6B5A76FE1FAB4A14A3D80314F"
+    },
+    {
+      "name": "cs/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 444168,
+      "sha256": "1B7A95334E0457ED334646CB62E1287B88E908E50A5CCDCE60891613FFF7295C"
+    },
+    {
+      "name": "cs/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17680,
+      "sha256": "5F5E0C469C1127FF80E4811E4C2E44727791EBFF1ABDD097F2BB36B9A7F350EE"
+    },
+    {
+      "name": "cs/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 41224,
+      "sha256": "C5E242FC938DB3EFDDE8FF4457EB1C03F50ABC63DFB3E6EDD60188A0151849D8"
+    },
+    {
+      "name": "cs/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 40200,
+      "sha256": "B6F9770C7C83160B27D96E41486DA99ED43DEB71BBFB8D15BD70F25DC452C1AB"
+    },
+    {
+      "name": "de/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17672,
+      "sha256": "6EB4C209143A8B977C61D9F30A1EB92D39A7B6A741102C221663F0E60FBC4427"
+    },
+    {
+      "name": "de/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 474376,
+      "sha256": "74EE2D88897BE211E89AD4CD11A145A973BD4AF0E74877B5A64F8D227E0BA409"
+    },
+    {
+      "name": "de/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17672,
+      "sha256": "212CFA8A51D5708B54DE0F21ACBA6D3F8EC767C01AB6D985A950729CFD355EE9"
+    },
+    {
+      "name": "de/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 42760,
+      "sha256": "96D639A66C6C8A182DC532B47F7ABD7216BCD1D3AD2C3618777ED8890BFC7FEB"
+    },
+    {
+      "name": "de/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 41736,
+      "sha256": "CD62A1BFE99811C971BEC1328A548DBC5F24E3BC9CD27F9715373C1E52ABF32F"
+    },
+    {
+      "name": "es/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17672,
+      "sha256": "A8DB27C5EAB7825E5D6B967D8E214F0136C12C3C8A91D344CEFD2B3485AB3EAD"
+    },
+    {
+      "name": "es/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 463120,
+      "sha256": "719BC0F799E12704498649267E473166F91015B629F4116474091F8EE9253E4D"
+    },
+    {
+      "name": "es/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17672,
+      "sha256": "7DA0BD6A7D84A44C3F61E5AC9C51F1445FAC66163A8CFCB156CFC0BA695DD21B"
+    },
+    {
+      "name": "es/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 42248,
+      "sha256": "C5C863FA842C5DC4462DCD54E9A6B8C2531AE1CC1F1A5E8016F64126F77CB766"
+    },
+    {
+      "name": "es/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 41272,
+      "sha256": "4C741B47FA2BECF2F1283E96EC6F76D958F1DEFC2868D93C2C011CAFCBC9F9F4"
+    },
+    {
+      "name": "fr/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17680,
+      "sha256": "A70609F91AD5C1D223F2F9DBFF6E4AE7221A03A7CA59F9AE3BD894F1015C5344"
+    },
+    {
+      "name": "fr/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 475920,
+      "sha256": "463E22BA0FDFEE0025D6FB00314A0A7CF8A47D6B6689D88E0429686025A8F53C"
+    },
+    {
+      "name": "fr/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17672,
+      "sha256": "5330E886183987A386636F26F7902F0AA0551FCAADB3D4ADF5ED83311A0D3C68"
+    },
+    {
+      "name": "fr/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 43320,
+      "sha256": "FF1EE1395F15D8F13E9FD3113C3FACDA1E321C665D30765890034EE5BBBBC093"
+    },
+    {
+      "name": "fr/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 41736,
+      "sha256": "80F5A07838B046388FDA788223279C1C6638ECCF9610FE80A598BB17F3B20F22"
+    },
+    {
+      "name": "it/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17672,
+      "sha256": "29791CBA2BD4ADEE27FC945DBD7BC26D6A2DB45D38CDA68E5BFC39693A624D43"
+    },
+    {
+      "name": "it/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 469768,
+      "sha256": "A853F3E433C9892150C47AD5BBEDD46D3ACB755BBC20ED58796B9E3E75AA9250"
+    },
+    {
+      "name": "it/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17720,
+      "sha256": "D1967347CBC0E243D711F32F3444EACCF3C22682E44B4E052FCB89F7376297D2"
+    },
+    {
+      "name": "it/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 42808,
+      "sha256": "6C4759807AEB547437ADC3E77A4E24852753D07876F0056F65C7B6E3D3F6506D"
+    },
+    {
+      "name": "it/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 41784,
+      "sha256": "321A24F5AC605314380585F4991DB0D99BCAC59EC976BE896A589FE842FEF7A0"
+    },
+    {
+      "name": "ja/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17672,
+      "sha256": "EAB73A963BB4603272ED17D2FFECF701A64876E2E86B9E93960CB30495B67636"
+    },
+    {
+      "name": "ja/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 515848,
+      "sha256": "4D2BAAD888D7DA2F20D528D27F6B56286961A6CAA294A3D3927F834A3459F71D"
+    },
+    {
+      "name": "ja/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17672,
+      "sha256": "4CFBAA8CEBDE81D60F626B5CC0545D9081226460DC20DC2BEA6A969B9414571F"
+    },
+    {
+      "name": "ja/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 45320,
+      "sha256": "021A4A339D89D06E2B300480416597A61D97CF1C787FD3C7024C849220387E43"
+    },
+    {
+      "name": "ja/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 44304,
+      "sha256": "F66432A517A834CA169317C170D32A610094C3EBC0C2B1F59D0087B33E2D36AD"
+    },
+    {
+      "name": "ko/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17680,
+      "sha256": "08814208264064105ABCCC96957C1E2AE073D4E7DD97ED745998F04B777273CB"
+    },
+    {
+      "name": "ko/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 475920,
+      "sha256": "6A2E477C2A8604157F2C9F8E3756A98AB07995C0E6FCFE22F2E7BF6679F30389"
+    },
+    {
+      "name": "ko/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17672,
+      "sha256": "D7054C0BF6BDCA4013CCD75FACE70958B5DC0709F3A577E61F8C0E560BEF6EB5"
+    },
+    {
+      "name": "ko/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 43280,
+      "sha256": "6F28E1CD4C7CE5311DDFB4DE3B42966A555EE42AA41603332F88154F6A9B21C4"
+    },
+    {
+      "name": "ko/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 41744,
+      "sha256": "1033D3D5D10557F7070430BE5643DC89620D84CBEAC2112CFB8C4A1D1580845F"
+    },
+    {
+      "name": "pl/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17712,
+      "sha256": "49292BF397E478694F68D7CB186AEFA8E6565FAA7668E70D486C53CADB4ABC9E"
+    },
+    {
+      "name": "pl/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 476432,
+      "sha256": "39B5E1471817790A31EC4038639188F7B89FD6713EA19C88472BDCF4FA56F795"
+    },
+    {
+      "name": "pl/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17672,
+      "sha256": "DD022150AD075152F44C90E75ABCC6E4CC045B0B6B57EEC997213A2FFE25E493"
+    },
+    {
+      "name": "pl/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 42760,
+      "sha256": "E2EE84F74B48DBB730809341B5279E521DBFD6844C013400777E0E1D02160C0F"
+    },
+    {
+      "name": "pl/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 41736,
+      "sha256": "F8779E45B1F699FE722898B1865377BEDAF5A433C1AAB6298AF5B3EDF067E88F"
+    },
+    {
+      "name": "pt-BR/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17712,
+      "sha256": "BA6B4079D560AF3176E48E8F46AA7F3305B43717B051FC7CD27A913BA93730A9"
+    },
+    {
+      "name": "pt-BR/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 456456,
+      "sha256": "0188246FA239EADAD25885093F21C20DF4A775F794FC34468430729974A8C1EC"
+    },
+    {
+      "name": "pt-BR/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17680,
+      "sha256": "3B38428FEC1990FEFDE9DEA01A913BC2709F81DAD2C4B7A72C8CAB8C8BCAE1F6"
+    },
+    {
+      "name": "pt-BR/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 42296,
+      "sha256": "53FA339D0151215CFDEC187B2EAA73215F809B95CA86A8C882B0DE82F6D48550"
+    },
+    {
+      "name": "pt-BR/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 40720,
+      "sha256": "8FFDB0EFF7C2DE635A38F0093DA5E95F52CA905EC2080CAB4EFAC42585DD0143"
+    },
+    {
+      "name": "ru/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 18192,
+      "sha256": "3862E9990EA7D92EEC34066E8730E5C84D454BF3A1ABFD35623AE75D05CEBF1D"
+    },
+    {
+      "name": "ru/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 617744,
+      "sha256": "D0B7B57BB90A4AED649F10C30FCDAE5C9EFB8280447287A76A3D64EB0DB13E41"
+    },
+    {
+      "name": "ru/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17680,
+      "sha256": "6F83219312C32E3E6303FE58957E4350A4AFD63EFDEE875F2277593BDA6FCBB1"
+    },
+    {
+      "name": "ru/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 47888,
+      "sha256": "C248867E873C629A2214EED85A4FD9BD426B21404723468981DAAB77BEEF3C2F"
+    },
+    {
+      "name": "ru/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 49464,
+      "sha256": "5153D18368224E120D2415262C49302100BB76EF7AFF8AA686300D4225766C67"
+    },
+    {
+      "name": "tr/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17680,
+      "sha256": "F4D005D18148227A171A5689C122ECDE11C22442644E698C5DBA6810D26FE7DC"
+    },
+    {
+      "name": "tr/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 452360,
+      "sha256": "09FF456D47D79B6F1A7EE5512662A490AFDAA05C60EB8190A7DCD76AE050DC0E"
+    },
+    {
+      "name": "tr/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17720,
+      "sha256": "BF1D4A66DAEEB639AAACD54543DC67F9036452186444C9A34129C337B91A9123"
+    },
+    {
+      "name": "tr/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 41784,
+      "sha256": "B9023CB23FE7B1960B01C5C68BB34D2F258DC4F7463CEC0868A0084C6E7DFA76"
+    },
+    {
+      "name": "tr/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 40240,
+      "sha256": "5FDE98451BE8B9D11EFA9AA0783C64DCFBA6C552F405D03B82A575CEFF631027"
+    },
+    {
+      "name": "zh-Hans/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17680,
+      "sha256": "F091E36CD829445AE557248EF8EF7CA766428FE0F654BDCAF159BE354EABC8F9"
+    },
+    {
+      "name": "zh-Hans/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 405776,
+      "sha256": "FE526A7CDFB9A06E2C679A67BC07F1F4F4F1AFCB4AC2D176F38EA2FC4B11BFBE"
+    },
+    {
+      "name": "zh-Hans/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17672,
+      "sha256": "6CCABBEFC428B2198ED03F54AC550CDECA22D53F5973C584CADCE49ACB19766E"
+    },
+    {
+      "name": "zh-Hans/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 40200,
+      "sha256": "61D2B8938866A2835FCAE414BCC209CFC7EFC3676563062D80DEB865385E400B"
+    },
+    {
+      "name": "zh-Hans/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 37640,
+      "sha256": "2B8460E62D86C91CCE2182C31B59DC3CEF9CF8AC7FACE19AE0592516C3227897"
+    },
+    {
+      "name": "zh-Hant/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll",
+      "bytes": 17720,
+      "sha256": "5D822240421B9ABB5F853EEB15ABE745048DB7723E9DFF116D968950D0BEBF80"
+    },
+    {
+      "name": "zh-Hant/Microsoft.CodeAnalysis.CSharp.resources.dll",
+      "bytes": 405304,
+      "sha256": "515E77DDEBD633C7F79DFAE31C8D5B343ED278832119357BDC3228C726C3E48D"
+    },
+    {
+      "name": "zh-Hant/Microsoft.CodeAnalysis.Workspaces.MSBuild.resources.dll",
+      "bytes": 17672,
+      "sha256": "0613EC2F04506E99AFF95608AD8C531E3FDFFDEA41CE24432EDF05DB8EF6A322"
+    },
+    {
+      "name": "zh-Hant/Microsoft.CodeAnalysis.Workspaces.resources.dll",
+      "bytes": 40248,
+      "sha256": "2F99D0BC2EBBD1F6B838EF450B6F744B955BA99675F7980B5E11631274A366C9"
+    },
+    {
+      "name": "zh-Hant/Microsoft.CodeAnalysis.resources.dll",
+      "bytes": 38152,
+      "sha256": "E1B882A624FC2FEF8FC63A2DD0A61E19543F6C2974B0AE5F1A8E580C0A490AED"
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+using ControlPlus.Domain.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -131,8 +132,12 @@ public sealed partial class SalesService
                 ? Result.Failure<CancelSaleDto>(ApplicationError.Conflict("La anulación original no es recuperable."))
                 : Result.Success(saved);
         }
-        if (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-            string.IsNullOrWhiteSpace(request.Authorization.Password))
+        var actorSnapshot = await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, ct);
+        var administratorSelfAuthorized = actorSnapshot?.HighestRoleLevel == RoleLevel.Administrador &&
+            request.Authorization is null;
+        if (!administratorSelfAuthorized &&
+            (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
+             string.IsNullOrWhiteSpace(request.Authorization.Password)))
             return Result.Failure<CancelSaleDto>(Validation("Las credenciales de otro Supervisor o Administrador son obligatorias."));
         var sale = await repository.GetSaleForUpdateAsync(saleId, ct);
         if (sale is null || sale.InstalacionId != installation.Id)
@@ -227,39 +232,55 @@ public sealed partial class SalesService
                 return Result.Failure<CancelSaleDto>(ApplicationError.Conflict("El efectivo esperado no cubre la devolución."));
         }
 
-        var candidate = await userRepository.GetByUserNameAsync(request.Authorization.UserName.Trim(), ct);
-        if (candidate is null) return Result.Failure<CancelSaleDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
-        var authorizer = await repository.GetUserForUpdateAsync(candidate.Id, ct);
-        if (authorizer is null || !authorizer.IsActive || authorizer.Id == actor.UserId ||
-            !await CanVoidAsync(authorizer.Id, ct))
-            return Result.Failure<CancelSaleDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
-        if (!passwordHasher.Verify(request.Authorization.Password, authorizer.PasswordHash))
+        Usuario? authorizer;
+        if (administratorSelfAuthorized)
         {
-            var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
-            await userRepository.UpdateAsync(authorizer, ct);
-            if (locked)
-                await AuditWriter.WriteAsync(auditRepository, clock, authorizer.Id, AuditAction.UserLocked,
-                    nameof(Usuario), authorizer.Id, new { authorizer.Id, authorizer.FailedLoginAttempts }, ct);
-            await AuditWriter.WriteCashFailureAsync(auditRepository, clock, actor.UserId,
-                AuditAction.SaleCancellationAuthorizationRejected, nameof(Venta), saleId,
-                new { SaleId = saleId, Result = "INVALID_AUTHORIZATION" }, Guid.CreateVersion7(),
-                terminal.Id, null, ct);
-            await unitOfWork.SaveChangesAsync(ct);
-            return Result.Failure<CancelSaleDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            authorizer = await repository.GetUserForUpdateAsync(actor.UserId, ct);
+            if (authorizer is null || !authorizer.IsActive)
+                return Result.Failure<CancelSaleDto>(ApplicationError.Forbidden());
+        }
+        else
+        {
+            var candidate = await userRepository.GetByUserNameAsync(request.Authorization!.UserName.Trim(), ct);
+            if (candidate is null) return Result.Failure<CancelSaleDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            authorizer = await repository.GetUserForUpdateAsync(candidate.Id, ct);
+            if (authorizer is null || !authorizer.IsActive || authorizer.Id == actor.UserId ||
+                !await CanVoidAsync(authorizer.Id, ct) ||
+                !RoleHierarchy.IsHigherThan(authorizer.HighestRoleLevel, actorSnapshot!.HighestRoleLevel))
+                return Result.Failure<CancelSaleDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            if (!passwordHasher.Verify(request.Authorization.Password, authorizer.PasswordHash))
+            {
+                var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
+                await userRepository.UpdateAsync(authorizer, ct);
+                if (locked)
+                    await AuditWriter.WriteAsync(auditRepository, clock, authorizer.Id, AuditAction.UserLocked,
+                        nameof(Usuario), authorizer.Id, new { authorizer.Id, authorizer.FailedLoginAttempts }, ct);
+                await AuditWriter.WriteCashFailureAsync(auditRepository, clock, actor.UserId,
+                    AuditAction.SaleCancellationAuthorizationRejected, nameof(Venta), saleId,
+                    new { SaleId = saleId, Result = "INVALID_AUTHORIZATION" }, Guid.CreateVersion7(),
+                    terminal.Id, null, ct);
+                await unitOfWork.SaveChangesAsync(ct);
+                return Result.Failure<CancelSaleDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            }
         }
         var permission = await permissionRepository.GetByCodeAsync(PermissionCodes.SalesVoid, ct);
         if (permission is null || !permission.Activo)
             return Result.Failure<CancelSaleDto>(ApplicationError.Conflict("El permiso de anulación no está disponible."));
         var now = clock.UtcNow.UtcDateTime;
         var correlation = Guid.CreateVersion7();
-        authorizer.RegisterSuccessfulLogin(clock.UtcNow);
-        await userRepository.UpdateAsync(authorizer, ct);
+        if (!administratorSelfAuthorized)
+        {
+            authorizer.RegisterSuccessfulLogin(clock.UtcNow);
+            await userRepository.UpdateAsync(authorizer, ct);
+        }
         var authorization = new AutorizacionOperacion
         {
             Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId,
             UsuarioAutorizadorId = authorizer.Id, PermisoId = permission.Id,
             TipoOperacion = "ANULACION_VENTA", CorrelacionId = correlation,
-            DescripcionOperacion = "Autorización de anulación de venta.", Motivo = reason.Codigo,
+            DescripcionOperacion = administratorSelfAuthorized
+                ? "Autorización de anulación de venta por Administrador sin segundo autorizador."
+                : "Autorización de anulación de venta.", Motivo = reason.Codigo,
             MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA", Estado = "UTILIZADA",
             FechaSolicitud = now, FechaExpiracion = now.AddMinutes(5), FechaUtilizacion = now
         };
@@ -332,7 +353,9 @@ public sealed partial class SalesService
         await AuditWriter.WriteCashAsync(auditRepository, clock, actor.UserId,
             AuditAction.SaleCancelled, nameof(Venta), sale.Id,
             new { SaleId = sale.Id, From = "CONFIRMADA", To = "ANULADA", ReasonId = reason.Id,
-                AuthorizationId = authorization.Id, SaleType = sale.TipoVenta, ReversedAmount = response.ReversedAmount,
+                AuthorizationId = authorization.Id,
+                AuthorizationMode = administratorSelfAuthorized ? "ADMINISTRATOR_SELF" : "OTHER_USER",
+                SaleType = sale.TipoVenta, ReversedAmount = response.ReversedAmount,
                 CorrelationId = correlation }, correlation, authorizer.Id, operatorSession?.Id, terminal.Id, null, ct);
         await unitOfWork.SaveChangesAsync(ct);
         if (operatorSession is not null)

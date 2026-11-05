@@ -101,7 +101,8 @@ public sealed partial class LayawayCreateApiFlowTests
         using var first = CreateClient(scenario.Admin.AccessToken);
         using var second = CreateClient(scenario.Admin.AccessToken);
         var created = await ReadAsync<CreatedLayawayDto>(await PostAsync(first,
-            "layaway-payment-race-create", Request(scenario, [new("EFECTIVO", 201m, 201m, null)])),
+            "layaway-payment-race-create", Request(scenario, [new("EFECTIVO", 201m, 201m, null)])
+                with { Authorization = null }),
             HttpStatusCode.Created);
         var before = await CaptureAsync(scenario);
         var request = new ApplyLayawayPaymentRequest(created.Version,

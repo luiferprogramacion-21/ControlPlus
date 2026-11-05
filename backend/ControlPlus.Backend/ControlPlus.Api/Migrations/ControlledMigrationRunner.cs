@@ -12,6 +12,7 @@ public static class ControlledMigrationRunner
     public const int FailedExitCode = 1;
     public const int RejectedExitCode = 2;
     public const string InitialProductInventoryMigration = "20261026010000_InitialProductInventoryMovementV1";
+    public const string PermanentProductReferencesMigration = "20261029010000_PermanentProductReferencesV1";
 
     public static async Task<ControlledMigrationResult> RunAsync(
         IConfiguration configuration,
@@ -107,6 +108,9 @@ public static class ControlledMigrationRunner
             {
                 return Rejected(safeTarget, "initial product inventory must be the first pending migration and can only apply that target");
             }
+
+            if (targetMigration == PermanentProductReferencesMigration && targetIndex != applied.Length)
+                return Rejected(safeTarget, "permanent product references must be the first pending migration; earlier migrations need separate approval");
 
             var requestedSequence = expectedPending.Take(targetIndex - applied.Length + 1).ToArray();
             if (requestedSequence.Length == 0 ||

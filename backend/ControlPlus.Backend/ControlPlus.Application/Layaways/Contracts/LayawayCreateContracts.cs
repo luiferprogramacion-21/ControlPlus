@@ -20,7 +20,7 @@ public sealed record CreateLayawayRequest(
     IReadOnlyCollection<CreateLayawayLineRequest> Lines,
     IReadOnlyCollection<CreateLayawayPaymentRequest> Payments,
     DateOnly? DueDate,
-    CreateLayawayAuthorizationRequest Authorization);
+    CreateLayawayAuthorizationRequest? Authorization);
 
 public sealed record CreatedLayawayLineDto(
     Guid ProductId, string ProductCode, string ProductName, string MeasurementUnit,

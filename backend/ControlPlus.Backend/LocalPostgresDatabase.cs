@@ -51,9 +51,6 @@ internal sealed class LocalPostgresDatabase : IAsyncDisposable
             return;
 
         NpgsqlConnection.ClearAllPools();
-        await using var admin = new NpgsqlConnection(_adminConnectionString);
-        await admin.OpenAsync();
-
         for (var index = _ownedDatabases.Count - 1; index >= 0; index--)
         {
             var databaseName = _ownedDatabases[index];
@@ -61,22 +58,27 @@ internal sealed class LocalPostgresDatabase : IAsyncDisposable
                 !Guid.TryParseExact(databaseName[DatabasePrefix.Length..], "N", out _))
                 throw new InvalidOperationException("Se rechazó eliminar una base ajena a las pruebas.");
 
-            await DropDatabaseAsync(admin, databaseName);
+            await DropDatabaseAsync(_adminConnectionString, databaseName);
             _ownedDatabases.RemoveAt(index);
         }
     }
 
-    private static async Task DropDatabaseAsync(NpgsqlConnection admin, string databaseName)
+    private static async Task DropDatabaseAsync(string adminConnectionString, string databaseName)
     {
         // PostgreSQL can briefly run a worker under another role in the test
         // database. FORCE closes our sessions; retry if that worker cannot be
         // signaled by this non-superuser test role.
+        var timeoutRetries = 0;
         for (var attempt = 0; attempt < 40; attempt++)
         {
             try
             {
+                // A timed-out command can leave its connection unusable. Each attempt
+                // gets a fresh connection; IF EXISTS also handles an ambiguous success.
+                await using var admin = new NpgsqlConnection(adminConnectionString);
+                await admin.OpenAsync();
                 await using var drop = new NpgsqlCommand(
-                    $"DROP DATABASE \"{databaseName}\" WITH (FORCE)", admin)
+                    $"DROP DATABASE IF EXISTS \"{databaseName}\" WITH (FORCE)", admin)
                 {
                     CommandTimeout = 120
                 };
@@ -84,6 +86,11 @@ internal sealed class LocalPostgresDatabase : IAsyncDisposable
                 return;
             }
             catch (PostgresException exception) when (exception.SqlState == "42501" && attempt < 39)
+            {
+                await Task.Delay(250);
+            }
+            catch (NpgsqlException exception) when (exception.InnerException is TimeoutException &&
+                timeoutRetries++ < 2 && attempt < 39)
             {
                 await Task.Delay(250);
             }

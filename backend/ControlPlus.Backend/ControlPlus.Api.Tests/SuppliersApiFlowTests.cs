@@ -228,7 +228,7 @@ public sealed class SuppliersApiFlowTests : IAsyncLifetime
         Bearer(client, users.Admin.Token.AccessToken);
         var supplier = await CreateAsync(client, new(null, null, "Asociado", null, null, null, null));
         var category = await ReadAsync<CategoryDto>(await client.PostAsJsonAsync("/api/categories",
-            new CreateCategoryRequest("Categoría de proveedor", null)), HttpStatusCode.Created);
+            new CreateCategoryRequest("Categoría de proveedor", null, "PRV")), HttpStatusCode.Created);
         var units = await ReadAsync<MeasurementUnitDto[]>(await client.GetAsync("/api/measurement-units"), HttpStatusCode.OK);
         var unit = Assert.Single(units, x => x.Code == "UNIDAD");
         var associated = await ReadAsync<ProductDto>(await client.PostAsJsonAsync("/api/products",
@@ -309,7 +309,7 @@ public sealed class SuppliersApiFlowTests : IAsyncLifetime
         var supplier = await CreateAsync(client, new("NIT", "ROLLBACK-EDIT", "Antes", null, null, null, null));
         var unrelated = await CreateAsync(client, new(null, null, "Ajeno", null, null, null, null));
         var category = await ReadAsync<CategoryDto>(await client.PostAsJsonAsync("/api/categories",
-            new CreateCategoryRequest("Categoría rollback", null)), HttpStatusCode.Created);
+            new CreateCategoryRequest("Categoría rollback", null, "RLB")), HttpStatusCode.Created);
         var units = await ReadAsync<MeasurementUnitDto[]>(await client.GetAsync("/api/measurement-units"), HttpStatusCode.OK);
         var unit = Assert.Single(units, x => x.Code == "UNIDAD");
         var product = await ReadAsync<ProductDto>(await client.PostAsJsonAsync("/api/products",

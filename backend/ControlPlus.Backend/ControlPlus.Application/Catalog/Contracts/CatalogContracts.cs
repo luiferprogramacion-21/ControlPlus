@@ -4,7 +4,7 @@ using ControlPlus.Application.Security.Contracts;
 namespace ControlPlus.Application.Catalog.Contracts;
 
 public sealed record CategoryDto(
-    Guid Id, string Name, string? Description, bool IsActive, long Version);
+    Guid Id, string Name, string? Description, bool IsActive, long Version, string? Abbreviation = null);
 
 public sealed record MeasurementUnitDto(
     Guid Id, string Code, string Name, string Symbol, bool IsActive);
@@ -75,8 +75,8 @@ public sealed record ProductPurchaseCostHistoryDto(
     decimal? LastConfirmedPurchaseCost,
     PagedResult<PurchaseCostHistoryItemDto> History);
 
-public sealed record CreateCategoryRequest(string Name, string? Description);
-public sealed record UpdateCategoryRequest(string Name, string? Description, long Version);
+public sealed record CreateCategoryRequest(string Name, string? Description, string? Abbreviation = null);
+public sealed record UpdateCategoryRequest(string Name, string? Description, long Version, string? Abbreviation = null);
 
 public sealed record CreateProductRequest(
     Guid CategoryId,

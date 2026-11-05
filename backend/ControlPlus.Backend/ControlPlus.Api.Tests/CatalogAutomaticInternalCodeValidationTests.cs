@@ -18,12 +18,12 @@ public sealed partial class CatalogAutomaticInternalCodeApiTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task MissingInternalCode_IsDerivedFromPersistedUuidAndAudited(string? code)
+    public async Task MissingInternalCode_IsAssignedPermanentReferenceAndAudited(string? code)
     {
         var scenario = await CreateValidationScenarioAsync();
         using var client = scenario.Client;
         var product = await ReadProductAsync(await client.PostAsJsonAsync("/api/products", ProductRequest(scenario, code)));
-        Assert.Equal($"PRD-{product.Id:N}".ToUpperInvariant(), product.InternalCode);
+        Assert.Matches("^CAT-[0-9]{6,}$", product.InternalCode);
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var stored = await db.Producto.AsNoTracking().SingleAsync();
@@ -39,7 +39,9 @@ public sealed partial class CatalogAutomaticInternalCodeApiTests
         var scenario = await CreateValidationScenarioAsync();
         using var client = scenario.Client;
         var product = await ReadProductAsync(await client.PostAsJsonAsync("/api/products", ProductRequest(scenario, "  manual-01  ")));
-        Assert.Equal("MANUAL-01", product.InternalCode);
+        Assert.Matches("^CAT-[0-9]{6,}$", product.InternalCode);
+        var found = await client.GetFromJsonAsync<PagedResult<ProductDto>>("/api/products?search=MANUAL-01");
+        Assert.Equal(product.Id, Assert.Single(found!.Items).Id);
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var audits = await db.EventoAuditoria.CountAsync();
@@ -64,7 +66,7 @@ public sealed partial class CatalogAutomaticInternalCodeApiTests
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var product = await db.Producto.AsNoTracking().SingleAsync();
-        Assert.Equal("MANUAL-CONCURRENT", product.CodigoInterno);
+        Assert.Matches("^CAT-[0-9]{6,}$", product.CodigoInterno);
         Assert.Equal(1, await db.EventoAuditoria.CountAsync(x => x.EntidadId == product.Id));
     }
 
@@ -137,7 +139,7 @@ public sealed partial class CatalogAutomaticInternalCodeApiTests
         setup.Headers.Add("X-ControlPlus-Master-Key", _masterKey);
         Assert.Equal(HttpStatusCode.Created, (await client.SendAsync(setup)).StatusCode);
         await LoginValidationActorAsync(client, AdminName, AdminPassword);
-        var categoryResponse = await client.PostAsJsonAsync("/api/categories", new CreateCategoryRequest("Categoría temporal", null));
+        var categoryResponse = await client.PostAsJsonAsync("/api/categories", new CreateCategoryRequest("Categoría temporal", null, "CAT"));
         Assert.Equal(HttpStatusCode.Created, categoryResponse.StatusCode);
         var category = (await categoryResponse.Content.ReadFromJsonAsync<CategoryDto>())!;
         var units = (await client.GetFromJsonAsync<MeasurementUnitDto[]>("/api/measurement-units"))!;

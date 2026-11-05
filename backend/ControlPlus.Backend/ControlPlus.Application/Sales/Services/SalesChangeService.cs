@@ -1,3 +1,4 @@
+using ControlPlus.Domain.Security;
 using System.Text.Json;
 using ControlPlus.Application.Common;
 using ControlPlus.Application.Sales.Contracts;
@@ -47,11 +48,17 @@ public sealed partial class SalesService
         if (snapshot is null) return Result.Failure<SaleChangeDto>(ApplicationError.Unauthorized());
         if (!snapshot.PermissionCodes.Contains(PermissionCodes.SalesCreate, StringComparer.OrdinalIgnoreCase))
             return Result.Failure<SaleChangeDto>(ApplicationError.Forbidden());
+        var administratorSelfAuthorized = snapshot.HighestRoleLevel == RoleLevel.Administrador &&
+            request.Authorization is null;
+        if (administratorSelfAuthorized &&
+            !snapshot.PermissionCodes.Contains(PermissionCodes.SalesChangeAuthorize, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<SaleChangeDto>(ApplicationError.Forbidden());
+        var requestHash = administratorSelfAuthorized ? Hash(input.Hash + "|ADMINISTRATOR_SELF") : input.Hash;
         var previous = await repository.GetIdempotencyAsync(installation.Id, input.Key, ct);
         if (previous is not null)
         {
             if (previous.TipoOperacion != "CAMBIAR_VENTA" || previous.UsuarioId != actor.UserId ||
-                previous.EntidadId != saleId || previous.HashSolicitud != input.Hash || previous.Resultado is null)
+                previous.EntidadId != saleId || previous.HashSolicitud != requestHash || previous.Resultado is null)
                 return Result.Failure<SaleChangeDto>(ApplicationError.Conflict("La clave de idempotencia ya fue utilizada con otra solicitud."));
             SaleChangeDto? saved;
             try { saved = JsonSerializer.Deserialize<SaleChangeDto>(previous.Resultado); }
@@ -60,8 +67,9 @@ public sealed partial class SalesService
                 ? Result.Failure<SaleChangeDto>(ApplicationError.Conflict("El cambio anterior no puede recuperarse."))
                 : Result.Success(saved);
         }
-        if (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-            string.IsNullOrWhiteSpace(request.Authorization.Password))
+        if (!administratorSelfAuthorized &&
+            (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
+             string.IsNullOrWhiteSpace(request.Authorization.Password)))
             return Result.Failure<SaleChangeDto>(Validation("Se requieren credenciales de otro Supervisor o Administrador."));
         var terminal = await repository.GetActiveTerminalAsync(installation.Id, ct);
         if (terminal is null) return Result.Failure<SaleChangeDto>(ApplicationError.NotFound("la terminal activa"));
@@ -175,45 +183,60 @@ public sealed partial class SalesService
             treatment.CashAmount, input.Payments, ct);
         if (paymentCheck.Error is not null) return Result.Failure<SaleChangeDto>(paymentCheck.Error);
 
-        var candidate = await userRepository.GetByUserNameAsync(request.Authorization.UserName.Trim(), ct);
-        if (candidate is null)
-            return Result.Failure<SaleChangeDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
-        var authorizer = await repository.GetUserForUpdateAsync(candidate.Id, ct);
-        var authorizerSnapshot = authorizer is null ? null
-            : await userRepository.GetAuthorizationSnapshotAsync(authorizer.Id, ct);
-        if (authorizer is null || !authorizer.IsActive || authorizer.Id == actor.UserId ||
-            authorizerSnapshot is null ||
-            !SaleCancellationEligibility.HasAuthorizedRole(authorizerSnapshot.HighestRoleLevel) ||
-            !authorizerSnapshot.PermissionCodes.Contains(PermissionCodes.SalesChangeAuthorize,
-                StringComparer.OrdinalIgnoreCase))
-            return Result.Failure<SaleChangeDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
-        if (!passwordHasher.Verify(request.Authorization.Password, authorizer.PasswordHash))
+        Usuario? authorizer;
+        if (administratorSelfAuthorized)
         {
-            var locked = authorizer.RegisterFailedLogin(now);
-            await userRepository.UpdateAsync(authorizer, ct);
-            if (locked)
-                await AuditWriter.WriteAsync(auditRepository, clock, authorizer.Id, AuditAction.UserLocked,
-                    nameof(Usuario), authorizer.Id, new { authorizer.Id, authorizer.FailedLoginAttempts }, ct);
-            await AuditWriter.WriteCashFailureAsync(auditRepository, clock, actor.UserId,
-                AuditAction.SaleChangeAuthorizationRejected, nameof(Venta), sale.Id,
-                new { SaleId = sale.Id, Result = "INVALID_AUTHORIZATION" }, Guid.CreateVersion7(),
-                terminal.Id, null, ct);
-            await unitOfWork.SaveChangesAsync(ct);
-            return Result.Failure<SaleChangeDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            authorizer = await repository.GetUserForUpdateAsync(actor.UserId, ct);
+            if (authorizer is null || !authorizer.IsActive)
+                return Result.Failure<SaleChangeDto>(ApplicationError.Forbidden());
+        }
+        else
+        {
+            var candidate = await userRepository.GetByUserNameAsync(request.Authorization!.UserName.Trim(), ct);
+            if (candidate is null)
+                return Result.Failure<SaleChangeDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            authorizer = await repository.GetUserForUpdateAsync(candidate.Id, ct);
+            var authorizerSnapshot = authorizer is null ? null
+                : await userRepository.GetAuthorizationSnapshotAsync(authorizer.Id, ct);
+            if (authorizer is null || !authorizer.IsActive || authorizer.Id == actor.UserId ||
+                authorizerSnapshot is null ||
+                !RoleHierarchy.IsHigherThan(authorizerSnapshot.HighestRoleLevel, snapshot.HighestRoleLevel) ||
+                !authorizerSnapshot.PermissionCodes.Contains(PermissionCodes.SalesChangeAuthorize,
+                    StringComparer.OrdinalIgnoreCase))
+                return Result.Failure<SaleChangeDto>(ApplicationError.Forbidden("El autorizador debe tener un rol estrictamente superior al del ejecutor."));
+            if (!passwordHasher.Verify(request.Authorization.Password, authorizer.PasswordHash))
+            {
+                var locked = authorizer.RegisterFailedLogin(now);
+                await userRepository.UpdateAsync(authorizer, ct);
+                if (locked)
+                    await AuditWriter.WriteAsync(auditRepository, clock, authorizer.Id, AuditAction.UserLocked,
+                        nameof(Usuario), authorizer.Id, new { authorizer.Id, authorizer.FailedLoginAttempts }, ct);
+                await AuditWriter.WriteCashFailureAsync(auditRepository, clock, actor.UserId,
+                    AuditAction.SaleChangeAuthorizationRejected, nameof(Venta), sale.Id,
+                    new { SaleId = sale.Id, Result = "INVALID_AUTHORIZATION" }, Guid.CreateVersion7(),
+                    terminal.Id, null, ct);
+                await unitOfWork.SaveChangesAsync(ct);
+                return Result.Failure<SaleChangeDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+            }
         }
         var permission = await permissionRepository.GetByCodeAsync(PermissionCodes.SalesChangeAuthorize, ct);
         if (permission is null || !permission.Activo)
             return Result.Failure<SaleChangeDto>(ApplicationError.Conflict("El permiso de autorización no está disponible."));
 
         var correlation = Guid.CreateVersion7();
-        authorizer.RegisterSuccessfulLogin(now);
-        await userRepository.UpdateAsync(authorizer, ct);
+        if (!administratorSelfAuthorized)
+        {
+            authorizer.RegisterSuccessfulLogin(now);
+            await userRepository.UpdateAsync(authorizer, ct);
+        }
         var authorization = new AutorizacionOperacion
         {
             Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId,
             UsuarioAutorizadorId = authorizer.Id, PermisoId = permission.Id,
             TipoOperacion = "CAMBIO_VENTA", CorrelacionId = correlation,
-            DescripcionOperacion = "Autorización de cambio de productos de venta.",
+            DescripcionOperacion = administratorSelfAuthorized
+                ? "Autorización de cambio de venta por Administrador sin segundo autorizador."
+                : "Autorización de cambio de productos de venta.",
             Motivo = input.Reason, MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA",
             Estado = "UTILIZADA", FechaSolicitud = now.UtcDateTime,
             FechaExpiracion = now.UtcDateTime.AddMinutes(5), FechaUtilizacion = now.UtcDateTime
@@ -259,7 +282,7 @@ public sealed partial class SalesService
         {
             Id = Guid.CreateVersion7(), InstalacionId = installation.Id, TerminalId = terminal.Id,
             UsuarioId = actor.UserId, SesionOperadorId = session?.Id,
-            ClaveIdempotencia = input.Key, TipoOperacion = "CAMBIAR_VENTA", HashSolicitud = input.Hash,
+            ClaveIdempotencia = input.Key, TipoOperacion = "CAMBIAR_VENTA", HashSolicitud = requestHash,
             Entidad = nameof(Venta), EntidadId = sale.Id,
             Resultado = JsonSerializer.Serialize(response), CorrelacionId = correlation,
             FechaRegistro = now.UtcDateTime
@@ -268,7 +291,9 @@ public sealed partial class SalesService
             AuditAction.SaleChanged, nameof(CambioVenta), change.Id,
             new { SaleId = sale.Id, ChangeId = change.Id, change.Diferencia,
                 change.TratamientoDiferencia, AuthorizationId = authorization.Id, CorrelationId = correlation,
-                ResellableConfirmed = true }, correlation, authorizer.Id, session?.Id, terminal.Id, null, ct);
+                ResellableConfirmed = true,
+                AuthorizationMode = administratorSelfAuthorized ? "ADMINISTRATOR_SELF" : "OTHER_USER" },
+            correlation, authorizer.Id, session?.Id, terminal.Id, null, ct);
         await unitOfWork.SaveChangesAsync(ct);
         if (session is not null)
         {

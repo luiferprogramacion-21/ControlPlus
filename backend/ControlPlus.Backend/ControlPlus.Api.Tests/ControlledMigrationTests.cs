@@ -237,6 +237,32 @@ public sealed class ControlledMigrationTests(ControlledMigrationPostgresFixture 
     }
 
     [Fact]
+    public async Task PermanentReferences_PreflightIsReadOnly_AndOnlyExactNextTargetCanBeApplied()
+    {
+        var connection = await postgres.CreateDatabaseAsync();
+        var target = ControlledMigrationRunner.PermanentProductReferencesMigration;
+        await ApplyAsync(connection, ControlledMigrationRunner.InitialProductInventoryMigration);
+        var rejected = await RunApiProcessAsync(connection, "true", ControlledExecutionCommand.MigrationTargetArgument, target);
+        Assert.Equal(2, rejected.ExitCode);
+        Assert.False(rejected.HttpPortObserved);
+        Assert.Equal(0L, await MigrationCountAsync(connection, target));
+        await ApplyAsync(connection, "20261028010000_SaleReceiptDataSnapshotV1");
+        var before = await HistoryCountAsync(connection);
+        var preflight = await RunApiProcessAsync(connection, "true", ControlledExecutionCommand.PreflightTargetArgument, target);
+        Assert.Equal(0, preflight.ExitCode);
+        Assert.Contains("READ ONLY", preflight.Output);
+        Assert.Contains("rollback=confirmed", preflight.Output);
+        Assert.False(preflight.HttpPortObserved);
+        Assert.Equal(before, await HistoryCountAsync(connection));
+        var applied = await RunApiProcessAsync(connection, "true", ControlledExecutionCommand.MigrationTargetArgument, target);
+        Assert.Equal(0, applied.ExitCode);
+        Assert.False(applied.HttpPortObserved);
+        Assert.Equal(1L, await MigrationCountAsync(connection, target));
+        var repeated = await RunApiProcessAsync(connection, "true", ControlledExecutionCommand.MigrationTargetArgument, target);
+        Assert.Equal(2, repeated.ExitCode);
+    }
+
+    [Fact]
     public async Task ProviderFailure_ReturnsNonZeroWithoutRevealingConnectionSecret()
     {
         var connectionString = await postgres.CreateDatabaseAsync();

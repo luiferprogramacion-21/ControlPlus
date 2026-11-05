@@ -264,6 +264,49 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         Assert.Equal(before.SaleSequence, after.SaleSequence);
     }
 
+    [Fact, Trait("Category", "Integration")]
+    public async Task CreditSale_SupervisorAndAdministratorWithoutSecondAuthorizer_PersistOwnAuthorizationAndReplay()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        var dueDate = scenario.Shift.OperatingDate.AddDays(1);
+        var request = CreditRequest(scenario, scenario.CustomerId, dueDate) with { Authorization = null };
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await PostSaleAsync(client, "cashier-credit-without-authorizer", request)).StatusCode);
+
+        foreach (var (actor, mode) in new[]
+                 {
+                     (scenario.Supervisor, "SUPERVISOR_SELF"),
+                     (scenario.Admin, "ADMINISTRATOR_SELF")
+                 })
+        {
+            _ = await StartSessionAsync(client, scenario, actor);
+            SetBearer(client, actor.AccessToken);
+            var key = "credit-self-" + mode;
+            var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, key, request), HttpStatusCode.Created);
+            var beforeReplay = await CaptureStateAsync(scenario.ProductId);
+            var replay = await ReadAsync<SaleDto>(await PostSaleAsync(client, key, request), HttpStatusCode.Created);
+            Assert.Equal(sale.Id, replay.Id);
+            Assert.Equal(beforeReplay, await CaptureStateAsync(scenario.ProductId));
+
+            await using var scope = _factory!.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            var credit = await db.Credito.AsNoTracking().SingleAsync(x => x.Id == sale.CreditId);
+            var authorization = await db.AutorizacionOperacion.AsNoTracking()
+                .SingleAsync(x => x.Id == credit.AutorizacionOperacionId);
+            Assert.Equal(actor.User.Id, authorization.UsuarioSolicitanteId);
+            Assert.Equal(actor.User.Id, authorization.UsuarioAutorizadorId);
+            Assert.Equal("PASSWORD", authorization.MetodoAutenticacion);
+            Assert.Null(authorization.CredencialAutorizadorId);
+            Assert.Contains("sin segundo autorizador", authorization.DescripcionOperacion);
+            var audit = await db.EventoAuditoria.AsNoTracking().SingleAsync(x =>
+                x.Accion == "CREDITCREATED" && x.EntidadId == credit.Id);
+            Assert.Contains(mode, audit.DatosNuevos);
+        }
+    }
+
     [Fact]
     [Trait("Category", "Integration")]
     public async Task FailedCreditAuthorization_SharesLoginCounter_LocksOnce_AndKeepsActorUntouched()
@@ -446,7 +489,7 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
                 [cashierRole])), HttpStatusCode.Created);
 
         var category = await ReadAsync<CategoryDto>(await client.PostAsJsonAsync("/api/categories",
-            new CreateCategoryRequest("Categoría de crédito aislada", null)), HttpStatusCode.Created);
+            new CreateCategoryRequest("Categoría de crédito aislada", null, "CRA")), HttpStatusCode.Created);
         var units = await ReadAsync<IReadOnlyCollection<MeasurementUnitDto>>(
             await client.GetAsync("/api/measurement-units"), HttpStatusCode.OK);
         var product = await ReadAsync<ProductDto>(await client.PostAsJsonAsync("/api/products",

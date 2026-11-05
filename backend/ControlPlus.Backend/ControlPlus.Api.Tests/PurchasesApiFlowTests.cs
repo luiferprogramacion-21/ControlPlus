@@ -35,6 +35,7 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
     private readonly string _supervisorPassword = $"Purchases-Supervisor-{Secret(32)}!";
     private readonly string _cashierPassword = $"Purchases-Cashier-{Secret(32)}!";
     private readonly ConcurrentQueue<string> _capturedLogs = new();
+    private int _categorySequence;
     private LocalPostgresDatabase _postgres = NewPostgres();
     private WebApplicationFactory<Program>? _factory;
 
@@ -109,9 +110,12 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         return await client.SendAsync(message);
     }
 
-    [Fact]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     [Trait("Category", "Integration")]
-    public async Task PurchaseOrder_ExceptionRequiresCurrentAdministratorAndEarlyClosePreservesPendingHistory()
+    public async Task PurchaseOrder_ExceptionRequiresCurrentAdministratorAndEarlyClosePreservesPendingHistory(
+        bool administratorCloses)
     {
         using var client = Client();
         var users = await BootstrapAsync(client);
@@ -153,8 +157,7 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
             Assert.Equal(0, (await db.ConsecutivoDocumento.SingleAsync(x => x.TipoDocumento == "COMPRA")).UltimoNumero);
         }
         var valid = new { expectedOrderVersion = 2, invoiceDate = "2026-10-16", vatMode = "NO_DISCRIMINADO",
-            lines = new[] { new { orderLineId = lineId, productId = substitute.Id, quantity = 3, unitCost = 9m } },
-            authorization = new { userName = AdminName, password = _adminPassword } };
+            lines = new[] { new { orderLineId = lineId, productId = substitute.Id, quantity = 3, unitCost = 9m } } };
         var receipt = await ReadJsonAsync(await ReceiveOrderAsync(client, orderId, "excess-valid", valid), HttpStatusCode.Created);
         Assert.Equal("RECIBIDO_PARCIAL", receipt.GetProperty("orderStatus").GetString());
         Assert.Equal(3, (await StateAsync(substitute.Id)).Stock - before.Stock);
@@ -165,10 +168,14 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         await ProblemAsync(await client.PostAsJsonAsync($"/api/purchase-orders/{orderId}/cancel",
             new { expectedVersion = 3, reasonId = Guid.NewGuid(),
                 authorization = new { userName = AdminName, password = _adminPassword } }), HttpStatusCode.Conflict);
-        Bearer(client, users.Supervisor.Token.AccessToken);
-        var closed = await ReadJsonAsync(await client.PostAsJsonAsync($"/api/purchase-orders/{orderId}/close",
-            new { expectedVersion = 3, reasonId = closeReason, observation = "Resto no requerido",
-                authorization = new { userName = AdminName, password = _adminPassword } }), HttpStatusCode.OK);
+        Bearer(client, administratorCloses ? users.Admin.Token.AccessToken : users.Supervisor.Token.AccessToken);
+        var closeResponse = administratorCloses
+            ? await client.PostAsJsonAsync($"/api/purchase-orders/{orderId}/close",
+                new { expectedVersion = 3, reasonId = closeReason, observation = "Resto no requerido" })
+            : await client.PostAsJsonAsync($"/api/purchase-orders/{orderId}/close",
+                new { expectedVersion = 3, reasonId = closeReason, observation = "Resto no requerido",
+                    authorization = new { userName = AdminName, password = _adminPassword } });
+        var closed = await ReadJsonAsync(closeResponse, HttpStatusCode.OK);
         Assert.Equal("CERRADO_CON_PENDIENTES", closed.GetProperty("status").GetString());
         await using var finalScope = _factory!.Services.CreateAsyncScope();
         var finalDb = finalScope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
@@ -180,9 +187,18 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         Assert.Equal(storedLine.AutorizacionExcesoId, detail.AutorizacionExcepcionId);
         Assert.NotNull(detail.AutorizacionExcepcionId);
         Assert.NotNull(storedOrder.AutorizacionCierreId);
+        var closeAuthorization = await finalDb.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.Id == storedOrder.AutorizacionCierreId);
+        Assert.Equal(administratorCloses, closeAuthorization.UsuarioSolicitanteId ==
+            closeAuthorization.UsuarioAutorizadorId);
         Assert.Equal(closeReason, storedOrder.MotivoCierreId);
         Assert.Equal(2, await finalDb.AutorizacionOperacion.CountAsync(x =>
             x.TipoOperacion == "EXCEPCION_RECEPCION_COMPRA" || x.TipoOperacion == "CIERRE_PEDIDO_PENDIENTE"));
+        var ownReceiptAuthorization = await finalDb.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.TipoOperacion == "EXCEPCION_RECEPCION_COMPRA");
+        Assert.Equal(ownReceiptAuthorization.UsuarioSolicitanteId, ownReceiptAuthorization.UsuarioAutorizadorId);
+        Assert.Equal("PASSWORD", ownReceiptAuthorization.MetodoAutenticacion);
+        Assert.Null(ownReceiptAuthorization.CredencialAutorizadorId);
     }
 
     [Fact]
@@ -210,8 +226,7 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         Assert.Equal("BORRADOR", (await ReadJsonAsync(await client.GetAsync($"/api/purchase-orders/{id}"),
             HttpStatusCode.OK)).GetProperty("status").GetString());
         var canceled = await ReadJsonAsync(await client.PostAsJsonAsync($"/api/purchase-orders/{id}/cancel",
-            new { expectedVersion = 1, reasonId, authorization = new { userName = AdminName,
-                password = _adminPassword } }), HttpStatusCode.OK);
+            new { expectedVersion = 1, reasonId }), HttpStatusCode.OK);
         Assert.Equal("CANCELADO", canceled.GetProperty("status").GetString());
         Assert.Equal(before, await StateAsync(product.Id));
         await ProblemAsync(await client.PostAsJsonAsync($"/api/purchase-orders/{id}/send",
@@ -221,6 +236,11 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var stored = await db.PedidoCompra.AsNoTracking().SingleAsync(x => x.Id == id);
         Assert.Equal(reasonId, stored.MotivoCancelacionId);
         Assert.NotNull(stored.AutorizacionCancelacionId);
+        var ownCancelAuthorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.Id == stored.AutorizacionCancelacionId);
+        Assert.Equal(ownCancelAuthorization.UsuarioSolicitanteId, ownCancelAuthorization.UsuarioAutorizadorId);
+        Assert.Equal("PASSWORD", ownCancelAuthorization.MetodoAutenticacion);
+        Assert.Null(ownCancelAuthorization.CredencialAutorizadorId);
         Assert.Equal(0, await db.Compra.CountAsync(x => x.PedidoCompraId == id));
     }
 
@@ -678,8 +698,9 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
             request.observation, request.authorization, stock = 0 }) };
         invalid.Headers.Add("Idempotency-Key", "cancel-invalid-json");
         await ProblemAsync(await client.SendAsync(invalid), HttpStatusCode.BadRequest);
-        await ProblemCodeAsync(await PostCancelAsync(client, id, "cancel-no-authorization",
-            new { request.expectedVersion, request.reasonId, request.observation }),
+        await ProblemCodeAsync(await PostCancelAsync(client, id, "cancel-invalid-authorization",
+            new { request.expectedVersion, request.reasonId, request.observation,
+                authorization = new { userName = AdminName, password = "" } }),
             HttpStatusCode.BadRequest, "validation.failed");
         Assert.Equal(beforePurchase, await PurchasePersistenceAsync(id, first.Id, second.Id));
         using var call = new HttpRequestMessage(HttpMethod.Post, $"/api/purchases/{id}/cancel")
@@ -756,7 +777,7 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task Cancel_RequiresCredentialsOnlyForFirstExecution_AndNeverPersistsThem()
+    public async Task Cancel_AdministratorWithoutSecondAuthorizer_ReplaysWithoutCredentials()
     {
         using var client = Client();
         var setup = await PrepareCancellationAsync(client, "PUR-AUTH-SAME");
@@ -768,16 +789,8 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var withoutCredentials = new { expectedVersion = version, reasonId = setup.ReasonId,
             observation = "  observación repetible  " };
 
-        await ProblemCodeAsync(await PostCancelAsync(client, id, "auth-same-cancel", withoutCredentials),
-            HttpStatusCode.BadRequest, "validation.failed");
-        Assert.Equal(before, await PurchasePersistenceAsync(id, product.Id));
-
-        var cancelled = await ReadJsonAsync(await PostCancelAsync(client, id, "auth-same-cancel", new
-        {
-            withoutCredentials.expectedVersion, withoutCredentials.reasonId,
-            withoutCredentials.observation,
-            authorization = new { userName = AdminName, password = _adminPassword }
-        }), HttpStatusCode.OK);
+        var cancelled = await ReadJsonAsync(await PostCancelAsync(client, id, "auth-same-cancel",
+            withoutCredentials), HttpStatusCode.OK);
         var after = await PurchasePersistenceAsync(id, product.Id);
         var replay = await ReadJsonAsync(await PostCancelAsync(client, id, "auth-same-cancel", new
         {
@@ -797,6 +810,12 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var operation = await db.OperacionIdempotente.AsNoTracking().SingleAsync(x => x.ClaveIdempotencia == "auth-same-cancel");
+        var authorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.TipoOperacion == "ANULAR_COMPRA");
+        Assert.Equal(authorization.UsuarioSolicitanteId, authorization.UsuarioAutorizadorId);
+        Assert.Equal("PASSWORD", authorization.MetodoAutenticacion);
+        Assert.Null(authorization.CredencialAutorizadorId);
+        Assert.Contains("sin segundo autorizador", authorization.DescripcionOperacion);
         Assert.Equal(1, await db.AutorizacionOperacion.CountAsync(x => x.TipoOperacion == "ANULAR_COMPRA"));
         Assert.Equal(1, await db.EventoAuditoria.CountAsync(x => x.EntidadId == id && x.Accion == "PURCHASECANCELLED"));
         Assert.DoesNotContain(_adminPassword, operation.Resultado ?? "");
@@ -1233,7 +1252,9 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         await RestartAtPreviousMigrationAsync();
         using var client = Client();
         var setup = await PrepareCancellationAsync(client, "Proveedor histórico anterior a orden");
-        var product = await ProductAsync(client, setup.Supplier.Id, "PUR-HIST-NULL", null);
+        // The schema is intentionally older than the product reference migrations, so the product
+        // cannot be created through the current API; seed it with the minimal historical columns.
+        var product = await HistoricalProductAsync(setup.Supplier.Id, setup.Users.Admin.User.Id, "PUR-HIST-NULL");
         var draft = await CreateDraftAsync(client, Body(setup.Supplier.Id, null, "NO_DISCRIMINADO",
             new Line(product.Id, 2, 10m)));
         var purchaseId = draft.GetProperty("id").GetGuid();
@@ -1625,12 +1646,49 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
     private async Task<ProductDto> ProductAsync(HttpClient client, Guid supplierId, string code, decimal? taxPercentage)
     {
         var category = await ReadAsync<CategoryDto>(await client.PostAsJsonAsync("/api/categories",
-            new CreateCategoryRequest($"Categoría {code}", null)), HttpStatusCode.Created);
+            new CreateCategoryRequest($"Categoría {code}", null, NextCategoryAbbreviation())), HttpStatusCode.Created);
         var units = await ReadAsync<MeasurementUnitDto[]>(await client.GetAsync("/api/measurement-units"), HttpStatusCode.OK);
         return await ReadAsync<ProductDto>(await client.PostAsJsonAsync("/api/products",
             new CreateProductRequest(category.Id, units.Single(x => x.Code == "UNIDAD").Id,
                 supplierId, code, null, null, true, $"Producto {code}", null, 1000m,
                 null, taxPercentage, 0)), HttpStatusCode.Created);
+    }
+
+    private sealed record HistoricalProduct(Guid Id);
+
+    private string NextCategoryAbbreviation()
+    {
+        var sequence = Interlocked.Increment(ref _categorySequence);
+        var letters = new char[7];
+        for (var index = letters.Length - 1; index >= 0; index--)
+        {
+            letters[index] = (char)('A' + sequence % 26);
+            sequence /= 26;
+        }
+        return "CMP" + new string(letters);
+    }
+
+    private async Task<HistoricalProduct> HistoricalProductAsync(Guid supplierId, Guid userId, string code)
+    {
+        var productId = Guid.CreateVersion7();
+        await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO catalogo.categoria(id,nombre,usuario_creacion_id) VALUES (@category,@categoryName,@user);
+            INSERT INTO catalogo.producto(id,categoria_id,unidad_medida_id,proveedor_id,codigo_interno,nombre,precio_minorista,usuario_creacion_id)
+            SELECT @product,@category,u.id,@supplier,@code,@name,1000,@user
+            FROM catalogo.unidad_medida u WHERE u.codigo='UNIDAD';
+            """, connection);
+        command.Parameters.AddWithValue("category", Guid.CreateVersion7());
+        command.Parameters.AddWithValue("categoryName", $"Categoría {code}");
+        command.Parameters.AddWithValue("product", productId);
+        command.Parameters.AddWithValue("supplier", supplierId);
+        command.Parameters.AddWithValue("user", userId);
+        command.Parameters.AddWithValue("code", code);
+        command.Parameters.AddWithValue("name", $"Producto {code}");
+        Assert.Equal(2, await command.ExecuteNonQueryAsync());
+        return new HistoricalProduct(productId);
     }
 
     private async Task SeedStockAsync(Guid productId, int stock, decimal? averageCost)

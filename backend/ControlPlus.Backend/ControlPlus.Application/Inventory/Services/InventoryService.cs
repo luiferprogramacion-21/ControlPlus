@@ -1,3 +1,4 @@
+using ControlPlus.Domain.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -113,7 +114,7 @@ public sealed class InventoryService(
         if (input.Error is not null) return Result.Failure<InventoryMovementDto>(input.Error);
 
         return await loginAttemptCoordinator.ExecuteAsync(
-            input.Authorization!.UserName.ToUpperInvariant(),
+            input.Authorization?.UserName.ToUpperInvariant() ?? actor.UserId.ToString("N"),
             token => AdjustWithinTransactionAsync(actor, input, token),
             cancellationToken);
     }
@@ -130,8 +131,12 @@ public sealed class InventoryService(
 
         var executor = await RequireAsync(actor, PermissionCodes.InventoryAdjust, cancellationToken);
         if (executor.Error is not null) return Result.Failure<InventoryMovementDto>(executor.Error);
+        var administratorSelfAuthorized = executor.Snapshot!.HighestRoleLevel == RoleLevel.Administrador &&
+            input.Authorization is null;
+        if (!administratorSelfAuthorized && input.Authorization is null)
+            return Result.Failure<InventoryMovementDto>(Validation("Las credenciales del autorizador son obligatorias."));
 
-        var requestHash = Hash(input.Canonical!);
+        var requestHash = Hash(input.Canonical! + (administratorSelfAuthorized ? "|ADMINISTRATOR_SELF" : ""));
         var existingOperation = await repository.GetIdempotencyAsync(installation.Id, input.Key!, cancellationToken);
         if (existingOperation is not null)
         {
@@ -155,7 +160,15 @@ public sealed class InventoryService(
         if (terminal is null) return Result.Failure<InventoryMovementDto>(ApplicationError.NotFound("la terminal activa"));
 
         var correlationId = Guid.CreateVersion7();
-        var authorizerResult = await ValidateAuthorizerAsync(actor, input.Authorization!, cancellationToken);
+        Result<Usuario> authorizerResult;
+        if (administratorSelfAuthorized)
+        {
+            var self = await repository.GetUserForUpdateAsync(actor.UserId, cancellationToken);
+            authorizerResult = self is not null && self.IsActive
+                ? Result.Success(self) : Result.Failure<Usuario>(ApplicationError.Forbidden());
+        }
+        else
+            authorizerResult = await ValidateAuthorizerAsync(actor, input.Authorization!, cancellationToken);
         if (authorizerResult.IsFailure)
         {
             await AuditWriter.WriteInventoryFailureAsync(
@@ -207,7 +220,9 @@ public sealed class InventoryService(
             PermisoId = permission.Id,
             TipoOperacion = AdjustmentOperationType,
             CorrelacionId = correlationId,
-            DescripcionOperacion = "Autorizacion de ajuste manual de inventario.",
+            DescripcionOperacion = administratorSelfAuthorized
+                ? "Autorización de ajuste de inventario por Administrador sin segundo autorizador."
+                : "Autorizacion de ajuste manual de inventario.",
             Motivo = reason.Codigo,
             MetodoAutenticacion = "PASSWORD",
             Resultado = "EXITOSA",
@@ -241,8 +256,11 @@ public sealed class InventoryService(
             AutorizacionOperacion = authorization
         };
 
-        authorizer.RegisterSuccessfulLogin(now);
-        await userRepository.UpdateAsync(authorizer, cancellationToken);
+        if (!administratorSelfAuthorized)
+        {
+            authorizer.RegisterSuccessfulLogin(now);
+            await userRepository.UpdateAsync(authorizer, cancellationToken);
+        }
         await repository.AddAuthorizationAsync(authorization, cancellationToken);
         await repository.AddMovementAsync(movement, cancellationToken);
         var operation = new OperacionIdempotente
@@ -270,6 +288,7 @@ public sealed class InventoryService(
             new
             {
                 ProductId = product.Id,
+                AuthorizationMode = administratorSelfAuthorized ? "ADMINISTRATOR_SELF" : "OTHER_USER",
                 movement.TipoMovimiento,
                 movement.CantidadStock,
                 movement.StockAnterior,
@@ -301,6 +320,9 @@ public sealed class InventoryService(
         user = await repository.GetUserForUpdateAsync(user.Id, cancellationToken) ?? user;
         if (!user.IsActive || user.Id == actor.UserId)
             return Result.Failure<Usuario>(InvalidAuthorizer());
+        if (!RoleHierarchy.IsHigherThan(user.HighestRoleLevel,
+            (await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken))!.HighestRoleLevel))
+            return Result.Failure<Usuario>(ApplicationError.AuthorizerRoleInsufficient());
         if (!passwordHasher.Verify(request.Password, user.PasswordHash))
         {
             var now = clock.UtcNow;
@@ -352,13 +374,14 @@ public sealed class InventoryService(
         if (request.ExpectedVersion <= 0)
             return (null, default, default, default, default, null, null, null,
                 Validation("La version esperada debe ser mayor que cero."));
-        if (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-            string.IsNullOrWhiteSpace(request.Authorization.Password))
+        if (request.Authorization is not null &&
+            (string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
+             string.IsNullOrWhiteSpace(request.Authorization.Password)))
             return (null, default, default, default, default, null, null, null,
-                Validation("Las credenciales del autorizador son obligatorias."));
+                Validation("Si envía authorization, incluya usuario y contraseña."));
 
         var observation = NormalizeOptional(request.Observation);
-        var authorization = new InventoryAdjustmentAuthorizationRequest(
+        var authorization = request.Authorization is null ? null : new InventoryAdjustmentAuthorizationRequest(
             request.Authorization.UserName.Trim(), request.Authorization.Password);
         var canonical = JsonSerializer.Serialize(new
         {
@@ -367,7 +390,7 @@ public sealed class InventoryService(
             request.ReasonId,
             request.ExpectedVersion,
             Observation = observation,
-            Authorizer = authorization.UserName.ToUpperInvariant()
+            Authorizer = authorization?.UserName.ToUpperInvariant()
         });
         return (key, request.ProductId, request.QuantityDelta, request.ReasonId, request.ExpectedVersion,
             observation, authorization, canonical, null);

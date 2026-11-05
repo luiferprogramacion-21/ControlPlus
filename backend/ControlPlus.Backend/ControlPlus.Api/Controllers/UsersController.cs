@@ -1,5 +1,6 @@
 using ControlPlus.Api.Authorization;
 using ControlPlus.Api.Security;
+using ControlPlus.Application.Common;
 using ControlPlus.Application.Security.Contracts;
 using Microsoft.AspNetCore.Mvc;
 

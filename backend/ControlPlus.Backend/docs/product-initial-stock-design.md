@@ -1,5 +1,14 @@
 # Alta de producto con inventario inicial
 
+Actualización de catálogo aprobada el 29 de octubre de 2026: el backend asigna
+`internalCode=P-000001` con numeración permanente; `generateBarcode=true` produce
+barras iguales a esa referencia en Code 128. Un código externo opcional admite
+`barcodeFormat=null` sin inferencia por longitud. No cambia el contrato de
+cantidad/costo, autorización, movimiento obligatorio ni fingerprint de la solicitud.
+Los replays anteriores conservan su resultado persistido. Esta evolución requiere
+la migración nueva de [referencias permanentes](permanent-product-references.md),
+separada de la migración de inventario inicial; no está aplicada a la base real.
+
 Estado: política aprobada por el usuario el 26 de octubre de 2026. Implementación
 preparada en código; la migración requiere aplicación controlada antes de usar el
 alta con existencias positivas en cualquier base persistente.

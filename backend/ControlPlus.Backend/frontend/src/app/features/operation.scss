@@ -1,0 +1,27 @@
+:host { display:block; min-width:0; }
+.operation { max-width:1500px; margin:auto; padding:24px; display:grid; gap:18px; }
+.operation__heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.operation h2,.operation h3 { margin:0; }
+.operation h2 { font-size:22px; }
+.operation h3 { font-size:19px; }
+.op-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; align-items:start; }
+.op-card { background:var(--cp-surface); border:1px solid var(--cp-border); border-radius:12px; padding:18px; box-shadow:var(--cp-shadow); min-width:0; display:grid; gap:12px; }
+.op-card p { margin:0; }
+.op-form label,.op-search label,.op-line label,.op-method label { display:grid; gap:5px; font-weight:500; min-width:0; }
+.op-form input,.op-form select,.op-form textarea,.op-search input,.op-line input,.op-line select,.op-method input { border:1px solid var(--cp-control-border); border-radius:6px; padding:9px; min-width:0; width:100%; }
+.op-form button { justify-self:start; }
+.op-search,.op-pay { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:end; }
+.op-pay { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.op-list { display:grid; max-height:48vh; overflow:auto; border-top:1px solid var(--cp-border); }
+.op-list > div { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid var(--cp-border); }
+.op-list small { display:block; color:var(--cp-text-secondary); font-size:13px; }
+.op-list .op-line { display:grid; grid-template-columns:minmax(130px,2fr) 85px 115px 85px auto auto; }
+.op-list .op-method { display:grid; grid-template-columns:minmax(140px,1fr) 140px auto; }
+.op-total { align-self:stretch; }
+.op-total > p { display:flex; justify-content:space-between; }
+.op-change { background:var(--cp-primary-soft); color:var(--cp-primary); border-radius:9px; padding:16px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:21px; }
+.op-change strong { font-size:32px; }
+.op-error,.op-notice { padding:12px; border-radius:8px; background:var(--cp-error-soft); color:var(--cp-error); }
+.op-notice { background:var(--cp-success-soft); color:var(--cp-success); }
+@media(max-width:950px) { .op-grid { grid-template-columns:1fr; } .op-list .op-line { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:600px) { .operation { padding:14px; } .op-list .op-line,.op-list .op-method { grid-template-columns:1fr 1fr; } .op-line > span { grid-column:1/-1; } }

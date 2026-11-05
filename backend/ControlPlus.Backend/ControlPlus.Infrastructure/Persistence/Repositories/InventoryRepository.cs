@@ -40,10 +40,14 @@ public sealed class EfInventoryRepository(OfficialControlPlusDbContext dbContext
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var pattern = $"%{query.Search}%";
-            source = source.Where(x =>
+            var term = query.Search.Trim().ToUpperInvariant();
+            var exactId = await dbContext.ProductoCodigo.Where(c => c.Codigo == term)
+                .Select(c => (Guid?)c.ProductoId).SingleOrDefaultAsync(cancellationToken);
+            source = exactId is not null ? source.Where(x => x.Id == exactId) : source.Where(x =>
                 EF.Functions.ILike(x.CodigoInterno, pattern) ||
                 EF.Functions.ILike(x.Nombre, pattern) ||
-                (x.CodigoBarras != null && EF.Functions.ILike(x.CodigoBarras, pattern)));
+                (x.CodigoBarras != null && EF.Functions.ILike(x.CodigoBarras, pattern)) ||
+                dbContext.ProductoCodigo.Any(c => c.ProductoId == x.Id && EF.Functions.ILike(c.Codigo, pattern)));
         }
 
         var count = await source.CountAsync(cancellationToken);

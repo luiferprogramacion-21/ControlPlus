@@ -111,3 +111,5 @@ aunque las rutas protegidas de Compras muestran los costos de sus documentos.
 
 Pedidos de compra y recepción parcial pertenecen al corte 3. La anulación de
 compras pertenece al corte 2. Consulte [purchases.md](purchases.md).
+
+**Jerarquía de autorización (5 de noviembre de 2026):** con credenciales, el autorizador debe tener rol base estrictamente superior al ejecutor: Cajero → Supervisor o Administrador; Supervisor → Administrador. Las autoautorizaciones aprobadas conservan sus condiciones. El permiso efectivo sigue siendo obligatorio.

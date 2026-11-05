@@ -1,3 +1,4 @@
+using ControlPlus.Domain.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -29,7 +30,7 @@ public sealed class LayawayCancellationService(
     {
         var input = Normalize(layawayId, idempotencyKey, request);
         if (input.Error is not null) return Task.FromResult(Fail(input.Error));
-        return loginAttempts.ExecuteAsync(input.AuthorizerName!,
+        return loginAttempts.ExecuteAsync(input.AuthorizerName ?? actor.UserId.ToString("N"),
             token => CancelWithinTransactionAsync(actor, layawayId, request, input, token),
             cancellationToken);
     }
@@ -44,10 +45,14 @@ public sealed class LayawayCancellationService(
         if (installation is null) return Fail(ApplicationError.NotFound("la instalación activa"));
         var snapshot = await users.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
         if (snapshot is null) return Fail(ApplicationError.Unauthorized());
-        if (snapshot.HighestRoleLevel != RoleLevel.Administrador ||
+        if (snapshot.HighestRoleLevel < RoleLevel.Supervisor ||
             !snapshot.PermissionCodes.Contains(PermissionCodes.LayawayCancel, StringComparer.OrdinalIgnoreCase) ||
             !snapshot.PermissionCodes.Contains(PermissionCodes.LayawayRefundDecide, StringComparer.OrdinalIgnoreCase))
             return Fail(ApplicationError.Forbidden());
+        var administratorSelfAuthorized = snapshot.HighestRoleLevel == RoleLevel.Administrador &&
+            request.Authorization is null;
+        if (!administratorSelfAuthorized && request.Authorization is null)
+            return Fail(ApplicationError.Validation("El Supervisor debe enviar authorization para cancelar un apartado."));
 
         var previous = await sales.GetIdempotencyAsync(installation.Id, input.Key!, cancellationToken);
         if (previous is not null)
@@ -131,29 +136,38 @@ public sealed class LayawayCancellationService(
             }
         }
 
-        var candidate = await users.GetByUserNameAsync(input.AuthorizerName!, cancellationToken);
-        if (candidate is null) return Fail(ApplicationError.Forbidden());
-        var authorizer = await sales.GetUserForUpdateAsync(candidate.Id, cancellationToken);
-        if (authorizer is null || !authorizer.IsActive || authorizer.Id == actor.UserId ||
-            authorizer.HighestRoleLevel < RoleLevel.Supervisor)
-            return Fail(ApplicationError.Forbidden());
-        if (!passwordHasher.Verify(request.Authorization.Password, authorizer.PasswordHash))
+        Usuario? authorizer;
+        if (administratorSelfAuthorized)
         {
-            var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
-            await users.UpdateAsync(authorizer, cancellationToken);
-            if (locked)
-                await AuditWriter.WriteAsync(audits, clock, authorizer.Id, AuditAction.UserLocked,
-                    nameof(Usuario), authorizer.Id,
-                    new { authorizer.Id, authorizer.FailedLoginAttempts }, cancellationToken);
-            await AuditWriter.WriteCashFailureAsync(audits, clock, actor.UserId,
-                AuditAction.LayawayAuthorizationRejected, nameof(Apartado), layaway.Id,
-                new { Reason = "INVALID_AUTHORIZER_CREDENTIALS" }, Guid.CreateVersion7(),
-                terminal.Id, null, cancellationToken);
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-            return Fail(ApplicationError.Forbidden());
+            authorizer = await sales.GetUserForUpdateAsync(actor.UserId, cancellationToken);
+            if (authorizer is null || !authorizer.IsActive) return Fail(ApplicationError.Forbidden());
         }
-        if (!await permissions.HasPermissionAsync(authorizer.Id, PermissionCodes.LayawayCancel,
-                cancellationToken)) return Fail(ApplicationError.Forbidden());
+        else
+        {
+            var candidate = await users.GetByUserNameAsync(input.AuthorizerName!, cancellationToken);
+            if (candidate is null) return Fail(ApplicationError.Forbidden());
+            authorizer = await sales.GetUserForUpdateAsync(candidate.Id, cancellationToken);
+            if (authorizer is null || !authorizer.IsActive || authorizer.Id == actor.UserId ||
+                !RoleHierarchy.IsHigherThan(authorizer.HighestRoleLevel, snapshot.HighestRoleLevel))
+                return Fail(ApplicationError.Forbidden());
+            if (!passwordHasher.Verify(request.Authorization!.Password, authorizer.PasswordHash))
+            {
+                var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
+                await users.UpdateAsync(authorizer, cancellationToken);
+                if (locked)
+                    await AuditWriter.WriteAsync(audits, clock, authorizer.Id, AuditAction.UserLocked,
+                        nameof(Usuario), authorizer.Id,
+                        new { authorizer.Id, authorizer.FailedLoginAttempts }, cancellationToken);
+                await AuditWriter.WriteCashFailureAsync(audits, clock, actor.UserId,
+                    AuditAction.LayawayAuthorizationRejected, nameof(Apartado), layaway.Id,
+                    new { Reason = "INVALID_AUTHORIZER_CREDENTIALS" }, Guid.CreateVersion7(),
+                    terminal.Id, null, cancellationToken);
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                return Fail(ApplicationError.Forbidden());
+            }
+            if (!await permissions.HasPermissionAsync(authorizer.Id, PermissionCodes.LayawayCancel,
+                    cancellationToken)) return Fail(ApplicationError.Forbidden());
+        }
         var permission = await permissionRepository.GetByCodeAsync(PermissionCodes.LayawayCancel,
             cancellationToken);
         if (permission is null) return Fail(ApplicationError.Conflict("El permiso de cancelación no existe."));
@@ -208,7 +222,9 @@ public sealed class LayawayCancellationService(
             Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId,
             UsuarioAutorizadorId = authorizer.Id, PermisoId = permission.Id,
             TipoOperacion = "ANULAR_APARTADO", CorrelacionId = correlationId,
-            DescripcionOperacion = "Autorización de cancelación de apartado.",
+            DescripcionOperacion = administratorSelfAuthorized
+                ? "Autorización de cancelación de apartado por Administrador sin segundo autorizador."
+                : "Autorización de cancelación de apartado.",
             MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA", Estado = "UTILIZADA",
             FechaSolicitud = now.UtcDateTime, FechaExpiracion = now.AddMinutes(5).UtcDateTime,
             FechaUtilizacion = now.UtcDateTime
@@ -230,8 +246,11 @@ public sealed class LayawayCancellationService(
                 methods.Single(m => m.Id == x.MetodoPagoId).Codigo,
                 x.Valor, x.Referencia, now)).ToArray());
 
-        authorizer.RegisterSuccessfulLogin(now);
-        await users.UpdateAsync(authorizer, cancellationToken);
+        if (!administratorSelfAuthorized)
+        {
+            authorizer.RegisterSuccessfulLogin(now);
+            await users.UpdateAsync(authorizer, cancellationToken);
+        }
         await sales.AddAuthorizationAsync(authorization, cancellationToken);
         await sales.AddInventoryMovementsAsync(movements, cancellationToken);
         if (cashMovement is not null) await sales.AddCashMovementAsync(cashMovement, cancellationToken);
@@ -249,7 +268,8 @@ public sealed class LayawayCancellationService(
             AuditAction.LayawayCancelled, nameof(Apartado), layaway.Id,
             new { layaway.Id, layaway.Estado, Paid = paid, Refunded = input.Amount,
                 Retained = paid - input.Amount, RefundIds = refunds.Select(x => x.Id).ToArray(),
-                InventoryMovementIds = movements.Select(x => x.Id).ToArray() },
+                InventoryMovementIds = movements.Select(x => x.Id).ToArray(),
+                AuthorizationMode = administratorSelfAuthorized ? "ADMINISTRATOR_SELF" : "OTHER_USER" },
             correlationId, authorizer.Id, session?.Id, terminal.Id, input.Observation,
             cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -269,13 +289,14 @@ public sealed class LayawayCancellationService(
         CancelLayawayRequest request)
     {
         if (layawayId == Guid.Empty || string.IsNullOrWhiteSpace(key) || key.Trim().Length > 100 ||
-            request is null || request.ExpectedVersion <= 0 || request.Authorization is null ||
-            string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-            string.IsNullOrWhiteSpace(request.Authorization.Password) ||
+            request is null || request.ExpectedVersion <= 0 ||
+            (request.Authorization is not null &&
+             (string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
+              string.IsNullOrWhiteSpace(request.Authorization.Password))) ||
             request.Refunds is null || !CashMoney.IsValid(request.RefundAmount, allowNegative: false))
-            return NormalizedCancellation.Fail("Clave, versión, importe, reembolsos y autorización son obligatorios.");
+            return NormalizedCancellation.Fail("Clave, versión, importe y reembolsos son obligatorios; si envía authorization, incluya usuario y contraseña.");
         var observation = string.IsNullOrWhiteSpace(request.Observation) ? null : request.Observation.Trim();
-        if (observation?.Length > 1000 || request.Authorization.UserName.Trim().Length > 100 ||
+        if (observation?.Length > 1000 || request.Authorization?.UserName.Trim().Length > 100 ||
             request.Refunds.Count > 3 ||
             (request.RefundAmount == 0 && request.Refunds.Count != 0) ||
             (request.RefundAmount > 0 && request.Refunds.Count == 0))
@@ -304,7 +325,7 @@ public sealed class LayawayCancellationService(
             return NormalizedCancellation.Fail("El importe acumulado excede el rango permitido.");
         }
         var sorted = refunds.OrderBy(x => x.MethodCode).ToArray();
-        var name = request.Authorization.UserName.Trim().ToUpperInvariant();
+        var name = request.Authorization?.UserName.Trim().ToUpperInvariant();
         var canonical = JsonSerializer.Serialize(new { layawayId, request.ExpectedVersion,
             request.RefundAmount, Refunds = sorted, request.ReasonId, Observation = observation,
             AuthorizerUserName = name });

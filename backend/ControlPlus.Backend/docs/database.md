@@ -1,5 +1,23 @@
 # Base de datos
 
+## Catálogo: referencias permanentes, preparado sin aplicación real
+
+El 30 de octubre de 2026 se comprobaron los TRX Windows de Catálogo: migraciones
+**6/6**, API **49/49** y Domain **70/70**, sin errores ni omisiones. La migración
+`20261029010000_PermanentProductReferencesV1` continúa **sin aplicar a la base
+real**. [Evidencia](testing/catalog-references-20261029.md) y
+[procedimiento PowerShell 5.1 para revisión](catalog-reference-maintenance.md).
+
+El objetivo tiene una protección adicional en el migrador: debe ser la primera
+pendiente, con las doce predecesoras aplicadas, incluida
+`20261028010000_SaleReceiptDataSnapshotV1`. No debe confundirse con el
+comportamiento genérico que sí puede ejecutar una cadena hasta el destino.
+Una predecesora faltante exige revisión y autorización separadas. El historial
+real no se consultó durante esta preparación. No existe postflight CLI de
+Catálogo: se prepara SQL de solo lectura y huellas de conservación, sin
+ejecutarlo. Respaldo, restauración temporal, ensayo, aplicación y postflight
+persistentes siguen pendientes de revisión y autorización.
+
 ## Fuente oficial
 
 La fuente de verdad es `docs/ControlPlus_Fase4_Documento_y_Complementos.zip` desde la raíz del repositorio. El ZIP contiene el MER, el diccionario y `Script_Base_de_Datos_PostgreSQL_V3.sql`; Infrastructure lo incrusta y la migración base ejecuta el SQL original sobre una base vacía.
@@ -152,3 +170,6 @@ invalida el éxito del migrador ni reemplaza la comprobación independiente.
 Esta migración ya está aplicada en la base persistente local: no repetirla ni
 intentar su reversión automática. La API normal no aplica migraciones.
 El contrato de alta se describe en [product-initial-stock-design.md](product-initial-stock-design.md).
+# Acceso a códigos de producto (2 de noviembre de 2026)
+
+La migración compensatoria `20261102010000_GrantProductCodeAccessV1` fue aplicada una vez a `controlplus` por el operador el 2 de noviembre de 2026, con respaldo verificado y marcador `PRODUCT_CODE_GRANT_OK`. Concede a `controlplus_app` los permisos requeridos sobre los objetos nuevos de referencias permanentes. **No repetirla.** Evidencia y procedimiento histórico: [product-code-access.md](product-code-access.md).

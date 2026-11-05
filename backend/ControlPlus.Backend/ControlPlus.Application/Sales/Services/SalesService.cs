@@ -1,3 +1,4 @@
+using ControlPlus.Domain.Security;
 using System.Data;
 using System.Security.Cryptography;
 using System.Text;
@@ -44,7 +45,7 @@ public sealed partial class SalesService(
 
         if (input.SaleType == "CREDITO")
             return await loginAttemptCoordinator.ExecuteAsync(
-                request.Authorization!.UserName.Trim().ToUpperInvariant(),
+                request.Authorization?.UserName.Trim().ToUpperInvariant() ?? actor.UserId.ToString("N"),
                 token => ConfirmWithinTransactionAsync(actor, request, input, token), cancellationToken);
 
         await using var transaction = await transactionManager.BeginAsync(IsolationLevel.ReadCommitted, cancellationToken);
@@ -66,8 +67,21 @@ public sealed partial class SalesService(
         if (input.SaleType == "CREDITO" &&
             !authorization.PermissionCodes.Contains(PermissionCodes.CreditRequest, StringComparer.OrdinalIgnoreCase))
             return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+        var creditSelfMode = input.SaleType == "CREDITO" && request.Authorization is null
+            ? authorization.HighestRoleLevel switch
+            {
+                RoleLevel.Administrador => "ADMINISTRATOR_SELF",
+                RoleLevel.Supervisor => "SUPERVISOR_SELF",
+                _ => null
+            }
+            : null;
+        if (input.SaleType == "CREDITO" && request.Authorization is null && creditSelfMode is null)
+            return Result.Failure<SaleDto>(Validation("El Cajero debe enviar authorization para una venta a crédito."));
+        if (creditSelfMode is not null &&
+            !authorization.PermissionCodes.Contains(PermissionCodes.CreditAuthorize, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<SaleDto>(ApplicationError.Forbidden());
 
-        var requestHash = Hash(input.Canonical!);
+        var requestHash = Hash(input.Canonical! + (creditSelfMode is null ? "" : "|" + creditSelfMode));
         var existingOperation = await repository.GetIdempotencyAsync(installation.Id, input.Key!, cancellationToken);
         if (existingOperation is not null)
         {
@@ -128,27 +142,36 @@ public sealed partial class SalesService(
         Usuario? creditAuthorizer = null;
         if (input.SaleType == "CREDITO")
         {
-            var candidate = await userRepository.GetByUserNameAsync(request.Authorization!.UserName.Trim(), cancellationToken);
-            if (candidate is null) return Result.Failure<SaleDto>(ApplicationError.Forbidden());
-            creditAuthorizer = await repository.GetUserForUpdateAsync(candidate.Id, cancellationToken);
-            if (creditAuthorizer is null || !creditAuthorizer.IsActive || creditAuthorizer.Id == actor.UserId ||
-                creditAuthorizer.HighestRoleLevel < RoleLevel.Supervisor)
-                return Result.Failure<SaleDto>(ApplicationError.Forbidden());
-            if (!passwordHasher.Verify(request.Authorization.Password, creditAuthorizer.PasswordHash))
+            if (creditSelfMode is not null)
             {
-                var locked = creditAuthorizer.RegisterFailedLogin(clock.UtcNow);
-                await userRepository.UpdateAsync(creditAuthorizer, cancellationToken);
-                if (locked)
-                    await AuditWriter.WriteAsync(auditRepository, clock, creditAuthorizer.Id,
-                        AuditAction.UserLocked, nameof(Usuario), creditAuthorizer.Id,
-                        new { creditAuthorizer.Id, creditAuthorizer.FailedLoginAttempts }, cancellationToken);
-                await AuditWriter.WriteCreditAuthorizationFailureAsync(auditRepository, clock,
-                    actor.UserId, Guid.CreateVersion7(), terminal.Id, cancellationToken);
-                await unitOfWork.SaveChangesAsync(cancellationToken);
-                return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+                creditAuthorizer = await repository.GetUserForUpdateAsync(actor.UserId, cancellationToken);
+                if (creditAuthorizer is null || !creditAuthorizer.IsActive)
+                    return Result.Failure<SaleDto>(ApplicationError.Forbidden());
             }
-            if (!await permissionChecker.HasPermissionAsync(creditAuthorizer.Id, PermissionCodes.CreditAuthorize, cancellationToken))
-                return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+            else
+            {
+                var candidate = await userRepository.GetByUserNameAsync(request.Authorization!.UserName.Trim(), cancellationToken);
+                if (candidate is null) return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+                creditAuthorizer = await repository.GetUserForUpdateAsync(candidate.Id, cancellationToken);
+                if (creditAuthorizer is null || !creditAuthorizer.IsActive || creditAuthorizer.Id == actor.UserId ||
+                    !RoleHierarchy.IsHigherThan(creditAuthorizer.HighestRoleLevel, authorization.HighestRoleLevel))
+                    return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+                if (!passwordHasher.Verify(request.Authorization.Password, creditAuthorizer.PasswordHash))
+                {
+                    var locked = creditAuthorizer.RegisterFailedLogin(clock.UtcNow);
+                    await userRepository.UpdateAsync(creditAuthorizer, cancellationToken);
+                    if (locked)
+                        await AuditWriter.WriteAsync(auditRepository, clock, creditAuthorizer.Id,
+                            AuditAction.UserLocked, nameof(Usuario), creditAuthorizer.Id,
+                            new { creditAuthorizer.Id, creditAuthorizer.FailedLoginAttempts }, cancellationToken);
+                    await AuditWriter.WriteCreditAuthorizationFailureAsync(auditRepository, clock,
+                        actor.UserId, Guid.CreateVersion7(), terminal.Id, cancellationToken);
+                    await unitOfWork.SaveChangesAsync(cancellationToken);
+                    return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+                }
+                if (!await permissionChecker.HasPermissionAsync(creditAuthorizer.Id, PermissionCodes.CreditAuthorize, cancellationToken))
+                    return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+            }
         }
 
         var sequence = await repository.GetSaleSequenceForUpdateAsync(installation.Id, installation.Serie, cancellationToken);
@@ -342,7 +365,12 @@ public sealed partial class SalesService(
                 Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId,
                 UsuarioAutorizadorId = creditAuthorizer!.Id, PermisoId = permission.Id,
                 TipoOperacion = "CREAR_CREDITO", CorrelacionId = correlationId,
-                DescripcionOperacion = "Autorización de venta a crédito.", MetodoAutenticacion = "PASSWORD",
+                DescripcionOperacion = creditSelfMode switch
+                {
+                    "ADMINISTRATOR_SELF" => "Autorización de venta a crédito por Administrador sin segundo autorizador.",
+                    "SUPERVISOR_SELF" => "Autorización de venta a crédito por Supervisor sin segundo autorizador.",
+                    _ => "Autorización de venta a crédito."
+                }, MetodoAutenticacion = "PASSWORD",
                 Resultado = "EXITOSA", Estado = "UTILIZADA", FechaSolicitud = now.UtcDateTime,
                 FechaExpiracion = now.AddMinutes(5).UtcDateTime, FechaUtilizacion = now.UtcDateTime
             };
@@ -353,8 +381,11 @@ public sealed partial class SalesService(
                 FechaOtorgamiento = shift.FechaOperativa, FechaVencimiento = request.DueDate!.Value,
                 Estado = "PENDIENTE", Version = 1
             };
-            creditAuthorizer.RegisterSuccessfulLogin(now);
-            await userRepository.UpdateAsync(creditAuthorizer, cancellationToken);
+            if (creditSelfMode is null)
+            {
+                creditAuthorizer.RegisterSuccessfulLogin(now);
+                await userRepository.UpdateAsync(creditAuthorizer, cancellationToken);
+            }
             await repository.AddAuthorizationAsync(operationAuthorization, cancellationToken);
             await repository.AddCreditAsync(credit, cancellationToken);
         }
@@ -426,7 +457,8 @@ public sealed partial class SalesService(
         if (credit is not null)
             await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId,
                 AuditAction.CreditCreated, nameof(Credito), credit.Id,
-                new { credit.Id, credit.VentaId, credit.Estado, CorrelationId = correlationId }, cancellationToken);
+                new { credit.Id, credit.VentaId, credit.Estado, CorrelationId = correlationId,
+                    AuthorizationMode = creditSelfMode ?? "OTHER_USER" }, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         if (operatorSession is not null)
@@ -712,9 +744,10 @@ public sealed partial class SalesService(
         if (request.Payments is null || (saleType == "CONTADO" && request.Payments.Count == 0))
             return NormalizedInput.Fail("La venta de contado debe contener al menos un pago.");
         if (saleType == "CREDITO" && (request.Payments.Count != 0 || request.DueDate is null ||
-            request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-            string.IsNullOrWhiteSpace(request.Authorization.Password)))
-            return NormalizedInput.Fail("El crédito requiere vencimiento y autorizador, sin pago inicial.");
+            (request.Authorization is not null &&
+             (string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
+              string.IsNullOrWhiteSpace(request.Authorization.Password)))))
+            return NormalizedInput.Fail("El crédito requiere vencimiento, sin pago inicial; si envía authorization, incluya usuario y contraseña.");
         if (saleType == "CONTADO" && (request.DueDate is not null || request.Authorization is not null))
             return NormalizedInput.Fail("Una venta de contado no admite vencimiento ni autorización de crédito.");
         if (request.DiscountReason?.Length > 2000)
@@ -770,17 +803,26 @@ public sealed partial class SalesService(
                 DiscountReason = NormalizeOptional(request.DiscountReason),
                 Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal)
             })
-            : JsonSerializer.Serialize(new
-            {
-                SaleType = saleType,
-                request.CustomerId,
-                Lines = lines.OrderBy(x => x.ProductId),
-                GeneralDiscount = general.Value,
-                DiscountReason = NormalizeOptional(request.DiscountReason),
-                Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal),
-                request.DueDate,
-                Authorizer = request.Authorization!.UserName.Trim().ToUpperInvariant()
-            });
+            : request.Authorization is null
+                ? JsonSerializer.Serialize(new
+                {
+                    SaleType = saleType, request.CustomerId,
+                    Lines = lines.OrderBy(x => x.ProductId), GeneralDiscount = general.Value,
+                    DiscountReason = NormalizeOptional(request.DiscountReason),
+                    Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal),
+                    request.DueDate, AuthorizationMode = "SELF"
+                })
+                : JsonSerializer.Serialize(new
+                {
+                    SaleType = saleType,
+                    request.CustomerId,
+                    Lines = lines.OrderBy(x => x.ProductId),
+                    GeneralDiscount = general.Value,
+                    DiscountReason = NormalizeOptional(request.DiscountReason),
+                    Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal),
+                    request.DueDate,
+                    Authorizer = request.Authorization.UserName.Trim().ToUpperInvariant()
+                });
         return new NormalizedInput(key.Trim(), lines, general.Value, payments, saleType, canonical, null);
     }
 

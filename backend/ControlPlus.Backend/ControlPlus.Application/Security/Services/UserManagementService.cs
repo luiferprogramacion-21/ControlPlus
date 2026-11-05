@@ -353,23 +353,21 @@ public sealed class UserManagementService : IUserManagementService
         }
         else
         {
-            var isSupervisorResettingCashier =
-                actor.HighestRoleLevel == RoleLevel.Supervisor &&
-                user.HighestRoleLevel == RoleLevel.Cajero &&
-                actor.HasPermission(PermissionCodes.CashierPasswordsReset);
-
-            if (!isSupervisorResettingCashier)
+            var roleError = RequireAdministrator(actor);
+            if (roleError is not null)
             {
-                var authorizationError = await RequireUsersManageAsync(actor, cancellationToken);
-                if (authorizationError is not null)
-                {
-                    return Result.Failure(authorizationError);
-                }
+                return Result.Failure(roleError);
+            }
 
-                if (!CanManageUser(actor, user))
-                {
-                    return Result.Failure(SecurityErrors.CannotManageSameOrHigherRole);
-                }
+            var authorizationError = await RequireUsersManageAsync(actor, cancellationToken);
+            if (authorizationError is not null)
+            {
+                return Result.Failure(authorizationError);
+            }
+
+            if (!CanManageUser(actor, user))
+            {
+                return Result.Failure(SecurityErrors.CannotManageSameOrHigherRole);
             }
         }
 
@@ -527,7 +525,14 @@ public sealed class UserManagementService : IUserManagementService
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
         if (user is null) return Result.Failure<IReadOnlyCollection<EffectiveUserPermissionDto>>(ApplicationError.NotFound("el usuario"));
 
-        var catalog = await _permissionRepository.ListAsync(new PermissionListQuery(PageSize: 200), cancellationToken);
+        var permissions = new List<ControlPlus.Domain.OfficialModel.Permiso>();
+        for (var page = 1; ; page++)
+        {
+            var batch = await _permissionRepository.ListAsync(
+                new PermissionListQuery(IsActive: true, Page: page, PageSize: 200), cancellationToken);
+            permissions.AddRange(batch.Items);
+            if (batch.Items.Count == 0 || permissions.Count >= batch.TotalCount) break;
+        }
         var rolePermissionIds = user.UserRoles
             .Where(x => x.Role.IsActive)
             .SelectMany(x => x.Role.RolePermissions)
@@ -536,7 +541,7 @@ public sealed class UserManagementService : IUserManagementService
             .ToHashSet();
         var overrides = user.UsuarioPermiso.ToDictionary(x => x.PermisoId);
 
-        var items = catalog.Items.Select(permission =>
+        var items = permissions.Select(permission =>
         {
             overrides.TryGetValue(permission.Id, out var permissionOverride);
             var granted = permissionOverride?.IsGranted ?? rolePermissionIds.Contains(permission.Id);

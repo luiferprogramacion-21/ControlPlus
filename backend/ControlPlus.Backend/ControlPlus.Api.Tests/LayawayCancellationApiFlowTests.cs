@@ -14,6 +14,56 @@ namespace ControlPlus.Api.Tests;
 
 public sealed partial class LayawayCreateApiFlowTests
 {
+    [Fact, Trait("Category", "Integration")]
+    public async Task AdministratorCancelsLayawayWithoutSecondAuthorizer_AndReplays()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client, sharedShift: false);
+        var created = await CreateForCancellationAsync(client, scenario, "admin-cancel-self-create");
+        var request = CancellationRequest(created.Version, 0m, 0m, 0m) with { Authorization = null };
+        var cancelled = await ReadAsync<LayawayCancellationDto>(await PostCancellationAsync(client,
+            created.Id, "admin-cancel-self", request), HttpStatusCode.OK);
+        var replay = await ReadAsync<LayawayCancellationDto>(await PostCancellationAsync(client,
+            created.Id, "admin-cancel-self", request), HttpStatusCode.OK);
+        Assert.Equal(JsonSerializer.Serialize(cancelled), JsonSerializer.Serialize(replay));
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var layaway = await db.Apartado.AsNoTracking().SingleAsync(x => x.Id == created.Id);
+        var authorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.Id == layaway.AutorizacionAnulacionId);
+        Assert.Equal(authorization.UsuarioSolicitanteId, authorization.UsuarioAutorizadorId);
+        Assert.Equal("PASSWORD", authorization.MetodoAutenticacion);
+        Assert.Null(authorization.CredencialAutorizadorId);
+        Assert.Contains("sin segundo autorizador", authorization.DescripcionOperacion);
+        Assert.Equal(1, await db.EventoAuditoria.CountAsync(x => x.EntidadId == created.Id &&
+            x.Accion == "LAYAWAYCANCELLED"));
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task SupervisorCanCancelAndDecideRefund_WithAnotherAdministratorAuthorizing()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        _ = await StartSessionAsync(client, scenario, scenario.Admin);
+        var created = await CreateForCancellationAsync(client, scenario, "supervisor-cancel-create");
+        _ = await StartSessionAsync(client, scenario, scenario.Supervisor);
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        var request = CancellationRequest(created.Version, 100m, 100m, 0m) with
+        {
+            Authorization = new(AdminName, AdminPassword)
+        };
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostCancellationAsync(client, created.Id,
+            "supervisor-cancel-no-auth", request with { Authorization = null })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostCancellationAsync(client, created.Id,
+            "supervisor-cancel-self-auth", request with
+            { Authorization = new(SupervisorName, SupervisorPassword) })).StatusCode);
+        var cancelled = await ReadAsync<LayawayCancellationDto>(await PostCancellationAsync(client,
+            created.Id, "supervisor-cancel-with-admin", request), HttpStatusCode.OK);
+        Assert.Equal(100m, cancelled.Refunded);
+        Assert.Equal(scenario.Supervisor.User.Id, cancelled.CancelledByUserId);
+        Assert.Equal(scenario.Admin.User.Id, cancelled.AuthorizedByUserId);
+    }
+
     [Theory, Trait("Category", "Integration")]
     [InlineData(0, 0, 0)]
     [InlineData(300, 300, 0)]
@@ -215,7 +265,7 @@ public sealed partial class LayawayCreateApiFlowTests
         SetBearer(client, scenario.Admin.AccessToken);
         var created = await ReadAsync<CreatedLayawayDto>(await PostAsync(client,
             "cancel-payment-race-create", Request(scenario,
-                [new("EFECTIVO", 201m, 201m, null)])), HttpStatusCode.Created);
+                [new("EFECTIVO", 201m, 201m, null)]) with { Authorization = null }), HttpStatusCode.Created);
         var cancel = PostCancellationAsync(client, created.Id, "cancel-payment-race",
             CancellationRequest(created.Version, 0, 0, 0));
         var payment = PostPaymentAsync(client, created.Id, "payment-cancel-race",
@@ -241,7 +291,8 @@ public sealed partial class LayawayCreateApiFlowTests
         SetBearer(client, scenario.Admin.AccessToken);
         var created = await ReadAsync<CreatedLayawayDto>(await PostAsync(client,
             "cancel-no-cash-create", Request(scenario,
-                [new("NEQUI", 1001m, null, "INITIAL-NEQUI")])), HttpStatusCode.Created);
+                [new("NEQUI", 1001m, null, "INITIAL-NEQUI")]) with { Authorization = null }),
+            HttpStatusCode.Created);
         var before = await CaptureAsync(scenario);
         Assert.Equal(HttpStatusCode.Conflict, (await PostCancellationAsync(client, created.Id,
             "cancel-no-cash", CancellationRequest(created.Version, 1001, 1001, 0))).StatusCode);
@@ -428,7 +479,8 @@ public sealed partial class LayawayCreateApiFlowTests
     {
         SetBearer(client, scenario.Admin.AccessToken);
         return await ReadAsync<CreatedLayawayDto>(await PostAsync(client, key,
-            Request(scenario, [new("EFECTIVO", 1001m, 1001m, null)])), HttpStatusCode.Created);
+            Request(scenario, [new("EFECTIVO", 1001m, 1001m, null)]) with { Authorization = null }),
+            HttpStatusCode.Created);
     }
 
     private static CancelLayawayRequest CancellationRequest(long version, decimal amount,

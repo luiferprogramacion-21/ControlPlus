@@ -208,6 +208,11 @@ public sealed partial class SalesApiFlowTests
                 [new("EFECTIVO", 400m, 400m, null),
                  new("TRANSFERENCIA", 600m, null, "VOID-SALE-TRANSFER")])), HttpStatusCode.Created);
 
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostSaleCancellationAsync(client,
+            sale.Id, "void-supervisor-without-auth", new CancelSaleRequest(
+                sale.Version, Guid.CreateVersion7(), null, null))).StatusCode);
+
         SetBearer(client, scenario.Admin.AccessToken);
         var reasons = await ReadAsync<IReadOnlyCollection<SaleCancellationReasonDto>>(
             await client.PostAsync("/api/sales/cancellation-reasons/initialize", null), HttpStatusCode.OK);
@@ -221,8 +226,7 @@ public sealed partial class SalesApiFlowTests
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var before = await db.Producto.AsNoTracking().SingleAsync(x => x.Id == scenario.Products.Standard);
-        var request = new CancelSaleRequest(sale.Version, reason.Id, null,
-            new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword));
+        var request = new CancelSaleRequest(sale.Version, reason.Id, null, null);
         var result = await ReadAsync<CancelSaleDto>(await PostSaleCancellationAsync(client,
             sale.Id, "void-cash-key", request), HttpStatusCode.OK);
         Assert.Equal("ANULADA", result.State);
@@ -239,6 +243,18 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(0m, expectedByMethod.Single(x => x.Code == "EFECTIVO").ExpectedAmount);
         Assert.Equal(0m, expectedByMethod.Single(x => x.Code == "TRANSFERENCIA").ExpectedAmount);
         Assert.Single(await db.AnulacionVenta.Where(x => x.VentaId == sale.Id).ToArrayAsync());
+        var cancellationAuthorizationId = (await db.AnulacionVenta.AsNoTracking()
+            .SingleAsync(c => c.VentaId == sale.Id)).AutorizacionOperacionId;
+        var selfAuthorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.Id == cancellationAuthorizationId);
+        Assert.Equal(scenario.Admin.User.Id, selfAuthorization.UsuarioSolicitanteId);
+        Assert.Equal(scenario.Admin.User.Id, selfAuthorization.UsuarioAutorizadorId);
+        Assert.Equal("PASSWORD", selfAuthorization.MetodoAutenticacion);
+        Assert.Null(selfAuthorization.CredencialAutorizadorId);
+        Assert.Contains("sin segundo autorizador", selfAuthorization.DescripcionOperacion);
+        var selfAudit = await db.EventoAuditoria.AsNoTracking()
+            .SingleAsync(x => x.Accion == "SALECANCELLED" && x.EntidadId == sale.Id);
+        Assert.Contains("ADMINISTRATOR_SELF", selfAudit.DatosNuevos);
         Assert.Single(await db.MovimientoInventario.Where(x => x.AnulacionVentaId == result.CancellationId).ToArrayAsync());
         var operationCount = await db.OperacionIdempotente.CountAsync();
         var movementCount = await db.MovimientoCaja.CountAsync();

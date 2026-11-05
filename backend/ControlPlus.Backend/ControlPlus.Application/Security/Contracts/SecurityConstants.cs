@@ -18,7 +18,6 @@ public static class PermissionCodes
     // Permission.Code is normalized by Domain to uppercase, so policies and seed data use the same canonical values.
     public const string UsersRead = "USERS.READ";
     public const string UsersManage = "USERS.MANAGE";
-    public const string CashierPasswordsReset = "USERS.CASHIER_PASSWORD_RESET";
     public const string RolesRead = "ROLES.READ";
     public const string RolesManage = "ROLES.MANAGE";
     public const string PermissionsRead = "PERMISSIONS.READ";

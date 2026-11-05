@@ -1,0 +1,55 @@
+<section class="prototype-operation cash-page">
+  <div class="module-heading"><div><h2>{{ closingMode() ? 'Arqueo y cierre' : 'Caja' }}</h2><p>{{ closingMode() ? 'Recuento por medio de pago' : state()?.currentShift ? (state()?.requiresPreviousShiftClosure ? 'Turno anterior pendiente de cierre' : 'Turno abierto') : 'Apertura de turno' }}</p></div><div class="cash-heading-actions">@if (state()?.hasOpenShift && session.has('CASH.SHIFT_MANAGE')) { <button class="button button--secondary" type="button" (click)="closingMode.set(!closingMode())">{{ closingMode() ? 'Volver al turno' : 'Arqueo y cierre' }}</button> }<button class="button button--secondary" type="button" (click)="refresh()" [disabled]="loading() || busy()">Actualizar</button></div></div>
+  @if (loading()) { <p class="field-hint" role="status">Cargando información de caja…</p> }
+  @if (error()) { <p class="inline-feedback inline-feedback--error" role="alert"><span>!</span>{{ error() }}</p> }
+  @if (notice()) { <p class="inline-feedback inline-feedback--success" role="status"><span>✓</span>{{ notice() }}</p> }
+  @if (state(); as cash) {
+    @if (!cash.isConfigured) {
+      <section class="panel panel--padded cash-message"><span class="badge badge--warning">Caja sin configurar</span><p>Un administrador debe configurar la caja antes de abrir un turno.</p></section>
+    } @else if (!cash.hasOpenShift) {
+      <div class="opening-grid">
+        <form class="panel panel--padded opening-form cash-form" (submit)="$event.preventDefault(); open()"><div class="panel-heading"><h2>Apertura de caja</h2></div>
+          <div class="form-grid form-grid--two"><div><label class="field-label" for="initial-amount">Fondo inicial</label><div class="money-field"><span>$</span><input id="initial-amount" name="initialAmount" type="number" min="0" step="1" [(ngModel)]="initialAmount" inputmode="numeric" autofocus><b>COP</b></div></div>
+            <div><label class="field-label" for="operation-mode">Modalidad</label><input id="operation-mode" class="text-field text-field--readonly" [value]="configuredModeLabel(cash.defaultShiftMode)" readonly></div>
+          </div>
+          <label class="field-label field-label--spaced" for="opening-notes">Observaciones <span>(opcional)</span></label><textarea id="opening-notes" class="text-field textarea" name="openObservations" [(ngModel)]="openObservations" rows="2" maxlength="500"></textarea>
+          <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="busy() || !validMoney(initialAmount, true)">{{ busy() ? 'Abriendo…' : 'Abrir caja' }}</button></div>
+        </form>
+        <aside class="panel panel--padded terminal-card"><div class="panel-heading"><h2>Datos del turno</h2></div><dl class="status-list"><div><dt>Establecimiento</dt><dd>Baratísimo</dd></div><div><dt>Estado</dt><dd><span class="badge badge--warning">Cerrada</span></dd></div><div><dt>Modalidad</dt><dd>{{ configuredModeLabel(cash.defaultShiftMode) }}</dd></div><div><dt>Moneda</dt><dd>COP</dd></div></dl></aside>
+      </div>
+    } @else {
+      @if (!closingMode()) { <div class="cash-open-grid">
+        <section class="panel panel--padded cash-operations">
+          @if (cash.requiresPreviousShiftClosure) { <div class="notice notice--warning"><strong>Turno anterior pendiente de cierre</strong><span>{{ cash.guidance }}</span></div> }
+          @if (cash.currentShift; as shift) { <div class="cash-shift-heading"><div><h3>Turno {{ shift.operatingDate }}</h3><p>Base inicial: <strong>{{ shift.initialAmount | currency:'COP':'symbol':'1.0-0' }}</strong></p></div><span class="badge badge--success">Abierto</span></div> }
+          @if (cash.requiresOperatorSession) { <div class="cash-session">
+            @if (cash.ownOperatorSession) { <span class="badge badge--success">Sesión activa</span><button class="button button--secondary" type="button" (click)="endSession()" [disabled]="busy()">Finalizar sesión</button> }
+            @else { <label class="field-label" for="operator-token">Credencial de operador</label><div class="cash-inline"><input id="operator-token" class="text-field" name="credential" type="password" autocomplete="off" [(ngModel)]="credential" placeholder="Escanee la credencial Code 128"><button class="button button--primary" type="button" (click)="startSession()" [disabled]="busy() || !credential.trim()">Iniciar turno</button></div> }
+          </div> }
+          @if (session.has('CASH.MOVEMENTS_MANAGE') && cash.currentShift) { <form class="movement-form" (submit)="$event.preventDefault(); move()"><h3>Movimiento de caja</h3><div class="movement-form__fields"><label class="field-label">Tipo<select class="text-field" name="kind" [(ngModel)]="kind"><option value="incomes">Ingreso</option><option value="expenses">Gasto</option><option value="cash-drops">Sangría</option></select></label><label class="field-label">Monto<div class="money-field"><span>$</span><input name="amount" type="number" min="1" step="1" [(ngModel)]="amount"><b>COP</b></div></label><label class="field-label movement-concept">Concepto<input class="text-field" name="concept" maxlength="200" [(ngModel)]="concept"></label><button class="button button--secondary" type="submit" [disabled]="busy() || !validMoney(amount) || !concept.trim() || (cash.requiresOperatorSession && !cash.ownOperatorSession)">Registrar movimiento</button></div></form> }
+          <div class="cash-movements"><div class="panel-heading"><h3>Movimientos recientes</h3></div><div class="table-wrap"><table><thead><tr><th>Movimiento</th><th>Concepto</th><th>Fecha</th><th class="align-right">Monto</th></tr></thead><tbody>@for (item of movements(); track item.id) { <tr><td>{{ item.type }}</td><td>{{ item.concept || item.category }}</td><td>{{ item.occurredAtUtc | date:'short' }}</td><td class="align-right numeric">{{ item.amount | currency:'COP':'symbol':'1.0-0' }}</td></tr> } @empty { <tr class="empty-row"><td colspan="4">No hay movimientos manuales recientes.</td></tr> }</tbody></table></div></div>
+        </section>
+        <aside class="panel panel--padded terminal-card"><div class="panel-heading"><h2>Resumen del turno</h2></div><dl class="status-list"><div><dt>Responsable</dt><dd>{{ cash.currentShift?.responsibleUserId === session.user()?.id ? session.user()?.displayName : 'Turno compartido' }}</dd></div><div><dt>Fecha operativa</dt><dd>{{ cash.currentShift?.operatingDate }}</dd></div><div><dt>Fondo inicial</dt><dd>{{ cash.currentShift?.initialAmount | currency:'COP':'symbol':'1.0-0' }}</dd></div><div><dt>Modalidad</dt><dd>{{ modeLabel(cash.currentShift?.mode) }}</dd></div><div><dt>Estado</dt><dd><span class="badge badge--success">Abierto</span></dd></div></dl></aside>
+      </div> }
+      @if (closingMode() && reconciliation(); as rec) {
+        @if (session.has('CASH.SHIFT_MANAGE')) {
+          <div class="closing-grid">
+            <section class="panel panel--padded closing-form"><div class="panel-heading"><h2>Arqueo de caja</h2><p>Cuenta cada medio de pago antes de cerrar el turno.</p></div>
+              <div class="expected-cash-card"><span>TOTAL ESPERADO</span><strong>{{ rec.totalExpected | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+              <div class="cash-count-list">@for (method of rec.paymentMethods; track method.paymentMethodId) { <div class="cash-count-row"><div><strong>{{ method.name }}</strong><small>Esperado {{ method.expectedAmount | currency:'COP':'symbol':'1.0-0' }}</small></div><label class="cash-count-input">Contado<div class="money-field"><span>$</span><input type="number" step="1" [min]="method.affectsCash ? 0 : null" [(ngModel)]="counted[method.paymentMethodId]" (ngModelChange)="onCountedChange()"><b>COP</b></div></label><div class="closure-live-difference" [class.closure-live-difference--negative]="methodDifference(method.paymentMethodId, method.expectedAmount) < 0" [class.closure-live-difference--positive]="methodDifference(method.paymentMethodId, method.expectedAmount) > 0"><span>Diferencia</span><strong>{{ methodDifference(method.paymentMethodId, method.expectedAmount) | currency:'COP':'symbol':'1.0-0' }}</strong></div></div> }</div>
+              <div class="cash-total-difference"><span>Diferencia total</span><strong>{{ difference | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+              @if (difference !== 0) { <div class="cash-authorization"><label class="field-label" for="closure-reason">Motivo del descuadre</label>
+                @if (reasonsLoading()) { <p class="field-hint" role="status">Cargando motivos…</p> }
+                @else if (reasonsError()) { <p class="field-error" role="alert">{{ reasonsError() }}</p><button class="small-action" type="button" (click)="loadReasons()" [disabled]="busy()">Reintentar consulta</button> }
+                @else { @if (reasons(); as available) { @if (available.length) { <select id="closure-reason" class="text-field" [(ngModel)]="reasonId"><option value="">Selecciona el motivo</option>@for (reason of available; track reason.id) { <option [value]="reason.id">{{ reason.name }}</option> }</select> } @else { <p class="field-error">No hay motivos disponibles para registrar la diferencia.</p><button class="small-action" type="button" (click)="loadReasons()" [disabled]="busy()">Actualizar motivos</button> } } @else { <button class="small-action" type="button" (click)="loadReasons()" [disabled]="busy()">Consultar motivos</button> } }
+                <label class="field-label field-label--spaced" for="closure-notes">Observación <span>(opcional)</span></label><textarea id="closure-notes" class="text-field textarea" [(ngModel)]="differenceObservation" rows="2" maxlength="2000"></textarea>
+              </div> }
+              <div class="form-actions closing-actions"><button class="button button--primary" type="button" (click)="close()" [disabled]="busy() || !hasValidCounts || (difference !== 0 && (reasonsLoading() || !reasons()?.length || !reasonId))">{{ busy() ? 'Cerrando…' : 'Cerrar caja' }}</button></div>
+            </section>
+            <aside class="panel panel--padded terminal-card"><div class="panel-heading"><h2>Resumen del turno</h2><p>Montos del arqueo</p></div><dl class="status-list"><div><dt>Esperado</dt><dd>{{ rec.totalExpected | currency:'COP':'symbol':'1.0-0' }}</dd></div><div><dt>Contado</dt><dd>{{ (rec.totalExpected + difference) | currency:'COP':'symbol':'1.0-0' }}</dd></div><div><dt>Medios de pago</dt><dd>{{ rec.paymentMethods.length }}</dd></div><div><dt>Responsable</dt><dd>{{ session.user()?.displayName }}</dd></div><div><dt>Estado</dt><dd><span class="badge badge--success">Abierto</span></dd></div></dl></aside>
+          </div>
+        }
+      }
+    }
+  }
+</section>

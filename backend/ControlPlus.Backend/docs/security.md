@@ -44,6 +44,10 @@ Los endpoints protegidos exigen autenticación y permisos explícitos. Los permi
 
 Los únicos roles de V1 son Cajero, Supervisor y Administrador. El modelo oficial admite exactamente un rol primario por usuario. Los permisos efectivos combinan la plantilla editable del rol con excepciones individuales `CONCEDER` o `REVOCAR`; una revocación individual siempre prevalece. Las reactivaciones de cuentas bloqueadas requieren un rol estrictamente superior al rol de la cuenta objetivo.
 
+`GET /api/users/{userId}/permissions/effective` recorre el catálogo activo completo en páginas de 200. La respuesta incluye todos los permisos activos, aunque el catálogo supere 200; los permisos inactivos no aparecen. Esta exclusión es un cambio respecto de la lectura anterior, que incluía permisos inactivos de la primera página.
+
+Decisión del 4 de noviembre de 2026: solo el Administrador restablece contraseñas de otros usuarios (Cajeros y Supervisores) mediante `PUT /api/users/{userId}/password` con `USERS.MANAGE`; el Supervisor no puede. Se retiró `GET /api/users/cashiers` y el permiso `USERS.CASHIER_PASSWORD_RESET` salió del catálogo y de la plantilla de Supervisor. La fila ya sembrada por la migración publicada `20260912012000_HybridPermissionsV1` permanece huérfana y sin efecto en las bases existentes hasta que se autorice una migración compensatoria.
+
 El rol principal se reemplaza mediante `POST /api/users/{userId}/roles`. La operación conserva la cardinalidad oficial de un solo rol, genera auditoría e invalida el sello de seguridad de la cuenta afectada; no existe un endpoint para retirar el único rol.
 
 La matriz funcional aprobada y sus códigos estables están en `docs/permissions-matrix.md`. Los cambios de plantilla invalidan las sesiones del rol; los cambios individuales invalidan solo las del usuario. Restaurar un rol repone su plantilla V1 y restaurar un usuario elimina sus excepciones. Solo Administrador puede ejecutar estas operaciones.

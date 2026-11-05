@@ -1,0 +1,22 @@
+<div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="layaway-cancel-title"><div class="module-form-sheet__backdrop" (click)="closed.emit()"></div>
+  <form class="panel panel--padded module-form" (submit)="$event.preventDefault(); confirm()">
+    <div class="panel-heading"><h2 id="layaway-cancel-title">Cancelar apartado</h2><p>{{ detail().layaway.number }} · {{ detail().layaway.customerName }}</p></div>
+    <p class="muted">Solo un Administrador decide el valor a devolver. Un Supervisor o Administrador distinto de ti debe autorizarlo. Una devolución positiva requiere un turno de Caja abierto.</p>
+    <div class="layaway-summary">
+      <div><span>Total abonado</span><strong>{{ money(totalPaid()) }}</strong></div>
+      <div><span>A devolver</span><strong>{{ money(refundAmount || 0) }}</strong></div>
+      <div><span>Retenido</span><strong>{{ money(retained) }}</strong></div>
+    </div>
+    <label class="field-label field-label--spaced" for="cancel-refund">Valor a devolver</label>
+    <input id="cancel-refund" class="text-field" type="number" min="0" step="1" [max]="totalPaid()" name="refundAmount" [(ngModel)]="refundAmount">
+    @if (refundAmount > 0) {
+      <h3>Devolución por medio</h3>
+      <cp-payment-methods [drafts]="drafts" mode="refund" idPrefix="cancel" />
+      <p class="form-hint">Suma de medios: {{ money(refundTotal) }} de {{ money(refundAmount) }}.</p>
+    }
+    <label class="field-label field-label--spaced" for="cancel-observation">Observación <span>(opcional)</span></label>
+    <textarea id="cancel-observation" class="text-field" name="observation" maxlength="1000" [(ngModel)]="observation"></textarea>
+    @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+    <div class="form-actions"><button class="button button--secondary" type="button" (click)="closed.emit()" [disabled]="saving()">Volver</button><button class="button button--primary" type="submit" [disabled]="saving()">Continuar a la autorización</button></div>
+  </form>
+</div>

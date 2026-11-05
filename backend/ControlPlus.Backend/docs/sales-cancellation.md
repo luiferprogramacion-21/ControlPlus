@@ -1,6 +1,8 @@
 # Anulación de ventas — corte de backend
 
-`POST /api/sales/{saleId}/cancel` exige JWT, rol vigente Supervisor o Administrador, permiso efectivo `SALES.VOID`, `Idempotency-Key`, `expectedVersion` y un motivo activo `ANULACION_VENTA`. Una ejecución nueva exige credenciales de **otro** Supervisor o Administrador activo, no bloqueado y con `SALES.VOID` efectivo. Las credenciales no forman parte del fingerprint, la auditoría ni la respuesta. Un replay exacto conserva la respuesta original y puede omitirlas, tras revalidar actor, rol y permiso.
+`POST /api/sales/{saleId}/cancel` exige JWT, rol vigente Supervisor o Administrador, permiso efectivo `SALES.VOID`, `Idempotency-Key`, `expectedVersion` y un motivo activo `ANULACION_VENTA`. El Administrador vigente puede omitir `authorization`: la autorización persistida tiene al mismo usuario como solicitante y autorizador, método `PASSWORD`, credencial nula y descripción «Autorización de anulación de venta por Administrador sin segundo autorizador.»; `AuthorizationMode` en la auditoría vale `ADMINISTRATOR_SELF`. Si envía credenciales, se validan con las reglas existentes de otro usuario y el modo es `OTHER_USER`. Supervisor siempre requiere credenciales de **otro** Supervisor o Administrador activo, no bloqueado y con `SALES.VOID` efectivo. Las credenciales no forman parte del fingerprint, la auditoría ni la respuesta. Un replay exacto conserva la respuesta original y puede omitirlas, tras revalidar actor, rol y permiso.
+
+La migración compensatoria `20261104010000_AdminSelfSaleCancellationV1` reemplaza `ck_anulacion_venta_usuarios` por un trigger que acepta igualdad solo con la marca, método y permiso efectivos del Administrador. Está preparada, no aplicada a `controlplus`. Su preflight y postflight de solo lectura están en `scripts/admin-self-authorization/`.
 
 `POST /api/sales/cancellation-reasons/initialize` inicializa explícitamente `ERROR_REGISTRO`, `SOLICITUD_CLIENTE` y `OTRO` para los tipos oficiales `ANULACION_VENTA` y `ANULACION_PAGO`. Solo crea filas faltantes y falla atómicamente ante un código incompatible. `GET /api/sales/cancellation-reasons` devuelve los tres motivos activos de venta. `OTRO` exige observación normalizada no vacía. La inicialización no ocurre al iniciar la API.
 
@@ -21,7 +23,7 @@ Pruebas focalizadas nuevas en `ControlPlus.Api.Tests.SalesApiFlowTests`:
 - `SaleCancellation_BadAuthorizerPassword_KeepsOnlyFailureCountAndAudit`
 - `SaleCancellation_DeferredCommitFailure_RollsBackAllEffects`
 
-El contrato OpenAPI se verifica con `ControlPlus.Api.Tests.OpenApiSaleReceiptContractTests.Cancellation_DeclaresProtectedReasonAndMutationRoutes`. Las integraciones usan únicamente `LocalPostgresDatabase` y bases temporales `controlplus_test_*`. No se requiere migración de esquema; se reutilizan las entidades oficiales.
+El contrato OpenAPI se verifica con `ControlPlus.Api.Tests.OpenApiSaleReceiptContractTests.Cancellation_DeclaresProtectedReasonAndMutationRoutes`. Las integraciones usan únicamente `LocalPostgresDatabase` y bases temporales `controlplus_test_*`. La excepción del Administrador requiere la migración compensatoria indicada; las demás entidades oficiales se conservan.
 
 Validación previa en copia temporal del backend, sin base de datos: build de `ControlPlus.Api.Tests` y sus dependencias con 0 errores y 0 advertencias; `SaleCancellationEligibilityTests` 7/7 y `Cancellation_DeclaresProtectedReasonAndMutationRoutes` 1/1. El usuario comunicó que la suite completa de Windows, incluidos estos cortes, terminó **470/470**, sin pruebas fallidas ni omitidas y con compilación correcta. Este resultado de Windows fue comunicado por el usuario; no se ejecutó de nuevo durante la preparación del índice.
 
@@ -31,3 +33,5 @@ Filtros focalizados para Windows, con `CONTROLPLUS_TEST_ADMIN_CONNECTION` config
 dotnet test ControlPlus.Domain.Tests --filter 'FullyQualifiedName~SaleCancellationEligibilityTests'
 dotnet test ControlPlus.Api.Tests --filter 'FullyQualifiedName~SalesApiFlowTests.SaleCancellation_|FullyQualifiedName~OpenApiSaleReceiptContractTests.Cancellation_DeclaresProtectedReasonAndMutationRoutes'
 ```
+
+**Jerarquía de autorización (5 de noviembre de 2026):** con credenciales, el autorizador debe tener rol base estrictamente superior al ejecutor: Cajero → Supervisor o Administrador; Supervisor → Administrador. Las autoautorizaciones aprobadas conservan sus condiciones. El permiso efectivo sigue siendo obligatorio.

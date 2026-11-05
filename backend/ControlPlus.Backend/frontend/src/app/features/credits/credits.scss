@@ -1,0 +1,19 @@
+.credit-filters { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.credit-filters > div { min-width: 140px; flex: 1 1 140px; }
+.credit-filters .text-field { width: 100%; }
+.credit-customer-filter { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.credit-customer-filter .field-label { width: 100%; }
+.credit-customer-filter .text-field { max-width: 290px; }
+.credit-matches { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.credit-detail { margin-top: 16px; }
+.credit-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.credit-summary > div { display: flex; flex-direction: column; gap: 4px; }
+.credit-summary span { color: var(--cp-text-muted); font-size: 12px; }
+.credit-summary strong { font-size: 18px; }
+.credit-detail-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 16px 0; }
+.credit-payment-row { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--cp-border); }
+.credit-payment-row .table-action { margin-top: 10px; }
+.credit-totals { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.credit-totals span { display: flex; flex-direction: column; }
+.credit-totals strong { font-size: 22px; }
+@media (max-width: 700px) { .credit-summary { grid-template-columns: repeat(2, 1fr); } }

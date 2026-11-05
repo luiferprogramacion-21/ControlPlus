@@ -5,6 +5,7 @@ namespace ControlPlus.Infrastructure.Persistence.Official;
 
 public partial class OfficialControlPlusDbContext
 {
+    public DbSet<ProductoCodigo> ProductoCodigo => Set<ProductoCodigo>();
     public virtual DbSet<UsuarioPermiso> UsuarioPermiso { get; set; }
 
     public virtual DbSet<DetalleArqueoMedioPago> DetalleArqueoMedioPago { get; set; }
@@ -13,6 +14,19 @@ public partial class OfficialControlPlusDbContext
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Categoria>(entity =>
+        {
+            entity.Property(x => x.Abreviatura).HasMaxLength(10).HasColumnName("abreviatura");
+            entity.HasIndex(x => x.Abreviatura).IsUnique().HasDatabaseName("uq_categoria_abreviatura");
+        });
+        modelBuilder.Entity<ProductoCodigo>(entity =>
+        {
+            entity.ToTable("producto_codigo", "catalogo");
+            entity.HasKey(x => x.Codigo);
+            entity.Property(x => x.Codigo).HasColumnType("text").HasColumnName("codigo");
+            entity.Property(x => x.ProductoId).HasColumnName("producto_id");
+            entity.HasOne<Producto>().WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
+        });
         modelBuilder.Entity<UsuarioPermiso>(entity =>
         {
             entity.HasKey(x => new { x.UsuarioId, x.PermisoId }).HasName("pk_usuario_permiso");

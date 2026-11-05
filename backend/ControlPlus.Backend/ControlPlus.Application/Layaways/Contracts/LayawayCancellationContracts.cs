@@ -10,7 +10,7 @@ public sealed record LayawayRefundRequest(string MethodCode, decimal Amount, str
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CancelLayawayRequest(long ExpectedVersion, decimal RefundAmount,
     IReadOnlyCollection<LayawayRefundRequest> Refunds, Guid? ReasonId,
-    string? Observation, CreateLayawayAuthorizationRequest Authorization);
+    string? Observation, CreateLayawayAuthorizationRequest? Authorization = null);
 
 public sealed record LayawayRefundDto(Guid Id, string MethodCode, decimal Amount,
     string? Reference, DateTimeOffset OccurredAtUtc);

@@ -28,6 +28,8 @@ public static class ControlledPreflightRunner
 
         var safeTarget = targetMigration;
 
+        if (targetMigration == ControlledMigrationRunner.PermanentProductReferencesMigration)
+            return await PermanentProductReferencesPreflightRunner.RunAsync(configuration, targetMigration, cancellationToken);
         if (string.Equals(targetMigration, InitialProductInventoryPreflightRunner.TargetMigration, StringComparison.Ordinal))
         {
             return await InitialProductInventoryPreflightRunner.RunAsync(configuration, targetMigration, cancellationToken);

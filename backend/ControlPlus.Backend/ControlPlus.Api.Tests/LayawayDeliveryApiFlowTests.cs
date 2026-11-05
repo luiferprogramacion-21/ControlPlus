@@ -42,7 +42,9 @@ public sealed partial class LayawayCreateApiFlowTests
         Assert.NotEqual(Guid.Empty, delivered.CorrelationId);
         var deliveredProduct = Assert.Single(delivered.Products);
         Assert.Equal(scenario.ProductId, deliveredProduct.ProductId);
-        Assert.Equal("LAYAWAY-CREATE-ITEM", deliveredProduct.ProductCode);
+        // The code supplied at creation is kept only as an alias; the document shows the assigned reference.
+        Assert.StartsWith("APA-", scenario.ProductCode);
+        Assert.Equal(scenario.ProductCode, deliveredProduct.ProductCode);
         Assert.Equal("Producto ficticio de apartado", deliveredProduct.ProductName);
         Assert.Equal(Assert.Single(created.Lines).MeasurementUnit, deliveredProduct.Unit);
         Assert.Equal(2, deliveredProduct.Quantity);
@@ -200,7 +202,8 @@ public sealed partial class LayawayCreateApiFlowTests
         var scenario = await BootstrapAsync(client, sharedShift: false);
         SetBearer(client, scenario.Admin.AccessToken);
         var created = await ReadAsync<CreatedLayawayDto>(await PostAsync(client,
-            "delivery-payment-race-create", Request(scenario, [new("EFECTIVO", 201m, 201m, null)])),
+            "delivery-payment-race-create", Request(scenario, [new("EFECTIVO", 201m, 201m, null)])
+                with { Authorization = null }),
             HttpStatusCode.Created);
         using var deliveryClient = CreateClient(scenario.Admin.AccessToken);
         var before = await CaptureDeliveryStateAsync(scenario, created.Id);
