@@ -15,7 +15,7 @@ const METHOD_NAMES: Record<string, string> = { EFECTIVO: 'Efectivo', TRANSFERENC
 const cop = (value: number): string => `$ ${Math.round(Number.isFinite(value) ? value : 0).toLocaleString('es-CO')}`;
 const percent = (value: number): string => new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(value);
 
-/** The included-VAT lines appear only for sales that saved a breakdown, i.e. made while VAT was switched on. */
+/** The VAT lines appear only for sales that saved a breakdown, i.e. made while VAT was switched on. The price already includes it. */
 export function vatBreakdown(receipt: SaleReceipt): { label: string; base: number; vat: number } | null {
   const { vatPercentage: rate, taxableBaseTotal: base, vatTotal: vat } = receipt;
   if (typeof rate !== 'number' || typeof base !== 'number' || typeof vat !== 'number') return null;
@@ -23,7 +23,7 @@ export function vatBreakdown(receipt: SaleReceipt): { label: string; base: numbe
   return { label: `IVA ${percent(rate)} %`, base, vat };
 }
 
-export const escapeHtml =(value: string): string => value.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch] as string);
+export const escapeHtml = (value: string): string => value.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch] as string);
 
 /** Builds a self-contained 80 mm ticket document. Every dynamic value is escaped. */
 export function buildTicketHtml(receipt: SaleReceipt, extras: TicketExtras = {}, reprint = false): string {
@@ -32,6 +32,12 @@ export function buildTicketHtml(receipt: SaleReceipt, extras: TicketExtras = {},
     `<tr><td colspan="2">${escapeHtml(line.productName)}</td></tr>` +
     `<tr><td class="muted">${line.quantity} x ${cop(line.unitPrice)}</td><td class="r">${cop(line.netAmount)}</td></tr>`).join('');
   const vat = vatBreakdown(receipt);
+  const discountRow = receipt.discountTotal ? `<tr><td>Descuento</td><td class="r">-${cop(receipt.discountTotal)}</td></tr>` : '';
+  // With VAT: Subtotal + IVA = TOTAL (the price includes it, the total never changes). Without VAT the summary is unchanged.
+  const summary = vat
+    ? `${receipt.discountTotal ? `<tr><td>Valor productos</td><td class="r">${cop(receipt.grossSubtotal)}</td></tr>${discountRow}` : ''}` +
+      `<tr><td>Subtotal</td><td class="r">${cop(vat.base)}</td></tr><tr><td>${escapeHtml(vat.label)}</td><td class="r">${cop(vat.vat)}</td></tr>`
+    : `<tr><td>Subtotal</td><td class="r">${cop(receipt.grossSubtotal)}</td></tr>${discountRow}`;
   const payments = receipt.payments.map(payment =>
     `<tr><td>${escapeHtml(METHOD_NAMES[payment.methodCode] ?? payment.methodCode)}</td><td class="r">${cop(payment.appliedAmount)}</td></tr>`).join('');
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Ticket ${escapeHtml(receipt.visibleNumber)}</title><style>
@@ -44,9 +50,8 @@ table { width: 100%; border-collapse: collapse; } td { padding: 1px 0; vertical-
 <h1>Baratísimo</h1><p class="c">${reprint ? 'REIMPRESIÓN' : 'Ticket de venta'}<br>${escapeHtml(receipt.visibleNumber)}<br>${escapeHtml(date)}</p>
 ${extras.operator ? `<p>Atendió: ${escapeHtml(extras.operator)}</p>` : ''}${extras.customer ? `<p>Cliente: ${escapeHtml(extras.customer)}</p>` : ''}
 <hr><table>${lines}</table><hr>
-<table><tr><td>Subtotal</td><td class="r">${cop(receipt.grossSubtotal)}</td></tr>${receipt.discountTotal ? `<tr><td>Descuento</td><td class="r">-${cop(receipt.discountTotal)}</td></tr>` : ''}
+<table>${summary}
 <tr class="total"><td>TOTAL</td><td class="r">${cop(receipt.total)}</td></tr></table>
-${vat ? `<table class="muted"><tr><td>Base gravable</td><td class="r">${cop(vat.base)}</td></tr><tr><td>${escapeHtml(vat.label)} incluido</td><td class="r">${cop(vat.vat)}</td></tr></table>` : ''}
 ${receipt.payments.length ? `<hr><table>${payments}${receipt.change > 0 ? `<tr><td>Cambio</td><td class="r">${cop(receipt.change)}</td></tr>` : ''}</table>` : '<hr><p class="c">Venta a crédito</p>'}
 <hr><p class="c">¡Gracias por su compra!</p></body></html>`;
 }

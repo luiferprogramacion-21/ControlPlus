@@ -18,16 +18,27 @@ describe('ticket', () => {
     for (const text of ['VTA-001-000010', 'TOTAL', '$ 50.000', '-$ 5.000', 'Efectivo', 'Cambio', '$ 10.000', 'Atendió: Cajero Uno', 'Cliente: Ana', 'Ticket de venta']) expect(html).toContain(text);
   });
   describe('desglose de IVA', () => {
-    const withVat = { ...receipt, vatPercentage: 19, taxableBaseTotal: 42017, vatTotal: 7983 };
-    it('aparece con la base y el IVA incluido cuando la venta lo guardó', () => {
+    // Price with VAT included: Subtotal + IVA = TOTAL, and the total never changes.
+    const withVat = { ...receipt, grossSubtotal: 50000, discountTotal: 0, total: 50000, vatPercentage: 19, taxableBaseTotal: 42017, vatTotal: 7983 };
+    const order = (html: string, labels: string[]) => labels.map(label => html.indexOf(label));
+    it('muestra Subtotal, IVA y TOTAL en ese orden, con el precio ya incluyendo el IVA', () => {
       const html = buildTicketHtml(withVat);
-      expect(html).toContain('Base gravable'); expect(html).toContain('$ 42.017'); expect(html).toContain('IVA 19 % incluido'); expect(html).toContain('$ 7.983');
-      expect(html.indexOf('TOTAL')).toBeLessThan(html.indexOf('Base gravable'));
+      const positions = order(html, ['Subtotal', 'IVA 19 %', 'TOTAL']);
+      expect(positions.every(position => position >= 0)).toBe(true); expect(positions).toEqual([...positions].sort((a, b) => a - b));
+      expect(html).toContain('$ 42.017'); expect(html).toContain('$ 7.983'); expect(html).toContain('$ 50.000');
+      expect(html).not.toContain('incluido'); expect(html).not.toContain('Base gravable'); expect(html).not.toContain('Valor productos');
     });
-    it('no aparece si el IVA estaba apagado (sin datos, nulos o porcentaje cero)', () => {
+    it('con descuento agrega Valor productos y Descuento antes del Subtotal', () => {
+      const html = buildTicketHtml({ ...withVat, grossSubtotal: 55000, discountTotal: 5000 });
+      const positions = order(html, ['Valor productos', 'Descuento', 'Subtotal', 'IVA 19 %', 'TOTAL']);
+      expect(positions.every(position => position >= 0)).toBe(true); expect(positions).toEqual([...positions].sort((a, b) => a - b));
+      expect(html).toContain('$ 55.000'); expect(html).toContain('-$ 5.000');
+    });
+    it('no aparece si el IVA estaba apagado (sin datos, nulos o porcentaje cero) y el resumen queda como siempre', () => {
       for (const sale of [receipt, { ...receipt, vatPercentage: null, taxableBaseTotal: null, vatTotal: null }, { ...receipt, vatPercentage: 0, taxableBaseTotal: 50000, vatTotal: 0 }]) {
         const html = buildTicketHtml(sale);
-        expect(html).not.toContain('Base gravable'); expect(html).not.toContain('IVA');
+        expect(html).not.toContain('IVA'); expect(html).not.toContain('Base gravable'); expect(html).not.toContain('Valor productos');
+        expect(html).toContain('Subtotal'); expect(html).toContain('$ 55.000');
       }
     });
     it('no aparece con datos incompletos ni inválidos', () => {
@@ -36,7 +47,7 @@ describe('ticket', () => {
     });
     it('formatea un porcentaje con decimales y se conserva en crédito y reimpresión', () => {
       const html = buildTicketHtml({ ...withVat, vatPercentage: 19.5, payments: [], change: 0 }, {}, true);
-      expect(html).toContain('IVA 19,5 % incluido'); expect(html).toContain('Venta a crédito'); expect(html).toContain('REIMPRESIÓN');
+      expect(html).toContain('IVA 19,5 %'); expect(html).toContain('Venta a crédito'); expect(html).toContain('REIMPRESIÓN');
     });
   });
   it('marca la reimpresión y la venta a crédito sin pagos', () => {
