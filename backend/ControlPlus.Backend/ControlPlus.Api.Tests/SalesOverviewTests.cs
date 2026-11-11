@@ -108,24 +108,84 @@ public sealed class SalesOverviewTests
         Assert.Null(repo.RequestedInstallationId);
     }
 
+    private static string RenderPdf(SalesOverviewReport report) =>
+        Encoding.Latin1.GetString(SalesOverviewPdf.Render(report));
+
+    private static void AssertValidStructure(string pdf)
+    {
+        Assert.StartsWith("%PDF-1.4", pdf);
+        var xrefStart = long.Parse(pdf[(pdf.LastIndexOf("startxref\n", StringComparison.Ordinal) + 10)..]
+            .Split('\n')[0]);
+        Assert.Equal("xref", pdf.Substring((int)xrefStart, 4));
+        Assert.EndsWith("%%EOF\n", pdf);
+    }
+
     [Fact]
-    public void Pdf_ContainsApprovedMetricsAndValidCrossReferenceOffsets()
+    public void Pdf_UsesPlainLanguageAndHidesSystemTerms()
     {
         var report = new SalesOverviewReport(From, To, "COP", new(1, 100m, 0, 100m),
             new(1, -20m), 80m, 0m, null, 100m, 40m, 40m, 50m,
             "COMPLETE", 0, 0, [new(From, 100m, 0, 100m), new(To, 0, -20m, -20m)],
             100m, [new("EFECTIVO", "Efectivo", 100m, 100m)]);
-        var bytes = SalesOverviewPdf.Render(report);
-        var pdf = Encoding.Latin1.GetString(bytes);
-        Assert.StartsWith("%PDF-1.4", pdf);
-        Assert.Contains("Costo productos: 40", pdf);
-        Assert.Contains("Ganancia estimada: 40", pdf);
-        Assert.Contains("MEDIOS DE COBRO INMEDIATO", pdf);
-        Assert.Contains("2026-11-05", pdf);
-        var xrefStart = long.Parse(pdf[(pdf.LastIndexOf("startxref\n", StringComparison.Ordinal) + 10)..]
-            .Split('\n')[0]);
-        Assert.Equal("xref", pdf.Substring((int)xrefStart, 4));
-        Assert.EndsWith("%%EOF\n", pdf);
+        var pdf = RenderPdf(report);
+        AssertValidStructure(pdf);
+
+        foreach (var text in new[]
+                 {
+                     "Reporte de ventas", "Del 04/11/2026 al 05/11/2026", "Generado el", "Ventas del período",
+                     "Cambios de productos", "Total vendido", "Venta promedio", "Costo de los productos",
+                     "Ganancia estimada", "50 % de las ventas sin IVA", "Ventas por día", "Total del día",
+                     "05/11/2026", "Cómo pagaron los clientes", "Medio de pago", "Efectivo",
+                     "$ 100", "-$ 20", "$ 80", "$ 40", "100 %",
+                     "No hubo ventas en el período anterior para comparar."
+                 })
+            Assert.Contains(text, pdf);
+
+        foreach (var system in new[]
+                 {
+                     "COMPLETE", "INCOMPLETE", "EFECTIVO", "(UTC)", "operativ", "2026-11-05", "Ventas originales",
+                     "Ventas netas", "Ajuste neto", "Transacciones", "Sin referencia", "MEDIOS DE COBRO"
+                 })
+            Assert.DoesNotContain(system, pdf);
+        Assert.DoesNotContain("Courier", pdf);
+        Assert.Contains("/BaseFont /Helvetica-Bold", pdf);
+    }
+
+    [Fact]
+    public void Pdf_WithMissingCostsExplainsItInsteadOfShowingCodes()
+    {
+        var report = new SalesOverviewReport(From, To, "COP", new(2, 100m, 0, 100m),
+            new(0, 0m), 100m, 50m, 100m, 50m, null, null, null,
+            "INCOMPLETE", 2, 1, [new(From, 100m, 0, 100m), new(To, 0, 0, 0)],
+            0m, []);
+        var pdf = RenderPdf(report);
+        AssertValidStructure(pdf);
+        Assert.Contains("Atención: no se pudo calcular el costo ni la ganancia.", pdf);
+        Assert.Contains("Faltan los costos de 3 productos vendidos.", pdf);
+        Assert.Contains("No disponible", pdf);
+        Assert.Contains("las ventas subieron 100 %", pdf);
+        Assert.Contains("No hubo ventas de contado con pago en este período.", pdf);
+        Assert.DoesNotContain("INCOMPLETE", pdf);
+        Assert.DoesNotContain("líneas sin costo", pdf);
+    }
+
+    [Fact]
+    public void Pdf_WithAFullMonthContinuesOnANewPageWithFooterAndEscapedNames()
+    {
+        var from = new DateOnly(2026, 10, 1);
+        var days = Enumerable.Range(0, 31).Select(i => new OverviewDay(from.AddDays(i), 1000m * i, 0m, 1000m * i)).ToArray();
+        var report = new SalesOverviewReport(from, from.AddDays(30), "COP", new(31, 465000m, 0, 465000m),
+            new(0, 0m), 465000m, 0m, null, 15000m, 200000m, 265000m, 57m,
+            "COMPLETE", 0, 0, days, 465000m,
+            [new("NEQUI", "Nequi (QR) \\ prueba", 465000m, 100m)]);
+        var pdf = RenderPdf(report);
+        AssertValidStructure(pdf);
+        Assert.Contains("Página 1 de 2", pdf);
+        Assert.Contains("Página 2 de 2", pdf);
+        Assert.Contains("/Count 2", pdf);
+        Assert.Contains("Nequi \\(QR\\) \\\\ prueba", pdf);
+        Assert.Contains("31/10/2026", pdf);
+        Assert.Contains("Total del día", pdf);
     }
 
     private static SalesOverviewData EmptyData() => new([], [], new(0, 0, 0),

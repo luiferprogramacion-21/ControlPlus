@@ -125,3 +125,14 @@ if ($testExit -ne 0 -or $trx.TestRun.ResultSummary.outcome -ne 'Completed' -or
 **Este contrato puede implementarse sin migración**, sujeto a demostrar en pruebas la correspondencia uno a uno entre líneas entregadas y movimientos `CAMBIO_ENTREGA`. `detalle_venta.costo_unitario` y `movimiento_inventario.costo_promedio_anterior` ya existen. Si hay datos históricos sin esa correspondencia, la regla propuesta es `INCOMPLETE`. Añadir `costo_unitario` inmutable a `detalle_cambio_venta` para futuras entregas sería una **migración compensatoria separada**; no se autoriza aquí ni se inventarían costos anteriores.
 
 El usuario aprobó las cinco reglas nuevas: fecha del cambio, margen con IVA incluido, costo ausente, denominador de medios y doble permiso. La maqueta mantiene su estructura; las etiquetas deben aclarar «estimado» y el denominador de medios. Cualquier separación visual adicional del prototipo exige la aprobación indicada en `AGENTS.md`.
+
+## Redacción del PDF de ventas (aprobada por el usuario el 11 de noviembre de 2026)
+
+El PDF se escribe para el dueño del negocio, no para el sistema: lenguaje sencillo y sin códigos internos.
+
+- Nunca muestra valores como `COMPLETE`, `INCOMPLETE` o `EFECTIVO`, ni términos como «operativo», «UTC», «transacciones» o «ventas originales». Los medios de pago salen solo por su nombre.
+- Fechas `dd/MM/yyyy`, hora local de Bogotá, importes como `$ 1.234.567` (negativos `-$ 25.000`) y porcentajes con coma (`34,27 %`).
+- Vocabulario común con la pantalla de Reportes: «Ventas del período», «Cambios de productos», «Total vendido», «Venta promedio», «Costo de los productos», «Ganancia estimada» y «Total del día».
+- Cuando faltan costos históricos explica el problema y qué hacer («Faltan los costos de N productos vendidos. Revisa que cada producto tenga su costo registrado») y muestra «No disponible», nunca cero.
+- Diseño: tarjetas con las cifras, tablas «Ventas por día» y «Cómo pagaron los clientes» (con barra por medio), notas aclaratorias y «Página X de Y». Usa las fuentes Helvetica incluidas en el formato PDF, sin dependencias.
+- Verificación: pruebas unitarias del contenido y de la estructura del PDF (incluido un mes completo que continúa en una segunda página) y la prueba de integración `SalesOverview_UsesPersistedCostsAndAppliedMethods_PdfMatches_AndMissingCostIsNotZero`, 12/12 aprobadas en Windows con bases temporales. Revisión visual comunicada por el usuario sobre dos PDF de muestra.

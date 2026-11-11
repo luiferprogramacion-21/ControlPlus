@@ -1,4 +1,5 @@
 using System.Net;
+using ControlPlus.Api.Controllers;
 using System.Text;
 using ControlPlus.Application.Reports;
 using ControlPlus.Application.Sales.Contracts;
@@ -97,8 +98,12 @@ public sealed partial class SalesApiFlowTests
             Assert.Equal(HttpStatusCode.OK, pdfResponse.StatusCode);
             Assert.Equal("application/pdf", pdfResponse.Content.Headers.ContentType?.MediaType);
             var pdf = Encoding.Latin1.GetString(await pdfResponse.Content.ReadAsByteArrayAsync());
-            Assert.Contains($"Ventas originales: {persisted.Total.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}", pdf);
-            Assert.Contains($"Costo productos: {cost.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}", pdf);
+            Assert.Contains("Ventas del período", pdf);
+            Assert.Contains(SalesOverviewPdf.FormatMoney(persisted.Total), pdf);
+            Assert.Contains("Costo de los productos", pdf);
+            Assert.Contains(SalesOverviewPdf.FormatMoney(cost), pdf);
+            Assert.DoesNotContain("COMPLETE", pdf);
+            Assert.DoesNotContain("EFECTIVO", pdf);
         }
 
         // A sale line without cost is a legacy case: the immutability trigger is disabled only inside this disposable database.
