@@ -26,6 +26,19 @@ public sealed class CashController(
             : FromResult(await cashService.ListClosureDifferenceReasonsAsync(actor, cancellationToken), Ok);
     }
 
+    [HttpPost("closure-difference-reasons/initialize")]
+    [PermissionAuthorize(PermissionCodes.CashShiftManage)]
+    [ProducesResponseType<IReadOnlyCollection<CashClosureDifferenceReasonDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> InitializeClosureDifferenceReasons(CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null
+            ? MissingActor()
+            : FromResult(await cashService.InitializeClosureDifferenceReasonsAsync(actor, cancellationToken), Ok);
+    }
+
     [HttpGet("state")]
     [PermissionAuthorize(PermissionCodes.CashOwnRead)]
     [ProducesResponseType<CashStateDto>(StatusCodes.Status200OK)]
@@ -83,7 +96,7 @@ public sealed class CashController(
     }
 
     [HttpPost("shifts")]
-    [PermissionAuthorize(PermissionCodes.CashShiftManage)]
+    [PermissionAuthorize(PermissionCodes.CashOwnRead)]
     [Consumes("application/json")]
     [ProducesResponseType<CashShiftDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]

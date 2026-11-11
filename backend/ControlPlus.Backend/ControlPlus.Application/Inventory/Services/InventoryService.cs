@@ -22,6 +22,7 @@ public sealed class InventoryService(
     IPermissionRepository permissionRepository,
     IPermissionChecker permissionChecker,
     IPasswordHasher passwordHasher,
+    IAuthorizerCredentialResolver credentialResolver,
     IAuditRepository auditRepository,
     IClock clock,
     ILoginAttemptCoordinator loginAttemptCoordinator) : IInventoryService
@@ -110,11 +111,18 @@ public sealed class InventoryService(
         CreateInventoryAdjustmentRequest request,
         CancellationToken cancellationToken = default)
     {
-        var input = NormalizeAdjustment(idempotencyKey, request);
+        if (request?.Authorization is { } scanned && scanned.UsesCredential())
+        {
+            if (scanned.MixesCredentialWithPassword())
+                return Result.Failure<InventoryMovementDto>(Validation("Envíe la credencial escaneada o usuario y contraseña, no ambos."));
+            var (scannedUserName, scannedCredentialId) = await credentialResolver.ResolveOrUnknownAsync(scanned.CredentialToken!, cancellationToken);
+            request = request with { Authorization = scanned with { UserName = scannedUserName, ResolvedCredentialId = scannedCredentialId } };
+        }
+        var input = NormalizeAdjustment(idempotencyKey, request!);
         if (input.Error is not null) return Result.Failure<InventoryMovementDto>(input.Error);
 
         return await loginAttemptCoordinator.ExecuteAsync(
-            input.Authorization?.UserName.ToUpperInvariant() ?? actor.UserId.ToString("N"),
+            input.Authorization?.UserName!.ToUpperInvariant() ?? actor.UserId.ToString("N"),
             token => AdjustWithinTransactionAsync(actor, input, token),
             cancellationToken);
     }
@@ -224,7 +232,8 @@ public sealed class InventoryService(
                 ? "Autorización de ajuste de inventario por Administrador sin segundo autorizador."
                 : "Autorizacion de ajuste manual de inventario.",
             Motivo = reason.Codigo,
-            MetodoAutenticacion = "PASSWORD",
+            MetodoAutenticacion = input.Authorization.AuthenticationMethod(),
+            CredencialAutorizadorId = input.Authorization?.ResolvedCredentialId,
             Resultado = "EXITOSA",
             Estado = "UTILIZADA",
             FechaSolicitud = now.UtcDateTime,
@@ -314,7 +323,7 @@ public sealed class InventoryService(
         InventoryAdjustmentAuthorizationRequest request,
         CancellationToken cancellationToken)
     {
-        var user = await userRepository.GetByUserNameAsync(request.UserName, cancellationToken);
+        var user = await userRepository.GetByUserNameAsync(request.UserName!, cancellationToken);
         if (user is null)
             return Result.Failure<Usuario>(InvalidAuthorizer());
         user = await repository.GetUserForUpdateAsync(user.Id, cancellationToken) ?? user;
@@ -323,7 +332,7 @@ public sealed class InventoryService(
         if (!RoleHierarchy.IsHigherThan(user.HighestRoleLevel,
             (await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken))!.HighestRoleLevel))
             return Result.Failure<Usuario>(ApplicationError.AuthorizerRoleInsufficient());
-        if (!passwordHasher.Verify(request.Password, user.PasswordHash))
+        if (!request.UsesCredential() && !passwordHasher.Verify(request.Password!, user.PasswordHash))
         {
             var now = clock.UtcNow;
             var wasLocked = user.RegisterFailedLogin(now);
@@ -374,15 +383,12 @@ public sealed class InventoryService(
         if (request.ExpectedVersion <= 0)
             return (null, default, default, default, default, null, null, null,
                 Validation("La version esperada debe ser mayor que cero."));
-        if (request.Authorization is not null &&
-            (string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-             string.IsNullOrWhiteSpace(request.Authorization.Password)))
+        if (request.Authorization is not null && !request.Authorization.IsComplete())
             return (null, default, default, default, default, null, null, null,
-                Validation("Si envía authorization, incluya usuario y contraseña."));
+                Validation("Si envía authorization, incluya usuario y contraseña o la credencial escaneada."));
 
         var observation = NormalizeOptional(request.Observation);
-        var authorization = request.Authorization is null ? null : new InventoryAdjustmentAuthorizationRequest(
-            request.Authorization.UserName.Trim(), request.Authorization.Password);
+        var authorization = request.Authorization is null ? null : request.Authorization with { UserName = request.Authorization.UserName!.Trim() };
         var canonical = JsonSerializer.Serialize(new
         {
             request.ProductId,
@@ -390,7 +396,7 @@ public sealed class InventoryService(
             request.ReasonId,
             request.ExpectedVersion,
             Observation = observation,
-            Authorizer = authorization?.UserName.ToUpperInvariant()
+            Authorizer = authorization?.UserName!.ToUpperInvariant()
         });
         return (key, request.ProductId, request.QuantityDelta, request.ReasonId, request.ExpectedVersion,
             observation, authorization, canonical, null);

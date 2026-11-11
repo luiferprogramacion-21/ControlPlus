@@ -47,7 +47,16 @@ public sealed record ConfigureCashRegisterRequest(string Code, string Name);
 
 public sealed record UpdateCashShiftModeRequest(string Mode, long Version);
 
-public sealed record OpenCashShiftRequest(decimal InitialAmount, string? Observations);
+/// <summary>Second user (Supervisor or Administrador) who authorizes a Cajero to open the cash shift.</summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CashOpenAuthorizationRequest(string? UserName, string? Password, string? CredentialToken = null)
+    : IAuthorizerCredentials
+{
+    [JsonIgnore] public Guid? ResolvedCredentialId { get; init; }
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record OpenCashShiftRequest(decimal InitialAmount, string? Observations, CashOpenAuthorizationRequest? Authorization = null);
 
 public sealed record CashMovementDto(
     Guid Id,
@@ -86,7 +95,11 @@ public sealed record CashReconciliationDto(
 public sealed record CountedPaymentMethodRequest(Guid PaymentMethodId, decimal CountedAmount);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record CashCloseAuthorizationRequest(string UserName, string Password);
+public sealed record CashCloseAuthorizationRequest(string? UserName, string? Password, string? CredentialToken = null)
+    : IAuthorizerCredentials
+{
+    [JsonIgnore] public Guid? ResolvedCredentialId { get; init; }
+}
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CloseCashShiftRequest(
@@ -132,6 +145,8 @@ public sealed record ExpectedPaymentMethodAmount(
 public interface ICashService
 {
     Task<Result<IReadOnlyCollection<CashClosureDifferenceReasonDto>>> ListClosureDifferenceReasonsAsync(ActorContext actor, CancellationToken cancellationToken = default);
+    /// <summary>Creates the default closing-difference reasons that are missing and returns the active ones.</summary>
+    Task<Result<IReadOnlyCollection<CashClosureDifferenceReasonDto>>> InitializeClosureDifferenceReasonsAsync(ActorContext actor, CancellationToken cancellationToken = default);
     Task<Result<CashStateDto>> GetStateAsync(ActorContext actor, CancellationToken cancellationToken = default);
     Task<Result<CashRegisterDto>> ConfigureCashRegisterAsync(ActorContext actor, ConfigureCashRegisterRequest request, CancellationToken cancellationToken = default);
     Task<Result<CashStateDto>> UpdateShiftModeAsync(ActorContext actor, UpdateCashShiftModeRequest request, CancellationToken cancellationToken = default);

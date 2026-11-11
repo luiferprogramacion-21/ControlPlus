@@ -8,6 +8,7 @@ using ControlPlus.Application.Layaways.Services;
 using ControlPlus.Application.Sales.Ports;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Application.Security.Ports;
+using ControlPlus.Application.Security.Services;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Domain.Security.Enums;
 using Xunit;
@@ -138,6 +139,7 @@ public sealed class LayawayCreateServiceTests
                 Stub<IPermissionChecker>.Create((method, _) => throw new NotSupportedException(method.Name)),
                 Stub<IPermissionRepository>.Create((method, _) => throw new NotSupportedException(method.Name)),
                 Stub<IPasswordHasher>.Create((method, _) => throw new NotSupportedException(method.Name)),
+                Stub<IAuthorizerCredentialResolver>.Create((method, _) => throw new NotSupportedException(method.Name)),
                 new ImmediateCoordinator(),
                 Stub<IAuditRepository>.Create((method, _) => throw new NotSupportedException(method.Name)),
                 Stub<IUnitOfWork>.Create((method, _) => throw new NotSupportedException(method.Name)),

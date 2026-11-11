@@ -32,14 +32,17 @@ public sealed class EfCashTransactionManager(OfficialControlPlusDbContext dbCont
 }
 
 /// <summary>
-/// Produces an opaque, Code 128-compatible value with 192 bits of entropy.
-/// The caller is responsible for returning it only once and persisting only its hash.
+/// Produces an opaque, Code 128-compatible value with 192 bits of entropy, written as a 58-digit decimal number so a
+/// scanner reads it in Code 128 subset C (two digits per symbol: about 40 % shorter than hexadecimal, so the bars stay
+/// wide enough on a card). The caller is responsible for returning it only once and persisting only its hash.
 /// </summary>
 public sealed class Code128CredentialTokenGenerator : ICredentialTokenGenerator
 {
     private const int EntropyBytes = 24;
 
-    public string Generate() => Convert.ToHexString(RandomNumberGenerator.GetBytes(EntropyBytes));
+    public string Generate() =>
+        new System.Numerics.BigInteger(RandomNumberGenerator.GetBytes(EntropyBytes), isUnsigned: true, isBigEndian: true)
+            .ToString().PadLeft(58, '0');
 }
 
 public sealed class EfCashRepository(OfficialControlPlusDbContext dbContext) : ICashRepository
@@ -357,6 +360,19 @@ public sealed class EfCashRepository(OfficialControlPlusDbContext dbContext) : I
                       reason.Establecimiento.Activo &&
                       reason.TipoOperacion == CashConstants.CashDifferenceReasonType,
             cancellationToken);
+
+    public async Task<IReadOnlyCollection<MotivoOperacion>> GetDifferenceReasonsAsync(
+        Guid establishmentId,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.MotivoOperacion
+            .Where(reason => reason.EstablecimientoId == establishmentId &&
+                             reason.TipoOperacion == CashConstants.CashDifferenceReasonType)
+            .ToArrayAsync(cancellationToken);
+
+    public Task AddDifferenceReasonsAsync(
+        IReadOnlyCollection<MotivoOperacion> reasons,
+        CancellationToken cancellationToken = default) =>
+        dbContext.MotivoOperacion.AddRangeAsync(reasons, cancellationToken);
 
     public async Task<IReadOnlyCollection<MotivoOperacion>> ListActiveDifferenceReasonsAsync(
         CancellationToken cancellationToken = default) =>

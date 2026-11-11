@@ -97,6 +97,9 @@ public sealed partial class SalesService
             return Result.Failure<CancelSaleDto>(Validation("La solicitud de anulación o Idempotency-Key es inválida."));
         if (request.ExpectedVersion == long.MaxValue)
             return Result.Failure<CancelSaleDto>(ApplicationError.ConcurrencyConflict("La versión de la venta está agotada."));
+        var scanned = await ResolveScannedAuthorizationAsync(request.Authorization, cancellationToken);
+        if (scanned.Error is not null) return Result.Failure<CancelSaleDto>(scanned.Error);
+        request = request with { Authorization = scanned.Authorization };
         var observation = string.IsNullOrWhiteSpace(request.Observation) ? null : request.Observation.Trim();
         var fingerprint = Hash(JsonSerializer.Serialize(new
         {
@@ -136,8 +139,7 @@ public sealed partial class SalesService
         var administratorSelfAuthorized = actorSnapshot?.HighestRoleLevel == RoleLevel.Administrador &&
             request.Authorization is null;
         if (!administratorSelfAuthorized &&
-            (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-             string.IsNullOrWhiteSpace(request.Authorization.Password)))
+            (request.Authorization is null || !request.Authorization.IsComplete()))
             return Result.Failure<CancelSaleDto>(Validation("Las credenciales de otro Supervisor o Administrador son obligatorias."));
         var sale = await repository.GetSaleForUpdateAsync(saleId, ct);
         if (sale is null || sale.InstalacionId != installation.Id)
@@ -241,14 +243,14 @@ public sealed partial class SalesService
         }
         else
         {
-            var candidate = await userRepository.GetByUserNameAsync(request.Authorization!.UserName.Trim(), ct);
+            var candidate = await userRepository.GetByUserNameAsync(request.Authorization!.UserName!.Trim(), ct);
             if (candidate is null) return Result.Failure<CancelSaleDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
             authorizer = await repository.GetUserForUpdateAsync(candidate.Id, ct);
             if (authorizer is null || !authorizer.IsActive || authorizer.Id == actor.UserId ||
                 !await CanVoidAsync(authorizer.Id, ct) ||
                 !RoleHierarchy.IsHigherThan(authorizer.HighestRoleLevel, actorSnapshot!.HighestRoleLevel))
                 return Result.Failure<CancelSaleDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
-            if (!passwordHasher.Verify(request.Authorization.Password, authorizer.PasswordHash))
+            if (!request.Authorization.UsesCredential() && !passwordHasher.Verify(request.Authorization.Password!, authorizer.PasswordHash))
             {
                 var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
                 await userRepository.UpdateAsync(authorizer, ct);
@@ -281,7 +283,9 @@ public sealed partial class SalesService
             DescripcionOperacion = administratorSelfAuthorized
                 ? "Autorización de anulación de venta por Administrador sin segundo autorizador."
                 : "Autorización de anulación de venta.", Motivo = reason.Codigo,
-            MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA", Estado = "UTILIZADA",
+            MetodoAutenticacion = request.Authorization.AuthenticationMethod(),
+            CredencialAutorizadorId = request.Authorization?.ResolvedCredentialId,
+            Resultado = "EXITOSA", Estado = "UTILIZADA",
             FechaSolicitud = now, FechaExpiracion = now.AddMinutes(5), FechaUtilizacion = now
         };
         await repository.AddAuthorizationAsync(authorization, ct);

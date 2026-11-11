@@ -23,6 +23,7 @@ public sealed class LayawayCreateService(
     IPermissionChecker permissions,
     IPermissionRepository permissionRepository,
     IPasswordHasher passwordHasher,
+    IAuthorizerCredentialResolver credentialResolver,
     ILoginAttemptCoordinator loginAttempts,
     IAuditRepository audits,
     IUnitOfWork unitOfWork,
@@ -32,7 +33,14 @@ public sealed class LayawayCreateService(
         ActorContext actor, string idempotencyKey, CreateLayawayRequest request,
         CancellationToken cancellationToken = default)
     {
-        var normalized = Normalize(idempotencyKey, request);
+        if (request?.Authorization is { } scanned && scanned.UsesCredential())
+        {
+            if (scanned.MixesCredentialWithPassword())
+                return Fail(ApplicationError.Validation("Envíe la credencial escaneada o usuario y contraseña, no ambos."));
+            var (userName, credentialId) = await credentialResolver.ResolveOrUnknownAsync(scanned.CredentialToken!, cancellationToken);
+            request = request with { Authorization = scanned with { UserName = userName, ResolvedCredentialId = credentialId } };
+        }
+        var normalized = Normalize(idempotencyKey, request!);
         if (normalized.Error is not null)
             return Result.Failure<CreatedLayawayDto>(normalized.Error);
 
@@ -127,7 +135,7 @@ public sealed class LayawayCreateService(
             if (authorizer is null || !authorizer.IsActive || authorizer.Id == actor.UserId ||
                 !RoleHierarchy.IsHigherThan(authorizer.HighestRoleLevel, snapshot.HighestRoleLevel))
                 return Fail(ApplicationError.Forbidden());
-            if (!passwordHasher.Verify(input.AuthorizerPassword!, authorizer.PasswordHash))
+            if (input.CredentialId is null && !passwordHasher.Verify(input.AuthorizerPassword!, authorizer.PasswordHash))
             {
                 var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
                 await users.UpdateAsync(authorizer, cancellationToken);
@@ -321,7 +329,8 @@ public sealed class LayawayCreateService(
                 : supervisorSelfAuthorized
                     ? "Autorización de creación de apartado por Supervisor sin segundo autorizador."
                     : "Autorización de creación de apartado por otro usuario.",
-            MetodoAutenticacion = "PASSWORD",
+            MetodoAutenticacion = input.CredentialId is null ? "PASSWORD" : "CODIGO_BARRAS_PIN",
+            CredencialAutorizadorId = input.CredentialId,
             Resultado = "EXITOSA", Estado = "UTILIZADA",
             FechaSolicitud = now.UtcDateTime, FechaExpiracion = now.AddMinutes(5).UtcDateTime,
             FechaUtilizacion = now.UtcDateTime
@@ -384,10 +393,8 @@ public sealed class LayawayCreateService(
         if (string.IsNullOrWhiteSpace(key) || key.Trim().Length > 100 || request is null ||
             request.CustomerId == Guid.Empty || request.Lines is null || request.Lines.Count == 0 ||
             request.Payments is null || request.Payments.Count is < 1 or > 3 ||
-            (request.Authorization is not null &&
-             (string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-              string.IsNullOrWhiteSpace(request.Authorization.Password))))
-            return NormalizedCreate.Fail("Cliente, líneas, pagos e Idempotency-Key son obligatorios; si envía authorization, incluya usuario y contraseña.");
+            (request.Authorization is not null && !request.Authorization.IsComplete()))
+            return NormalizedCreate.Fail("Cliente, líneas, pagos e Idempotency-Key son obligatorios; si envía authorization, incluya usuario y contraseña o la credencial escaneada.");
 
         var lines = new List<CreateLayawayLineRequest>();
         foreach (var line in request.Lines)
@@ -434,7 +441,7 @@ public sealed class LayawayCreateService(
         }
         if (payments.Select(x => x.MethodCode).Distinct().Count() != payments.Count)
             return NormalizedCreate.Fail("No se puede repetir un método de pago.");
-        var authorizerUserName = request.Authorization?.UserName.Trim().ToUpperInvariant();
+        var authorizerUserName = request.Authorization?.UserName!.Trim().ToUpperInvariant();
         var sortedPayments = payments.OrderBy(x => x.MethodCode).ToArray();
         var canonical = authorizerUserName is null
             ? JsonSerializer.Serialize(new
@@ -449,7 +456,7 @@ public sealed class LayawayCreateService(
             });
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
         return new NormalizedCreate(key.Trim(), request.CustomerId, lines.ToArray(), sortedPayments,
-            request.DueDate, authorizerUserName, request.Authorization?.Password, hash, null);
+            request.DueDate, authorizerUserName, request.Authorization?.Password, hash, request.Authorization?.ResolvedCredentialId, null);
     }
 
     private static Result<CreatedLayawayDto> Fail(ApplicationError error) => Result.Failure<CreatedLayawayDto>(error);
@@ -460,10 +467,10 @@ public sealed class LayawayCreateService(
     private sealed record NormalizedCreate(
         string? Key, Guid CustomerId, CreateLayawayLineRequest[]? Lines,
         CreateLayawayPaymentRequest[]? Payments, DateOnly? DueDate,
-        string? AuthorizerUserName, string? AuthorizerPassword, string? Hash,
+        string? AuthorizerUserName, string? AuthorizerPassword, string? Hash, Guid? CredentialId,
         ApplicationError? Error)
     {
         public static NormalizedCreate Fail(string message) =>
-            new(null, Guid.Empty, null, null, null, null, null, null, ApplicationError.Validation(message));
+            new(null, Guid.Empty, null, null, null, null, null, null, null, ApplicationError.Validation(message));
     }
 }

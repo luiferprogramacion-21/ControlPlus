@@ -244,6 +244,8 @@ public sealed class CatalogService(
                     existing.HashSolicitud != requestHash || existing.Entidad != nameof(Producto) ||
                     existing.EntidadId is null || existing.Resultado is null)
                     return Result.Failure<ProductDto>(ApplicationError.Conflict("La clave de idempotencia ya fue utilizada con otra solicitud."));
+                if (await repository.GetProductAsync(existing.EntidadId.Value, cancellationToken) is null)
+                    return Result.Failure<ProductDto>(ApplicationError.Conflict("El producto de esta operación fue eliminado"));
                 var saved = JsonSerializer.Deserialize<ProductDto>(existing.Resultado)!;
                 var canViewCost = await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.ProductCostsRead, cancellationToken);
                 return Result.Success(saved.RestrictCostVisibility(canViewCost));
@@ -359,6 +361,32 @@ public sealed class CatalogService(
         await unitOfWork.SaveChangesAsync(cancellationToken);
         var canViewCost = await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.ProductCostsRead, cancellationToken);
         return Result.Success(Map(product, canViewCost));
+    }
+
+    public async Task<Result> DeleteProductAsync(ActorContext actor, Guid productId, long expectedVersion,
+        CancellationToken cancellationToken = default)
+    {
+        var authorization = await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
+        if (authorization is null || !authorization.Roles.Any(role => role.Code == RoleCodes.Administrator) ||
+            !await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.ProductsSensitiveUpdate, cancellationToken))
+            return Result.Failure(ApplicationError.Forbidden());
+        if (expectedVersion < 1)
+            return Result.Failure(ApplicationError.Validation("expectedVersion debe ser positivo."));
+
+        await using var transaction = await repository.BeginTransactionAsync(cancellationToken);
+        var product = await repository.GetProductForUpdateAsync(productId, cancellationToken);
+        if (product is null) return Result.Failure(ApplicationError.NotFound("el producto"));
+        if (product.Version != expectedVersion) return Result.Failure(VersionConflict);
+        if (await repository.HasProductHistoryAsync(productId, cancellationToken))
+            return Result.Failure(ApplicationError.Conflict("El producto tiene historial comercial; solo puede inactivarse."));
+
+        await repository.DeleteProductOwnedDataAsync(productId, cancellationToken);
+        await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId, AuditAction.ProductDeleted,
+            nameof(Producto), productId, new { Id = productId, Codigo = product.CodigoInterno,
+                Nombre = product.Nombre, UsuarioId = actor.UserId }, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Result.Success();
     }
 
     public async Task<Result<ProductDto>> SetProductActiveAsync(

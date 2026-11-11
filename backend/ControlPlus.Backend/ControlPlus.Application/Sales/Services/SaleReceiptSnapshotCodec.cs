@@ -10,7 +10,7 @@ using ControlPlus.Domain.OfficialModel;
 namespace ControlPlus.Application.Sales.Services;
 
 // The version belongs to the data schema. It is independent of document and template versions.
-internal static class SaleReceiptSnapshotCodec
+public static class SaleReceiptSnapshotCodec
 {
     private const int SchemaVersion = 1;
     private static readonly JsonSerializerOptions JsonOptions = new()

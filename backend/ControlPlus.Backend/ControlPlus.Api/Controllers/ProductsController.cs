@@ -74,6 +74,21 @@ public sealed class ProductsController(
         return actor is null ? MissingActor() : FromResult(await catalogService.UpdateProductAsync(actor, productId, request, cancellationToken), Ok);
     }
 
+    /// <summary>Borra un producto sin historial comercial y conserva la auditoría del borrado.</summary>
+    /// <remarks>Solo Administrador vigente con PRODUCTS.SENSITIVE_UPDATE. La versión anterior produce concurrency.conflict; el historial produce resource.conflict y permite únicamente inactivar. Un replay del alta después del borrado devuelve resource.conflict.</remarks>
+    [HttpDelete("{productId:guid}")]
+    [PermissionAuthorize(PermissionCodes.ProductsSensitiveUpdate)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid productId, [FromQuery] long expectedVersion, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await catalogService.DeleteProductAsync(actor, productId, expectedVersion, cancellationToken));
+    }
+
     [HttpPut("{productId:guid}/activate")]
     [PermissionAuthorize(PermissionCodes.ProductsSensitiveUpdate)]
     [ProducesResponseType<ProductDto>(StatusCodes.Status200OK)]

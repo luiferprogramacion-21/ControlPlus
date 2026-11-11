@@ -126,14 +126,13 @@ public sealed partial class SalesApiFlowTests
         SetBearer(client, setup.Cashier.AccessToken);
         var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "change-same-product-origin",
             CashRequest(setup.Products.Standard, 1, 1000m)), HttpStatusCode.Created);
-        _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
         var request = new ConfirmSaleChangeRequest(sale.Version, null,
             [new(Assert.Single(sale.Lines).Id, 1, true)],
             [new(setup.Products.Standard, 1, "MINORISTA")], "AUTO", [],
             new(SupervisorUser, SupervisorPassword));
-        using var firstClient = CreateClient(setup.Admin.AccessToken);
-        using var secondClient = CreateClient(setup.Admin.AccessToken);
+        using var firstClient = CreateClient(setup.Cashier.AccessToken);
+        using var secondClient = CreateClient(setup.Cashier.AccessToken);
         var responses = await Task.WhenAll(
             PostChangeAsync(firstClient, sale.Id, "change-reserved-race-a", request),
             PostChangeAsync(secondClient, sale.Id, "change-reserved-race-b", request));
@@ -173,15 +172,14 @@ public sealed partial class SalesApiFlowTests
         var sale = await ReadAsync<SaleDto>(await PostSaleAsync(setupClient,
             "change-concurrent-origin", CashRequest(setup.Products.Standard, 1, 1000m)),
             HttpStatusCode.Created);
-        _ = await StartSessionAsync(setupClient, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
+        _ = await StartSessionAsync(setupClient, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
         var request = new ConfirmSaleChangeRequest(sale.Version, null,
             [new(Assert.Single(sale.Lines).Id, 1, true)],
             [new(setup.Products.ResidueA, 1, "MINORISTA")], "AUTO",
             [new("EFECTIVO", 899m, null, null)],
             new(SupervisorUser, SupervisorPassword));
-        using var firstClient = CreateClient(setup.Admin.AccessToken);
-        using var secondClient = CreateClient(setup.Admin.AccessToken);
+        using var firstClient = CreateClient(setup.Cashier.AccessToken);
+        using var secondClient = CreateClient(setup.Cashier.AccessToken);
         var responses = await Task.WhenAll(
             PostChangeAsync(firstClient, sale.Id, "change-concurrent-same", request),
             PostChangeAsync(secondClient, sale.Id, "change-concurrent-same", request));
@@ -225,9 +223,8 @@ public sealed partial class SalesApiFlowTests
         var standardLine = sale.Lines.Single(x => x.ProductId == setup.Products.Standard);
         var smallLine = sale.Lines.Single(x => x.ProductId == setup.Products.ResidueA);
         var thirdLine = sale.Lines.Single(x => x.ProductId == setup.Products.ResidueC);
-        _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
-        SetBearer(client, setup.Admin.AccessToken);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
         var collection = await ReadAsync<SaleChangeDto>(await PostChangeAsync(client, sale.Id,
             "change-net-medium-collect", new ConfirmSaleChangeRequest(sale.Version, null,
                 [new(smallLine.Id, 1, true)],
@@ -237,9 +234,8 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal("PAGO_INMEDIATO", collection.Treatment);
         var preparation = await ReadAsync<SaleChangePreparationDto>(await client.GetAsync(
             $"/api/sales/{sale.Id}/change-preparation"), HttpStatusCode.OK);
-        _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
-        SetBearer(client, setup.Admin.AccessToken);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
         var baseRequest = new ConfirmSaleChangeRequest(preparation.SaleVersion, null,
             [new(standardLine.Id, 1, true)],
             [new(setup.Products.ResidueB, 1, "MINORISTA")], "AUTO",
@@ -260,9 +256,8 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal("NET-REFUND", refund.Payments.Single(x => x.MethodCode == "TRANSFERENCIA").Reference);
         var thirdPreparation = await ReadAsync<SaleChangePreparationDto>(await client.GetAsync(
             $"/api/sales/{sale.Id}/change-preparation"), HttpStatusCode.OK);
-        _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
-        SetBearer(client, setup.Admin.AccessToken);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
         var thirdRequest = new ConfirmSaleChangeRequest(thirdPreparation.SaleVersion, null,
             [new(thirdLine.Id, 1, true)],
             [new(setup.Products.ResidueB, 1, "MINORISTA")], "AUTO",
@@ -294,16 +289,16 @@ public sealed partial class SalesApiFlowTests
         var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "change-partial-origin",
             new ConfirmSaleRequest(null,
                 [new(setup.Products.Standard, 3, "MINORISTA", new("VALOR_FIJO", 2m))],
-                null, "Descuento histórico", [new("EFECTIVO", 2998m, 2998m, null)])),
+                null, "Descuento histórico", [new("EFECTIVO", 2998m, 2998m, null)],
+                Authorization: new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword))),
             HttpStatusCode.Created);
         var originalLine = Assert.Single(sale.Lines);
         Assert.Equal(2998m, originalLine.NetAmount);
         var expectedNet = new[] { 999m, 999m, 1000m };
         for (var index = 0; index < expectedNet.Length; index++)
         {
-            _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-                setup.Admin.AccessToken, setup.Admin.User.Id);
-            SetBearer(client, setup.Admin.AccessToken);
+            _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+            SetBearer(client, setup.Cashier.AccessToken);
             var preparation = await ReadAsync<SaleChangePreparationDto>(await client.GetAsync(
                 $"/api/sales/{sale.Id}/change-preparation"), HttpStatusCode.OK);
             Assert.Equal(3 - index, Assert.Single(preparation.Lines).RemainingQuantity);
@@ -317,7 +312,7 @@ public sealed partial class SalesApiFlowTests
             Assert.Equal(expectedNet[index], change.Details.Single(x => x.Type == "DEVUELTO").NetAmount);
         }
 
-        SetBearer(client, setup.Admin.AccessToken);
+        SetBearer(client, setup.Cashier.AccessToken);
         var finalPreparation = await ReadAsync<SaleChangePreparationDto>(await client.GetAsync(
             $"/api/sales/{sale.Id}/change-preparation"), HttpStatusCode.OK);
         Assert.False(finalPreparation.CanStartChange);
@@ -343,9 +338,8 @@ public sealed partial class SalesApiFlowTests
         SetBearer(client, setup.Cashier.AccessToken);
         var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "sale-change-reject-origin",
             CashRequest(setup.Products.Standard, 1, 1000m)), HttpStatusCode.Created);
-        _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
-        SetBearer(client, setup.Admin.AccessToken);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
         var request = new ConfirmSaleChangeRequest(sale.Version, null,
             [new(Assert.Single(sale.Lines).Id, 1, true)],
             [new(setup.Products.ResidueA, 1, "MINORISTA")], "AUTO",
@@ -391,9 +385,8 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(sale.CreditId, preparation.CreditId);
         Assert.Equal(1L, preparation.CreditVersion);
         Assert.Equal(1000m, preparation.CreditBalance);
-        _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
-        SetBearer(client, setup.Admin.AccessToken);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
         var change = await ReadAsync<SaleChangeDto>(await PostChangeAsync(client, sale.Id,
             "sale-change-credit-reduction", new ConfirmSaleChangeRequest(sale.Version,
                 preparation.CreditVersion,
@@ -434,9 +427,8 @@ public sealed partial class SalesApiFlowTests
                 [new(setup.Products.ResidueA, 1, "MINORISTA")], null, null, [],
                 "CREDITO", state.CurrentShift!.OperatingDate.AddDays(10),
                 new(SupervisorUser, SupervisorPassword))), HttpStatusCode.Created);
-        _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
-        SetBearer(client, setup.Admin.AccessToken);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
         var change = await ReadAsync<SaleChangeDto>(await PostChangeAsync(client, sale.Id,
             "change-credit-increase", new ConfirmSaleChangeRequest(sale.Version, 1,
                 [new(Assert.Single(sale.Lines).Id, 1, true)],
@@ -475,9 +467,8 @@ public sealed partial class SalesApiFlowTests
                 [new(setup.Products.Standard, 1, "MINORISTA")], null, null, [],
                 "CREDITO", state.CurrentShift!.OperatingDate.AddDays(10),
                 new(SupervisorUser, SupervisorPassword))), HttpStatusCode.Created);
-        _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
-        SetBearer(client, setup.Admin.AccessToken);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
         using var payment = new HttpRequestMessage(HttpMethod.Post,
             $"/api/credits/{sale.CreditId}/payments")
         { Content = JsonContent.Create(new ApplyCreditPaymentRequest(1,
@@ -488,9 +479,8 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(50m, abono.Balance);
         Assert.Equal("PENDIENTE", abono.State);
         Assert.Equal(2L, abono.Version);
-        _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
-        SetBearer(client, setup.Admin.AccessToken);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
         var change = await ReadAsync<SaleChangeDto>(await PostChangeAsync(client, sale.Id,
             "sale-change-credit-excess", new ConfirmSaleChangeRequest(sale.Version, abono.Version,
                 [new(Assert.Single(sale.Lines).Id, 1, true)],
@@ -524,8 +514,7 @@ public sealed partial class SalesApiFlowTests
         var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "change-permission-origin",
             CashRequest(setup.Products.Standard, 1, 1000m)), HttpStatusCode.Created);
         _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
-        SetBearer(client, setup.Admin.AccessToken);
+            setup.Cashier.AccessToken, setup.Users.Cashier.Id);
         var request = new ConfirmSaleChangeRequest(sale.Version, null,
             [new(Assert.Single(sale.Lines).Id, 1, true)],
             [new(setup.Products.ResidueA, 1, "MINORISTA")], "AUTO",
@@ -535,20 +524,26 @@ public sealed partial class SalesApiFlowTests
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var before = await CaptureChangeStateAsync(db, sale.Id,
             setup.Products.Standard, setup.Products.ResidueA);
+
+        // The Administrator revokes the authorizer's permission: the Cajero's change is rejected.
+        SetBearer(client, setup.Admin.AccessToken);
         var authPermissionId = await GetPermissionIdAsync(client, PermissionCodes.SalesChangeAuthorize);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
             $"/api/users/{setup.Users.Supervisor.Id}/permissions/{authPermissionId}",
             new SetUserPermissionRequest(false))).StatusCode);
+        SetBearer(client, setup.Cashier.AccessToken);
         await AssertProblemAsync(await PostChangeAsync(client, sale.Id, "change-revoked-authorizer",
-            request), HttpStatusCode.Unauthorized);
+            request), HttpStatusCode.Forbidden);
         Assert.Equal(before, await CaptureChangeStateAsync(db, sale.Id,
             setup.Products.Standard, setup.Products.ResidueA));
 
+        // Then the executor's own permission is revoked: the request is rejected before any effect.
+        SetBearer(client, setup.Admin.AccessToken);
         var executionPermissionId = await GetPermissionIdAsync(client, PermissionCodes.SalesCreate);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
-            $"/api/users/{setup.Admin.User.Id}/permissions/{executionPermissionId}",
+            $"/api/users/{setup.Users.Cashier.Id}/permissions/{executionPermissionId}",
             new SetUserPermissionRequest(false))).StatusCode);
-        var refreshed = await LoginAsync(client, AdminUser, AdminPassword);
+        var refreshed = await LoginAsync(client, CashierUser, CashierPassword);
         SetBearer(client, refreshed.AccessToken);
         await AssertProblemAsync(await PostChangeAsync(client, sale.Id, "change-revoked-executor",
             request), HttpStatusCode.Forbidden);
@@ -568,8 +563,7 @@ public sealed partial class SalesApiFlowTests
         SetBearer(client, setup.Cashier.AccessToken);
         var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "change-deferred-origin",
             CashRequest(setup.Products.Standard, 1, 1000m)), HttpStatusCode.Created);
-        var session = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
+        var session = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var before = await CaptureChangeStateAsync(db, sale.Id,
@@ -580,7 +574,7 @@ public sealed partial class SalesApiFlowTests
         var sequenceBefore = await db.ConsecutivoDocumento.Where(x => x.TipoDocumento == "CAMBIO_VENTA")
             .Select(x => x.UltimoNumero).SingleAsync();
         await InstallDeferredChangeFailureAsync();
-        SetBearer(client, setup.Admin.AccessToken);
+        SetBearer(client, setup.Cashier.AccessToken);
         var response = await PostChangeAsync(client, sale.Id, "change-forced-commit-failure",
             new ConfirmSaleChangeRequest(sale.Version, null,
                 [new(Assert.Single(sale.Lines).Id, 1, true)],
@@ -622,9 +616,8 @@ public sealed partial class SalesApiFlowTests
                 [new(setup.Products.Standard, 1, "MINORISTA")], null, null, [],
                 "CREDITO", state.CurrentShift!.OperatingDate.AddDays(10),
                 new(SupervisorUser, SupervisorPassword))), HttpStatusCode.Created);
-        _ = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
-        SetBearer(client, setup.Admin.AccessToken);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
         using var payment = new HttpRequestMessage(HttpMethod.Post,
             $"/api/credits/{sale.CreditId}/payments")
         { Content = JsonContent.Create(new ApplyCreditPaymentRequest(1,
@@ -635,8 +628,7 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(50m, abono.Balance);
         Assert.Equal("PENDIENTE", abono.State);
         Assert.Equal(2L, abono.Version);
-        var session = await StartSessionAsync(client, setup.Admin.AccessToken,
-            setup.Admin.AccessToken, setup.Admin.User.Id);
+        var session = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var before = await CaptureChangeStateAsync(db, sale.Id,
@@ -650,7 +642,7 @@ public sealed partial class SalesApiFlowTests
         var sequenceBefore = await db.ConsecutivoDocumento.Where(x => x.TipoDocumento == "CAMBIO_VENTA")
             .Select(x => x.UltimoNumero).SingleAsync();
         await InstallDeferredChangeFailureAsync();
-        SetBearer(client, setup.Admin.AccessToken);
+        SetBearer(client, setup.Cashier.AccessToken);
         var response = await PostChangeAsync(client, sale.Id, "change-credit-forced-failure",
             new ConfirmSaleChangeRequest(sale.Version, abono.Version,
                 [new(Assert.Single(sale.Lines).Id, 1, true)],

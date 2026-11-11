@@ -198,25 +198,71 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
+    public async Task Adjustment_AuthorizedWithScannedCredential_RecordsTheCredentialMethod()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client, 10);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var permissionId = await GetPermissionIdAsync(client, PermissionCodes.InventoryAdjust);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{scenario.SupervisorUser.Id}/permissions/{permissionId}",
+            new SetUserPermissionRequest(true))).StatusCode);
+        var supervisor = await LoginAsync(client, SupervisorUser, SupervisorPassword);
+        var reasons = await ReadAsync<IReadOnlyCollection<InventoryAdjustmentReasonDto>>(
+            await GetWithBearerAsync(client, "/api/inventory/adjustment-reasons", supervisor.AccessToken), HttpStatusCode.OK);
+        var reason = reasons.Single(x => x.Code == "CONTEO_FISICO");
+        SetBearer(client, scenario.Admin.AccessToken);
+        var issued = await ReadAsync<IssuedOperatorCredentialDto>(await client.PostAsJsonAsync(
+            $"/api/cash/operator-credentials/{scenario.AuthorizerUser.Id}", new IssueOperatorCredentialRequest(null)),
+            HttpStatusCode.Created);
+
+        var unknown = new CreateInventoryAdjustmentRequest(scenario.ProductId, 5, reason.Id, scenario.ProductVersion,
+            "Credencial desconocida", new(null, null, "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"));
+        Assert.Equal(HttpStatusCode.Forbidden, (await PostAdjustmentAsync(
+            client, supervisor.AccessToken, "inventory-unknown-credential", unknown)).StatusCode);
+
+        var request = unknown with
+        {
+            Observation = "Conteo con credencial escaneada",
+            Authorization = new(null, null, issued.CredentialToken)
+        };
+        var created = await ReadAsync<InventoryMovementDto>(await PostAdjustmentAsync(
+            client, supervisor.AccessToken, "inventory-scanned-credential", request), HttpStatusCode.Created);
+        Assert.Equal(15, created.NewStock);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var authorization = await context.AutorizacionOperacion.SingleAsync(x => x.TipoOperacion == "AJUSTAR_INVENTARIO");
+        Assert.Equal("CODIGO_BARRAS_PIN", authorization.MetodoAutenticacion);
+        Assert.Equal(scenario.AuthorizerUser.Id, authorization.UsuarioAutorizadorId);
+        Assert.Equal(issued.CredentialId, authorization.CredencialAutorizadorId);
+        var persistedText = string.Join('|', (await context.EventoAuditoria.AsNoTracking().ToArrayAsync())
+            .Select(x => x.DatosNuevos ?? string.Empty));
+        Assert.DoesNotContain(issued.CredentialToken, persistedText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
     public async Task WrongAuthorizerAttempts_ShareLoginLockout_AuditAndSanitization()
     {
         using var client = CreateClient();
         var scenario = await BootstrapAsync(client, 10);
+        var supervisorToken = await GrantedSupervisorTokenAsync(client, scenario);
         var reason = (await ReadAsync<IReadOnlyCollection<InventoryAdjustmentReasonDto>>(
-            await GetWithBearerAsync(client, "/api/inventory/adjustment-reasons", scenario.Admin.AccessToken),
+            await GetWithBearerAsync(client, "/api/inventory/adjustment-reasons", supervisorToken),
             HttpStatusCode.OK)).Single(x => x.Code == "CONTEO_FISICO");
         var request = new CreateInventoryAdjustmentRequest(
             scenario.ProductId, 1, reason.Id, scenario.ProductVersion, "Credencial rechazada",
             new(AuthorizerUser, "Wrong-Authorizer-Password!"));
 
         await AssertProblemAsync(await PostAdjustmentAsync(
-            client, scenario.Admin.AccessToken, "wrong-authorizer-isolated", request), HttpStatusCode.Forbidden);
+            client, supervisorToken, "wrong-authorizer-isolated", request), HttpStatusCode.Forbidden);
         Assert.Equal(1, (await ReadAuthenticationStateAsync(scenario.AuthorizerUser.Id)).Attempts);
 
         using var concurrentAdjustmentClient = CreateClient();
         using var concurrentLoginClient = CreateClient();
         var concurrentResponses = await Task.WhenAll(
-            PostAdjustmentAsync(concurrentAdjustmentClient, scenario.Admin.AccessToken,
+            PostAdjustmentAsync(concurrentAdjustmentClient, supervisorToken,
                 "wrong-authorizer-concurrent", request),
             concurrentLoginClient.PostAsJsonAsync("/api/auth/login",
                 new LoginRequest(AuthorizerUser, "Wrong-Login-Password!")));
@@ -225,13 +271,13 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
         Assert.Equal(3, (await ReadAuthenticationStateAsync(scenario.AuthorizerUser.Id)).Attempts);
 
         await AssertProblemAsync(await PostAdjustmentAsync(
-            client, scenario.Admin.AccessToken, "wrong-authorizer-fourth", request), HttpStatusCode.Forbidden);
+            client, supervisorToken, "wrong-authorizer-fourth", request), HttpStatusCode.Forbidden);
         Assert.Equal(4, (await ReadAuthenticationStateAsync(scenario.AuthorizerUser.Id)).Attempts);
 
         using var fifthAdjustmentClient = CreateClient();
         using var fifthLoginClient = CreateClient();
         var fifthResponses = await Task.WhenAll(
-            PostAdjustmentAsync(fifthAdjustmentClient, scenario.Admin.AccessToken,
+            PostAdjustmentAsync(fifthAdjustmentClient, supervisorToken,
                 "wrong-authorizer-fifth-race", request),
             fifthLoginClient.PostAsJsonAsync("/api/auth/login",
                 new LoginRequest(AuthorizerUser, "Wrong-Fifth-Password!")));
@@ -241,7 +287,7 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
         var locked = await ReadAuthenticationStateAsync(scenario.AuthorizerUser.Id);
         Assert.Equal(5, locked.Attempts);
         Assert.NotNull(locked.LockedAt);
-        await AssertProblemAsync(await PostAdjustmentAsync(client, scenario.Admin.AccessToken,
+        await AssertProblemAsync(await PostAdjustmentAsync(client, supervisorToken,
             "blocked-authorizer-after-fifth", request with
             {
                 Authorization = new(AuthorizerUser, AuthorizerPassword)
@@ -254,7 +300,7 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
             x => x.Accion == "USERLOCKED" && x.EntidadId == scenario.AuthorizerUser.Id));
         Assert.True(await context.EventoAuditoria.CountAsync(
             x => x.Accion == "INVENTORYADJUSTMENTAUTHORIZATIONREJECTED") >= 4);
-        var executor = await context.Usuario.AsNoTracking().SingleAsync(x => x.Id == scenario.Admin.User.Id);
+        var executor = await context.Usuario.AsNoTracking().SingleAsync(x => x.Id == scenario.SupervisorUser.Id);
         Assert.Equal(0, executor.IntentosFallidos);
         Assert.Null(executor.BloqueoHasta);
         Assert.Equal(0, await context.MovimientoInventario.CountAsync());
@@ -265,7 +311,7 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
         Assert.DoesNotContain("Wrong-", auditText, StringComparison.Ordinal);
         Assert.DoesNotContain(AuthorizerPassword, auditText, StringComparison.Ordinal);
         Assert.DoesNotContain(authorizer.PasswordHash, auditText, StringComparison.Ordinal);
-        Assert.DoesNotContain(scenario.Admin.AccessToken, auditText, StringComparison.Ordinal);
+        Assert.DoesNotContain(supervisorToken, auditText, StringComparison.Ordinal);
         Assert.DoesNotContain("wrong-authorizer", auditText, StringComparison.Ordinal);
     }
 
@@ -278,39 +324,40 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
         var reason = (await ReadAsync<IReadOnlyCollection<InventoryAdjustmentReasonDto>>(
             await GetWithBearerAsync(client, "/api/inventory/adjustment-reasons", scenario.Admin.AccessToken),
             HttpStatusCode.OK)).Single(x => x.Code == "CONTEO_FISICO");
+        var supervisorToken = await GrantedSupervisorTokenAsync(client, scenario);
         var request = new CreateInventoryAdjustmentRequest(
             scenario.ProductId, 1, reason.Id, scenario.ProductVersion, null,
-            new(SupervisorUser, SupervisorPassword));
-
-        await AssertProblemAsync(await PostAdjustmentAsync(
-            client, scenario.Admin.AccessToken, "authorizer-without-grant", request), HttpStatusCode.Forbidden);
+            new(AuthorizerUser, AuthorizerPassword));
         SetBearer(client, scenario.Admin.AccessToken);
         var permissionId = await GetPermissionIdAsync(client, PermissionCodes.InventoryAdjust);
+
+        // The authorizer's effective permission is revoked, granted again, and revoked once more.
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
-            $"/api/users/{scenario.SupervisorUser.Id}/permissions/{permissionId}",
-            new SetUserPermissionRequest(true))).StatusCode);
+            $"/api/users/{scenario.AuthorizerUser.Id}/permissions/{permissionId}", new SetUserPermissionRequest(false))).StatusCode);
+        await AssertProblemAsync(await PostAdjustmentAsync(
+            client, supervisorToken, "authorizer-without-grant", request), HttpStatusCode.Forbidden);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{scenario.AuthorizerUser.Id}/permissions/{permissionId}", new SetUserPermissionRequest(true))).StatusCode);
         var created = await ReadAsync<InventoryMovementDto>(await PostAdjustmentAsync(
-            client, scenario.Admin.AccessToken, "authorizer-with-grant", request), HttpStatusCode.Created);
+            client, supervisorToken, "authorizer-with-grant", request), HttpStatusCode.Created);
 
         SetBearer(client, scenario.Admin.AccessToken);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
-            $"/api/users/{scenario.SupervisorUser.Id}/permissions/{permissionId}",
-            new SetUserPermissionRequest(false))).StatusCode);
-        await AssertProblemAsync(await PostAdjustmentAsync(client, scenario.Admin.AccessToken,
+            $"/api/users/{scenario.AuthorizerUser.Id}/permissions/{permissionId}", new SetUserPermissionRequest(false))).StatusCode);
+        await AssertProblemAsync(await PostAdjustmentAsync(client, supervisorToken,
             "authorizer-after-revoke", request with { ExpectedVersion = scenario.ProductVersion + 1 }),
             HttpStatusCode.Forbidden);
 
         SetBearer(client, scenario.Admin.AccessToken);
         Assert.Equal(HttpStatusCode.OK, (await client.PutAsync(
             $"/api/users/{scenario.SecondAuthorizerUser.Id}/deactivate", null)).StatusCode);
-        await AssertProblemAsync(await PostAdjustmentAsync(client, scenario.Admin.AccessToken,
+        await AssertProblemAsync(await PostAdjustmentAsync(client, supervisorToken,
             "inactive-authorizer", request with
             {
                 ExpectedVersion = scenario.ProductVersion + 1,
                 Authorization = new(SecondAuthorizerUser, SecondAuthorizerPassword)
             }), HttpStatusCode.Forbidden);
-        Assert.NotEqual(Guid.Empty, created.Id);
-    }
+        Assert.NotEqual(Guid.Empty, created.Id);    }
 
     [Fact]
     [Trait("Category", "Integration")]
@@ -323,7 +370,7 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
             HttpStatusCode.OK)).Single(x => x.Code == "CONTEO_FISICO");
         var baseRequest = new CreateInventoryAdjustmentRequest(
             scenario.ProductId, 1, reason.Id, scenario.ProductVersion, null,
-            new(AuthorizerUser, AuthorizerPassword));
+            null);
 
         var unknownJson = JsonSerializer.Serialize(new
         {
@@ -332,7 +379,7 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
             reasonId = reason.Id,
             expectedVersion = scenario.ProductVersion,
             observation = (string?)null,
-            authorization = new { userName = AuthorizerUser, password = AuthorizerPassword },
+            authorization = (object?)null,
             unknownInventoryField = true
         });
         await AssertProblemAsync(await PostRawAdjustmentAsync(
@@ -342,8 +389,7 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
         {
             var numericJson = $$$"""
                 {"productId":"{{{scenario.ProductId}}}","quantityDelta":{{{quantity}}},"reasonId":"{{{reason.Id}}}",
-                 "expectedVersion":{{{scenario.ProductVersion}}},"observation":null,
-                 "authorization":{"userName":"{{{AuthorizerUser}}}","password":"{{{AuthorizerPassword}}}"}}
+                 "expectedVersion":{{{scenario.ProductVersion}}},"observation":null}
                 """;
             await AssertProblemAsync(await PostRawAdjustmentAsync(
                 client, scenario.Admin.AccessToken, $"numeric-{quantity}", numericJson), HttpStatusCode.BadRequest);
@@ -391,7 +437,7 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
             HttpStatusCode.OK)).Single(x => x.Code == "CONTEO_FISICO");
         var request = new CreateInventoryAdjustmentRequest(
             scenario.ProductId, 1, reason.Id, scenario.ProductVersion, null,
-            new(AuthorizerUser, AuthorizerPassword));
+            null);
         var created = await ReadAsync<InventoryMovementDto>(await PostAdjustmentAsync(
             client, scenario.Admin.AccessToken, "cost-redaction-replay", request), HttpStatusCode.Created);
         Assert.Equal(40m, created.PreviousAverageCost);
@@ -416,14 +462,15 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
         using var client = CreateClient();
         var scenario = await BootstrapAsync(client, 10);
         var foreignFixture = await PrepareForeignSaleFixtureAsync(client, scenario);
+        var supervisorToken = await GrantedSupervisorTokenAsync(client, scenario);
         var reason = (await ReadAsync<IReadOnlyCollection<InventoryAdjustmentReasonDto>>(
-            await GetWithBearerAsync(client, "/api/inventory/adjustment-reasons", scenario.Admin.AccessToken),
+            await GetWithBearerAsync(client, "/api/inventory/adjustment-reasons", supervisorToken),
             HttpStatusCode.OK)).Single(x => x.Code == "CONTEO_FISICO");
         var currentProductVersion = await ReadProductVersionAsync(scenario.ProductId);
         var failedRequest = new CreateInventoryAdjustmentRequest(
             scenario.ProductId, 1, reason.Id, currentProductVersion, null,
             new(AuthorizerUser, "Wrong-Before-Commit!"));
-        await AssertProblemAsync(await PostAdjustmentAsync(client, scenario.Admin.AccessToken,
+        await AssertProblemAsync(await PostAdjustmentAsync(client, supervisorToken,
             "persisted-rejection-before-commit", failedRequest), HttpStatusCode.Forbidden);
 
         var before = await CaptureRollbackStateAsync(scenario.ProductId, scenario.AuthorizerUser.Id);
@@ -439,7 +486,7 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
             Authorization = new(AuthorizerUser, AuthorizerPassword),
             Observation = "Debe revertirse por completo"
         };
-        await AssertProblemAsync(await PostAdjustmentAsync(client, scenario.Admin.AccessToken,
+        await AssertProblemAsync(await PostAdjustmentAsync(client, supervisorToken,
             "inventory-forced-commit-failure", validRequest), HttpStatusCode.Conflict);
 
         Assert.Equal(before, await CaptureRollbackStateAsync(scenario.ProductId, scenario.AuthorizerUser.Id));
@@ -457,8 +504,9 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
     {
         using var setupClient = CreateClient();
         var scenario = await BootstrapAsync(setupClient, 10);
+        var supervisorToken = await GrantedSupervisorTokenAsync(setupClient, scenario);
         var reason = (await ReadAsync<IReadOnlyCollection<InventoryAdjustmentReasonDto>>(
-            await GetWithBearerAsync(setupClient, "/api/inventory/adjustment-reasons", scenario.Admin.AccessToken),
+            await GetWithBearerAsync(setupClient, "/api/inventory/adjustment-reasons", supervisorToken),
             HttpStatusCode.OK)).Single(x => x.Code == "CORRECCION_REGISTRO");
         using var firstClient = CreateClient();
         using var secondClient = CreateClient();
@@ -468,10 +516,10 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
         await using var blockerTransaction = await blocker.BeginTransactionAsync();
         await LockActiveInstallationAsync(blocker, blockerTransaction);
 
-        var first = PostAdjustmentAsync(firstClient, scenario.Admin.AccessToken, "adjustment-race-a", new(
+        var first = PostAdjustmentAsync(firstClient, supervisorToken, "adjustment-race-a", new(
             scenario.ProductId, 1, reason.Id, scenario.ProductVersion, "Carrera A",
             new(AuthorizerUser, AuthorizerPassword)));
-        var second = PostAdjustmentAsync(secondClient, scenario.Admin.AccessToken, "adjustment-race-b", new(
+        var second = PostAdjustmentAsync(secondClient, supervisorToken, "adjustment-race-b", new(
             scenario.ProductId, 2, reason.Id, scenario.ProductVersion, "Carrera B",
             new(SecondAuthorizerUser, SecondAuthorizerPassword)));
         await WaitForInstallationLockWaitersAsync(2);
@@ -512,7 +560,7 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
         var saleTask = PostSaleAsync(saleClient, scenario.Admin.AccessToken, "inventory-sale-race", scenario.ProductId);
         var adjustmentTask = PostAdjustmentAsync(adjustmentClient, scenario.Admin.AccessToken, "inventory-adjustment-race", new(
             scenario.ProductId, -1, reason.Id, scenario.ProductVersion, "Pérdida concurrente",
-            new(AuthorizerUser, AuthorizerPassword)));
+            null));
         await WaitForInstallationLockWaitersAsync(2);
         await blockerTransaction.CommitAsync();
 
@@ -534,6 +582,16 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
         var movement = await context.MovimientoInventario.SingleAsync(x => x.ProductoId == scenario.ProductId);
         Assert.Contains(movement.TipoMovimiento, new[] { "VENTA", "AJUSTE_SALIDA" });
         Assert.Equal(movement.TipoMovimiento == "VENTA" ? 1 : 0, await context.Venta.CountAsync());
+    }
+
+    /// <summary>Grants the Supervisor INVENTORY.ADJUST (it is not part of its role) and signs it in; the Administrators then authorize.</summary>
+    private async Task<string> GrantedSupervisorTokenAsync(HttpClient client, Scenario scenario)
+    {
+        SetBearer(client, scenario.Admin.AccessToken);
+        var permissionId = await GetPermissionIdAsync(client, PermissionCodes.InventoryAdjust);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{scenario.SupervisorUser.Id}/permissions/{permissionId}", new SetUserPermissionRequest(true))).StatusCode);
+        return (await LoginAsync(client, SupervisorUser, SupervisorPassword)).AccessToken;
     }
 
     private HttpClient CreateClient()

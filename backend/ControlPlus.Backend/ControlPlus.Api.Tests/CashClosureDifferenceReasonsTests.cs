@@ -88,7 +88,7 @@ public sealed partial class CashApiFlowTests
             PaymentMethods = request.PaymentMethods.Select(x => new CountedPaymentMethodRequest(
                 x.PaymentMethodId, x.CountedAmount + (x.PaymentMethodId == scenario.Catalog.PaymentMethodIds.First() ? 1m : 0m))).ToArray(),
             DifferenceReasonId = reason.Id,
-            Authorization = new CashCloseAuthorizationRequest(SupervisorUserName, SupervisorPassword)
+            Authorization = null
         };
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();

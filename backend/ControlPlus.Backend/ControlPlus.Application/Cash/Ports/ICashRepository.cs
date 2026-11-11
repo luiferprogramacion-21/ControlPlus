@@ -42,6 +42,9 @@ public interface ICashRepository
 
     Task<MotivoOperacion?> GetActiveDifferenceReasonAsync(Guid reasonId, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<MotivoOperacion>> ListActiveDifferenceReasonsAsync(CancellationToken cancellationToken = default);
+    /// <summary>Every closing-difference reason of the establishment, active or not (tracked).</summary>
+    Task<IReadOnlyCollection<MotivoOperacion>> GetDifferenceReasonsAsync(Guid establishmentId, CancellationToken cancellationToken = default);
+    Task AddDifferenceReasonsAsync(IReadOnlyCollection<MotivoOperacion> reasons, CancellationToken cancellationToken = default);
     Task AddAuthorizationAsync(AutorizacionOperacion authorization, CancellationToken cancellationToken = default);
     Task AddCloseAuthorizationLinkAsync(AutorizacionCierreTurno link, CancellationToken cancellationToken = default);
 

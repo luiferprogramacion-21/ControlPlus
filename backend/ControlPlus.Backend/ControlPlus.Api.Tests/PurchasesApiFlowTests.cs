@@ -62,6 +62,14 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         } };
         var order = await ReadJsonAsync(await client.PostAsJsonAsync("/api/purchase-orders", body), HttpStatusCode.Created);
         var orderId = order.GetProperty("id").GetGuid();
+        var orderedProduct = await ReadAsync<ProductDto>(
+            await client.GetAsync($"/api/products/{first.Id}"), HttpStatusCode.OK);
+        using (var blocked = await client.DeleteAsync(
+            $"/api/products/{first.Id}?expectedVersion={orderedProduct.Version}"))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+            Assert.Contains("solo puede inactivarse", await blocked.Content.ReadAsStringAsync());
+        }
         Assert.Equal("PED-PURCHASES1-1", order.GetProperty("visibleNumber").GetString());
         await ProblemAsync(await client.PostAsJsonAsync("/api/purchase-orders", body), HttpStatusCode.Conflict);
         var sent = await ReadJsonAsync(await client.PostAsJsonAsync($"/api/purchase-orders/{orderId}/send",
@@ -500,6 +508,14 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var confirmed = await ReadJsonAsync(await ConfirmAsync(client, id, key,
             draft.GetProperty("version").GetInt64()), HttpStatusCode.OK);
         Assert.Equal("CONFIRMADA", confirmed.GetProperty("status").GetString());
+        var purchasedProduct = await ReadAsync<ProductDto>(
+            await client.GetAsync($"/api/products/{zeroProduct.Id}"), HttpStatusCode.OK);
+        using (var blocked = await client.DeleteAsync(
+            $"/api/products/{zeroProduct.Id}?expectedVersion={purchasedProduct.Version}"))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+            Assert.Contains("solo puede inactivarse", await blocked.Content.ReadAsStringAsync());
+        }
         Assert.Equal(1, confirmed.GetProperty("consecutive").GetInt64());
         Assert.Equal("CMP", confirmed.GetProperty("prefix").GetString());
         var internalDocument = confirmed.GetProperty("supplierDocumentNumber").GetString();

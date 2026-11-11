@@ -27,6 +27,9 @@ public interface ICatalogRepository
 
     Task<PagedResult<Producto>> ListProductsAsync(ProductListQuery query, CancellationToken cancellationToken = default);
     Task<Producto?> GetProductAsync(Guid productId, CancellationToken cancellationToken = default);
+    Task<Producto?> GetProductForUpdateAsync(Guid productId, CancellationToken cancellationToken = default);
+    Task<bool> HasProductHistoryAsync(Guid productId, CancellationToken cancellationToken = default);
+    Task DeleteProductOwnedDataAsync(Guid productId, CancellationToken cancellationToken = default);
     Task<PagedResult<DetalleCompra>> ListProductPurchaseCostsAsync(Guid productId, int page, int pageSize, CancellationToken cancellationToken = default);
     Task<decimal?> GetLastConfirmedPurchaseCostAsync(Guid productId, CancellationToken cancellationToken = default);
     Task<bool> ProductInternalCodeExistsAsync(string code, Guid? excludedId = null, CancellationToken cancellationToken = default);

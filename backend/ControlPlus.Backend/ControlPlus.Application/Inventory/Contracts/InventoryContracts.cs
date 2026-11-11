@@ -68,7 +68,11 @@ public sealed record InventoryAdjustmentReasonDto(
     int DisplayOrder);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record InventoryAdjustmentAuthorizationRequest(string UserName, string Password);
+public sealed record InventoryAdjustmentAuthorizationRequest(string? UserName, string? Password, string? CredentialToken = null)
+    : IAuthorizerCredentials
+{
+    [JsonIgnore] public Guid? ResolvedCredentialId { get; init; }
+}
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CreateInventoryAdjustmentRequest(

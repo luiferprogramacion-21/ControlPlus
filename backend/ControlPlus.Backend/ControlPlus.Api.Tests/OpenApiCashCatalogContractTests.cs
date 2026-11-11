@@ -50,6 +50,24 @@ public sealed class OpenApiCashCatalogContractTests
         Assert.True(paths.GetProperty("/api/products/{productId}").GetProperty("put").GetProperty("security").GetArrayLength() > 0);
     }
 
+    [Fact]
+    public async Task ProductPhysicalDelete_DeclaresVersionSecurityAndOutcomes()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/openapi/v1.json");
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var operation = document.RootElement.GetProperty("paths")
+            .GetProperty("/api/products/{productId}").GetProperty("delete");
+        Assert.True(operation.GetProperty("security").GetArrayLength() > 0);
+        Assert.Contains(operation.GetProperty("parameters").EnumerateArray(), x =>
+            x.GetProperty("name").GetString() == "expectedVersion" &&
+            x.GetProperty("in").GetString() == "query");
+        foreach (var status in new[] { "204", "400", "403", "404", "409" })
+            Assert.True(operation.GetProperty("responses").TryGetProperty(status, out _));
+    }
+
     private static string?[] Required(JsonElement schema) => schema.TryGetProperty("required", out var required)
         ? required.EnumerateArray().Select(x => x.GetString()).ToArray() : [];
 

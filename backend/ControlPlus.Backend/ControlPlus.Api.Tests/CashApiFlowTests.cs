@@ -229,7 +229,7 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         Assert.Equal(110_000m, reconciliation.PaymentMethods.Single(x => x.Code == "EFECTIVO").ExpectedAmount);
         Assert.All(reconciliation.PaymentMethods.Where(x => x.Code != "EFECTIVO"), method => Assert.Equal(0m, method.ExpectedAmount));
 
-        var balancedCounts = reconciliation.PaymentMethods
+        var balancedCounts = reconciliation.PaymentMethods.Where(m => m.AffectsCash)
             .Select(method => new CountedPaymentMethodRequest(method.PaymentMethodId, method.ExpectedAmount))
             .ToArray();
         var staleClose = new CloseCashShiftRequest(
@@ -239,7 +239,7 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
             HttpStatusCode.Conflict,
             "concurrency.conflict");
 
-        var unbalancedCounts = reconciliation.PaymentMethods
+        var unbalancedCounts = reconciliation.PaymentMethods.Where(m => m.AffectsCash)
             .Select(method => new CountedPaymentMethodRequest(
                 method.PaymentMethodId,
                 method.Code == "EFECTIVO" ? method.ExpectedAmount - 1_000m : method.ExpectedAmount))
@@ -434,7 +434,7 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         var reconciliation = await ReadSuccessAsync<CashReconciliationDto>(
             await client.GetAsync("/api/cash/reconciliation"), HttpStatusCode.OK);
         Assert.Equal(54_000m, reconciliation.TotalExpected);
-        var exactCounts = reconciliation.PaymentMethods
+        var exactCounts = reconciliation.PaymentMethods.Where(m => m.AffectsCash)
             .Select(method => new CountedPaymentMethodRequest(method.PaymentMethodId, method.ExpectedAmount))
             .ToArray();
         var closed = await ReadSuccessAsync<CashReconciliationDto>(await client.PostAsJsonAsync(
@@ -455,7 +455,7 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
             HttpStatusCode.Created);
         var administratorReconciliation = await ReadSuccessAsync<CashReconciliationDto>(
             await client.GetAsync("/api/cash/reconciliation"), HttpStatusCode.OK);
-        var administratorCounts = administratorReconciliation.PaymentMethods
+        var administratorCounts = administratorReconciliation.PaymentMethods.Where(m => m.AffectsCash)
             .Select(method => new CountedPaymentMethodRequest(
                 method.PaymentMethodId,
                 method.Code == "EFECTIVO" ? method.ExpectedAmount - 1_000m : method.ExpectedAmount))

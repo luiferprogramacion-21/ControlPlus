@@ -83,6 +83,16 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
 
         var created = await ReadAsync<CreatedLayawayDto>(
             await PostAsync(client, "layaway-mixed-first", request), HttpStatusCode.Created);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var reservedProduct = await ReadAsync<ProductDto>(
+            await client.GetAsync($"/api/products/{scenario.ProductId}"), HttpStatusCode.OK);
+        using (var blocked = await client.DeleteAsync(
+            $"/api/products/{scenario.ProductId}?expectedVersion={reservedProduct.Version}"))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+            Assert.Contains("solo puede inactivarse", await blocked.Content.ReadAsStringAsync());
+        }
+        SetBearer(client, scenario.Cashier.AccessToken);
 
         Assert.Equal("APT-LAYAWAY1-1", created.VisibleNumber);
         Assert.Equal(scenario.Shift.OperatingDate.AddDays(15), created.DueDate);

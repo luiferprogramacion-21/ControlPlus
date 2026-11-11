@@ -118,6 +118,31 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
         dbContext.Producto.Include(x => x.Categoria).Include(x => x.UnidadMedida)
             .SingleOrDefaultAsync(x => x.Id == productId, cancellationToken);
 
+    public async Task<Producto?> GetProductForUpdateAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Producto.FromSqlInterpolated(
+            $"SELECT * FROM catalogo.producto WHERE id = {productId} FOR UPDATE")
+            .AsNoTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
+    public async Task<bool> HasProductHistoryAsync(Guid productId, CancellationToken cancellationToken = default) =>
+        await dbContext.DetalleVenta.AnyAsync(x => x.ProductoId == productId, cancellationToken) ||
+        await dbContext.DetalleCambioVenta.AnyAsync(x => x.ProductoId == productId, cancellationToken) ||
+        await dbContext.DetalleCompra.AnyAsync(x => x.ProductoId == productId, cancellationToken) ||
+        await dbContext.DetallePedidoCompra.AnyAsync(x => x.ProductoId == productId, cancellationToken) ||
+        await dbContext.DetalleApartado.AnyAsync(x => x.ProductoId == productId, cancellationToken) ||
+        await dbContext.DetalleBorradorVenta.AnyAsync(x => x.ProductoId == productId, cancellationToken) ||
+        await dbContext.MovimientoInventario.AnyAsync(x => x.ProductoId == productId && x.TipoMovimiento != "INVENTARIO_INICIAL", cancellationToken);
+
+    public async Task DeleteProductOwnedDataAsync(Guid productId, CancellationToken cancellationToken = default)
+    {
+        await dbContext.MovimientoInventario.Where(x => x.ProductoId == productId && x.TipoMovimiento == "INVENTARIO_INICIAL")
+            .ExecuteDeleteAsync(cancellationToken);
+        await dbContext.ProductoCodigo.Where(x => x.ProductoId == productId).ExecuteDeleteAsync(cancellationToken);
+        await dbContext.Producto.Where(x => x.Id == productId).ExecuteDeleteAsync(cancellationToken);
+    }
+
     public async Task<PagedResult<DetalleCompra>> ListProductPurchaseCostsAsync(
         Guid productId, int page, int pageSize, CancellationToken cancellationToken = default)
     {

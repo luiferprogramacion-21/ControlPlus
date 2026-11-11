@@ -19,6 +19,7 @@ public sealed class CashService(
     IUserRepository userRepository,
     IPermissionRepository permissionRepository,
     IPasswordHasher passwordHasher,
+    IAuthorizerCredentialResolver credentialResolver,
     ICredentialTokenGenerator tokenGenerator,
     IAuditRepository auditRepository,
     IClock clock,
@@ -36,6 +37,57 @@ public sealed class CashService(
         return Result.Success<IReadOnlyCollection<CashClosureDifferenceReasonDto>>(
             reasons.Select(reason => new CashClosureDifferenceReasonDto(
                 reason.Id, reason.Codigo, reason.Nombre, reason.Activo)).ToArray());
+    }
+
+    private static readonly (string Code, string Name)[] DefaultDifferenceReasons =
+    [
+        ("FALTANTE_EFECTIVO", "Faltante de efectivo"),
+        ("SOBRANTE_EFECTIVO", "Sobrante de efectivo"),
+        ("ERROR_DE_CONTEO", "Error de conteo"),
+        ("OTRO", "Otro")
+    ];
+
+    /// <summary>Creates the default reasons that are missing (never touches existing ones) and returns every reason.</summary>
+    private async Task<IReadOnlyCollection<MotivoOperacion>> EnsureDefaultDifferenceReasonsAsync(
+        Guid establishmentId, CancellationToken cancellationToken)
+    {
+        var existing = (await repository.GetDifferenceReasonsAsync(establishmentId, cancellationToken)).ToList();
+        var created = new List<MotivoOperacion>();
+        for (var index = 0; index < DefaultDifferenceReasons.Length; index++)
+        {
+            var (code, name) = DefaultDifferenceReasons[index];
+            if (existing.Any(x => x.Codigo == code)) continue;
+            created.Add(new MotivoOperacion
+            {
+                Id = Guid.CreateVersion7(), EstablecimientoId = establishmentId,
+                TipoOperacion = CashConstants.CashDifferenceReasonType, Codigo = code, Nombre = name,
+                Descripcion = name, OrdenVisual = (index + 1) * 10, Activo = true,
+                FechaCreacion = clock.UtcNow.UtcDateTime, Version = 1
+            });
+        }
+        if (created.Count > 0)
+        {
+            await repository.AddDifferenceReasonsAsync(created, cancellationToken);
+            existing.AddRange(created);
+        }
+        return existing;
+    }
+
+    public async Task<Result<IReadOnlyCollection<CashClosureDifferenceReasonDto>>> InitializeClosureDifferenceReasonsAsync(
+        ActorContext actor, CancellationToken cancellationToken = default)
+    {
+        var error = await RequireAsync(actor, PermissionCodes.CashShiftManage, cancellationToken);
+        if (error is not null) return Result.Failure<IReadOnlyCollection<CashClosureDifferenceReasonDto>>(error);
+        await using var transaction = await transactionManager.BeginAsync(IsolationLevel.Serializable, cancellationToken);
+        var establishment = await repository.GetEstablishmentAsync(false, cancellationToken);
+        if (establishment is null)
+            return Result.Failure<IReadOnlyCollection<CashClosureDifferenceReasonDto>>(ApplicationError.NotFound("el establecimiento"));
+        var reasons = await EnsureDefaultDifferenceReasonsAsync(establishment.Id, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Result.Success<IReadOnlyCollection<CashClosureDifferenceReasonDto>>(
+            reasons.Where(x => x.Activo).OrderBy(x => x.OrdenVisual).ThenBy(x => x.Codigo)
+                .Select(x => new CashClosureDifferenceReasonDto(x.Id, x.Codigo, x.Nombre, x.Activo)).ToArray());
     }
 
     public async Task<Result<CashStateDto>> GetStateAsync(
@@ -127,14 +179,58 @@ public sealed class CashService(
         OpenCashShiftRequest request,
         CancellationToken cancellationToken = default)
     {
-        var error = await RequireAsync(actor, PermissionCodes.CashShiftManage, cancellationToken);
+        // A Supervisor or Administrador opens the cash alone; a Cajero needs the authorization of one of them.
+        var canManage = await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.CashShiftManage, cancellationToken);
+        var error = await RequireAsync(actor, canManage ? PermissionCodes.CashShiftManage : PermissionCodes.CashOwnRead, cancellationToken);
         if (error is not null) return Result.Failure<CashShiftDto>(error);
         if (request is null || !IsWholeNonNegativeMoney(request.InitialAmount))
             return Result.Failure<CashShiftDto>(Validation("El monto inicial debe ser un valor entero de COP mayor o igual a cero."));
         if (request.Observations?.Length > 2000)
             return Result.Failure<CashShiftDto>(Validation("Las observaciones admiten hasta 2000 caracteres."));
+        if (canManage && request.Authorization is not null)
+            return Result.Failure<CashShiftDto>(Validation("Un Supervisor o Administrador abre la caja sin autorización."));
+        if (!canManage)
+        {
+            if (request.Authorization is null)
+                return Result.Failure<CashShiftDto>(ApplicationError.Forbidden("La apertura de caja necesita la autorización de un Supervisor o Administrador."));
+            if (request.Authorization.UsesCredential())
+            {
+                if (request.Authorization.MixesCredentialWithPassword())
+                    return Result.Failure<CashShiftDto>(Validation("Envíe la credencial escaneada o usuario y contraseña, no ambos."));
+                var (scannedUserName, scannedCredentialId) = await credentialResolver.ResolveOrUnknownAsync(request.Authorization.CredentialToken!, cancellationToken);
+                request = request with { Authorization = request.Authorization with { UserName = scannedUserName, ResolvedCredentialId = scannedCredentialId } };
+            }
+            if (!request.Authorization!.IsComplete())
+                return Result.Failure<CashShiftDto>(Validation("Indique usuario y contraseña del autorizador o la credencial escaneada."));
+            var account = request.Authorization.UserName!.Trim().ToUpperInvariant();
+            return await loginAttemptCoordinator.ExecuteAsync(account,
+                token => OpenWithinTransactionAsync(actor, request, true, token), cancellationToken);
+        }
 
         await using var transaction = await transactionManager.BeginAsync(IsolationLevel.Serializable, cancellationToken);
+        var result = await OpenWithinTransactionAsync(actor, request, false, cancellationToken);
+        if (result.IsSuccess) await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    private async Task<Result<CashShiftDto>> OpenWithinTransactionAsync(
+        ActorContext actor, OpenCashShiftRequest request, bool needsAuthorization, CancellationToken cancellationToken)
+    {
+        Usuario? authorizer = null;
+        if (needsAuthorization)
+        {
+            var validated = await ValidateAuthorizerAsync(actor, request.Authorization, cancellationToken);
+            if (validated.IsFailure)
+            {
+                await AuditWriter.WriteCashFailureAsync(auditRepository, clock, actor.UserId,
+                    AuditAction.CashOpenAuthorizationRejected, nameof(TurnoCaja), null,
+                    new { Failure = "INVALID_AUTHORIZER_CREDENTIALS_OR_PERMISSION" }, Guid.CreateVersion7(),
+                    null, null, cancellationToken);
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                return Result.Failure<CashShiftDto>(validated.Error!);
+            }
+            authorizer = validated.Value!;
+        }
         var cash = await repository.GetCashRegisterAsync(true, cancellationToken);
         if (cash is null) return Result.Failure<CashShiftDto>(ApplicationError.Conflict("Debe configurar la caja antes de abrir el primer turno."));
         if (!cash.Activo) return Result.Failure<CashShiftDto>(ApplicationError.Conflict("La caja configurada está inactiva."));
@@ -165,11 +261,28 @@ public sealed class CashService(
                 "Fondo inicial", correlationId, now), cancellationToken);
         }
 
+        if (authorizer is not null)
+        {
+            var permission = await permissionRepository.GetByCodeAsync(PermissionCodes.CashShiftManage, cancellationToken);
+            if (permission is null) return Result.Failure<CashShiftDto>(ApplicationError.Conflict("No existe el permiso estable CASH.SHIFT_MANAGE."));
+            await repository.AddAuthorizationAsync(new AutorizacionOperacion
+            {
+                Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId, UsuarioAutorizadorId = authorizer.Id,
+                PermisoId = permission.Id, TipoOperacion = "APERTURA_CAJA", CorrelacionId = correlationId,
+                DescripcionOperacion = "Autorización de apertura de caja de un Cajero.",
+                MetodoAutenticacion = request.Authorization.AuthenticationMethod(),
+                CredencialAutorizadorId = request.Authorization?.ResolvedCredentialId,
+                Resultado = "EXITOSA", Estado = "UTILIZADA", FechaSolicitud = now.UtcDateTime,
+                FechaExpiracion = now.AddMinutes(5).UtcDateTime, FechaUtilizacion = now.UtcDateTime
+            }, cancellationToken);
+            authorizer.RegisterSuccessfulLogin(now);
+            await userRepository.UpdateAsync(authorizer, cancellationToken);
+        }
+
         await AuditWriter.WriteCashAsync(auditRepository, clock, actor.UserId, AuditAction.CashShiftOpened,
             nameof(TurnoCaja), shift.Id, new { shift.ModoOperacion, shift.FechaOperativa, shift.MontoInicial },
             correlationId, null, null, terminal.Id, null, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
         return Result.Success(Map(shift));
     }
 
@@ -233,10 +346,18 @@ public sealed class CashService(
         if (request.DifferenceObservation?.Length > 2000)
             return Result.Failure<CashReconciliationDto>(Validation("La observación de diferencia admite hasta 2000 caracteres."));
 
+        if (request?.Authorization is { } scanned && scanned.UsesCredential())
+        {
+            if (scanned.MixesCredentialWithPassword())
+                return Result.Failure<CashReconciliationDto>(Validation("Envíe la credencial escaneada o usuario y contraseña, no ambos."));
+            var (scannedUserName, scannedCredentialId) = await credentialResolver.ResolveOrUnknownAsync(scanned.CredentialToken!, cancellationToken);
+            request = request with { Authorization = scanned with { UserName = scannedUserName, ResolvedCredentialId = scannedCredentialId } };
+        }
+
         // The same account lock as login covers credentials and the complete financial
         // transaction. Failed credentials commit only their counter and failure audit;
         // successful credentials remain atomic with the closing, including COMMIT.
-        if (!string.IsNullOrWhiteSpace(request.Authorization?.UserName))
+        if (!string.IsNullOrWhiteSpace(request!.Authorization?.UserName))
             return await loginAttemptCoordinator.ExecuteAsync(
                 request.Authorization.UserName.Trim().ToUpperInvariant(),
                 token => CloseWithinTransactionAsync(actor, shiftId, request, token), cancellationToken);
@@ -274,10 +395,13 @@ public sealed class CashService(
         var expectedValidation = ValidateExpectedMethods(expected);
         if (expectedValidation is not null) return Result.Failure<CashReconciliationDto>(expectedValidation);
         var counted = request.PaymentMethods.ToDictionary(x => x.PaymentMethodId, x => x.CountedAmount);
-        if (!expected.Select(x => x.PaymentMethodId).ToHashSet().SetEquals(counted.Keys))
-            return Result.Failure<CashReconciliationDto>(Validation("El arqueo debe incluir exactamente todos los medios de pago activos o utilizados."));
+        // Only the physical cash is counted. Nequi, transfers and any other medium cannot be verified by hand, so the system
+        // total is taken as counted (difference 0) and shown as information.
+        if (!expected.Where(x => x.AffectsCash).Select(x => x.PaymentMethodId).ToHashSet().SetEquals(counted.Keys))
+            return Result.Failure<CashReconciliationDto>(Validation("El arqueo solo incluye el efectivo contado físicamente; los demás medios de pago se toman del sistema."));
         if (expected.Any(x => x.AffectsCash && counted[x.PaymentMethodId] < 0))
             return Result.Failure<CashReconciliationDto>(Validation("El efectivo físico contado no puede ser negativo."));
+        counted = expected.ToDictionary(x => x.PaymentMethodId, x => x.AffectsCash ? counted[x.PaymentMethodId] : x.ExpectedAmount);
 
         var details = expected.Select(item => new DetalleArqueoMedioPago
         {
@@ -305,10 +429,21 @@ public sealed class CashService(
         }
         else
         {
-            if (request.DifferenceReasonId is not Guid reasonId)
-                return Result.Failure<CashReconciliationDto>(Validation("Debe seleccionar un motivo para la diferencia."));
-            reason = await repository.GetActiveDifferenceReasonAsync(reasonId, cancellationToken);
-            if (reason is null) return Result.Failure<CashReconciliationDto>(ApplicationError.NotFound("el motivo activo de diferencia de caja"));
+            if (request.DifferenceReasonId is Guid reasonId)
+            {
+                reason = await repository.GetActiveDifferenceReasonAsync(reasonId, cancellationToken);
+                if (reason is null) return Result.Failure<CashReconciliationDto>(ApplicationError.NotFound("el motivo activo de diferencia de caja"));
+            }
+            else if (administratorSelfAuthorized)
+            {
+                // The Administrator may close without choosing a reason: the generic "OTRO" is recorded.
+                var establishment = await repository.GetEstablishmentAsync(false, cancellationToken);
+                if (establishment is null) return Result.Failure<CashReconciliationDto>(ApplicationError.NotFound("el establecimiento"));
+                var all = await EnsureDefaultDifferenceReasonsAsync(establishment.Id, cancellationToken);
+                reason = all.FirstOrDefault(x => x.Codigo == "OTRO" && x.Activo) ?? all.FirstOrDefault(x => x.Activo);
+                if (reason is null) return Result.Failure<CashReconciliationDto>(ApplicationError.NotFound("el motivo activo de diferencia de caja"));
+            }
+            else return Result.Failure<CashReconciliationDto>(Validation("Debe seleccionar un motivo para la diferencia."));
             if (administratorSelfAuthorized)
             {
                 authorizer = await repository.GetUserForUpdateAsync(actor.UserId, cancellationToken);
@@ -332,7 +467,8 @@ public sealed class CashService(
                     ? "Autorización de cierre de caja con diferencia por Administrador sin segundo autorizador."
                     : "Autorización de cierre de caja con diferencia.",
                 Motivo = reason.Codigo,
-                MetodoAutenticacion = "PASSWORD",
+                MetodoAutenticacion = request.Authorization.AuthenticationMethod(),
+                CredencialAutorizadorId = request.Authorization?.ResolvedCredentialId,
                 Resultado = "EXITOSA",
                 Estado = "AUTORIZADA",
                 FechaSolicitud = now.UtcDateTime,
@@ -572,12 +708,12 @@ public sealed class CashService(
 
     private async Task<Result<Usuario>> ValidateAuthorizerAsync(
         ActorContext actor,
-        CashCloseAuthorizationRequest? request,
+        IAuthorizerCredentials? request,
         CancellationToken cancellationToken)
     {
-        if (request is null || string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password))
-            return Result.Failure<Usuario>(ApplicationError.Forbidden("El cierre con diferencia requiere credenciales de autorización."));
-        var user = await userRepository.GetByUserNameAsync(request.UserName, cancellationToken);
+        if (request is null || !request.IsComplete())
+            return Result.Failure<Usuario>(ApplicationError.Forbidden("Se requieren credenciales de autorización."));
+        var user = await userRepository.GetByUserNameAsync(request.UserName!, cancellationToken);
         if (user is null)
             return Result.Failure<Usuario>(ApplicationError.Forbidden("El autorizador debe ser otro usuario Supervisor o Administrador, activo y con permiso vigente."));
 
@@ -589,7 +725,7 @@ public sealed class CashService(
             (await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken))!.HighestRoleLevel))
             return Result.Failure<Usuario>(ApplicationError.AuthorizerRoleInsufficient());
         var now = clock.UtcNow;
-        if (!passwordHasher.Verify(request.Password, user.PasswordHash))
+        if (!request.UsesCredential() && !passwordHasher.Verify(request.Password!, user.PasswordHash))
         {
             var wasLocked = user.RegisterFailedLogin(now);
             await userRepository.UpdateAsync(user, cancellationToken);

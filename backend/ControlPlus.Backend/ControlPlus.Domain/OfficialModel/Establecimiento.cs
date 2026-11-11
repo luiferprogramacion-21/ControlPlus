@@ -60,6 +60,11 @@ public partial class Establecimiento
 
     public long Version { get; set; }
 
+    public bool VatEnabled { get; set; }
+    public decimal? VatPercentage { get; set; }
+    public long VatVersion { get; set; }
+    public DateTime? VatUpdatedAtUtc { get; set; }
+
     public virtual ICollection<Instalacion> Instalacion { get; set; } = new List<Instalacion>();
 
     public virtual ICollection<MotivoOperacion> MotivoOperacion { get; set; } = new List<MotivoOperacion>();

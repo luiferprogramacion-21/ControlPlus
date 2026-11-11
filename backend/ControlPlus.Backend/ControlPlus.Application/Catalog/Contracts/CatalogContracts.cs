@@ -125,4 +125,5 @@ public interface ICatalogService
     Task<Result<ProductDto>> CreateProductAsync(ActorContext actor, CreateProductRequest request, CancellationToken cancellationToken = default, string? idempotencyKey = null);
     Task<Result<ProductDto>> UpdateProductAsync(ActorContext actor, Guid productId, UpdateProductRequest request, CancellationToken cancellationToken = default);
     Task<Result<ProductDto>> SetProductActiveAsync(ActorContext actor, Guid productId, bool active, CancellationToken cancellationToken = default);
+    Task<Result> DeleteProductAsync(ActorContext actor, Guid productId, long expectedVersion, CancellationToken cancellationToken = default);
 }

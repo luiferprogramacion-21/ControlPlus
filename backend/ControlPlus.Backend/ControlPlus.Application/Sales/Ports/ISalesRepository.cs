@@ -19,6 +19,7 @@ public interface ISalesTransactionManager
 
 public interface ISalesRepository
 {
+    Task<Instalacion?> GetActiveInstallationAsync(CancellationToken cancellationToken = default);
     Task<Instalacion?> GetActiveInstallationForUpdateAsync(CancellationToken cancellationToken = default);
     Task<Establecimiento?> GetActiveEstablishmentAsync(CancellationToken cancellationToken = default);
     Task<Establecimiento?> GetActiveEstablishmentForUpdateAsync(

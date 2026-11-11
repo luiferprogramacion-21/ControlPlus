@@ -7,6 +7,9 @@ public sealed record DiscountShare(Guid StableKey, decimal ExactAmount);
 
 public static class SalePricingPolicy
 {
+    /// <summary>The wholesale price only applies from this many units of the same product in one sale.</summary>
+    public const int WholesaleMinimumQuantity = 12;
+
     public static decimal MaximumDiscountPercentage(RoleLevel role) => role switch
     {
         RoleLevel.Cajero => 5m,

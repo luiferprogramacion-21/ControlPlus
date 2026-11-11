@@ -28,6 +28,7 @@ public sealed partial class SalesService(
     IPasswordHasher passwordHasher,
     IPermissionChecker permissionChecker,
     IPermissionRepository permissionRepository,
+    IAuthorizerCredentialResolver credentialResolver,
     IClock clock) : ISalesService
 {
     private const int MaximumPageSize = 200;
@@ -43,9 +44,10 @@ public sealed partial class SalesService(
         var input = NormalizeInput(idempotencyKey, request);
         if (input.Error is not null) return Result.Failure<SaleDto>(input.Error);
 
-        if (input.SaleType == "CREDITO")
+        // Credentials of a second user (credit, or a Cajero's discount without a reason) serialize per account.
+        if (input.SaleType == "CREDITO" || request.Authorization is not null)
             return await loginAttemptCoordinator.ExecuteAsync(
-                request.Authorization?.UserName.Trim().ToUpperInvariant() ?? actor.UserId.ToString("N"),
+                request.Authorization?.IdentityKey ?? actor.UserId.ToString("N"),
                 token => ConfirmWithinTransactionAsync(actor, request, input, token), cancellationToken);
 
         await using var transaction = await transactionManager.BeginAsync(IsolationLevel.ReadCommitted, cancellationToken);
@@ -80,6 +82,18 @@ public sealed partial class SalesService(
         if (creditSelfMode is not null &&
             !authorization.PermissionCodes.Contains(PermissionCodes.CreditAuthorize, StringComparer.OrdinalIgnoreCase))
             return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+
+                var hasDiscountRequest = input.GeneralDiscount is not null || input.Lines!.Any(x => x.Discount is not null);
+        var hasWholesaleRequest = input.Lines!.Any(x => x.PriceType == "MAYORISTA");
+        // A Cajero always needs the authorization of a higher role to discount or to sell at the wholesale price.
+        var concessionNeedsAuthorization = (hasDiscountRequest || hasWholesaleRequest) &&
+            authorization.HighestRoleLevel == RoleLevel.Cajero;
+        if (input.SaleType == "CONTADO" && request.Authorization is not null && !concessionNeedsAuthorization)
+            return Result.Failure<SaleDto>(Validation(
+                "Una venta de contado solo admite authorization de un Cajero que aplica descuentos o precio mayorista."));
+        if (input.SaleType == "CONTADO" && request.Authorization is null && concessionNeedsAuthorization)
+            return Result.Failure<SaleDto>(Validation(
+                "El Cajero debe enviar authorization de un Supervisor o Administrador para aplicar descuentos o precio mayorista."));
 
         var requestHash = Hash(input.Canonical! + (creditSelfMode is null ? "" : "|" + creditSelfMode));
         var existingOperation = await repository.GetIdempotencyAsync(installation.Id, input.Key!, cancellationToken);
@@ -126,11 +140,13 @@ public sealed partial class SalesService(
              request.DueDate.Value.DayNumber > shift.FechaOperativa.DayNumber + 90))
             return Result.Failure<SaleDto>(Validation("El vencimiento debe estar entre mañana y 90 días desde la fecha operativa."));
 
+        Cliente? receiptCustomer = null;
         if (request.CustomerId is Guid customerId)
         {
             var customer = await repository.GetCustomerAsync(customerId, cancellationToken);
             if (customer is null || !customer.Activo)
                 return Result.Failure<SaleDto>(ApplicationError.NotFound("el cliente activo"));
+            receiptCustomer = customer;
             if (input.SaleType == "CREDITO" &&
                 (string.IsNullOrWhiteSpace(customer.TipoDocumento) || string.IsNullOrWhiteSpace(customer.NumeroDocumento)) &&
                 string.IsNullOrWhiteSpace(customer.Telefono))
@@ -140,6 +156,8 @@ public sealed partial class SalesService(
             return Result.Failure<SaleDto>(Validation("El cliente es obligatorio para una venta a crédito."));
 
         Usuario? creditAuthorizer = null;
+        Guid? creditCredentialId = null;
+        Guid? concessionCredentialId = null;
         if (input.SaleType == "CREDITO")
         {
             if (creditSelfMode is not null)
@@ -150,28 +168,27 @@ public sealed partial class SalesService(
             }
             else
             {
-                var candidate = await userRepository.GetByUserNameAsync(request.Authorization!.UserName.Trim(), cancellationToken);
-                if (candidate is null) return Result.Failure<SaleDto>(ApplicationError.Forbidden());
-                creditAuthorizer = await repository.GetUserForUpdateAsync(candidate.Id, cancellationToken);
-                if (creditAuthorizer is null || !creditAuthorizer.IsActive || creditAuthorizer.Id == actor.UserId ||
-                    !RoleHierarchy.IsHigherThan(creditAuthorizer.HighestRoleLevel, authorization.HighestRoleLevel))
-                    return Result.Failure<SaleDto>(ApplicationError.Forbidden());
-                if (!passwordHasher.Verify(request.Authorization.Password, creditAuthorizer.PasswordHash))
-                {
-                    var locked = creditAuthorizer.RegisterFailedLogin(clock.UtcNow);
-                    await userRepository.UpdateAsync(creditAuthorizer, cancellationToken);
-                    if (locked)
-                        await AuditWriter.WriteAsync(auditRepository, clock, creditAuthorizer.Id,
-                            AuditAction.UserLocked, nameof(Usuario), creditAuthorizer.Id,
-                            new { creditAuthorizer.Id, creditAuthorizer.FailedLoginAttempts }, cancellationToken);
-                    await AuditWriter.WriteCreditAuthorizationFailureAsync(auditRepository, clock,
-                        actor.UserId, Guid.CreateVersion7(), terminal.Id, cancellationToken);
-                    await unitOfWork.SaveChangesAsync(cancellationToken);
-                    return Result.Failure<SaleDto>(ApplicationError.Forbidden());
-                }
+                (creditAuthorizer, creditCredentialId) = await VerifyAuthorizerAsync(request.Authorization!, actor.UserId,
+                    authorization.HighestRoleLevel, terminal.Id, true, cancellationToken);
+                if (creditAuthorizer is null) return Result.Failure<SaleDto>(ApplicationError.Forbidden());
                 if (!await permissionChecker.HasPermissionAsync(creditAuthorizer.Id, PermissionCodes.CreditAuthorize, cancellationToken))
                     return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+                // The same credentials also authorize a Cajero's discount or wholesale price.
+                if (concessionNeedsAuthorization &&
+                    !await permissionChecker.HasPermissionAsync(creditAuthorizer.Id, PermissionCodes.SalesDiscountAuthorize, cancellationToken))
+                    return Result.Failure<SaleDto>(ApplicationError.Forbidden());
             }
+        }
+
+        // Cash sale: a Cajero's discount or wholesale price needs a second user of a strictly higher role.
+        Usuario? concessionAuthorizer = null;
+        if (input.SaleType == "CONTADO" && concessionNeedsAuthorization)
+        {
+            (concessionAuthorizer, concessionCredentialId) = await VerifyAuthorizerAsync(request.Authorization!, actor.UserId,
+                authorization.HighestRoleLevel, terminal.Id, false, cancellationToken);
+            if (concessionAuthorizer is null) return Result.Failure<SaleDto>(ApplicationError.Forbidden());
+            if (!await permissionChecker.HasPermissionAsync(concessionAuthorizer.Id, PermissionCodes.SalesDiscountAuthorize, cancellationToken))
+                return Result.Failure<SaleDto>(ApplicationError.Forbidden());
         }
 
         var sequence = await repository.GetSaleSequenceForUpdateAsync(installation.Id, installation.Serie, cancellationToken);
@@ -196,7 +213,8 @@ public sealed partial class SalesService(
         PreparedSale prepared;
         try
         {
-            prepared = PrepareSale(normalizedLines, input.GeneralDiscount, productsById, maximumDiscount);
+            prepared = PrepareSale(normalizedLines, input.GeneralDiscount, productsById, maximumDiscount,
+                establishment.VatEnabled ? establishment.VatPercentage : 0m);
         }
         catch (DomainRuleViolationException exception)
         {
@@ -302,7 +320,7 @@ public sealed partial class SalesService(
                 TipoPrecio = line.PriceType,
                 PrecioUnitario = line.UnitPrice,
                 CostoUnitario = product.CostoPromedio,
-                PorcentajeIva = product.PorcentajeIva,
+                PorcentajeIva = establishment.VatEnabled ? establishment.VatPercentage : 0m,
                 SubtotalBruto = line.GrossAmount,
                 OrigenDescuento = line.DiscountOrigin,
                 TipoDescuento = line.DiscountType,
@@ -370,7 +388,7 @@ public sealed partial class SalesService(
                     "ADMINISTRATOR_SELF" => "Autorización de venta a crédito por Administrador sin segundo autorizador.",
                     "SUPERVISOR_SELF" => "Autorización de venta a crédito por Supervisor sin segundo autorizador.",
                     _ => "Autorización de venta a crédito."
-                }, MetodoAutenticacion = "PASSWORD",
+                }, MetodoAutenticacion = creditCredentialId is null ? "PASSWORD" : "CODIGO_BARRAS_PIN", CredencialAutorizadorId = creditCredentialId,
                 Resultado = "EXITOSA", Estado = "UTILIZADA", FechaSolicitud = now.UtcDateTime,
                 FechaExpiracion = now.AddMinutes(5).UtcDateTime, FechaUtilizacion = now.UtcDateTime
             };
@@ -390,6 +408,33 @@ public sealed partial class SalesService(
             await repository.AddCreditAsync(credit, cancellationToken);
         }
 
+        // Record who authorized a Cajero's discount and/or wholesale price (same user as the credit authorizer on a credit).
+        var concessionAuthorizerUser = concessionAuthorizer ?? (concessionNeedsAuthorization ? creditAuthorizer : null);
+        if (concessionAuthorizerUser is not null)
+        {
+            var concessionPermission = await permissionRepository.GetByCodeAsync(PermissionCodes.SalesDiscountAuthorize, cancellationToken);
+            if (concessionPermission is null || !concessionPermission.Activo)
+                return Result.Failure<SaleDto>(ApplicationError.Conflict("El permiso de autorización de descuentos no está activo."));
+            var concessionKinds = new List<(string Type, string Description)>();
+            if (hasDiscountRequest) concessionKinds.Add(("DESCUENTO_VENTA", "Autorización de descuento de un Cajero."));
+            if (hasWholesaleRequest) concessionKinds.Add(("PRECIO_MAYORISTA", "Autorización de precio mayorista de un Cajero."));
+            foreach (var (type, description) in concessionKinds)
+                await repository.AddAuthorizationAsync(new AutorizacionOperacion
+                {
+                    Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId,
+                    UsuarioAutorizadorId = concessionAuthorizerUser.Id, PermisoId = concessionPermission.Id,
+                    TipoOperacion = type, CorrelacionId = correlationId, DescripcionOperacion = description,
+                    MetodoAutenticacion = (concessionCredentialId ?? creditCredentialId) is null ? "PASSWORD" : "CODIGO_BARRAS_PIN",
+                    CredencialAutorizadorId = concessionCredentialId ?? creditCredentialId, Resultado = "EXITOSA", Estado = "UTILIZADA",
+                    FechaSolicitud = now.UtcDateTime, FechaExpiracion = now.AddMinutes(5).UtcDateTime, FechaUtilizacion = now.UtcDateTime
+                }, cancellationToken);
+            if (concessionAuthorizer is not null)
+            {
+                concessionAuthorizer.RegisterSuccessfulLogin(now);
+                await userRepository.UpdateAsync(concessionAuthorizer, cancellationToken);
+            }
+        }
+
         await repository.AddSaleAsync(sale, cancellationToken);
         await repository.AddSaleDetailsAsync(details, cancellationToken);
         if (cashMovement is not null) await repository.AddCashMovementAsync(cashMovement, cancellationToken);
@@ -397,8 +442,16 @@ public sealed partial class SalesService(
         await repository.AddInventoryMovementsAsync(inventoryMovements, cancellationToken);
 
         var response = Map(sale, details, payments, methodsByCode) with { CreditId = credit?.Id };
+        var receiptVatPercentage = ReceiptVatPercentage(sale, details);
         var (snapshotData, snapshotHash) = SaleReceiptSnapshotCodec.Encode(
-            ToReceipt(response, sale.TipoVenta), response.Payments);
+            ToReceipt(response, sale.TipoVenta) with
+            {
+                OperatorName = authorization.DisplayName,
+                CustomerName = receiptCustomer?.NombreCompleto,
+                VatPercentage = receiptVatPercentage,
+                TaxableBaseTotal = receiptVatPercentage is > 0 ? sale.BaseGravableTotal : null,
+                VatTotal = receiptVatPercentage is > 0 ? sale.ImpuestoIncluidoTotal : null
+            }, response.Payments);
         await repository.AddReceiptSnapshotAsync(new DocumentoEmitido
         {
             Id = Guid.CreateVersion7(), InstalacionId = installation.Id, TerminalId = terminal.Id,
@@ -437,6 +490,7 @@ public sealed partial class SalesService(
                 sale.AmbitoDescuento,
                 sale.TipoDescuento,
                 DiscountReasonPresent = !string.IsNullOrWhiteSpace(sale.MotivoDescuento),
+                ConcessionAuthorizedByUserId = concessionAuthorizerUser?.Id,
                 sale.TipoVenta,
                 ProductCount = details.Count,
                 Lines = prepared.Lines.Select(x => new
@@ -599,7 +653,21 @@ public sealed partial class SalesService(
     private static SaleReceiptDto ToReceipt(Venta sale)
     {
         var detail = Map(sale);
-        return ToReceipt(detail, sale.TipoVenta);
+        var vatPercentage = ReceiptVatPercentage(sale, sale.DetalleVenta);
+        return ToReceipt(detail, sale.TipoVenta) with
+        {
+            VatPercentage = vatPercentage,
+            TaxableBaseTotal = vatPercentage is > 0 ? sale.BaseGravableTotal : null,
+            VatTotal = vatPercentage is > 0 ? sale.ImpuestoIncluidoTotal : null
+        };
+    }
+
+    private static decimal? ReceiptVatPercentage(Venta sale, IEnumerable<DetalleVenta> details)
+    {
+        if (!sale.IvaDiscriminadoCompleto || sale.BaseGravableTotal is null ||
+            sale.ImpuestoIncluidoTotal is null) return null;
+        var percentages = details.Select(x => x.PorcentajeIva).Distinct().ToArray();
+        return percentages.Length == 1 && percentages[0] is > 0 ? percentages[0] : null;
     }
 
     private static SaleReceiptDto ToReceipt(SaleDto detail, string saleType) =>
@@ -623,7 +691,7 @@ public sealed partial class SalesService(
         IReadOnlyCollection<NormalizedLine> requestedLines,
         NormalizedDiscount? generalDiscount,
         IReadOnlyDictionary<Guid, Producto> products,
-        decimal maximumDiscount)
+        decimal maximumDiscount, decimal? vatPercentage)
     {
         var lines = new List<PreparedLine>(requestedLines.Count);
         foreach (var requested in requestedLines.OrderBy(x => x.ProductId))
@@ -637,6 +705,9 @@ public sealed partial class SalesService(
                 ? product.PrecioMayorista ?? throw new DomainRuleViolationException($"El producto {product.CodigoInterno} no tiene precio mayorista.")
                 : product.PrecioMinorista;
             CashMoney.Require(unitPrice, allowNegative: false);
+            if (requested.PriceType == "MAYORISTA" && requested.Quantity < SalePricingPolicy.WholesaleMinimumQuantity)
+                throw new DomainRuleViolationException(
+                    $"El precio mayorista exige al menos {SalePricingPolicy.WholesaleMinimumQuantity} unidades de {product.CodigoInterno}.");
             var gross = CashMoney.Require(checked(unitPrice * requested.Quantity), allowNegative: false);
             var line = new PreparedLine(product, requested.Quantity, requested.PriceType, unitPrice, gross);
             if (requested.Discount is not null)
@@ -665,14 +736,20 @@ public sealed partial class SalesService(
 
         foreach (var line in lines)
         {
-            SalePricingPolicy.EnsureNotBelowCost(line.NetAmount, line.Product.CostoPromedio!.Value, line.Quantity);
-            line.CalculateTax();
+            try { SalePricingPolicy.EnsureNotBelowCost(line.NetAmount, line.Product.CostoPromedio!.Value, line.Quantity); }
+            catch (DomainRuleViolationException)
+            {
+                // Nombra el producto para poder corregirlo; el costo solo lo ve quien tiene permiso de costos.
+                throw new DomainRuleViolationException(
+                    $"El producto {line.Product.CodigoInterno} ({line.Product.Nombre}) se vendería por debajo de su costo. Revisa su precio de venta o su costo promedio.");
+            }
+            line.CalculateTax(vatPercentage);
         }
 
         var discountTotal = CashMoney.Sum(lines.Select(x => x.DiscountAmount));
         var total = CashMoney.Subtract(grossTotal, discountTotal);
         var scope = generalDiscount is not null ? "VENTA" : lines.Any(x => x.DiscountAmount > 0) ? "PRODUCTO" : "NINGUNO";
-        return new PreparedSale(lines, grossTotal, discountTotal, total, scope, lines.All(x => x.Product.PorcentajeIva is not null));
+        return new PreparedSale(lines, grossTotal, discountTotal, total, scope, true);
     }
 
     private static decimal CalculateDiscount(decimal gross, NormalizedDiscount discount, decimal maximumPercentage)
@@ -744,12 +821,12 @@ public sealed partial class SalesService(
         if (request.Payments is null || (saleType == "CONTADO" && request.Payments.Count == 0))
             return NormalizedInput.Fail("La venta de contado debe contener al menos un pago.");
         if (saleType == "CREDITO" && (request.Payments.Count != 0 || request.DueDate is null ||
-            (request.Authorization is not null &&
-             (string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-              string.IsNullOrWhiteSpace(request.Authorization.Password)))))
-            return NormalizedInput.Fail("El crédito requiere vencimiento, sin pago inicial; si envía authorization, incluya usuario y contraseña.");
-        if (saleType == "CONTADO" && (request.DueDate is not null || request.Authorization is not null))
-            return NormalizedInput.Fail("Una venta de contado no admite vencimiento ni autorización de crédito.");
+            (request.Authorization is not null && !request.Authorization.IsComplete())))
+            return NormalizedInput.Fail("El crédito requiere vencimiento, sin pago inicial; si envía authorization, incluya usuario y contraseña o la credencial escaneada.");
+        if (saleType == "CONTADO" && request.DueDate is not null)
+            return NormalizedInput.Fail("Una venta de contado no admite vencimiento.");
+        if (saleType == "CONTADO" && request.Authorization is not null && !request.Authorization.IsComplete())
+            return NormalizedInput.Fail("Si envía authorization, incluya usuario y contraseña o la credencial escaneada.");
         if (request.DiscountReason?.Length > 2000)
             return NormalizedInput.Fail("El motivo de descuento admite hasta 2000 caracteres.");
 
@@ -795,14 +872,25 @@ public sealed partial class SalesService(
 
         // Preserve the original CONTADO hash so existing keys remain replayable.
         var canonical = saleType == "CONTADO"
-            ? JsonSerializer.Serialize(new
-            {
-                request.CustomerId,
-                Lines = lines.OrderBy(x => x.ProductId),
-                GeneralDiscount = general.Value,
-                DiscountReason = NormalizeOptional(request.DiscountReason),
-                Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal)
-            })
+            ? request.Authorization is null
+                ? JsonSerializer.Serialize(new
+                {
+                    request.CustomerId,
+                    Lines = lines.OrderBy(x => x.ProductId),
+                    GeneralDiscount = general.Value,
+                    DiscountReason = NormalizeOptional(request.DiscountReason),
+                    Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal)
+                })
+                // The authorizer's name (never the password) identifies a cash sale authorized for a discount without a reason.
+                : JsonSerializer.Serialize(new
+                {
+                    request.CustomerId,
+                    Lines = lines.OrderBy(x => x.ProductId),
+                    GeneralDiscount = general.Value,
+                    DiscountReason = NormalizeOptional(request.DiscountReason),
+                    Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal),
+                    DiscountAuthorizer = request.Authorization.IdentityKey
+                })
             : request.Authorization is null
                 ? JsonSerializer.Serialize(new
                 {
@@ -821,7 +909,7 @@ public sealed partial class SalesService(
                     DiscountReason = NormalizeOptional(request.DiscountReason),
                     Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal),
                     request.DueDate,
-                    Authorizer = request.Authorization.UserName.Trim().ToUpperInvariant()
+                    Authorizer = request.Authorization.IdentityKey
                 });
         return new NormalizedInput(key.Trim(), lines, general.Value, payments, saleType, canonical, null);
     }
@@ -959,10 +1047,10 @@ public sealed partial class SalesService(
             DiscountAmount = amount;
         }
 
-        public void CalculateTax()
+        public void CalculateTax(decimal? taxPercentage)
         {
-            if (Product.PorcentajeIva is not decimal taxPercentage) return;
-            TaxBase = decimal.Round(NetAmount * 100m / (100m + taxPercentage), 4, MidpointRounding.AwayFromZero);
+            if (taxPercentage is null) throw new DomainRuleViolationException("La configuración de IVA no tiene porcentaje vigente.");
+            TaxBase = decimal.Round(NetAmount * 100m / (100m + taxPercentage.Value), 0, MidpointRounding.AwayFromZero);
             TaxAmount = NetAmount - TaxBase.Value;
         }
     }

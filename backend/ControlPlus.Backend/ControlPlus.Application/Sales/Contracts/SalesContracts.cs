@@ -33,7 +33,21 @@ public sealed record ConfirmSaleRequest(
     SaleCreditAuthorizationRequest? Authorization = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record SaleCreditAuthorizationRequest(string UserName, string Password);
+/// <summary>
+/// Second-user authorization: either <c>userName</c> + <c>password</c>, or the scanned Code 128 <c>credentialToken</c> of the
+/// authorizer's operator credential (never both).
+/// </summary>
+public sealed record SaleCreditAuthorizationRequest(string? UserName, string? Password, string? CredentialToken = null)
+    : IAuthorizerCredentials
+{
+    [JsonIgnore] public Guid? ResolvedCredentialId { get; init; }
+
+    /// <summary>Stable, non-secret identity: the upper-cased user name, or the visible fragment of the scanned credential.</summary>
+    [JsonIgnore]
+    public string IdentityKey => this.UsesCredential()
+        ? "CRED:" + CredentialToken!.Trim()[^Math.Min(8, CredentialToken.Trim().Length)..]
+        : UserName!.Trim().ToUpperInvariant();
+}
 
 public sealed record SaleLineDto(
     Guid Id,
@@ -150,7 +164,9 @@ public sealed record SaleChangePaymentDto(Guid Id, string Type, string MethodCod
 public sealed record SaleReceiptDto(Guid SaleId, string VisibleNumber, DateTimeOffset OccurredAtUtc,
     DateOnly OperatingDate, string SaleType, string State, decimal GrossSubtotal,
     decimal DiscountTotal, decimal Total, decimal Change,
-    IReadOnlyCollection<SaleLineDto> Lines, IReadOnlyCollection<SaleReceiptPaymentDto> Payments);
+    IReadOnlyCollection<SaleLineDto> Lines, IReadOnlyCollection<SaleReceiptPaymentDto> Payments,
+    string? OperatorName = null, string? CustomerName = null,
+    decimal? VatPercentage = null, decimal? TaxableBaseTotal = null, decimal? VatTotal = null);
 
 public sealed record SaleReceiptPaymentDto(string MethodCode, decimal AppliedAmount,
     decimal? ReceivedAmount, decimal Change);
@@ -169,8 +185,26 @@ public sealed record CancelSaleDto(Guid SaleId, string VisibleNumber, string Sta
     Guid CancellationId, Guid CorrelationId, DateTimeOffset CancelledAtUtc,
     string SaleType, decimal ReversedAmount);
 
+/// <summary>Kind of commercial concession a Cajero asks a higher role to authorize.</summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record VerifyConcessionAuthorizationRequest(string? UserName, string? Password, string Kind, string? CredentialToken = null);
+
+/// <summary>Result of a verified authorization; the credentials are not stored and the sale re-validates them.</summary>
+public sealed record ConcessionAuthorizationDto(string AuthorizedBy);
+
+public sealed record VatSettingDto(bool Enabled, decimal? Percentage, long Version, DateTime? UpdatedAtUtc);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record UpdateVatSettingRequest([property: JsonRequired] bool Enabled, decimal? Percentage,
+    [property: JsonRequired] long ExpectedVersion);
+
 public interface ISalesService
 {
+    Task<Result<VatSettingDto>> GetVatSettingAsync(ActorContext actor, CancellationToken cancellationToken = default);
+    Task<Result<VatSettingDto>> UpdateVatSettingAsync(ActorContext actor, UpdateVatSettingRequest request,
+        CancellationToken cancellationToken = default);
+    Task<Result<ConcessionAuthorizationDto>> VerifyConcessionAuthorizationAsync(ActorContext actor,
+        VerifyConcessionAuthorizationRequest request, CancellationToken cancellationToken = default);
     Task<Result<SaleChangePolicyDto>> GetChangePolicyAsync(ActorContext actor,
         CancellationToken cancellationToken = default);
     Task<Result<SaleChangePolicyDto>> UpdateChangePolicyAsync(ActorContext actor,

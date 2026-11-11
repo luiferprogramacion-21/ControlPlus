@@ -99,5 +99,16 @@ public enum AuditAction
     SaleChangeNumberingCreated = 91,
     SaleChanged = 92,
     SaleChangeAuthorizationRejected = 93,
-    SaleChangePolicyUpdated = 94
+    SaleChangePolicyUpdated = 94,
+    VatSettingUpdated = 105,
+    PrintProfileCreated = 95,
+    PrintJobQueued = 96,
+    PrintJobAccepted = 97,
+    PrintJobFailed = 98,
+    PrintJobRetried = 99,
+    PrintJobUncertain = 100,
+    ProductDeleted = 101,
+    SaleDiscountAuthorizationRejected = 102,
+    LayawaySettingsUpdated = 103,
+    CashOpenAuthorizationRejected = 104
 }

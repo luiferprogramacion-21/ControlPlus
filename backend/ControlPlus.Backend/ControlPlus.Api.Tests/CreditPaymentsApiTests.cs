@@ -656,7 +656,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         Assert.Equal(0m, reconciliation.TotalExpected);
         await ReadAsync<CashReconciliationDto>(await client.PostAsJsonAsync(
             $"/api/cash/shifts/{setup.Shift.Id}/close", new CloseCashShiftRequest(
-                reconciliation.ShiftVersion, reconciliation.PaymentMethods.Select(x =>
+                reconciliation.ShiftVersion, reconciliation.PaymentMethods.Where(m => m.AffectsCash).Select(x =>
                     new CountedPaymentMethodRequest(x.PaymentMethodId, x.ExpectedAmount)).ToArray(),
                 null, null, null)), HttpStatusCode.OK);
         var next = await ReadAsync<CashShiftDto>(await client.PostAsJsonAsync("/api/cash/shifts",
@@ -765,8 +765,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         SetBearer(client, setup.Admin.AccessToken);
         var request = new ConfirmSaleRequest(setup.CustomerId,
             [new SaleLineRequest(setup.ProductId, 1, "MINORISTA")], null, null, [],
-            "CREDITO", setup.Shift.OperatingDate.AddDays(10),
-            new SaleCreditAuthorizationRequest(SupervisorName, _supervisorPassword));
+            "CREDITO", setup.Shift.OperatingDate.AddDays(10), null);
         using var message = new HttpRequestMessage(HttpMethod.Post, "/api/sales") { Content = JsonContent.Create(request) };
         message.Headers.Add("Idempotency-Key", key);
         var sale = await ReadAsync<SaleDto>(await client.SendAsync(message), HttpStatusCode.Created);

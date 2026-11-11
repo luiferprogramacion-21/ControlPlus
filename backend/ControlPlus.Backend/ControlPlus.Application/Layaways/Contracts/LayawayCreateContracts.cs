@@ -12,7 +12,11 @@ public sealed record CreateLayawayPaymentRequest(
     string MethodCode, decimal AppliedAmount, decimal? ReceivedAmount, string? Reference);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record CreateLayawayAuthorizationRequest(string UserName, string Password);
+public sealed record CreateLayawayAuthorizationRequest(string? UserName, string? Password, string? CredentialToken = null)
+    : IAuthorizerCredentials
+{
+    [JsonIgnore] public Guid? ResolvedCredentialId { get; init; }
+}
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CreateLayawayRequest(

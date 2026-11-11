@@ -11,6 +11,7 @@ using ControlPlus.Application.Common;
 using ControlPlus.Application.Customers.Contracts;
 using ControlPlus.Application.Numbering.Contracts;
 using ControlPlus.Application.Sales.Contracts;
+using ControlPlus.Application.Printing;
 using ControlPlus.Application.Reports;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Domain.OfficialModel;
@@ -18,6 +19,7 @@ using ControlPlus.Infrastructure.Persistence;
 using ControlPlus.Infrastructure.Persistence.Official;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -41,6 +43,20 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "receipt-sale",
             new ConfirmSaleRequest(null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
                 [new("EFECTIVO", 1000m, 1000m, null)])), HttpStatusCode.Created);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var soldProduct = await ReadAsync<ProductDto>(
+            await client.GetAsync($"/api/products/{scenario.Products.Standard}"), HttpStatusCode.OK);
+        using (var blocked = await client.DeleteAsync(
+            $"/api/products/{soldProduct.Id}?expectedVersion={soldProduct.Version}"))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, blocked.StatusCode);
+            Assert.Contains("solo puede inactivarse", await blocked.Content.ReadAsStringAsync());
+        }
+        SetBearer(client, scenario.Cashier.AccessToken);
+
+        var noProfile = await ReadAsync<PrintStatusDto>(await client.GetAsync("/api/printing/status"), HttpStatusCode.OK);
+        Assert.False(noProfile.HasActiveProfile);
+        Assert.Null(noProfile.ProfileName);
 
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
@@ -70,6 +86,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         var another = await ReadAsync<SaleReprintRequestDto>(await client.SendAsync(anotherRequest), HttpStatusCode.OK);
         Assert.NotEqual(requested.RequestId, another.RequestId);
         Assert.Equal(2, await db.EventoAuditoria.CountAsync(x => x.Accion == "SALEREPRINTREQUESTED" && x.EntidadId == sale.Id));
+        Assert.Equal(0, await db.TrabajoImpresion.CountAsync(x => x.DocumentoEmitido.EntidadId == sale.Id));
         Assert.Equal(beforeSales, await db.Venta.CountAsync());
         Assert.Equal(beforePayments, await db.PagoVenta.CountAsync());
         Assert.Equal(beforeCash, await db.MovimientoCaja.CountAsync());
@@ -284,7 +301,10 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         "20261102020000_CategoryProductReferencesV1",
         "20261104010000_AdminSelfSaleCancellationV1",
         "20261104020000_AdminSelfCashDifferenceV1",
-        "20261105010000_SupervisorLayawayRefundDecisionV1"
+        "20261105010000_SupervisorLayawayRefundDecisionV1",
+        "20261106010000_ProductPhysicalDeletionPrivilegesV1",
+        "20261110010000_BusinessVatSettingV1",
+        "20261110020000_BusinessVatWholePesoSalesV1"
     ];
 
     private readonly string _masterKey = RandomSecret(48);
@@ -307,6 +327,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureLogging(logging => logging.ClearProviders());
+            builder.ConfigureTestServices(services => services.AddSingleton<IPrintSpooler, FakePrintSpooler>());
             builder.UseSetting("ConnectionStrings:ControlPlusDb", _postgres.GetConnectionString());
             builder.UseSetting("Installation:MasterKey", _masterKey);
             builder.UseSetting("Jwt:Issuer", "controlplus-sales-tests");
@@ -663,12 +684,13 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         SetBearer(client, scenario.Cashier.AccessToken);
 
         await AssertProblemAsync(await PostSaleAsync(client, "cashier-over-limit", DiscountRequest(
-            scenario.Products.RoleDiscount, 6m, 940m)), HttpStatusCode.BadRequest);
+            scenario.Products.RoleDiscount, 6m, 940m, authorized: true)), HttpStatusCode.BadRequest);
         await AssertProblemAsync(await PostSaleAsync(client, "under-cost", DiscountRequest(
-            scenario.Products.UnderCost, 5m, 95m)), HttpStatusCode.BadRequest);
+            scenario.Products.UnderCost, 5m, 95m, authorized: true)), HttpStatusCode.BadRequest);
         await AssertProblemAsync(await PostSaleAsync(client, "wholesale-discount", new ConfirmSaleRequest(
-            null, [new(scenario.Products.Standard, 1, "MAYORISTA", new("PORCENTAJE", 5m))], null, "No permitido",
-            [new("EFECTIVO", 855m, 855m, null)])), HttpStatusCode.BadRequest);
+            null, [new(scenario.Products.Standard, 12, "MAYORISTA", new("PORCENTAJE", 5m))], null, "No permitido",
+            [new("EFECTIVO", 10_260m, 10_260m, null)],
+            Authorization: new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword))), HttpStatusCode.BadRequest);
 
         var distributed = await ReadAsync<SaleDto>(await PostSaleAsync(client, "general-discount", new ConfirmSaleRequest(
             null,
@@ -676,7 +698,8 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
                 new(scenario.Products.ResidueC, 1, "MINORISTA")],
             new("PORCENTAJE", 5m),
             "Promoción controlada",
-            [new("EFECTIVO", 304m, 304m, null)])), HttpStatusCode.Created);
+            [new("EFECTIVO", 304m, 304m, null)],
+            Authorization: new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword))), HttpStatusCode.Created);
         Assert.Equal(16m, distributed.DiscountTotal);
         Assert.Equal(6m, distributed.Lines.Single(x => x.ProductId == scenario.Products.ResidueC).DiscountAmount);
         Assert.Equal(5m, distributed.Lines.Single(x => x.ProductId == scenario.Products.ResidueA).DiscountAmount);
@@ -963,7 +986,8 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
             [new(scenario.Products.Standard, 1, "MINORISTA", new("VALOR_FIJO", 50m))],
             null,
             "Descuento fijo válido",
-            [new("EFECTIVO", 950m, 950m, null)])), HttpStatusCode.Created);
+            [new("EFECTIVO", 950m, 950m, null)],
+            Authorization: new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword))), HttpStatusCode.Created);
         Assert.Equal(50m, fixedDiscount.DiscountTotal);
         Assert.Equal("VALOR_FIJO", Assert.Single(fixedDiscount.Lines).DiscountType);
 
@@ -971,10 +995,11 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         SetBearer(client, scenario.Cashier.AccessToken);
         var wholesale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "valid-wholesale", new ConfirmSaleRequest(
             null,
-            [new(scenario.Products.Standard, 1, "MAYORISTA")],
+            [new(scenario.Products.Standard, 12, "MAYORISTA")],
             null,
             null,
-            [new("EFECTIVO", 900m, 900m, null)])), HttpStatusCode.Created);
+            [new("EFECTIVO", 10_800m, 10_800m, null)],
+            Authorization: new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword))), HttpStatusCode.Created);
         var wholesaleLine = Assert.Single(wholesale.Lines);
         Assert.Equal("MAYORISTA", wholesaleLine.PriceType);
         Assert.Equal(900m, wholesaleLine.UnitPrice);
@@ -1137,7 +1162,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         SetBearer(client, adminToken);
         var reconciliation = await ReadAsync<CashReconciliationDto>(
             await client.GetAsync("/api/cash/reconciliation"), HttpStatusCode.OK);
-        var counts = reconciliation.PaymentMethods
+        var counts = reconciliation.PaymentMethods.Where(m => m.AffectsCash)
             .Select(x => new CountedPaymentMethodRequest(x.PaymentMethodId, x.ExpectedAmount)).ToArray();
         await ReadAsync<CashReconciliationDto>(await client.PostAsJsonAsync(
             $"/api/cash/shifts/{reconciliation.ShiftId}/close",
@@ -1420,9 +1445,10 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         customerId, [new(productId, quantity, "MINORISTA")], null, null,
         [new("EFECTIVO", total, total, null)]);
 
-    private static ConfirmSaleRequest DiscountRequest(Guid productId, decimal percentage, decimal total) => new(
+    private static ConfirmSaleRequest DiscountRequest(Guid productId, decimal percentage, decimal total, bool authorized = false) => new(
         null, [new(productId, 1, "MINORISTA", new("PORCENTAJE", percentage))], null,
-        "Descuento de prueba", [new("EFECTIVO", total, total, null)]);
+        "Descuento de prueba", [new("EFECTIVO", total, total, null)],
+        Authorization: authorized ? new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword) : null);
 
     private static async Task<HttpResponseMessage> PostSaleAsync(
         HttpClient client, string idempotencyKey, ConfirmSaleRequest request)

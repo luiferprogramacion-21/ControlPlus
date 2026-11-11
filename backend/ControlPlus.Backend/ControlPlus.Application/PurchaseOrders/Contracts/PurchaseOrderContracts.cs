@@ -28,8 +28,11 @@ public sealed record UpdatePurchaseOrderRequest(
 public sealed record SendPurchaseOrderRequest([property: JsonRequired] long ExpectedVersion);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record PurchaseOrderAuthorizationRequest(
-    [property: JsonRequired] string UserName, [property: JsonRequired] string Password);
+public sealed record PurchaseOrderAuthorizationRequest(string? UserName, string? Password, string? CredentialToken = null)
+    : IAuthorizerCredentials
+{
+    [JsonIgnore] public Guid? ResolvedCredentialId { get; init; }
+}
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ClosePurchaseOrderRequest([property: JsonRequired] long ExpectedVersion,

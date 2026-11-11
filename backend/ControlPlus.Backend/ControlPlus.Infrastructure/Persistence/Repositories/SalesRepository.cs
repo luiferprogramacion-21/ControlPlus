@@ -25,6 +25,10 @@ public sealed class EfSalesTransactionManager(OfficialControlPlusDbContext dbCon
 
 public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : ISalesRepository
 {
+    public Task<Instalacion?> GetActiveInstallationAsync(CancellationToken cancellationToken = default) =>
+        dbContext.Instalacion.AsNoTracking().Where(x => x.Activo)
+            .OrderBy(x => x.FechaInstalacion).ThenBy(x => x.Id).FirstOrDefaultAsync(cancellationToken);
+
     public async Task<Instalacion?> GetActiveInstallationForUpdateAsync(CancellationToken cancellationToken = default)
     {
         var rows = await dbContext.Instalacion.FromSqlRaw(

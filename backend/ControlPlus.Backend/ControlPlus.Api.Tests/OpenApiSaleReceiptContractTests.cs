@@ -60,8 +60,17 @@ public sealed class OpenApiSaleReceiptContractTests
         var paths = json.RootElement.GetProperty("paths");
         var receipt = paths.GetProperty("/api/sales/{saleId}/receipt").GetProperty("get");
         var reprint = paths.GetProperty("/api/sales/{saleId}/reprint-requests").GetProperty("post");
+        var status = paths.GetProperty("/api/printing/status").GetProperty("get");
+        var jobs = paths.GetProperty("/api/sales/{saleId}/print-jobs").GetProperty("get");
+        var retry = paths.GetProperty("/api/sales/{saleId}/print-jobs/{jobId}/retry").GetProperty("post");
         Assert.True(receipt.GetProperty("security").GetArrayLength() > 0);
         Assert.True(reprint.GetProperty("security").GetArrayLength() > 0);
+        Assert.True(status.GetProperty("security").GetArrayLength() > 0);
+        Assert.True(jobs.GetProperty("security").GetArrayLength() > 0);
+        Assert.True(retry.GetProperty("security").GetArrayLength() > 0);
+        Assert.True(status.GetProperty("responses").TryGetProperty("200", out _));
+        Assert.True(jobs.GetProperty("responses").TryGetProperty("200", out _));
+        Assert.True(retry.GetProperty("responses").TryGetProperty("200", out _));
         Assert.Contains(reprint.GetProperty("parameters").EnumerateArray(),
             parameter => parameter.GetProperty("name").GetString() == "Idempotency-Key"
                          && parameter.GetProperty("required").GetBoolean());

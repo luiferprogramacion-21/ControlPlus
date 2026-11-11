@@ -3,6 +3,7 @@ using ControlPlus.Api.Authorization;
 using ControlPlus.Api.Security;
 using ControlPlus.Application.Common;
 using ControlPlus.Application.Sales.Contracts;
+using ControlPlus.Application.Printing;
 using ControlPlus.Application.Security.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +13,9 @@ namespace ControlPlus.Api.Controllers;
 [Route("api/sales")]
 public sealed class SalesController(
     CurrentActorContextResolver actorContextResolver,
-    ISalesService salesService) : ApiControllerBase(actorContextResolver)
+    ISalesService salesService,
+    IReceiptPrintingService printing,
+    ILogger<SalesController> logger) : ApiControllerBase(actorContextResolver)
 {
     /// <summary>Confirma una venta CONTADO o CREDITO idempotente y descuenta su inventario.</summary>
     [HttpPost]
@@ -32,6 +35,14 @@ public sealed class SalesController(
         var actor = await GetActorAsync(cancellationToken);
         if (actor is null) return MissingActor();
         var result = await salesService.ConfirmAsync(actor, idempotencyKey, request, cancellationToken);
+        if (result.IsSuccess)
+        {
+            try { await printing.QueueOriginalAsync(result.Value!.Id, cancellationToken); }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "No se pudo preparar el comprobante de venta {SaleId}.", result.Value!.Id);
+            }
+        }
         return FromResult(result, sale => CreatedAtAction(nameof(Get), new { saleId = sale.Id }, sale));
     }
 
@@ -59,6 +70,22 @@ public sealed class SalesController(
     {
         var actor = await GetActorAsync(cancellationToken);
         return actor is null ? MissingActor() : FromResult(await salesService.ListAllAsync(actor, query, cancellationToken), Ok);
+    }
+
+    /// <summary>Verifica, al aplicar un descuento o elegir precio mayorista, las credenciales de un Supervisor o Administrador. No registra nada: la venta las valida de nuevo.</summary>
+    [HttpPost("concession-authorizations/verify")]
+    [PermissionAuthorize(PermissionCodes.SalesCreate)]
+    [Consumes("application/json")]
+    [ProducesResponseType<ConcessionAuthorizationDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<IActionResult> VerifyConcessionAuthorization(
+        [FromBody] VerifyConcessionAuthorizationRequest request, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.VerifyConcessionAuthorizationAsync(
+            actor, request, cancellationToken), Ok);
     }
 
     /// <summary>Consulta el plazo para futuras ventas; las fechas límite históricas no cambian.</summary>
@@ -185,6 +212,37 @@ public sealed class SalesController(
         return actor is null ? MissingActor() : FromResult(await salesService.GetReceiptAsync(actor, saleId, cancellationToken), Ok);
     }
 
+    /// <summary>Consulta el estado de cola de las copias del comprobante, sin afirmar salida en papel.</summary>
+    [HttpGet("{saleId:guid}/print-jobs")]
+    [Authorize]
+    [ProducesResponseType<PagedResult<PrintJobDto>>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<IActionResult> ListPrintJobs(Guid saleId, [FromQuery] PrintJobsQuery query,
+        CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await printing.ListSaleJobsAsync(actor, saleId,
+            query, cancellationToken), Ok);
+    }
+
+    /// <summary>Reintenta un trabajo fallido de esta venta; repetirlo no crea otra copia.</summary>
+    [HttpPost("{saleId:guid}/print-jobs/{jobId:guid}/retry")]
+    [PermissionAuthorize(PermissionCodes.SalesReprint)]
+    [ProducesResponseType<PrintJobDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> RetryPrintJob(Guid saleId, Guid jobId, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await printing.RetrySaleJobAsync(actor, saleId,
+            jobId, cancellationToken), Ok);
+    }
+
     /// <summary>Registra una solicitud de reimpresión; no confirma impresión física.</summary>
     [HttpPost("{saleId:guid}/reprint-requests")]
     [PermissionAuthorize(PermissionCodes.SalesReprint)]
@@ -199,7 +257,17 @@ public sealed class SalesController(
         CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
-        return actor is null ? MissingActor() : FromResult(await salesService.RequestReprintAsync(actor, saleId, idempotencyKey, cancellationToken), Ok);
+        if (actor is null) return MissingActor();
+        var result = await salesService.RequestReprintAsync(actor, saleId, idempotencyKey, cancellationToken);
+        if (result.IsSuccess)
+        {
+            try { await printing.QueueReprintAsync(result.Value!.RequestId, saleId, actor.UserId, cancellationToken); }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "No se pudo preparar la reimpresión de la venta {SaleId}.", saleId);
+            }
+        }
+        return FromResult(result, Ok);
     }
 
     /// <summary>Consulta los motivos activos y aprobados para anular ventas.</summary>

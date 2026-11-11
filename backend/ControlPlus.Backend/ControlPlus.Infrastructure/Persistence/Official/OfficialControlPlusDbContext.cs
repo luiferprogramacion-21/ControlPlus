@@ -1723,6 +1723,10 @@ public partial class OfficialControlPlusDbContext : DbContext
             entity.Property(e => e.Identificacion)
                 .HasMaxLength(30)
                 .HasColumnName("identificacion");
+            entity.Property(e => e.VatEnabled).HasColumnName("iva_negocio_habilitado");
+            entity.Property(e => e.VatPercentage).HasPrecision(5, 2).HasColumnName("iva_negocio_porcentaje");
+            entity.Property(e => e.VatVersion).HasColumnName("iva_negocio_version");
+            entity.Property(e => e.VatUpdatedAtUtc).HasColumnName("iva_negocio_actualizado_utc");
             entity.Property(e => e.IvaPredeterminado)
                 .HasPrecision(5, 2)
                 .HasComment("Opcional. NULL significa que no existe un IVA sugerido al crear productos.")

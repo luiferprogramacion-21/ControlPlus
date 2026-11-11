@@ -63,7 +63,7 @@ public sealed class OpenApiPurchaseCancellationContractTests
             Assert.DoesNotContain(required.EnumerateArray(), item => item.GetString() == "authorization");
 
         var authorization = schemas.GetProperty("CancelPurchaseAuthorizationRequest").GetProperty("properties");
-        Assert.Equal(new[] { "password", "userName" },
+        Assert.Equal(new[] { "credentialToken", "password", "userName" },
             authorization.EnumerateObject().Select(x => x.Name).Order(StringComparer.Ordinal));
     }
 

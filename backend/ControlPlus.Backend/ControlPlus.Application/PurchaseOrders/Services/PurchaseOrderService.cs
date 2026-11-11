@@ -11,7 +11,8 @@ using ControlPlus.Domain.Security.Enums;
 namespace ControlPlus.Application.PurchaseOrders.Services;
 
 public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IUserRepository users,
-    IPermissionRepository permissions, IPasswordHasher passwords, ILoginAttemptCoordinator loginAttempts,
+    IPermissionRepository permissions, IPasswordHasher passwords, IAuthorizerCredentialResolver credentialResolver,
+    ILoginAttemptCoordinator loginAttempts,
     IAuditRepository audit, IUnitOfWork unitOfWork, IClock clock) : IPurchaseOrderService
 {
     private static readonly (string Code, string Name)[] CloseCatalog =
@@ -210,9 +211,15 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
         long version, Guid reasonId, string? observation, PurchaseOrderAuthorizationRequest? credentials,
         bool cancel, CancellationToken ct)
     {
+        if (credentials is not null && credentials.UsesCredential())
+        {
+            if (credentials.MixesCredentialWithPassword())
+                return Invalid<PurchaseOrderDto>("Envíe la credencial escaneada o usuario y contraseña, no ambos.");
+            var (scannedUserName, scannedCredentialId) = await credentialResolver.ResolveOrUnknownAsync(credentials.CredentialToken!, ct);
+            credentials = credentials with { UserName = scannedUserName, ResolvedCredentialId = scannedCredentialId };
+        }
         if (id == Guid.Empty || version <= 0 || reasonId == Guid.Empty || observation?.Length > 500 ||
-            (credentials is not null &&
-             (string.IsNullOrWhiteSpace(credentials.UserName) || string.IsNullOrWhiteSpace(credentials.Password))))
+            (credentials is not null && !credentials.IsComplete()))
             return Invalid<PurchaseOrderDto>("Versión, motivo y credenciales enviadas deben ser válidos.");
         var permissionCode = cancel ? PermissionCodes.PurchaseOrdersCancel : PermissionCodes.PurchaseOrdersManage;
         if (!await AllowedAsync(actor.UserId, permissionCode,
@@ -220,7 +227,7 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
             return Denied<PurchaseOrderDto>();
         if (credentials is null && !await AllowedAsync(actor.UserId, permissionCode, RoleLevel.Administrador, ct))
             return Invalid<PurchaseOrderDto>("El Supervisor debe enviar authorization para cerrar el pedido.");
-        return await loginAttempts.ExecuteAsync(credentials?.UserName.Trim().ToUpperInvariant() ?? actor.UserId.ToString("N"), token =>
+        return await loginAttempts.ExecuteAsync(credentials?.UserName!.Trim().ToUpperInvariant() ?? actor.UserId.ToString("N"), token =>
             ChangeStatusWithinTransactionAsync(actor, id, version, reasonId, observation?.Trim(),
                 credentials, cancel, permissionCode, token), ct);
     }
@@ -250,7 +257,7 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
         var administratorSelfAuthorized = credentials is null;
         var authorizer = administratorSelfAuthorized
             ? await repository.GetUserForUpdateAsync(actor.UserId, ct)
-            : await users.GetByUserNameAsync(credentials!.UserName.Trim(), ct);
+            : await users.GetByUserNameAsync(credentials!.UserName!.Trim(), ct);
         var correlation = Guid.CreateVersion7();
         if (authorizer is null)
         {
@@ -262,7 +269,7 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
             (!administratorSelfAuthorized && !RoleHierarchy.IsHigherThan(authorizer.HighestRoleLevel,
                 (await users.GetAuthorizationSnapshotAsync(actor.UserId, ct))!.HighestRoleLevel)))
             return Result.Failure<PurchaseOrderDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
-        if (!administratorSelfAuthorized && !passwords.Verify(credentials!.Password, authorizer.PasswordHash))
+        if (!administratorSelfAuthorized && !credentials!.UsesCredential() && !passwords.Verify(credentials!.Password!, authorizer.PasswordHash))
         {
             var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
             await users.UpdateAsync(authorizer, ct);
@@ -285,7 +292,8 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
             DescripcionOperacion = administratorSelfAuthorized
                 ? "Autorización de pedido de compra por Administrador sin segundo autorizador."
                 : "Autorización de pedido de compra.",
-            Motivo = reason.Codigo, MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA",
+            Motivo = reason.Codigo, MetodoAutenticacion = credentials.AuthenticationMethod(),
+            CredencialAutorizadorId = credentials?.ResolvedCredentialId, Resultado = "EXITOSA",
             Estado = "UTILIZADA", FechaSolicitud = now, FechaExpiracion = now.AddMinutes(5), FechaUtilizacion = now };
         await repository.AddAuthorizationAsync(authorization, ct);
         if (cancel)

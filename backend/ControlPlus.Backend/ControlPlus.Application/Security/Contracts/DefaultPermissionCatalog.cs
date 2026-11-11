@@ -56,6 +56,7 @@ public static class DefaultPermissionCatalog
         new(PermissionCodes.OperationalReportsRead, "Consultar reportes operativos", "REPORTES"),
         new(PermissionCodes.FinancialReportsRead, "Consultar reportes financieros", "REPORTES"),
         new(PermissionCodes.ConfigurationManage, "Gestionar configuración", "CONFIGURACION"),
+        new(PermissionCodes.TaxesManage, "Gestionar IVA", "CONFIGURACION"),
         new(PermissionCodes.BackupsManage, "Gestionar respaldos y restauración", "CONFIGURACION"),
         new(PermissionCodes.PrintTest, "Ejecutar impresión de prueba", "CONFIGURACION"),
         new(PermissionCodes.PaymentMethodsManage, "Gestionar métodos de pago", "CONFIGURACION"),

@@ -79,15 +79,16 @@ public sealed partial class SalesApiFlowTests
         SetBearer(client, scenario.Admin.AccessToken);
         var reasons = await ReadAsync<IReadOnlyCollection<SaleCancellationReasonDto>>(
             await client.PostAsync("/api/sales/cancellation-reasons/initialize", null), HttpStatusCode.OK);
+        SetBearer(client, scenario.Supervisor.AccessToken);
         _ = await StartSessionAsync(client, scenario.Admin.AccessToken,
-            scenario.Admin.AccessToken, scenario.Admin.User.Id);
+            scenario.Supervisor.AccessToken, scenario.Users.Supervisor.Id);
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var before = (await db.Producto.AsNoTracking().SingleAsync(x => x.Id == scenario.Products.Standard)).StockActual;
         var cashBefore = await db.MovimientoCaja.CountAsync();
         var request = new CancelSaleRequest(sale.Version,
             reasons.Single(x => x.Code == "ERROR_REGISTRO").Id, null,
-            new SaleCreditAuthorizationRequest(SupervisorUser, "invalid-password"));
+            new SaleCreditAuthorizationRequest(AdminUser, "invalid-password"));
         Assert.Equal(HttpStatusCode.Unauthorized, (await PostSaleCancellationAsync(client,
             sale.Id, "void-bad-auth-key", request)).StatusCode);
         Assert.False(await db.AnulacionVenta.AnyAsync(x => x.VentaId == sale.Id));
@@ -95,11 +96,11 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(cashBefore, await db.MovimientoCaja.CountAsync());
         Assert.False(await db.OperacionIdempotente.AnyAsync(x => x.ClaveIdempotencia == "void-bad-auth-key"));
         Assert.Equal(1, await db.EventoAuditoria.CountAsync(x => x.Accion == "SALECANCELLATIONAUTHORIZATIONREJECTED"));
-        Assert.Equal(1, (await db.Usuario.AsNoTracking().SingleAsync(x => x.Id == scenario.Users.Supervisor.Id)).IntentosFallidos);
+        Assert.Equal(1, (await db.Usuario.AsNoTracking().SingleAsync(x => x.Id == scenario.Admin.User.Id)).IntentosFallidos);
         Assert.Equal(HttpStatusCode.Unauthorized, (await PostSaleCancellationAsync(client,
             sale.Id, "void-self-auth-key", request with
             {
-                Authorization = new SaleCreditAuthorizationRequest(AdminUser, AdminPassword)
+                Authorization = new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword)
             })).StatusCode);
         Assert.False(await db.AnulacionVenta.AnyAsync(x => x.VentaId == sale.Id));
     }
@@ -118,8 +119,9 @@ public sealed partial class SalesApiFlowTests
         SetBearer(client, scenario.Admin.AccessToken);
         var reasons = await ReadAsync<IReadOnlyCollection<SaleCancellationReasonDto>>(
             await client.PostAsync("/api/sales/cancellation-reasons/initialize", null), HttpStatusCode.OK);
+        SetBearer(client, scenario.Supervisor.AccessToken);
         _ = await StartSessionAsync(client, scenario.Admin.AccessToken,
-            scenario.Admin.AccessToken, scenario.Admin.User.Id);
+            scenario.Supervisor.AccessToken, scenario.Users.Supervisor.Id);
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var beforeStock = (await db.Producto.AsNoTracking().SingleAsync(x => x.Id == scenario.Products.Standard)).StockActual;
@@ -145,7 +147,7 @@ public sealed partial class SalesApiFlowTests
         }
         var request = new CancelSaleRequest(sale.Version,
             reasons.Single(x => x.Code == "ERROR_REGISTRO").Id, null,
-            new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword));
+            new SaleCreditAuthorizationRequest(AdminUser, AdminPassword));
         Assert.Equal(HttpStatusCode.Conflict, (await PostSaleCancellationAsync(client,
             sale.Id, "void-rollback-key", request)).StatusCode);
         Assert.Equal("CONFIRMADA", (await db.Venta.AsNoTracking().SingleAsync(x => x.Id == sale.Id)).Estado);
@@ -174,16 +176,17 @@ public sealed partial class SalesApiFlowTests
         var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "void-credit-sale",
             new ConfirmSaleRequest(customerId, [new(scenario.Products.Standard, 1, "MINORISTA")],
                 null, null, [], "CREDITO", dueDate,
-                new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword))),
+                new SaleCreditAuthorizationRequest(AdminUser, AdminPassword))),
             HttpStatusCode.Created);
         var cashBefore = await db.MovimientoCaja.CountAsync();
         SetBearer(client, scenario.Admin.AccessToken);
         var reasons = await ReadAsync<IReadOnlyCollection<SaleCancellationReasonDto>>(
             await client.PostAsync("/api/sales/cancellation-reasons/initialize", null), HttpStatusCode.OK);
+        SetBearer(client, scenario.Supervisor.AccessToken);
         var result = await ReadAsync<CancelSaleDto>(await PostSaleCancellationAsync(client,
             sale.Id, "void-credit-key", new CancelSaleRequest(sale.Version,
                 reasons.Single(x => x.Code == "ERROR_REGISTRO").Id, null,
-                new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword))), HttpStatusCode.OK);
+                new SaleCreditAuthorizationRequest(AdminUser, AdminPassword))), HttpStatusCode.OK);
         Assert.Equal("CREDITO", result.SaleType);
         Assert.Equal(0m, result.ReversedAmount);
         Assert.Equal(cashBefore, await db.MovimientoCaja.CountAsync());

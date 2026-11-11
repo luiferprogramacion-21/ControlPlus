@@ -319,7 +319,7 @@ public sealed partial class LayawayCreateApiFlowTests
         _ = await ReadAsync<CashReconciliationDto>(await client.PostAsJsonAsync(
             $"/api/cash/shifts/{scenario.Shift.Id}/close", new CloseCashShiftRequest(
                 reconciliation.ShiftVersion,
-                reconciliation.PaymentMethods.Select(x =>
+                reconciliation.PaymentMethods.Where(m => m.AffectsCash).Select(x =>
                     new CountedPaymentMethodRequest(x.PaymentMethodId, x.ExpectedAmount)).ToArray(),
                 null, null, null)), HttpStatusCode.OK);
     }

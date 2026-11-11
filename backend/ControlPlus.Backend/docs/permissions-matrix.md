@@ -61,6 +61,10 @@ La autorización adicional depende de `diferencia_total != 0`; las diferencias p
 
 Los códigos estables se agrupan por módulo: `USERS.*`, `ROLES.*`, `PERMISSIONS.*`, `USER_PERMISSIONS.*`, `AUDIT.*`, `PRODUCTS.*`, `CATEGORIES.*`, `INVENTORY.*`, `CASH.*`, `SALES.*`, `CUSTOMERS.*`, `CREDIT.*`, `LAYAWAY.*`, `SUPPLIERS.*`, `PURCHASE_ORDERS.*`, `PURCHASES.*`, `REPORTS.*`, `CONFIGURATION.*`, `BACKUPS.*`, `PRINT.*`, `PAYMENT_METHODS.*`, `NUMBERING.*`, `SYNCHRONIZATION.*`, `TECHNICAL_STATUS.*` y `UPDATES.*`. `CUSTOMERS.BASIC_MANAGE` separa los datos básicos permitidos al Cajero de `CUSTOMERS.MANAGE`.
 
+## Impresión local de comprobantes
+
+`POST /api/printing/profiles` exige rol vigente Administrador y `CONFIGURATION.MANAGE` efectivo. `GET /api/printing/profiles`, `GET /api/printing/jobs` y `POST /api/printing/jobs/{jobId}/retry` exigen `CONFIGURATION.MANAGE` efectivo; el reintento solo admite un trabajo `FALLIDO`. `GET /api/sales/{saleId}/print-jobs` conserva el alcance de lectura de la venta: `SALES.ALL_READ`, o `SALES.OWN_READ` si es propia. `POST /api/sales/{saleId}/reprint-requests` sigue exigiendo `SALES.REPRINT` y ese mismo alcance de lectura. `PRINT.TEST` no se utiliza todavía: no hay endpoint de impresión de prueba ni impresora instalada. `IMPRESO` registra aceptación por la cola de Windows, no salida física. Véase `docs/printing-implementation.md`.
+
 ## Restauración
 
 - Restaurar una plantilla reemplaza los permisos actuales del rol por su plantilla V1 y rota los sellos de todos sus usuarios.

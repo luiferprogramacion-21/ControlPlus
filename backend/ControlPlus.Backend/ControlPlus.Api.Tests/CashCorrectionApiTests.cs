@@ -42,33 +42,27 @@ public sealed partial class CashApiFlowTests
     }
 
     [Theory, Trait("Category", "Integration")]
-    [InlineData(100, 50, 0, true)]
-    [InlineData(100, -50, 0, true)]
-    [InlineData(100, 0, 50, true)]
-    [InlineData(100, 0, -50, true)]
-    [InlineData(100, -50, 50, false)]
-    public async Task DifferenceFields_PreserveCashAndElectronicSemantics(
-        int initial, int cashDifference, int electronicDifference, bool requiresAuthorization)
+    [InlineData(100, 50, true)]
+    [InlineData(100, -50, true)]
+    [InlineData(100, 0, false)]
+    public async Task DifferenceFields_CountOnlyCash_AndTakeOtherMethodsFromTheSystem(
+        int initial, int cashDifference, bool requiresAuthorization)
     {
         var scenario = await PrepareCorrectionScenarioAsync(initial);
         await AddFourthPaymentMethodAsync();
         using var client = AuthenticatedClient(scenario.Administrator.AccessToken);
         var reconciliation = await ReconcileAsync(client);
         Assert.Equal(4, reconciliation.PaymentMethods.Count);
-        var counts = reconciliation.PaymentMethods.Select(method => new CountedPaymentMethodRequest(
-            method.PaymentMethodId, method.ExpectedAmount + (method.Code switch
-            {
-                "EFECTIVO" => cashDifference,
-                "TRANSFERENCIA" => electronicDifference,
-                _ => 0m
-            }))).ToArray();
+        var counts = reconciliation.PaymentMethods.Where(m => m.AffectsCash).Select(method => new CountedPaymentMethodRequest(
+            method.PaymentMethodId, method.ExpectedAmount + cashDifference)).ToArray();
         var request = new CloseCashShiftRequest(reconciliation.ShiftVersion, counts,
             requiresAuthorization ? scenario.Catalog.DifferenceReasonId : null, null,
-            requiresAuthorization ? new CashCloseAuthorizationRequest(SupervisorUserName, SupervisorPassword) : null);
+            null);
         var closed = await ReadSuccessAsync<CashReconciliationDto>(await client.PostAsJsonAsync(
             $"/api/cash/shifts/{scenario.Shift.Id}/close", request), HttpStatusCode.OK);
         Assert.Equal(cashDifference, closed.CashDifference);
-        Assert.Equal(cashDifference + electronicDifference, closed.TotalDifference);
+        Assert.Equal(cashDifference, closed.TotalDifference);
+        Assert.All(closed.PaymentMethods.Where(x => !x.AffectsCash), x => { Assert.Equal(x.ExpectedAmount, x.CountedAmount); Assert.Equal(0m, x.Difference); });
         Assert.Equal(closed.TotalDifference, closed.PaymentMethods.Sum(x => x.Difference));
         await using var scope = _factory!.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
@@ -76,7 +70,7 @@ public sealed partial class CashApiFlowTests
         Assert.Equal(cashDifference, shift.Diferencia);
         Assert.Equal(initial + cashDifference, shift.EfectivoContado);
         Assert.Equal(initial, shift.EfectivoEsperado);
-        Assert.Equal(cashDifference + electronicDifference, shift.DiferenciaTotal);
+        Assert.Equal(cashDifference, shift.DiferenciaTotal);
         Assert.Equal(requiresAuthorization ? 1 : 0, await context.AutorizacionCierreTurno.CountAsync());
         var details = await context.DetalleArqueoMedioPago.AsNoTracking().ToArrayAsync();
         Assert.Equal(4, details.Length);
@@ -120,17 +114,17 @@ public sealed partial class CashApiFlowTests
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(
             "/api/cash/movements/incomes", new CreateCashMovementRequest(1m, "Acumulado excedido", null))).StatusCode);
         var reconciliation = await ReconcileAsync(client);
-        var overflowCounts = reconciliation.PaymentMethods.Select(x => new CountedPaymentMethodRequest(
+        var overflowCounts = reconciliation.PaymentMethods.Where(m => m.AffectsCash).Select(x => new CountedPaymentMethodRequest(
             x.PaymentMethodId, x.Code == "EFECTIVO" ? MaximumCashAmount + 1m : 0m)).ToArray();
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(
             $"/api/cash/shifts/{scenario.Shift.Id}/close", new CloseCashShiftRequest(
                 reconciliation.ShiftVersion, overflowCounts, null, null, null))).StatusCode);
+        // Counting a non-cash medium is rejected: only the physical cash is counted.
         var accumulatedCounts = reconciliation.PaymentMethods.Select(x => new CountedPaymentMethodRequest(
             x.PaymentMethodId, x.Code == "EFECTIVO" ? MaximumCashAmount : x.Code == "NEQUI" ? 1m : 0m)).ToArray();
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(
             $"/api/cash/shifts/{scenario.Shift.Id}/close", new CloseCashShiftRequest(
-                reconciliation.ShiftVersion, accumulatedCounts, scenario.Catalog.DifferenceReasonId, null,
-                new CashCloseAuthorizationRequest(SupervisorUserName, SupervisorPassword)))).StatusCode);
+                reconciliation.ShiftVersion, accumulatedCounts, scenario.Catalog.DifferenceReasonId, null, null))).StatusCode);
         Assert.Equal(before, await CaptureFinancialStateAsync());
         var exact = await ReadSuccessAsync<CashReconciliationDto>(await client.PostAsJsonAsync(
             $"/api/cash/shifts/{scenario.Shift.Id}/close", BalancedClose(reconciliation)), HttpStatusCode.OK);
@@ -257,22 +251,22 @@ public sealed partial class CashApiFlowTests
     public async Task ConcurrentWrongAuthorizerAttempts_ArePreserved_AndCoordinateWithLogin(bool includeLogin)
     {
         var scenario = await PrepareCorrectionScenarioAsync(100m);
-        using var client = AuthenticatedClient(scenario.Administrator.AccessToken);
+        using var client = AuthenticatedClient(scenario.Supervisor.AccessToken);
         var request = DifferenceClose(scenario, await ReconcileAsync(client), -1m) with
         {
-            Authorization = new CashCloseAuthorizationRequest(SupervisorUserName, "Incorrect-Test-Password-2026!")
+            Authorization = new CashCloseAuthorizationRequest(AdministratorUserName, "Incorrect-Test-Password-2026!")
         };
-        var executorBefore = await ReadAuthenticationStateAsync(scenario.Administrator.User.Id);
+        var executorBefore = await ReadAuthenticationStateAsync(scenario.Supervisor.User.Id);
         var attempts = Enumerable.Range(0, 5).Select(index => includeLogin && index < 2
-            ? client.PostAsJsonAsync("/api/auth/login", new LoginRequest(SupervisorUserName, "Incorrect-Test-Password-2026!"))
+            ? client.PostAsJsonAsync("/api/auth/login", new LoginRequest(AdministratorUserName, "Incorrect-Test-Password-2026!"))
             : client.PostAsJsonAsync($"/api/cash/shifts/{scenario.Shift.Id}/close", request));
         var results = await Task.WhenAll(attempts);
         Assert.All(results, response => Assert.True(response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized));
-        await AssertUserAuthenticationStateAsync(scenario.Users.Supervisor.Id, 5, true);
-        Assert.Equal(executorBefore, await ReadAuthenticationStateAsync(scenario.Administrator.User.Id));
+        await AssertUserAuthenticationStateAsync(scenario.Administrator.User.Id, 5, true);
+        Assert.Equal(executorBefore, await ReadAuthenticationStateAsync(scenario.Supervisor.User.Id));
         await using var scope = _factory!.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
-        Assert.Equal(1, await context.EventoAuditoria.CountAsync(x => x.Accion == "USERLOCKED" && x.EntidadId == scenario.Users.Supervisor.Id));
+        Assert.Equal(1, await context.EventoAuditoria.CountAsync(x => x.Accion == "USERLOCKED" && x.EntidadId == scenario.Administrator.User.Id));
         Assert.Equal(includeLogin ? 3 : 5, await context.EventoAuditoria.CountAsync(x => x.Accion == "CASHCLOSEAUTHORIZATIONREJECTED"));
         Assert.Equal(CashConstants.OpenState, await context.TurnoCaja.Select(x => x.Estado).SingleAsync());
         Assert.Equal(0, await context.DetalleArqueoMedioPago.CountAsync());
@@ -323,6 +317,33 @@ public sealed partial class CashApiFlowTests
         Assert.Equal(1, await context.AutorizacionCierreTurno.CountAsync());
         Assert.Equal(1, await context.AutorizacionOperacion.CountAsync());
         Assert.Equal(1, await context.EventoAuditoria.CountAsync(x => x.Accion == "CASHSHIFTCLOSED"));
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task Cashier_OpensTheCash_OnlyWithSupervisorOrAdministratorAuthorization()
+    {
+        var scenario = await PrepareCorrectionScenarioAsync(0m);
+        using var administrator = AuthenticatedClient(scenario.Administrator.AccessToken);
+        _ = await ReadSuccessAsync<CashReconciliationDto>(await administrator.PostAsJsonAsync(
+            $"/api/cash/shifts/{scenario.Shift.Id}/close", BalancedClose(await ReconcileAsync(administrator))), HttpStatusCode.OK);
+
+        using var cashier = AuthenticatedClient(scenario.Cashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.PostAsJsonAsync(
+            "/api/cash/shifts", new OpenCashShiftRequest(1_000m, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.PostAsJsonAsync("/api/cash/shifts",
+            new OpenCashShiftRequest(1_000m, null, new CashOpenAuthorizationRequest(SupervisorUserName, "Incorrect-Test-Password-2026!")))).StatusCode);
+        var opened = await ReadSuccessAsync<CashShiftDto>(await cashier.PostAsJsonAsync("/api/cash/shifts",
+            new OpenCashShiftRequest(1_000m, null, new CashOpenAuthorizationRequest(SupervisorUserName, SupervisorPassword))),
+            HttpStatusCode.Created);
+        Assert.Equal(1_000m, opened.InitialAmount);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var authorization = await context.AutorizacionOperacion.AsNoTracking().SingleAsync(x => x.TipoOperacion == "APERTURA_CAJA");
+        Assert.Equal(scenario.Users.Cashier.Id, authorization.UsuarioSolicitanteId);
+        Assert.Equal(scenario.Users.Supervisor.Id, authorization.UsuarioAutorizadorId);
+        Assert.Equal("PASSWORD", authorization.MetodoAutenticacion);
+        Assert.Equal(1, await context.EventoAuditoria.CountAsync(x => x.Accion == "CASHOPENAUTHORIZATIONREJECTED"));
     }
 
     [Fact, Trait("Category", "Integration")]
@@ -441,8 +462,12 @@ public sealed partial class CashApiFlowTests
     public async Task SerializationAbortAtCommit_RetriesWithFreshState_AndIsBounded(bool alwaysFail)
     {
         var scenario = await PrepareCorrectionScenarioAsync(100m);
-        using var client = AuthenticatedClient(scenario.Administrator.AccessToken);
-        var close = DifferenceClose(scenario, await ReconcileAsync(client), -1m);
+        using var client = AuthenticatedClient(scenario.Supervisor.AccessToken);
+        // The retry loop belongs to the second-user reauthorization, so a Supervisor executes and the Administrator authorizes.
+        var close = DifferenceClose(scenario, await ReconcileAsync(client), -1m) with
+        {
+            Authorization = new CashCloseAuthorizationRequest(AdministratorUserName, AdministratorPassword)
+        };
         await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
         await connection.OpenAsync();
         var failCondition = alwaysFail ? "true" : "attempt < 3";
@@ -467,7 +492,7 @@ public sealed partial class CashApiFlowTests
         // Setup and login share one controlled instant. Make the successful
         // reauthorization observable as a real user update on every retry.
         _clock.Advance(TimeSpan.FromSeconds(1));
-        var before = await ReadAuthenticationStateAsync(scenario.Users.Supervisor.Id);
+        var before = await ReadAuthenticationStateAsync(scenario.Administrator.User.Id);
         var response = await client.PostAsJsonAsync($"/api/cash/shifts/{scenario.Shift.Id}/close", close);
         Assert.Equal(alwaysFail ? HttpStatusCode.Conflict : HttpStatusCode.OK, response.StatusCode);
         await using var attempts = new NpgsqlCommand("SELECT last_value FROM caja.test_serialization_attempt", connection);
@@ -480,7 +505,7 @@ public sealed partial class CashApiFlowTests
         Assert.Equal(alwaysFail ? 0 : 3, await context.DetalleArqueoMedioPago.CountAsync());
         Assert.Equal(alwaysFail ? 0 : 1, await context.EventoAuditoria.CountAsync(x => x.Accion == "CASHSHIFTCLOSED"));
         Assert.Equal(1, await context.MovimientoCaja.CountAsync());
-        var after = await ReadAuthenticationStateAsync(scenario.Users.Supervisor.Id);
+        var after = await ReadAuthenticationStateAsync(scenario.Administrator.User.Id);
         Assert.Equal(alwaysFail ? before.Version : before.Version + 1, after.Version);
     }
 
@@ -675,14 +700,13 @@ public sealed partial class CashApiFlowTests
         await ReadSuccessAsync<CashReconciliationDto>(await client.GetAsync("/api/cash/reconciliation"), HttpStatusCode.OK);
 
     private static CloseCashShiftRequest BalancedClose(CashReconciliationDto reconciliation) =>
-        new(reconciliation.ShiftVersion, reconciliation.PaymentMethods.Select(x =>
+        new(reconciliation.ShiftVersion, reconciliation.PaymentMethods.Where(m => m.AffectsCash).Select(x =>
             new CountedPaymentMethodRequest(x.PaymentMethodId, x.ExpectedAmount)).ToArray(), null, null, null);
 
     private static CloseCashShiftRequest DifferenceClose(CorrectionScenario scenario, CashReconciliationDto reconciliation, decimal cashDifference) =>
-        new(reconciliation.ShiftVersion, reconciliation.PaymentMethods.Select(x =>
+        new(reconciliation.ShiftVersion, reconciliation.PaymentMethods.Where(m => m.AffectsCash).Select(x =>
             new CountedPaymentMethodRequest(x.PaymentMethodId, x.ExpectedAmount + (x.AffectsCash ? cashDifference : 0m))).ToArray(),
-            scenario.Catalog.DifferenceReasonId, "Diferencia aislada de prueba",
-            new CashCloseAuthorizationRequest(SupervisorUserName, SupervisorPassword));
+            scenario.Catalog.DifferenceReasonId, "Diferencia aislada de prueba", null);
 
     private async Task AddFourthPaymentMethodAsync()
     {

@@ -56,8 +56,11 @@ public sealed record PurchaseReceiptDto(PurchaseDto Purchase, Guid OrderId, stri
     long OrderVersion);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record CancelPurchaseAuthorizationRequest(
-    [property: JsonRequired] string UserName, [property: JsonRequired] string Password);
+public sealed record CancelPurchaseAuthorizationRequest(string? UserName, string? Password, string? CredentialToken = null)
+    : IAuthorizerCredentials
+{
+    [JsonIgnore] public Guid? ResolvedCredentialId { get; init; }
+}
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CancelPurchaseRequest(

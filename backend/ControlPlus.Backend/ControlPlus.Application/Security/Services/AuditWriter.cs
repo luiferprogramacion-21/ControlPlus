@@ -134,6 +134,22 @@ internal static class AuditWriter
         return auditRepository.AddAsync(auditRecord, cancellationToken);
     }
 
+    /// <summary>Rejected authorizer credentials for a Cajero's discount without a reason; the credentials are never recorded.</summary>
+    public static Task WriteSaleDiscountAuthorizationFailureAsync(
+        IAuditRepository auditRepository,
+        IClock clock,
+        Guid actorUserId,
+        Guid correlationId,
+        Guid terminalId,
+        CancellationToken cancellationToken)
+    {
+        var auditRecord = AuditRecord.Create(actorUserId,
+            AuditAction.SaleDiscountAuthorizationRejected, "Venta", null,
+            JsonSerializer.Serialize(new { Reason = "INVALID_AUTHORIZER_CREDENTIALS" }),
+            clock.UtcNow, correlationId.ToString(), terminalId: terminalId, result: "FALLIDO");
+        return auditRepository.AddAsync(auditRecord, cancellationToken);
+    }
+
     public static Task WriteInventoryAsync(
         IAuditRepository auditRepository,
         IClock clock,

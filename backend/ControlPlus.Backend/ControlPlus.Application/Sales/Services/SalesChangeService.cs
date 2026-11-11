@@ -31,6 +31,9 @@ public sealed partial class SalesService
     {
         var input = NormalizeChange(saleId, idempotencyKey, request);
         if (input.Error is not null) return Result.Failure<SaleChangeDto>(input.Error);
+        var scanned = await ResolveScannedAuthorizationAsync(request.Authorization, cancellationToken);
+        if (scanned.Error is not null) return Result.Failure<SaleChangeDto>(scanned.Error);
+        request = request with { Authorization = scanned.Authorization };
         var account = string.IsNullOrWhiteSpace(request.Authorization?.UserName)
             ? $"SALE-CHANGE-REPLAY:{actor.UserId:N}"
             : request.Authorization.UserName.Trim().ToUpperInvariant();
@@ -68,8 +71,7 @@ public sealed partial class SalesService
                 : Result.Success(saved);
         }
         if (!administratorSelfAuthorized &&
-            (request.Authorization is null || string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-             string.IsNullOrWhiteSpace(request.Authorization.Password)))
+            (request.Authorization is null || !request.Authorization.IsComplete()))
             return Result.Failure<SaleChangeDto>(Validation("Se requieren credenciales de otro Supervisor o Administrador."));
         var terminal = await repository.GetActiveTerminalAsync(installation.Id, ct);
         if (terminal is null) return Result.Failure<SaleChangeDto>(ApplicationError.NotFound("la terminal activa"));
@@ -192,7 +194,7 @@ public sealed partial class SalesService
         }
         else
         {
-            var candidate = await userRepository.GetByUserNameAsync(request.Authorization!.UserName.Trim(), ct);
+            var candidate = await userRepository.GetByUserNameAsync(request.Authorization!.UserName!.Trim(), ct);
             if (candidate is null)
                 return Result.Failure<SaleChangeDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
             authorizer = await repository.GetUserForUpdateAsync(candidate.Id, ct);
@@ -204,7 +206,7 @@ public sealed partial class SalesService
                 !authorizerSnapshot.PermissionCodes.Contains(PermissionCodes.SalesChangeAuthorize,
                     StringComparer.OrdinalIgnoreCase))
                 return Result.Failure<SaleChangeDto>(ApplicationError.Forbidden("El autorizador debe tener un rol estrictamente superior al del ejecutor."));
-            if (!passwordHasher.Verify(request.Authorization.Password, authorizer.PasswordHash))
+            if (!request.Authorization.UsesCredential() && !passwordHasher.Verify(request.Authorization.Password!, authorizer.PasswordHash))
             {
                 var locked = authorizer.RegisterFailedLogin(now);
                 await userRepository.UpdateAsync(authorizer, ct);
@@ -237,7 +239,8 @@ public sealed partial class SalesService
             DescripcionOperacion = administratorSelfAuthorized
                 ? "Autorización de cambio de venta por Administrador sin segundo autorizador."
                 : "Autorización de cambio de productos de venta.",
-            Motivo = input.Reason, MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA",
+            Motivo = input.Reason, MetodoAutenticacion = request.Authorization.AuthenticationMethod(),
+            CredencialAutorizadorId = request.Authorization?.ResolvedCredentialId, Resultado = "EXITOSA",
             Estado = "UTILIZADA", FechaSolicitud = now.UtcDateTime,
             FechaExpiracion = now.UtcDateTime.AddMinutes(5), FechaUtilizacion = now.UtcDateTime
         };

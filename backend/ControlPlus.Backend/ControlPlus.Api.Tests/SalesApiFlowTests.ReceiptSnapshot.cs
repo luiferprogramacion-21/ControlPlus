@@ -34,6 +34,9 @@ public sealed partial class SalesApiFlowTests
             HttpStatusCode.Created);
         var url = $"/api/sales/{sale.Id}/receipt";
         var before = await ReadAsync<SaleReceiptDto>(await client.GetAsync(url), HttpStatusCode.OK);
+        Assert.Null(before.VatPercentage);
+        Assert.Null(before.TaxableBaseTotal);
+        Assert.Null(before.VatTotal);
 
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
@@ -44,8 +47,10 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(64, document.HashSnapshot.Length);
         Assert.Empty(await db.TrabajoImpresion.Where(x => x.DocumentoEmitidoId == document.Id).ToArrayAsync());
         foreach (var sensitive in new[] { AdminPassword, _masterKey, _jwtKey, scenario.Admin.AccessToken,
-                     "SNAPSHOT-TEST-REFERENCE", customerId.ToString(), "SNAPSHOT-PRIVATE" })
+                     "SNAPSHOT-TEST-REFERENCE", customerId.ToString() })
             Assert.DoesNotContain(sensitive, document.DatosSnapshot, StringComparison.Ordinal);
+        Assert.Equal("Cliente ficticio SNAPSHOT-PRIVATE", before.CustomerName);
+        Assert.Equal(scenario.Admin.User.DisplayName, before.OperatorName);
         foreach (var sensitiveField in new[] { "password", "accessToken", "authorization", "reference",
                      "customerId", "unitCost", "costoUnitario" })
             Assert.DoesNotContain($"\"{sensitiveField}\"", document.DatosSnapshot, StringComparison.OrdinalIgnoreCase);
@@ -262,6 +267,8 @@ public sealed partial class SalesApiFlowTests
         var second = await ReadAsync<SaleReceiptDto>(await client.GetAsync(url), HttpStatusCode.OK);
         Assert.Equal(JsonSerializer.Serialize(first), JsonSerializer.Serialize(second));
         Assert.Equal(sale.VisibleNumber, first.VisibleNumber);
+        Assert.Null(first.OperatorName);
+        Assert.Null(first.CustomerName);
         Assert.Equal(0, await db.DocumentoEmitido.CountAsync(x => x.EntidadId == sale.Id));
 
         SetBearer(client, scenario.SecondCashier.AccessToken);

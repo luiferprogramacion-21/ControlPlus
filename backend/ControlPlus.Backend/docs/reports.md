@@ -1,5 +1,7 @@
 # Reportes C1: ventas por fecha operativa
 
+> El corte C3 añade un resumen financiero de ventas y PDF sin alterar C1 ni C2. El contrato completo, las reglas aprobadas y las pruebas acreditadas están en [`reports-next-cut.md`](reports-next-cut.md). Las rutas nuevas son `GET /api/reports/sales/overview` y `GET /api/reports/sales/overview.pdf`, ambas con `from`/`to` y los permisos efectivos `REPORTS.FINANCIAL_READ` y `PRODUCTS.COSTS_READ`. La integración en PostgreSQL temporal aprobó 2/2 en Windows.
+
 `GET /api/reports/sales/daily?from=YYYY-MM-DD&to=YYYY-MM-DD` exige JWT y permiso efectivo vigente `REPORTS.FINANCIAL_READ`. El rango es inclusivo, obligatorio y admite hasta 31 días. La API resuelve la instalación activa; no acepta un identificador de instalación del cliente.
 
 La respuesta `200` contiene `from`, `to`, `days` (una entrada por fecha, incluso sin ventas), `cash`, `credit` y `total`. Cada importe tiene `transactions` y `total` decimal. En cada entrada de `days` figuran `date`, `cash`, `credit` y `total`. Los días sin ventas contienen ceros.

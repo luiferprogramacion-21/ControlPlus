@@ -66,6 +66,7 @@ public static class PermissionCodes
     public const string OperationalReportsRead = "REPORTS.OPERATIONAL_READ";
     public const string FinancialReportsRead = "REPORTS.FINANCIAL_READ";
     public const string ConfigurationManage = "CONFIGURATION.MANAGE";
+    public const string TaxesManage = "TAXES.MANAGE";
     public const string BackupsManage = "BACKUPS.MANAGE";
     public const string PrintTest = "PRINT.TEST";
     public const string PaymentMethodsManage = "PAYMENT_METHODS.MANAGE";

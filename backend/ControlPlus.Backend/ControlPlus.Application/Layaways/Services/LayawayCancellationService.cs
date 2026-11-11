@@ -20,18 +20,25 @@ public sealed class LayawayCancellationService(
     ILayawayCancellationRepository layaways, ILayawayCreateRepository creation,
     ISalesRepository sales, ICashRepository cash, IUserRepository users,
     IPermissionChecker permissions, IPermissionRepository permissionRepository,
-    IPasswordHasher passwordHasher, ILoginAttemptCoordinator loginAttempts,
+    IPasswordHasher passwordHasher, IAuthorizerCredentialResolver credentialResolver, ILoginAttemptCoordinator loginAttempts,
     IAuditRepository audits, IUnitOfWork unitOfWork, IClock clock)
     : ILayawayCancellationService
 {
-    public Task<Result<LayawayCancellationDto>> CancelAsync(ActorContext actor, Guid layawayId,
+    public async Task<Result<LayawayCancellationDto>> CancelAsync(ActorContext actor, Guid layawayId,
         string idempotencyKey, CancelLayawayRequest request,
         CancellationToken cancellationToken = default)
     {
-        var input = Normalize(layawayId, idempotencyKey, request);
-        if (input.Error is not null) return Task.FromResult(Fail(input.Error));
-        return loginAttempts.ExecuteAsync(input.AuthorizerName ?? actor.UserId.ToString("N"),
-            token => CancelWithinTransactionAsync(actor, layawayId, request, input, token),
+        if (request?.Authorization is { } scanned && scanned.UsesCredential())
+        {
+            if (scanned.MixesCredentialWithPassword())
+                return Fail(ApplicationError.Validation("Envíe la credencial escaneada o usuario y contraseña, no ambos."));
+            var (userName, credentialId) = await credentialResolver.ResolveOrUnknownAsync(scanned.CredentialToken!, cancellationToken);
+            request = request with { Authorization = scanned with { UserName = userName, ResolvedCredentialId = credentialId } };
+        }
+        var input = Normalize(layawayId, idempotencyKey, request!);
+        if (input.Error is not null) return Fail(input.Error);
+        return await loginAttempts.ExecuteAsync(input.AuthorizerName ?? actor.UserId.ToString("N"),
+            token => CancelWithinTransactionAsync(actor, layawayId, request!, input, token),
             cancellationToken);
     }
 
@@ -150,7 +157,7 @@ public sealed class LayawayCancellationService(
             if (authorizer is null || !authorizer.IsActive || authorizer.Id == actor.UserId ||
                 !RoleHierarchy.IsHigherThan(authorizer.HighestRoleLevel, snapshot.HighestRoleLevel))
                 return Fail(ApplicationError.Forbidden());
-            if (!passwordHasher.Verify(request.Authorization!.Password, authorizer.PasswordHash))
+            if (!request.Authorization!.UsesCredential() && !passwordHasher.Verify(request.Authorization!.Password!, authorizer.PasswordHash))
             {
                 var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
                 await users.UpdateAsync(authorizer, cancellationToken);
@@ -225,7 +232,8 @@ public sealed class LayawayCancellationService(
             DescripcionOperacion = administratorSelfAuthorized
                 ? "Autorización de cancelación de apartado por Administrador sin segundo autorizador."
                 : "Autorización de cancelación de apartado.",
-            MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA", Estado = "UTILIZADA",
+            MetodoAutenticacion = request.Authorization.AuthenticationMethod(),
+            CredencialAutorizadorId = request.Authorization?.ResolvedCredentialId, Resultado = "EXITOSA", Estado = "UTILIZADA",
             FechaSolicitud = now.UtcDateTime, FechaExpiracion = now.AddMinutes(5).UtcDateTime,
             FechaUtilizacion = now.UtcDateTime
         };
@@ -290,13 +298,11 @@ public sealed class LayawayCancellationService(
     {
         if (layawayId == Guid.Empty || string.IsNullOrWhiteSpace(key) || key.Trim().Length > 100 ||
             request is null || request.ExpectedVersion <= 0 ||
-            (request.Authorization is not null &&
-             (string.IsNullOrWhiteSpace(request.Authorization.UserName) ||
-              string.IsNullOrWhiteSpace(request.Authorization.Password))) ||
+            (request.Authorization is not null && !request.Authorization.IsComplete()) ||
             request.Refunds is null || !CashMoney.IsValid(request.RefundAmount, allowNegative: false))
             return NormalizedCancellation.Fail("Clave, versión, importe y reembolsos son obligatorios; si envía authorization, incluya usuario y contraseña.");
         var observation = string.IsNullOrWhiteSpace(request.Observation) ? null : request.Observation.Trim();
-        if (observation?.Length > 1000 || request.Authorization?.UserName.Trim().Length > 100 ||
+        if (observation?.Length > 1000 || request.Authorization?.UserName?.Trim().Length > 100 ||
             request.Refunds.Count > 3 ||
             (request.RefundAmount == 0 && request.Refunds.Count != 0) ||
             (request.RefundAmount > 0 && request.Refunds.Count == 0))
@@ -325,7 +331,7 @@ public sealed class LayawayCancellationService(
             return NormalizedCancellation.Fail("El importe acumulado excede el rango permitido.");
         }
         var sorted = refunds.OrderBy(x => x.MethodCode).ToArray();
-        var name = request.Authorization?.UserName.Trim().ToUpperInvariant();
+        var name = request.Authorization?.UserName?.Trim().ToUpperInvariant();
         var canonical = JsonSerializer.Serialize(new { layawayId, request.ExpectedVersion,
             request.RefundAmount, Refunds = sorted, request.ReasonId, Observation = observation,
             AuthorizerUserName = name });
