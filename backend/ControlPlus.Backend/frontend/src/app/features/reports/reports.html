@@ -23,13 +23,13 @@
     } @else if (shown() === 'sales' && sales(); as s) {
       <div class="report-cards">
         <article class="report-card"><div><span>Ventas</span><strong>{{ money(s.sales.total) }}</strong><small [class.report-positive]="(s.salesVariationPercentage ?? 0) > 0">{{ variationText(s) }}</small></div><i class="report-card__badge report-card__badge--success" aria-hidden="true">$</i></article>
-        <article class="report-card"><div><span>Transacciones</span><strong>{{ s.sales.transactions }}</strong><small class="report-info">Ticket: {{ optionalMoney(s.averageTicket) }}</small></div><i class="report-card__badge report-card__badge--info" aria-hidden="true">#</i></article>
+        <article class="report-card"><div><span>Ventas realizadas</span><strong>{{ s.sales.transactions }}</strong><small class="report-info">Venta promedio: {{ optionalMoney(s.averageTicket) }}</small></div><i class="report-card__badge report-card__badge--info" aria-hidden="true">#</i></article>
         <article class="report-card"><div><span>Costo productos</span><strong>{{ optionalMoney(s.estimatedCost) }}</strong>
-          @if (s.costCompleteness === 'INCOMPLETE') { <small class="report-warning">{{ missingText(s) }}</small> } @else { <small>{{ costShare(s) ? costShare(s) + ' de las ventas netas' : 'Lo que costó comprar lo que vendiste' }}</small> }</div><i class="report-card__badge" aria-hidden="true">C</i></article>
+          @if (s.costCompleteness === 'INCOMPLETE') { <small class="report-warning">{{ missingText(s) }}</small> } @else { <small>{{ costShare(s) ? costShare(s) + ' del total vendido' : 'Lo que costó comprar lo que vendiste' }}</small> }</div><i class="report-card__badge" aria-hidden="true">C</i></article>
         <article class="report-card"><div><span>Ganancia estimada</span><strong>{{ optionalMoney(s.estimatedMargin) }}</strong>
           @if (s.costCompleteness === 'INCOMPLETE') { <small class="report-warning">No se puede calcular: faltan costos</small> } @else { <small [class.report-positive]="(s.estimatedMarginPercentage ?? 0) > 0">{{ percent(s.estimatedMarginPercentage) }} de las ventas sin IVA</small> }</div><i class="report-card__badge report-card__badge--success" aria-hidden="true">%</i></article>
       </div>
-      <p class="report-note">Contado {{ money(s.sales.cashTotal) }} · Crédito {{ money(s.sales.creditTotal) }} · Cambios ({{ s.changes.transactions }}) {{ money(s.changes.netTotal) }} · Ventas netas {{ money(s.netSalesTotal) }}. Ganancia estimada = ventas netas, sin el IVA que incluyen, menos lo que costó la mercancía vendida (con el costo guardado al vender). No descuenta gastos ni otros impuestos.</p>
+      <p class="report-note">Contado {{ money(s.sales.cashTotal) }} · Crédito {{ money(s.sales.creditTotal) }} · Cambios de productos ({{ s.changes.transactions }}) {{ money(s.changes.netTotal) }} · Total vendido {{ money(s.netSalesTotal) }}. Ganancia estimada = total vendido, sin el IVA que incluye, menos lo que costó la mercancía vendida (con el costo guardado al vender). No descuenta gastos ni otros impuestos.</p>
 
       <div class="report-grid">
         <section class="report-box" aria-labelledby="report-chart-title">
@@ -54,7 +54,7 @@
 
       <section class="report-box" aria-labelledby="report-days-title">
         <h3 id="report-days-title">Detalle por día</h3>
-        <div class="table-wrap report-table"><table><thead><tr><th>Fecha</th><th class="align-right">Ventas</th><th class="align-right">Cambios (neto)</th><th class="align-right">Ventas netas</th></tr></thead><tbody>
+        <div class="table-wrap report-table"><table><thead><tr><th>Fecha</th><th class="align-right">Ventas</th><th class="align-right">Cambios</th><th class="align-right">Total del día</th></tr></thead><tbody>
           @for (day of s.days; track day.date) { <tr><td class="numeric">{{ dateText(day.date) }}</td><td class="align-right numeric">{{ money(day.salesTotal) }}</td><td class="align-right numeric">{{ money(day.changesNetTotal) }}</td><td class="align-right numeric">{{ money(day.netSalesTotal) }}</td></tr> }
         </tbody></table></div>
       </section>

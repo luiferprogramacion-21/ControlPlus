@@ -101,11 +101,11 @@ describe('Reportes', () => {
   describe('Ventas', () => {
     it('muestra los indicadores, la serie y solo los medios reales de la API', async () => {
       const fixture = await create(); const content = text(fixture);
-      expect(content).toContain('Ventas'); expect(content).toMatch(/\$\s?100\.000/); expect(content).toContain('Transacciones'); expect(content).toMatch(/Ticket: \$\s?50\.000/);
+      expect(content).toContain('Ventas'); expect(content).toMatch(/\$\s?100\.000/); expect(content).toContain('Ventas realizadas'); expect(content).toMatch(/Venta promedio: \$\s?50\.000/);
       expect(content).toMatch(/Costo productos\s*\$\s?54\.000/); expect(content).toMatch(/Ganancia estimada\s*\$\s?36\.000/); expect(content).toContain('+25 % frente al período anterior');
       expect(content).toContain('Efectivo'); expect(content).toContain('Nequi'); expect(content).not.toContain('Tarjeta');
       expect(content).toContain('62,5 %'); expect(fixture.componentInstance.salesBars().map(b => b.height)).toEqual([100, 0]);
-      expect(content).toContain('Cambios (1)');
+      expect(content).toContain('Cambios de productos (1)'); expect(content).toContain('Total vendido'); expect(content).not.toContain('Ventas netas');
     });
     it('costo incompleto: costo y margen aparecen como «No disponible» y no como cero', async () => {
       api.salesOverview.mockResolvedValue(overview({ costCompleteness: 'INCOMPLETE', estimatedCost: null, estimatedMargin: null, estimatedMarginPercentage: null, missingCostLines: 2, missingMovementLines: 1 }));
@@ -116,13 +116,13 @@ describe('Reportes', () => {
     it('ticket y variación nulos se muestran como no disponibles', async () => {
       api.salesOverview.mockResolvedValue(overview({ averageTicket: null, salesVariationPercentage: null, previousSalesTotal: 0 }));
       const content = text(await create());
-      expect(content).toContain('Ticket: No disponible'); expect(content).toContain('Sin período anterior con ventas para comparar');
+      expect(content).toContain('Venta promedio: No disponible'); expect(content).toContain('Sin período anterior con ventas para comparar');
     });
     it('período sin ventas ni cambios: ceros, mensaje vacío y todos los días listados', async () => {
       api.salesOverview.mockResolvedValue(emptyOverview());
       const fixture = await create(); const content = text(fixture);
       expect(fixture.componentInstance.salesEmpty()).toBe(true); expect(content).toContain('No hay ventas ni cambios en el período seleccionado');
-      expect(content).toContain('Sin cobros inmediatos de contado'); expect(content).toMatch(/Ticket: No disponible/);
+      expect(content).toContain('Sin cobros inmediatos de contado'); expect(content).toMatch(/Venta promedio: No disponible/);
       expect(fixture.nativeElement.querySelectorAll('tbody tr').length).toBe(2); expect(fixture.nativeElement.querySelector('.bars')).toBeNull();
     });
     it('un día vacío dentro de un período con ventas conserva su fila y su barra en cero', async () => {
