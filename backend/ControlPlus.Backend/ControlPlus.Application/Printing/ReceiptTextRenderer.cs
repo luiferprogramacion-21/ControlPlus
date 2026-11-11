@@ -37,15 +37,25 @@ public static class ReceiptTextRenderer
         }
 
         AppendRule(text, columns);
-        AppendAmount(text, "Subtotal", receipt.GrossSubtotal, columns);
-        if (receipt.DiscountTotal > 0) AppendAmount(text, "Descuento", -receipt.DiscountTotal, columns);
-        AppendAmount(text, "TOTAL", receipt.Total, columns);
-        if (receipt.VatPercentage is > 0 && receipt.TaxableBaseTotal is decimal taxableBase &&
-            receipt.VatTotal is decimal vatTotal)
+        // The VAT breakdown appears only for sales that saved it (made with VAT switched on). The price already
+        // includes the VAT, so the reading is: Subtotal + IVA = TOTAL, and the total never changes.
+        var showVat = receipt.VatPercentage is > 0 && receipt.TaxableBaseTotal is not null && receipt.VatTotal is not null;
+        if (showVat)
         {
-            AppendAmount(text, "Base gravable", taxableBase, columns);
-            AppendAmount(text, $"IVA {receipt.VatPercentage.Value.ToString("G29", ColombianCulture)} % incluido", vatTotal, columns);
+            if (receipt.DiscountTotal > 0)
+            {
+                AppendAmount(text, "Valor productos", receipt.GrossSubtotal, columns);
+                AppendAmount(text, "Descuento", -receipt.DiscountTotal, columns);
+            }
+            AppendAmount(text, "Subtotal", receipt.TaxableBaseTotal!.Value, columns);
+            AppendAmount(text, $"IVA {receipt.VatPercentage!.Value.ToString("G29", ColombianCulture)} %", receipt.VatTotal!.Value, columns);
         }
+        else
+        {
+            AppendAmount(text, "Subtotal", receipt.GrossSubtotal, columns);
+            if (receipt.DiscountTotal > 0) AppendAmount(text, "Descuento", -receipt.DiscountTotal, columns);
+        }
+        AppendAmount(text, "TOTAL", receipt.Total, columns);
         AppendRule(text, columns);
         if (receipt.Payments.Count == 0) AppendCentered(text, "Venta a crédito", columns);
         foreach (var payment in receipt.Payments)

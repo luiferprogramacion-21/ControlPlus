@@ -61,10 +61,17 @@ public sealed class ReceiptTextRendererTests
             VatPercentage: 19m, TaxableBaseTotal: 10000m, VatTotal: 1900m);
 
         var output = Encoding.UTF8.GetString(ReceiptTextRenderer.Render(receipt, "Baratísimo", columns));
-        Assert.Contains("Base gravable", output);
-        Assert.Contains("IVA 19 % incluido", output);
-        Assert.True(output.IndexOf("TOTAL", StringComparison.Ordinal) <
-            output.IndexOf("Base gravable", StringComparison.Ordinal));
+        // Subtotal + IVA = TOTAL, in that order, with the price already including the VAT.
+        Assert.DoesNotContain("Base gravable", output);
+        var subtotal = output.IndexOf("Subtotal", StringComparison.Ordinal);
+        var vat = output.IndexOf("IVA 19 %", StringComparison.Ordinal);
+        var total = output.IndexOf("TOTAL", StringComparison.Ordinal);
+        Assert.True(subtotal >= 0 && subtotal < vat && vat < total, output);
+        Assert.Contains("10.000", output);
+        Assert.Contains("1.900", output);
+        Assert.Contains("11.900", output);
+        Assert.DoesNotContain("incluido", output);
+        Assert.DoesNotContain("Valor productos", output);
         Assert.All(output.Split('\n').Where(line => line.Length > 0),
             line => Assert.True(line.TrimEnd('\r').Length <= columns, line));
 
@@ -75,10 +82,29 @@ public sealed class ReceiptTextRendererTests
                  })
         {
             var text = Encoding.UTF8.GetString(ReceiptTextRenderer.Render(hidden, "Baratísimo", columns));
-            Assert.DoesNotContain("Base gravable", text);
+            Assert.DoesNotContain("IVA", text);
             Assert.DoesNotContain("incluido", text);
+            Assert.Contains("Subtotal", text);
             Assert.Contains("11.900", text);
         }
+    }
+
+    [Fact]
+    public void Render_WithVatAndDiscount_ShowsProductsValueDiscountSubtotalVatAndTotalInOrder()
+    {
+        var receipt = new SaleReceiptDto(Guid.CreateVersion7(), "V-2", DateTimeOffset.UtcNow,
+            new DateOnly(2026, 11, 11), "CONTADO", "CONFIRMADA", 5500m, 500m, 5000m, 0m,
+            [], [new SaleReceiptPaymentDto("EFECTIVO", 5000m, 5000m, 0m)],
+            VatPercentage: 19m, TaxableBaseTotal: 4202m, VatTotal: 798m);
+
+        var output = Encoding.UTF8.GetString(ReceiptTextRenderer.Render(receipt, "Baratísimo", 32));
+        var order = new[] { "Valor productos", "Descuento", "Subtotal", "IVA 19 %", "TOTAL" }
+            .Select(label => output.IndexOf(label, StringComparison.Ordinal)).ToArray();
+        Assert.All(order, index => Assert.True(index >= 0, output));
+        Assert.Equal(order.OrderBy(x => x), order);
+        Assert.Contains("4.202", output);
+        Assert.Contains("798", output);
+        Assert.Contains("5.000", output);
     }
 
     [Theory]
