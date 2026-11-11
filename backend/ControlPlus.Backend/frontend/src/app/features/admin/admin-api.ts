@@ -11,6 +11,7 @@ export interface AdminUser {
   id: string; userName: string; displayName: string; isActive: boolean; isLocked: boolean;
   failedLoginAttempts: number; lockedAtUtc: string | null; lastLoginAtUtc: string | null; roles: RoleSummary[];
 }
+export interface IssuedCredential { credentialId: string; userId: string; format: string; credentialToken: string; visibleFragment: string; issuedAtUtc: string; expiresAtUtc: string | null; }
 export interface AdminPermission { id: string; code: string; name: string; description: string | null; module: string; isActive: boolean; }
 export interface AdminRole extends RoleSummary { permissions: AdminPermission[]; }
 /** Source is ROL or INDIVIDUAL; individualEffect is CONCEDER or REVOCAR when an exception exists. */
@@ -28,6 +29,8 @@ export class AdminApi {
     if (query.isLocked != null) params = params.set('isLocked', query.isLocked);
     return firstValueFrom(this.http.get<Page<AdminUser>>('/api/users', { params }));
   }
+  /** Issues the Code 128 operator credential of a user; the token is returned only this once and the previous one is revoked. */
+  issueCredential(userId: string): Promise<IssuedCredential> { return firstValueFrom(this.http.post<IssuedCredential>(`/api/cash/operator-credentials/${userId}`, { expiresAtUtc: null })); }
   createUser(input: CreateUserInput): Promise<AdminUser> { return firstValueFrom(this.http.post<AdminUser>('/api/users', input)); }
   updateUser(id: string, displayName: string): Promise<AdminUser> { return firstValueFrom(this.http.put<AdminUser>(`/api/users/${id}`, { displayName })); }
   setUserActive(user: AdminUser): Promise<AdminUser> {

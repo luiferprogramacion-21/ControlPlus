@@ -1,0 +1,44 @@
+<div class="discount-sheet" role="dialog" aria-modal="true" aria-labelledby="customer-picker-title" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown.escape)="$event.stopPropagation(); closed.emit()">
+  <div class="discount-sheet__backdrop" (click)="closed.emit()"></div>
+  <section class="discount-sheet__card customer-picker">
+    <div class="panel-heading">
+      <h2 id="customer-picker-title">{{ creating() ? 'Nuevo cliente' : title() }}</h2>
+      <p>Busca por nombre, documento o teléfono, o registra el cliente sin salir de la pantalla.</p>
+    </div>
+    @if (!creating()) {
+      <label class="field-label" for="customer-picker-search">Nombre, documento o teléfono</label>
+      <input id="customer-picker-search" class="text-field" name="customerPickerSearch" [ngModel]="search" (ngModelChange)="onSearch($event)" placeholder="Ej. 52418903 o Laura Martínez" autocomplete="off" cdkFocusInitial>
+      <div class="customer-results" role="listbox" aria-label="Clientes encontrados">
+        @for (candidate of results(); track candidate.id) {
+          <button type="button" class="customer-result" role="option" [disabled]="!eligible(candidate)" (click)="choose(candidate)">
+            <span><strong>{{ candidate.fullName }}</strong><small>{{ candidate.documentNumber ? (candidate.documentType + ' ' + candidate.documentNumber) : 'Sin documento' }} · {{ candidate.phone || 'Sin teléfono' }}</small></span>
+            <small>{{ eligible(candidate) ? candidate.address : 'Sin documento ni teléfono: no sirve para crédito' }}</small>
+          </button>
+        } @empty {
+          <p class="empty-customer-result">{{ loading() ? 'Buscando…' : 'No hay clientes que coincidan con la búsqueda.' }}</p>
+        }
+      </div>
+      @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+      <div class="form-actions customer-picker__actions">
+        @if (!required()) { <button class="button button--secondary" type="button" (click)="consumerFinal()">Usar consumidor final</button> } @else { <button class="button button--secondary" type="button" (click)="closed.emit()">Cancelar</button> }
+        @if (canCreate) { <button class="button button--primary" type="button" (click)="startCreate()">+ Nuevo cliente</button> }
+      </div>
+    } @else {
+      <form class="customer-create-form" (ngSubmit)="create()" novalidate>
+        <label class="field-label" for="customer-new-name">Nombre completo o razón social</label>
+        <input id="customer-new-name" class="text-field" name="newName" [(ngModel)]="form.fullName" maxlength="200" required cdkFocusInitial>
+        @if (canWriteDocument) {
+          <label class="field-label field-label--spaced" for="customer-new-doc-type">Documento <span>(opcional, tipo y número juntos)</span></label>
+          <div class="customer-doc-row"><select id="customer-new-doc-type" class="text-field" name="newDocType" [(ngModel)]="form.documentType"><option value="">Sin documento</option>@for (type of documentTypes; track type) { <option [value]="type">{{ type }}</option> }</select>
+            <input class="text-field" name="newDocNumber" [(ngModel)]="form.documentNumber" maxlength="50" [disabled]="!form.documentType" aria-label="Número de documento"></div>
+        }
+        <label class="field-label field-label--spaced" for="customer-new-phone">Teléfono {{ required() && !canWriteDocument ? '' : '(opcional)' }}</label>
+        <input id="customer-new-phone" class="text-field" name="newPhone" [(ngModel)]="form.phone" maxlength="30">
+        <label class="field-label field-label--spaced" for="customer-new-address">Dirección</label>
+        <input id="customer-new-address" class="text-field" name="newAddress" [(ngModel)]="form.address" maxlength="300" required>
+        @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+        <div class="form-actions customer-picker__actions"><button class="button button--secondary" type="button" (click)="creating.set(false); error.set('')" [disabled]="saving()">Volver a buscar</button><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar y seleccionar' }}</button></div>
+      </form>
+    }
+  </section>
+</div>

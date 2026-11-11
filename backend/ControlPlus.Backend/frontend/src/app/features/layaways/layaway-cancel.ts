@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SessionService } from '../../core/session.service';
-import { AuthorizationCredentials, AuthorizationDialog } from '../../shared/authorization-dialog';
+import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { LayawayCancellation, LayawayDetail, LayawaysApi } from './layaways-api';
 import { appliedTotal, emptyDraft, money, PaymentDraft, PaymentMethods, toRefunds, validateDrafts } from './payment-methods';
 
@@ -57,7 +57,7 @@ export class LayawayCancel {
       title: 'Autorizar cancelación de apartado',
       description: 'Se cancelará el apartado, se liberará la reserva de inventario y se registrará la devolución indicada. La existencia real no cambia.',
       detail: `${layaway.number} · abonado ${money(this.totalPaid())} · devolver ${money(Number(this.refundAmount))} · retenido ${money(this.retained)}`,
-      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
+      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
       onError: message => this.error.set(message),
       run: credentials => this.submit(credentials),
     });
@@ -69,13 +69,13 @@ export class LayawayCancel {
     const layaway = this.detail().layaway;
     const body = this.body();
     const fingerprint = JSON.stringify({ id: layaway.id, version: layaway.version, body });
-    const authorizer = credentials?.userName.toUpperCase() ?? null;
+    const authorizer = authorizationIdentity(credentials);
     if (this.pending && this.pending.fingerprint === fingerprint && this.pending.authorizerUserName !== authorizer)
       throw new Error('Reintenta con el mismo usuario autorizador; la clave de esta cancelación conserva su identidad.');
     if (!this.pending || this.pending.fingerprint !== fingerprint) this.pending = { key: crypto.randomUUID(), fingerprint, authorizerUserName: authorizer };
     this.saving.set(true);
     try {
-      const result = await this.api.cancel(layaway, credentials ? { ...body, authorization: { userName: credentials.userName, password: credentials.password } } : body, this.pending.key);
+      const result = await this.api.cancel(layaway, credentials ? { ...body, authorization: authorizationBody(credentials) } : body, this.pending.key);
       this.pending = null;
       this.cancelled.emit(result);
     } catch (error) {

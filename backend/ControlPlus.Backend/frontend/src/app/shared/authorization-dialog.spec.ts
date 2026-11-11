@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
 import { SessionService } from '../core/session.service';
-import { AuthorizationDialog, AuthorizationDialogComponent, AuthorizationPrompt } from './authorization-dialog';
+import { AuthorizationDialog, AuthorizationDialogComponent, AuthorizationPrompt, authorizationBody, authorizationIdentity } from './authorization-dialog';
 
 describe('Ventana de autorización', () => {
   let component: AuthorizationDialogComponent;
@@ -62,6 +62,39 @@ describe('Ventana de autorización', () => {
     component.password = 'correcta';
     await component.submit();
     expect(close).toHaveBeenCalledWith(true);
+  });
+
+  it('un código escaneado se envía como credencial, sin usuario ni contraseña, y se limpia', async () => {
+    run.mockResolvedValue(undefined);
+    component.scanToken = '  ABCDEF0123456789  ';
+    await component.scan();
+    expect(run).toHaveBeenCalledWith({ userName: '', password: '', credentialToken: 'ABCDEF0123456789' });
+    expect(component.scanToken).toBe('');
+    expect(close).toHaveBeenCalledWith(true);
+  });
+
+  it('un escaneo vacío no ejecuta nada y un escaneo rechazado deja la ventana abierta', async () => {
+    component.scanToken = '   ';
+    await component.scan();
+    expect(run).not.toHaveBeenCalled();
+    run.mockRejectedValueOnce(new Error('No se autorizó.'));
+    component.scanToken = 'TOKEN-INVALIDO';
+    await component.scan();
+    expect(component.error()).toBe('No se autorizó.');
+    expect(component.scanToken).toBe('');
+    expect(close).not.toHaveBeenCalled();
+  });
+});
+
+describe('Credencial escaneada: cuerpo e identidad', () => {
+  it('la credencial reemplaza usuario y contraseña en el cuerpo', () => {
+    expect(authorizationBody({ userName: '', password: '', credentialToken: 'TOK' })).toEqual({ credentialToken: 'TOK' });
+    expect(authorizationBody({ userName: 'jefe', password: 'clave' })).toEqual({ userName: 'jefe', password: 'clave' });
+  });
+  it('la identidad es estable y no expone el código completo', () => {
+    expect(authorizationIdentity(null)).toBeNull();
+    expect(authorizationIdentity({ userName: 'jefe', password: 'x' })).toBe('JEFE');
+    expect(authorizationIdentity({ userName: '', password: '', credentialToken: '00112233445566778899' })).toBe('CRED:66778899');
   });
 });
 

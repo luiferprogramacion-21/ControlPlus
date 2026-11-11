@@ -1,7 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { Page } from '../../core/api';
+import { AuthorizationBody, Page } from '../../core/api';
 
 /** Layaway states: ACTIVO, PAGADO, ENTREGADO, ANULADO. Overdue is a flag, never a state. */
 export interface Layaway {
@@ -33,7 +33,7 @@ export interface LayawayFilters {
 }
 export interface LayawayPaymentInput { methodCode: 'EFECTIVO' | 'TRANSFERENCIA' | 'NEQUI'; appliedAmount: number; receivedAmount: number | null; reference: string | null; }
 export type LayawayPriceType = 'MINORISTA' | 'MAYORISTA';
-export interface LayawayAuthorization { userName: string; password: string; }
+export type LayawayAuthorization = AuthorizationBody;
 export interface CreateLayawayLineInput { productId: string; quantity: number; priceType: LayawayPriceType; }
 export interface CreateLayawayInput {
   customerId: string; lines: CreateLayawayLineInput[]; payments: LayawayPaymentInput[]; dueDate: string | null;

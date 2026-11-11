@@ -66,6 +66,10 @@ export class CatalogApi {
   setProductActive(product: Product): Promise<Product> {
     return firstValueFrom(this.http.put<Product>(`/api/products/${product.id}/${product.isActive ? 'deactivate' : 'activate'}`, {}));
   }
+  /** Physical deletion: Administrator only, and only for a product without commercial history (the server decides). */
+  deleteProduct(product: Product): Promise<void> {
+    return firstValueFrom(this.http.delete<void>(`/api/products/${product.id}`, { params: { expectedVersion: product.version } }));
+  }
   private params(query: Record<string, string | number | boolean | undefined>): HttpParams {
     let params = new HttpParams();
     for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== '') params = params.set(key, String(value));

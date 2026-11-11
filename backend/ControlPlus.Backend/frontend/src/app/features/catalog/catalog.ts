@@ -408,6 +408,24 @@ export class Catalog implements OnInit {
     try { await this.api.setProductActive(product); await this.reload(); }
     catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); }
   }
+  /** Only an Administrator with the effective permission sees the button; the server enforces it too. */
+  canDeleteProduct(): boolean { return this.session.hasRole('ADMINISTRADOR') && this.session.has('PRODUCTS.SENSITIVE_UPDATE'); }
+  readonly deleting = signal<Product | null>(null);
+  askDelete(product: Product): void { this.error.set(''); this.notice.set(''); this.deleting.set(product); }
+  async confirmDelete(): Promise<void> {
+    const product = this.deleting(); if (!product || this.saving()) return;
+    this.saving.set(true); this.error.set('');
+    try {
+      await this.api.deleteProduct(product);
+      this.deleting.set(null); this.notice.set(`Producto ${product.internalCode} borrado.`); await this.reload();
+    } catch (e) {
+      this.deleting.set(null);
+      if (e instanceof HttpErrorResponse && e.status === 409 && e.error?.code === 'concurrency.conflict') { await this.reload(); this.error.set('El producto cambió mientras lo revisabas. Actualiza la lista e inténtalo de nuevo.'); }
+      else if (e instanceof HttpErrorResponse && e.status === 409) this.error.set(`${product.internalCode} tiene historial (ventas, compras, apartados, pedidos o movimientos) y no se puede borrar. Puedes inactivarlo.`);
+      else if (e instanceof HttpErrorResponse && e.status === 404) { await this.reload(); this.error.set('El producto ya no existe.'); }
+      else this.error.set(errorText(e));
+    } finally { this.saving.set(false); }
+  }
   async showCosts(product: Product, page = 1): Promise<void> {
     this.error.set(''); this.costProductName.set(product.name); this.costProduct.set(product);
     try { this.costHistory.set(await this.api.costHistory(product.id, page)); }

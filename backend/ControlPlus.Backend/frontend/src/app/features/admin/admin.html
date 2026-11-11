@@ -33,6 +33,7 @@
                 @if (canChooseRole) { <button class="table-action" type="button" (click)="changeRole(user)">Rol</button> }
                 <button class="table-action" type="button" (click)="resetPassword(user)">Contraseña</button>
                 @if (canManageUserPermissions) { <button class="table-action" type="button" (click)="openPermissions(user)">Permisos</button> }
+                <button class="table-action" type="button" (click)="openCredential(user)">Carné</button>
                 @if (user.isLocked) { <button class="table-action" type="button" [disabled]="saving()" (click)="unlock(user)">Reactivar acceso</button> }
                 <button class="table-action" type="button" [disabled]="saving() || isSelf(user)" (click)="toggle(user)">{{ user.isActive ? 'Inactivar' : 'Activar' }}</button>
               }</td>
@@ -72,6 +73,7 @@
     </section>
   }
 
+
   @if (mode(); as currentMode) {
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="admin-form-title"><div class="module-form-sheet__backdrop" (click)="close()"></div>
       <form class="panel panel--padded module-form" (submit)="$event.preventDefault(); save()">
@@ -104,5 +106,6 @@
       </form>
     </div>
   }
+  @if (credentialUser(); as target) { <cp-user-credential [user]="target" (closed)="closeCredential()" /> }
   @if (permissionUser(); as target) { <cp-user-permissions [user]="target" [catalog]="catalog()" (closed)="closePermissions()" /> }
 </section>

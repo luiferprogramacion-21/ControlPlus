@@ -91,4 +91,13 @@ describe('CatalogApi: alta de producto', () => {
     request.flush({ id: 'external-zeros' } as Product);
     expect((await task).id).toBe('external-zeros');
   });
+
+  it('borra enviando la versión esperada como parámetro de consulta', async () => {
+    const task = api.deleteProduct({ id: 'p1', version: 7 } as Product);
+    const request = http.expectOne(r => r.url === '/api/products/p1');
+    expect(request.request.method).toBe('DELETE');
+    expect(request.request.params.get('expectedVersion')).toBe('7');
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    await task;
+  });
 });

@@ -3,7 +3,7 @@ import { Component, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
-import { AuthorizationCredentials, AuthorizationDialog } from '../../shared/authorization-dialog';
+import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { CatalogApi, Product } from '../catalog/catalog-api';
 import { Customer, CustomersApi } from '../customers/customers-api';
 import { CreateLayawayInput, CreatedLayaway, LayawayPriceType, LayawaysApi } from './layaways-api';
@@ -112,7 +112,7 @@ export class LayawayCreate {
       title: 'Autorizar apartado',
       description: 'Se registrará el apartado, se reservará el inventario y se cobrará el pago inicial en Caja.',
       detail: `${this.customer()!.fullName} · total ${money(this.total())} · pago inicial ${money(this.initialPayment)}`,
-      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true,
+      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
       run: credentials => this.submit(credentials),
     });
   }
@@ -122,13 +122,13 @@ export class LayawayCreate {
     if (this.saving()) return;
     const body = this.input();
     const fingerprint = JSON.stringify(body);
-    const authorizer = credentials?.userName.toUpperCase() ?? null;
+    const authorizer = authorizationIdentity(credentials);
     if (this.pending && this.pending.fingerprint === fingerprint && this.pending.authorizerUserName !== authorizer)
       throw new Error('Reintenta con el mismo usuario autorizador; la clave de este apartado conserva su identidad.');
     if (!this.pending || this.pending.fingerprint !== fingerprint) this.pending = { key: crypto.randomUUID(), fingerprint, authorizerUserName: authorizer };
     this.saving.set(true);
     try {
-      const request: CreateLayawayInput = credentials ? { ...body, authorization: { userName: credentials.userName, password: credentials.password } } : body;
+      const request: CreateLayawayInput = credentials ? { ...body, authorization: authorizationBody(credentials) } : body;
       const result = await this.api.create(request, this.pending.key);
       this.pending = null;
       this.created.emit(result);

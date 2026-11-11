@@ -7,7 +7,7 @@ import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Adjustment, InventoryApi, Movement, Reason, Stock } from './inventory-api';
 import { Icon } from '../../layout/icon';
-import { AuthorizationCredentials, AuthorizationDialog } from '../../shared/authorization-dialog';
+import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 @Component({ selector: 'cp-inventory', imports: [FormsModule, MatPaginatorModule, DatePipe, Icon], templateUrl: './inventory.html', styleUrl: '../directory.scss' })
 export class Inventory implements OnInit {
   private readonly api = inject(InventoryApi);
@@ -50,17 +50,17 @@ export class Inventory implements OnInit {
     await this.authorization.open({ title: 'Autorizar ajuste de inventario',
       description: 'Se modificará la existencia y se registrará un movimiento auditado.',
       detail: `${stock.name} · ${this.quantityDelta > 0 ? '+' : ''}${this.quantityDelta} unidades`,
-      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
+      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
       onError: message => this.error.set(message),
       run: credentials => this.submitAdjustment(credentials) });
   }
   private async submitAdjustment(credentials: AuthorizationCredentials | null): Promise<void> {
     const stock = this.selected(); if (!stock || this.saving() || this.conflict()) throw new Error('Actualiza existencias antes de reintentar.');
-    if (this.pending && this.pending.authorizerUserName !== (credentials?.userName.toUpperCase() ?? null))
+    if (this.pending && this.pending.authorizerUserName !== authorizationIdentity(credentials))
       throw new Error('Reintenta con el mismo usuario autorizador; la clave del ajuste conserva su identidad.');
-    if (!this.pending) this.pending = { key: crypto.randomUUID(), authorizerUserName: credentials?.userName.toUpperCase() ?? null, input: { productId: stock.productId, quantityDelta: Number(this.quantityDelta), reasonId: this.reasonId, expectedVersion: stock.version, observation: this.observation.trim() || null } };
+    if (!this.pending) this.pending = { key: crypto.randomUUID(), authorizerUserName: authorizationIdentity(credentials), input: { productId: stock.productId, quantityDelta: Number(this.quantityDelta), reasonId: this.reasonId, expectedVersion: stock.version, observation: this.observation.trim() || null } };
     this.saving.set(true); this.error.set(''); this.notice.set('');
-    try { await this.api.adjust(credentials ? { ...this.pending.input, authorization: credentials } : { ...this.pending.input }, this.pending.key); this.pending = null; this.resetForm(); this.notice.set('Ajuste registrado.'); this.adjustmentOpen.set(false); await this.refreshSelected(); }
+    try { await this.api.adjust(credentials ? { ...this.pending.input, authorization: authorizationBody(credentials) } : { ...this.pending.input }, this.pending.key); this.pending = null; this.resetForm(); this.notice.set('Ajuste registrado.'); this.adjustmentOpen.set(false); await this.refreshSelected(); }
     catch (e) { if (e instanceof HttpErrorResponse && e.status === 409) { this.conflict.set(true); this.pending = null; this.error.set('Conflicto de versión o clave. Actualiza existencias y revisa el ajuste antes de crear otro intento.'); } else if (e instanceof HttpErrorResponse && e.status >= 400 && e.status < 500) { this.pending = null; this.error.set(errorText(e)); } throw e; }
     finally { this.saving.set(false); }
   }

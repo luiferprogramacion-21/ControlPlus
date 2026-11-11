@@ -20,14 +20,18 @@ import { Icon } from './icon';
           </div>
           <p class="sidebar__label">NAVEGACIÓN</p>
           <nav class="sidebar__nav">
+            @if (session.has('REPORTS.FINANCIAL_READ')) { <a routerLink="/operacion/dashboard" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'dashboard'"><span><cp-icon name="dashboard" /></span><b>Dashboard</b></a> }
             @if (session.has('SALES.CREATE')) { <a routerLink="/operacion/ventas" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'ventas'" aria-label="Punto de venta"><span><cp-icon name="sales" /></span><b>Ventas</b></a> }
+            @if (session.has('SALES.OWN_READ') || session.has('SALES.ALL_READ')) { <a routerLink="/operacion/ventas/historial" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'historial-ventas'"><span><cp-icon name="sales" /></span><b>Historial de ventas</b></a> }
             @if (session.has('CASH.OWN_READ')) { <a routerLink="/operacion/caja" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'caja'" aria-label="Caja"><span><cp-icon name="cash" /></span><b>Caja</b></a> }
             @if (session.has('INVENTORY.READ')) { <a routerLink="/operacion/inventario" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'inventario'"><span><cp-icon name="inventory" /></span><b>Inventario</b></a> }
             @if (session.has('CUSTOMERS.BASIC_MANAGE') || session.has('CUSTOMERS.MANAGE')) { <a routerLink="/operacion/clientes" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'clientes'"><span><cp-icon name="customers" /></span><b>Clientes</b></a> }
             @if (session.has('CREDIT.MANAGE')) { <a routerLink="/operacion/creditos" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'creditos'"><span><cp-icon name="customers" /></span><b>Créditos y abonos</b></a> }
             @if (session.has('PURCHASES.RECEIVE') || session.has('PURCHASE_ORDERS.MANAGE')) { <a routerLink="/operacion/compras" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'compras'"><span><cp-icon name="purchases" /></span><b>Compras</b></a> }
             @if (session.has('SUPPLIERS.READ')) { <a routerLink="/operacion/proveedores" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'proveedores'"><span><cp-icon name="purchases" /></span><b>Proveedores</b></a> }
+            @if (session.has('REPORTS.FINANCIAL_READ')) { <a routerLink="/operacion/reportes" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'reportes'"><span><cp-icon name="reports" /></span><b>Reportes</b></a> }
             @if (session.has('LAYAWAY.MANAGE')) { <a routerLink="/operacion/apartados" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'apartados'"><span><cp-icon name="catalog" /></span><b>Apartados</b></a> }
+            @if (session.has('CONFIGURATION.MANAGE') || session.has('NUMBERING.MANAGE') || session.has('TAXES.MANAGE')) { <a routerLink="/operacion/configuracion" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'configuracion'"><span><cp-icon name="settings" /></span><b>Configuración</b></a> }
             @if (session.has('USERS.READ') || session.has('ROLES.READ')) { <a routerLink="/operacion/administracion" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'administracion'"><span><cp-icon name="settings" /></span><b>Administración</b></a> }
             @if (session.has('PRODUCTS.READ') || session.has('CATEGORIES.READ')) { <a routerLink="/operacion/catalogo" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'catalogo'" aria-label="Catálogo"><span><cp-icon name="catalog" /></span><b>Catálogo</b></a> }
           </nav>
@@ -49,7 +53,7 @@ export class Shell {
   readonly boundedWorkspace = signal(false);
   readonly pageTitle = signal('Caja');
   readonly pageSubtitle = signal('Apertura de turno');
-  readonly activeSection = signal<'caja' | 'ventas' | 'catalogo' | 'inventario' | 'clientes' | 'creditos' | 'proveedores' | 'compras' | 'administracion' | 'apartados'>('caja');
+  readonly activeSection = signal<'caja' | 'ventas' | 'historial-ventas' | 'catalogo' | 'inventario' | 'clientes' | 'creditos' | 'proveedores' | 'compras' | 'administracion' | 'configuracion' | 'apartados' | 'reportes' | 'dashboard'>('caja');
   private readonly router = inject(Router);
 
   constructor() {
@@ -62,13 +66,17 @@ export class Shell {
   onMenuKeydown(event: KeyboardEvent): void { if (event.key === 'Escape') { event.preventDefault(); this.menuOpen.set(false); } }
   private syncHeader(url: string): void {
     this.boundedWorkspace.set(url.endsWith('/ventas'));
+    if (url.includes('/dashboard')) { this.activeSection.set('dashboard'); this.pageTitle.set('Dashboard'); this.pageSubtitle.set('Resumen operativo de hoy'); return; }
+    if (url.includes('/ventas/historial')) { this.activeSection.set('historial-ventas'); this.pageTitle.set('Historial de ventas'); this.pageSubtitle.set('Consulta, detalle y anulación'); return; }
     if (url.includes('/ventas')) { this.activeSection.set('ventas'); this.pageTitle.set('Punto de venta'); this.pageSubtitle.set('Terminal de ventas · Venta en curso'); return; }
     if (url.includes('/caja')) { this.activeSection.set('caja'); this.pageTitle.set('Caja'); this.pageSubtitle.set(url.includes('cierre') ? 'Cierre y conciliación' : 'Apertura y movimientos'); return; }
     if (url.includes('/inventario')) { this.activeSection.set('inventario'); this.pageTitle.set('Inventario'); this.pageSubtitle.set('Existencias y movimientos'); return; }
     if (url.includes('/clientes')) { this.activeSection.set('clientes'); this.pageTitle.set('Clientes'); this.pageSubtitle.set('Consulta y gestión'); return; }
     if (url.includes('/compras')) { this.activeSection.set('compras'); this.pageTitle.set('Compras'); this.pageSubtitle.set('Pedidos a proveedores y recepción'); return; }
     if (url.includes('/proveedores')) { this.activeSection.set('proveedores'); this.pageTitle.set('Proveedores'); this.pageSubtitle.set('Directorio y gestión'); return; }
+    if (url.includes('/reportes')) { this.activeSection.set('reportes'); this.pageTitle.set('Reportes'); this.pageSubtitle.set('Indicadores y análisis operativo'); return; }
     if (url.includes('/apartados')) { this.activeSection.set('apartados'); this.pageTitle.set('Apartados'); this.pageSubtitle.set('Abonos, entregas y saldos'); return; }
+    if (url.includes('/configuracion')) { this.activeSection.set('configuracion'); this.pageTitle.set('Configuración'); this.pageSubtitle.set('Numeración, plazos, impresora y motivos'); return; }
     if (url.includes('/administracion')) { this.activeSection.set('administracion'); this.pageTitle.set('Administración'); this.pageSubtitle.set('Usuarios, roles y permisos'); return; }
     if (url.includes('/creditos')) { this.activeSection.set('creditos'); this.pageTitle.set('Créditos y abonos'); this.pageSubtitle.set('Cartera de clientes y pagos'); return; }
     this.activeSection.set('catalogo'); this.pageTitle.set('Catálogo'); this.pageSubtitle.set('Productos, categorías y precios');

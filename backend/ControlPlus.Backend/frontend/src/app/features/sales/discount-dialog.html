@@ -1,0 +1,38 @@
+<div class="discount-sheet" role="dialog" aria-modal="true" aria-labelledby="discount-title" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown.escape)="$event.stopPropagation(); closed.emit()">
+  <div class="discount-sheet__backdrop" (click)="closed.emit()"></div>
+  <form class="discount-sheet__card" (ngSubmit)="apply()" novalidate>
+    <div class="panel-heading">
+      <h2 id="discount-title">{{ title }}</h2>
+      <p>{{ target() }} · {{ gross() | currency:'COP':'symbol':'1.0-0' }}</p>
+      @if (replaces()) { <p>{{ replaces() }}</p> }
+    </div>
+
+    <div class="discount-mode" role="radiogroup" aria-label="Tipo de descuento">
+      <button type="button" class="discount-mode__option" role="radio" [attr.aria-checked]="type === 'PORCENTAJE'" [class.is-active]="type === 'PORCENTAJE'" (click)="setType('PORCENTAJE')">Porcentaje (%)</button>
+      <button type="button" class="discount-mode__option" role="radio" [attr.aria-checked]="type === 'VALOR_FIJO'" [class.is-active]="type === 'VALOR_FIJO'" (click)="setType('VALOR_FIJO')">Valor ($)</button>
+    </div>
+
+    <label class="field-label field-label--spaced" for="discount-amount">{{ type === 'PORCENTAJE' ? 'Porcentaje a descontar' : 'Valor a descontar' }}</label>
+    <div class="money-field">
+      <span>{{ type === 'PORCENTAJE' ? '%' : '$' }}</span>
+      <input id="discount-amount" name="discountValue" type="number" min="0" [step]="type === 'PORCENTAJE' ? 0.5 : 1" [ngModel]="value" (ngModelChange)="value = $event; error = ''" cdkFocusInitial autocomplete="off">
+      <b>{{ type === 'PORCENTAJE' ? 'del valor' : 'COP' }}</b>
+    </div>
+    <p class="discount-hint">{{ limitText }}</p>
+
+    <dl class="discount-preview" aria-live="polite">
+      <div><dt>Descuento</dt><dd class="success-text">-{{ amount | currency:'COP':'symbol':'1.0-0' }}</dd></div>
+      <div><dt>{{ scope() === 'product' ? 'Valor del producto' : 'Total de la venta' }}</dt><dd><strong>{{ (gross() - amount) | currency:'COP':'symbol':'1.0-0' }}</strong></dd></div>
+    </dl>
+
+    <label class="field-label field-label--spaced" for="discount-reason">Motivo <span>(opcional)</span></label>
+    <input id="discount-reason" class="text-field" name="discountReason" [(ngModel)]="reason" maxlength="500" placeholder="Ej. empaque deteriorado" autocomplete="off">
+
+    @if (error) { <p class="field-error" role="alert">{{ error }}</p> }
+    <div class="form-actions">
+      <button class="button button--secondary" type="button" (click)="closed.emit()">Cancelar</button>
+      @if (current()) { <button class="button button--secondary" type="button" (click)="removed.emit()">Quitar descuento</button> }
+      <button class="button button--primary" type="submit">Aplicar descuento</button>
+    </div>
+  </form>
+</div>

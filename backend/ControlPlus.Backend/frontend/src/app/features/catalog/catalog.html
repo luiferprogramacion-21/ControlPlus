@@ -35,6 +35,7 @@
                   <td>@if (session.has('PRODUCTS.SENSITIVE_UPDATE')) {
                     <button mat-button type="button" (click)="editProduct(product)">Editar</button>
                     <button mat-button type="button" [disabled]="saving()" (click)="toggleProduct(product)">{{ product.isActive ? 'Inactivar' : 'Activar' }}</button>
+                    @if (canDeleteProduct()) { <button mat-button type="button" class="danger-action" [disabled]="saving()" (click)="askDelete(product)">Borrar</button> }
                   } @if (session.has('PRODUCTS.COSTS_READ')) {
                     <button mat-button type="button" (click)="showCosts(product)">Costos</button>
                   }</td>
@@ -155,5 +156,16 @@
         <div class="actions"><button mat-flat-button type="submit" [disabled]="saving() || checkingCreate() || (createOutcomeUncertain() && !product.id)">Guardar</button><button mat-button type="button" (click)="cancel()" [disabled]="saving() || checkingCreate()">{{ createOutcomeUncertain() && !product.id ? 'Cerrar formulario' : 'Cancelar' }}</button></div>
       </form>
     </section>
+  }
+  @if (deleting(); as doomed) {
+    <div class="discount-sheet" role="dialog" aria-modal="true" aria-labelledby="delete-product-title">
+      <div class="discount-sheet__backdrop" (click)="deleting.set(null)"></div>
+      <section class="discount-sheet__card">
+        <h2 id="delete-product-title">¿Borrar este producto?</h2>
+        <p><strong>{{ doomed.internalCode }} · {{ doomed.name }}</strong></p>
+        <p>Se elimina del catálogo junto con su inventario inicial. Solo es posible si nunca tuvo ventas, compras, apartados ni pedidos; en ese caso, inactívalo. Esta acción no se puede deshacer.</p>
+        <div class="form-actions"><button class="button button--secondary" type="button" (click)="deleting.set(null)" [disabled]="saving()">Cancelar</button><button class="button button--danger" type="button" (click)="confirmDelete()" [disabled]="saving()">{{ saving() ? 'Borrando…' : 'Borrar producto' }}</button></div>
+      </section>
+    </div>
   }
 </section>

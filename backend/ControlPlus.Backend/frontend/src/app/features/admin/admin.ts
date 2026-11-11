@@ -8,6 +8,7 @@ import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
 import { AdminApi, AdminPermission, AdminRole, AdminUser, ROLE_LEVEL_NAMES } from './admin-api';
 import { RoleTemplate } from './role-template';
+import { UserCredential } from './user-credential';
 import { UserPermissions } from './user-permissions';
 
 type Mode = 'create' | 'edit' | 'role' | 'password';
@@ -15,7 +16,7 @@ type Tab = 'users' | 'roles';
 
 @Component({
   selector: 'cp-admin',
-  imports: [DatePipe, FormsModule, MatButtonModule, MatPaginatorModule, Icon, RoleTemplate, UserPermissions],
+  imports: [DatePipe, FormsModule, MatButtonModule, MatPaginatorModule, Icon, RoleTemplate, UserPermissions, UserCredential],
   templateUrl: './admin.html',
   styleUrls: ['../directory.scss', './admin.scss'],
 })
@@ -29,6 +30,7 @@ export class Admin implements OnInit {
   readonly selected = signal<AdminUser | null>(null);
   readonly catalog = signal<AdminPermission[]>([]);
   readonly permissionUser = signal<AdminUser | null>(null);
+  readonly credentialUser = signal<AdminUser | null>(null);
   readonly mode = signal<Mode | null>(null);
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -168,6 +170,8 @@ export class Admin implements OnInit {
     this.permissionUser.set(user);
   }
   closePermissions(): void { this.permissionUser.set(null); }
+  openCredential(user: AdminUser): void { if (this.canManageUsers) { this.error.set(''); this.notice.set(''); this.credentialUser.set(user); } }
+  closeCredential(): void { this.credentialUser.set(null); }
 
   roleUpdated(updated: AdminRole): void {
     this.roles.update(list => list.map(role => role.id === updated.id ? updated : role));

@@ -27,3 +27,12 @@
 .permissions-list li label { display: flex; align-items: flex-start; gap: 8px; }
 .permissions-list small { color: var(--cp-text-muted); }
 .permission--exception { background: var(--cp-warning-soft); margin: 0 -12px; padding-inline: 12px !important; }
+
+.credential-sheet { width: min(520px, 100%); }
+.credential-preview { border: 1px solid var(--cp-border); border-radius: 10px; padding: 12px 14px; margin: 10px 0; background: #fff; color: #000; }
+.credential-preview__head { display: flex; justify-content: space-between; align-items: baseline; }
+.credential-preview__head span { font-size: 11px; text-transform: uppercase; }
+.credential-preview p { margin: 8px 0; }
+.credential-preview__barcode { text-align: center; }
+.credential-preview__barcode svg { width: 100%; height: auto; max-height: 90px; }
+.credential-preview small { color: #444; }

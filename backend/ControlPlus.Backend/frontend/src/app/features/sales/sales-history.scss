@@ -1,0 +1,9 @@
+.sale-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.sale-summary > div { display: flex; flex-direction: column; gap: 4px; }
+.sale-summary span { color: var(--cp-text-muted); font-size: 12px; }
+.sale-summary strong { font-size: 18px; }
+.sale-detail { margin-top: 16px; }
+.sale-detail h3 { margin: 18px 0 8px; }
+.sale-detail-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.sale-cancel-action { color: var(--cp-error); }
+@media (max-width: 700px) { .sale-summary { grid-template-columns: repeat(2, 1fr); } }

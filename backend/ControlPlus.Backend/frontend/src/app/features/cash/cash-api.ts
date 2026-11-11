@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { Page, authorizationContext } from '../../core/api';
+import { AuthorizationBody, Page, authorizationContext } from '../../core/api';
 
 export interface OperatorSession { id: string; state: string; }
 export interface CashShift { id: string; mode: string; state: string; operatingDate: string; openedAtUtc: string; initialAmount: number; version: number; responsibleUserId: string | null; }
@@ -15,19 +15,26 @@ export interface CashCloseInput {
   paymentMethods: { paymentMethodId: string; countedAmount: number }[];
   differenceReasonId: string | null;
   differenceObservation: string | null;
-  authorization: { userName: string; password: string } | null;
+  authorization: AuthorizationBody | null;
 }
 
 @Injectable({ providedIn: 'root' })
 export class CashApi {
   private readonly http = inject(HttpClient);
   state(): Promise<CashState> { return firstValueFrom(this.http.get<CashState>('/api/cash/state')); }
-  open(initialAmount: number, observations: string | null): Promise<CashShift> { return firstValueFrom(this.http.post<CashShift>('/api/cash/shifts', { initialAmount, observations })); }
+  /** A Cajero opens the cash with the authorization of a Supervisor or Administrador. */
+  open(initialAmount: number, observations: string | null, authorization?: AuthorizationBody): Promise<CashShift> {
+    return firstValueFrom(this.http.post<CashShift>('/api/cash/shifts', authorization ? { initialAmount, observations, authorization } : { initialAmount, observations }, { context: authorization ? authorizationContext() : undefined }));
+  }
   movements(): Promise<Page<CashMovement>> { return firstValueFrom(this.http.get<Page<CashMovement>>('/api/cash/movements', { params: { page: 1, pageSize: 50 } })); }
   movement(kind: 'incomes' | 'expenses' | 'cash-drops', amount: number, concept: string, operatorSessionId: string | null): Promise<CashMovement> {
     return firstValueFrom(this.http.post<CashMovement>(`/api/cash/movements/${kind}`, { amount, concept, operatorSessionId }));
   }
   reconciliation(): Promise<Reconciliation> { return firstValueFrom(this.http.get<Reconciliation>('/api/cash/reconciliation')); }
+  /** Creates the default closing-difference reasons that are missing and returns the active ones. */
+  initializeClosureReasons(): Promise<ClosureDifferenceReason[]> {
+    return firstValueFrom(this.http.post<ClosureDifferenceReason[]>('/api/cash/closure-difference-reasons/initialize', null));
+  }
   closureDifferenceReasons(): Promise<ClosureDifferenceReason[]> {
     return firstValueFrom(this.http.get<ClosureDifferenceReason[]>('/api/cash/closure-difference-reasons'));
   }

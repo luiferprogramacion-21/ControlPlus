@@ -1,0 +1,57 @@
+<div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="sale-change-title"><div class="module-form-sheet__backdrop" (click)="closed.emit()"></div>
+  <form class="panel panel--padded module-form sale-change-sheet" (submit)="$event.preventDefault(); confirm()">
+    <div class="panel-heading"><h2 id="sale-change-title">Cambio de productos</h2><p>{{ sale().visibleNumber }}@if (prep(); as p) { · plazo hasta {{ p.changeDeadline }} }</p></div>
+    @if (loading()) { <p class="muted" role="status">Preparando el cambio…</p> }
+    @if (prep(); as p) {
+      @if (!p.canStartChange) {
+        <p class="field-error" role="alert">{{ p.withinDeadline ? 'Esta venta no admite cambios.' : 'El plazo para cambios venció el ' + p.changeDeadline + '.' }}</p>
+      } @else {
+        <p class="muted">Un cambio no es una anulación: la venta original se conserva y el cambio tiene su propio número. Requiere un turno de Caja abierto.</p>
+
+        <h3>Productos que devuelve el cliente</h3>
+        <div class="table-wrap module-table-wrap"><table><thead><tr><th>Producto</th><th class="align-right">Vendidos</th><th class="align-right">Disponibles</th><th class="align-right">Devuelve</th><th>Revendible</th><th class="align-right">Valor</th></tr></thead><tbody>
+          @for (line of returning(); track line.saleLineId) {
+            <tr><td><strong>{{ line.name }}</strong><small>{{ line.code }}</small></td><td class="align-right numeric">{{ line.sold }}</td><td class="align-right numeric">{{ line.remaining }}</td>
+              <td class="align-right"><input class="text-field change-qty" type="number" min="0" [max]="line.remaining" step="1" [name]="'ret-' + line.saleLineId" [(ngModel)]="line.quantity" [attr.aria-label]="'Cantidad devuelta de ' + line.name"></td>
+              <td><label><input type="checkbox" [name]="'res-' + line.saleLineId" [(ngModel)]="line.resellable"> Sí, en buen estado</label></td>
+              <td class="align-right numeric">{{ returnedValue(line) | currency:'COP':'symbol':'1.0-0' }}</td></tr>
+          } @empty { <tr class="empty-row"><td colspan="6">Esta venta no tiene productos disponibles para devolver.</td></tr> }
+        </tbody></table></div>
+
+        <h3>Productos que se lleva el cliente</h3>
+        <div class="change-search"><div><label class="field-label" for="change-search">Buscar producto</label><input id="change-search" class="text-field" name="search" [(ngModel)]="search" (keydown.enter)="$event.preventDefault(); find()" placeholder="Código, nombre o código de barras" autocomplete="off"></div><button class="button button--secondary" type="button" (click)="find()" [disabled]="searching() || !search.trim()">Buscar</button></div>
+        @if (results().length) { <div class="change-matches">@for (product of results(); track product.id) { <button class="table-action" type="button" (click)="addDelivered(product)">{{ product.name }} · {{ product.internalCode }} · {{ product.retailPrice | currency:'COP':'symbol':'1.0-0' }} · disp. {{ product.availableStock }}</button> }</div> }
+        <div class="table-wrap module-table-wrap"><table><thead><tr><th>Producto</th><th>Precio</th><th class="align-right">Cantidad</th><th class="align-right">Subtotal</th><th></th></tr></thead><tbody>
+          @for (line of delivering(); track $index; let i = $index) {
+            <tr><td><strong>{{ line.product.name }}</strong><small>{{ line.product.internalCode }}</small></td>
+              <td><select class="text-field" [name]="'price-' + i" [(ngModel)]="line.priceType" [attr.aria-label]="'Precio de ' + line.product.name"><option value="MINORISTA">Minorista · {{ line.product.retailPrice | currency:'COP':'symbol':'1.0-0' }}</option>@if (line.product.wholesalePrice) { <option value="MAYORISTA">Mayorista · {{ line.product.wholesalePrice | currency:'COP':'symbol':'1.0-0' }}</option> }</select></td>
+              <td class="align-right"><input class="text-field change-qty" type="number" min="1" step="1" [name]="'del-' + i" [(ngModel)]="line.quantity" [attr.aria-label]="'Cantidad entregada de ' + line.product.name"></td>
+              <td class="align-right numeric">{{ unitPrice(line) * line.quantity | currency:'COP':'symbol':'1.0-0' }}</td>
+              <td class="align-right"><button class="table-action" type="button" (click)="removeDelivered(line)">Quitar</button></td></tr>
+          } @empty { <tr class="empty-row"><td colspan="5">Busca y agrega los productos que recibe el cliente.</td></tr> }
+        </tbody></table></div>
+
+        <div class="change-totals" aria-live="polite">
+          <div><span>Valor devuelto</span><strong>{{ totalReturned | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+          <div><span>Valor entregado</span><strong>{{ totalDelivered | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+          <div class="change-difference"><span>{{ difference > 0 ? 'Cliente paga' : difference < 0 ? 'Se devuelve al cliente' : 'Diferencia' }}</span><strong>{{ (difference < 0 ? -difference : difference) | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+        </div>
+
+        @if (settlement.needsChoice) {
+          <label class="field-label" for="change-choice">La diferencia de esta venta a crédito</label>
+          <select id="change-choice" class="text-field" name="choice" [(ngModel)]="choice"><option value="">Selecciona una opción</option><option value="PAGO_INMEDIATO">Se cobra ahora</option><option value="AGREGAR_CREDITO">Se suma al crédito</option></select>
+        }
+        @if (p.saleType === 'CREDITO' && settlement.creditAdjustment !== 0) {
+          <p class="form-hint">Saldo del crédito: {{ money(p.creditBalance ?? 0) }} → {{ money(creditResult ?? 0) }}.</p>
+        }
+        @if (settlement.mode !== 'none') {
+          <h3>{{ settlement.mode === 'payment' ? 'Cobro de la diferencia' : 'Devolución al cliente' }}</h3>
+          <p class="form-hint">{{ settlement.mode === 'refund' && p.saleType === 'CONTADO' ? 'La devolución solo puede salir por los medios con los que se pagó la venta.' : '' }} Suma de medios: {{ money(appliedTotal) }} de {{ money(settlement.cashAmount) }}.</p>
+          <cp-payment-methods [drafts]="drafts" [mode]="settlement.mode === 'payment' ? 'payment' : 'refund'" idPrefix="change" />
+        }
+      }
+    }
+    @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+    <div class="form-actions"><button class="button button--secondary" type="button" (click)="closed.emit()" [disabled]="saving()">Volver</button>@if (prep()?.canStartChange) { <button class="button button--primary" type="submit" [disabled]="saving() || loading()">Continuar a la autorización</button> }</div>
+  </form>
+</div>

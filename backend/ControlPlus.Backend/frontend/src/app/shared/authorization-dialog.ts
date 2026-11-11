@@ -4,16 +4,28 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
-import { errorText } from '../core/api';
+import { AuthorizationBody, errorText } from '../core/api';
 import { SessionService } from '../core/session.service';
 
-export interface AuthorizationCredentials { userName: string; password: string; }
+/** User name and password, or (userName/password empty) the Code 128 credential scanned from the authorizer's card. */
+export interface AuthorizationCredentials { userName: string; password: string; credentialToken?: string; }
+/** Request body of an authorization: the scanned credential replaces the user name and password. */
+export function authorizationBody(credentials: AuthorizationCredentials): AuthorizationBody {
+  return credentials.credentialToken ? { credentialToken: credentials.credentialToken } : { userName: credentials.userName, password: credentials.password };
+}
+/** Stable, non-secret identity of the authorizer (for idempotent retries). */
+export function authorizationIdentity(credentials: AuthorizationCredentials | null): string | null {
+  if (!credentials) return null;
+  return credentials.credentialToken ? 'CRED:' + credentials.credentialToken.slice(-8) : credentials.userName.toUpperCase();
+}
 export interface AuthorizationPrompt {
   title: string;
   description: string;
   detail: string;
   operatorUserName: string;
   requireDifferentUser: boolean;
+  /** Offers a field to scan the authorizer's Code 128 card instead of typing user and password. */
+  allowCredential?: boolean;
   /** Roles that run the operation without a second authorizer (run receives null). Business limits and audit still apply on the server. */
   selfAuthorizedRoles?: string[];
   /** Shows errors of the dialog-less path; without it they are rethrown. */
@@ -29,6 +41,12 @@ export interface AuthorizationPrompt {
       <h2 mat-dialog-title>{{ data.title }}</h2>
       <mat-dialog-content>
         <p>{{ data.description }}</p><p><strong>{{ data.detail }}</strong></p>
+        @if (data.allowCredential) {
+          <label for="authorization-scan">Escanear credencial del autorizador</label>
+          <input id="authorization-scan" class="text-field" type="password" name="scan" [(ngModel)]="scanToken" autocomplete="off" cdkFocusInitial
+            placeholder="Pase el carné por el lector" (keydown.enter)="scan($event)" [disabled]="busy()">
+          <p class="scan-hint">o escribe el usuario y la contraseña:</p>
+        }
         <form id="authorization-form" (ngSubmit)="submit()">
           <label for="authorization-user">Usuario autorizador</label>
           <input id="authorization-user" class="text-field" name="user" [(ngModel)]="userName" autocomplete="off" required [disabled]="busy()">
@@ -50,6 +68,7 @@ export interface AuthorizationPrompt {
     label { font-weight:600; margin-top:6px; }
     .text-field { width:100%; box-sizing:border-box; }
     .field-error { color:var(--cp-error); }
+    .scan-hint { color:var(--cp-text-muted, inherit); font-size:.9em; }
   `],
 })
 export class AuthorizationDialogComponent implements OnDestroy {
@@ -59,10 +78,18 @@ export class AuthorizationDialogComponent implements OnDestroy {
   readonly error = signal('');
   userName = '';
   password = '';
+  scanToken = '';
 
-  ngOnDestroy(): void { this.password = ''; }
+  ngOnDestroy(): void { this.password = ''; this.scanToken = ''; }
 
-  cancel(): void { if (this.busy()) return; this.password = ''; this.ref.close(false); }
+  cancel(): void { if (this.busy()) return; this.password = ''; this.scanToken = ''; this.ref.close(false); }
+  /** The reader types the token and presses Enter: authorize right away. */
+  async scan(event?: Event): Promise<void> {
+    event?.preventDefault();
+    const credentialToken = this.scanToken.trim();
+    if (!credentialToken || this.busy()) return;
+    await this.execute({ userName: '', password: '', credentialToken });
+  }
   async submit(): Promise<void> {
     if (this.busy()) return;
     const userName = this.userName.trim();
@@ -70,16 +97,19 @@ export class AuthorizationDialogComponent implements OnDestroy {
     if (this.data.requireDifferentUser && userName.toLocaleLowerCase() === this.data.operatorUserName.trim().toLocaleLowerCase()) {
       this.error.set('El autorizador debe ser otro usuario.'); this.password = ''; return;
     }
+    await this.execute({ userName, password: this.password });
+  }
+  private async execute(credentials: AuthorizationCredentials): Promise<void> {
     this.busy.set(true); this.error.set(''); this.ref.disableClose = true;
     try {
-      await this.data.run({ userName, password: this.password });
-      this.password = ''; this.ref.close(true);
+      await this.data.run(credentials);
+      this.password = ''; this.scanToken = ''; this.ref.close(true);
     } catch (error) {
       this.error.set(error instanceof HttpErrorResponse && error.status === 401 &&
         ['authentication.invalid_credentials', 'authentication.unauthorized'].includes(error.error?.code)
-        ? 'Credenciales de autorización inválidas. Revisa el usuario y la contraseña.' :
+        ? 'Credenciales de autorización inválidas. Revisa el usuario y la contraseña, o vuelve a escanear la credencial.' :
         error instanceof Error && !(error instanceof HttpErrorResponse) ? error.message : errorText(error));
-      this.password = '';
+      this.password = ''; this.scanToken = '';
     } finally { this.busy.set(false); this.ref.disableClose = false; }
   }
 }

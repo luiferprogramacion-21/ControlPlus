@@ -109,4 +109,48 @@ describe('Cierre de caja', () => {
     expect(screen.reasonId).toBe('reason-1');
     expect(screen.reconciliation()?.shiftVersion).toBe(4);
   });
+
+  it('solo se cuenta el efectivo: Nequi y transferencias se muestran del sistema y no se envían ni generan diferencia', async () => {
+    const withElectronic: Reconciliation = { ...reconciliation, totalExpected: 330, paymentMethods: [
+      ...reconciliation.paymentMethods,
+      { paymentMethodId: 'nequi-1', code: 'NEQUI', name: 'Nequi', affectsCash: false, expectedAmount: 180, countedAmount: null, difference: null },
+      { paymentMethodId: 'transfer-1', code: 'TRANSFERENCIA', name: 'Transferencia', affectsCash: false, expectedAmount: 50, countedAmount: null, difference: null },
+    ] };
+    screen.reconciliation.set(withElectronic);
+    screen.counted = { 'cash-1': 100 };
+    expect(screen.cashMethods().map(m => m.code)).toEqual(['EFECTIVO']);
+    expect(screen.electronicMethods().map(m => m.code)).toEqual(['NEQUI', 'TRANSFERENCIA']);
+    expect(screen.electronicTotal).toBe(230);
+    expect(screen.cashExpected).toBe(100);
+    expect(screen.hasValidCounts).toBe(true);
+    expect(screen.difference).toBe(0);
+    await screen.close();
+    expect(api.closureDifferenceReasons).not.toHaveBeenCalled();
+    expect(api.close).toHaveBeenCalledWith('shift-1', {
+      version: 4, paymentMethods: [{ paymentMethodId: 'cash-1', countedAmount: 100 }],
+      differenceReasonId: null, differenceObservation: null, authorization: null,
+    });
+  });
+
+  it('un Cajero abre la caja pidiendo la autorización de un Supervisor o Administrador', async () => {
+    (TestBed.inject(SessionService) as unknown as { has: (p: string) => boolean }).has = () => false;
+    const open = vi.fn().mockResolvedValue({});
+    (api as unknown as { open: typeof open }).open = open;
+    dialog.open.mockClear(); screen.initialAmount = 50000;
+    await screen.open();
+    expect(dialog.open).toHaveBeenCalledOnce();
+    const prompt = dialog.open.mock.calls[0][0] as AuthorizationPrompt;
+    expect(prompt.title).toBe('Autorizar apertura de caja');
+    expect(prompt.allowCredential).toBe(true);
+    expect(open).toHaveBeenCalledWith(50000, null, { userName: 'supervisor', password: 'clave' });
+  });
+
+  it('un Supervisor o Administrador abre la caja sin ventana de autorización', async () => {
+    const open = vi.fn().mockResolvedValue({});
+    (api as unknown as { open: typeof open }).open = open;
+    dialog.open.mockClear(); screen.initialAmount = 20000;
+    await screen.open();
+    expect(dialog.open).not.toHaveBeenCalled();
+    expect(open).toHaveBeenCalledWith(20000, null);
+  });
 });

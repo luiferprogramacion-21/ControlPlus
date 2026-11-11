@@ -389,4 +389,31 @@ describe('Catalog: existencias iniciales', () => {
     expect(component.filters.controls.includeOutOfStock.value).toBe(false);
     expect(component.notice()).toContain('PRD-1');
   });
+
+  describe('borrado de productos', () => {
+    const product = { id: 'p1', internalCode: 'P-000001', name: 'Camisa', version: 3 } as Product;
+    beforeEach(() => { Object.assign(api, { deleteProduct: vi.fn() }); });
+    it('solo el Administrador con PRODUCTS.SENSITIVE_UPDATE ve el borrado', () => {
+      user.roles = ['SUPERVISOR']; user.permissions = ['PRODUCTS.SENSITIVE_UPDATE']; expect(component.canDeleteProduct()).toBe(false);
+      user.roles = ['ADMINISTRADOR']; user.permissions = []; expect(component.canDeleteProduct()).toBe(false);
+      user.permissions = ['PRODUCTS.SENSITIVE_UPDATE']; expect(component.canDeleteProduct()).toBe(true);
+    });
+    it('pide confirmación y borra con el producto elegido', async () => {
+      (api as any).deleteProduct.mockResolvedValue(undefined);
+      component.askDelete(product); expect(component.deleting()).toBe(product); expect((api as any).deleteProduct).not.toHaveBeenCalled();
+      await component.confirmDelete();
+      expect((api as any).deleteProduct).toHaveBeenCalledWith(product);
+      expect(component.deleting()).toBeNull(); expect(component.notice()).toContain('P-000001');
+    });
+    it('un producto con historial se explica y sugiere inactivar', async () => {
+      (api as any).deleteProduct.mockRejectedValue(new HttpErrorResponse({ status: 409, error: { code: 'resource.conflict' } }));
+      component.askDelete(product); await component.confirmDelete();
+      expect(component.error()).toContain('historial'); expect(component.error()).toContain('inactivarlo');
+    });
+    it('un conflicto de versión pide actualizar y recarga la lista', async () => {
+      (api as any).deleteProduct.mockRejectedValue(new HttpErrorResponse({ status: 409, error: { code: 'concurrency.conflict' } }));
+      component.askDelete(product); await component.confirmDelete();
+      expect(component.error()).toContain('cambió'); expect(api.products).toHaveBeenCalled();
+    });
+  });
 });

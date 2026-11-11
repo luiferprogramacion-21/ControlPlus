@@ -1,0 +1,87 @@
+<section class="module-page reports-page">
+  <section class="panel module-panel">
+    <div class="module-heading"><div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="reports" /></span><div><h2>Reportes</h2><p>Análisis con filtros procesados desde el servidor.</p></div></div></div>
+
+    <form class="report-filters" (submit)="$event.preventDefault(); apply()" novalidate>
+      <div><label class="field-label" for="report-from">Desde</label><input id="report-from" class="text-field" type="date" name="from" [(ngModel)]="from" [attr.aria-invalid]="rangeIssue ? 'true' : null" /></div>
+      <div><label class="field-label" for="report-to">Hasta</label><input id="report-to" class="text-field" type="date" name="to" [(ngModel)]="to" [attr.aria-invalid]="rangeIssue ? 'true' : null" /></div>
+      <div><label class="field-label" for="report-kind">Reporte</label>
+        <select id="report-kind" class="text-field" name="kind" [(ngModel)]="kind" (ngModelChange)="kindChanged()">
+          @for (option of kinds; track option.value) { <option [value]="option.value">{{ option.label }}</option> }
+        </select></div>
+      <button class="button button--primary" type="submit" [disabled]="loading() || !!rangeIssue || !kinds.length">Aplicar filtros</button>
+      <span class="report-filters__spacer"></span>
+      @if (canPdf) { <button class="button button--secondary" type="button" [disabled]="downloading() || loading() || !!rangeIssue" (click)="downloadPdf()">{{ downloading() ? 'Generando PDF…' : 'Exportar PDF' }}</button> }
+    </form>
+    @if (rangeIssue) { <p class="field-error" role="alert">{{ rangeIssue }}</p> }
+    @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }} @if (!rangeIssue) { <button class="link-button" type="button" (click)="apply()">Reintentar</button> }</div> }
+    @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
+    @if (loading()) { <p class="muted" role="status">Cargando reporte…</p> }
+
+    @if (!kinds.length) {
+      <p class="report-empty">No tienes permiso para consultar reportes.</p>
+    } @else if (shown() === 'sales' && sales(); as s) {
+      <div class="report-cards">
+        <article class="report-card"><div><span>Ventas</span><strong>{{ money(s.sales.total) }}</strong><small [class.report-positive]="(s.salesVariationPercentage ?? 0) > 0">{{ variationText(s) }}</small></div><i class="report-card__badge report-card__badge--success" aria-hidden="true">$</i></article>
+        <article class="report-card"><div><span>Transacciones</span><strong>{{ s.sales.transactions }}</strong><small class="report-info">Ticket: {{ optionalMoney(s.averageTicket) }}</small></div><i class="report-card__badge report-card__badge--info" aria-hidden="true">#</i></article>
+        <article class="report-card"><div><span>Costo productos</span><strong>{{ optionalMoney(s.estimatedCost) }}</strong>
+          @if (s.costCompleteness === 'INCOMPLETE') { <small class="report-warning">{{ missingText(s) }}</small> } @else { <small>{{ costShare(s) ? costShare(s) + ' de las ventas netas' : 'Lo que costó comprar lo que vendiste' }}</small> }</div><i class="report-card__badge" aria-hidden="true">C</i></article>
+        <article class="report-card"><div><span>Ganancia estimada</span><strong>{{ optionalMoney(s.estimatedMargin) }}</strong>
+          @if (s.costCompleteness === 'INCOMPLETE') { <small class="report-warning">No se puede calcular: faltan costos</small> } @else { <small [class.report-positive]="(s.estimatedMarginPercentage ?? 0) > 0">{{ percent(s.estimatedMarginPercentage) }} de las ventas sin IVA</small> }</div><i class="report-card__badge report-card__badge--success" aria-hidden="true">%</i></article>
+      </div>
+      <p class="report-note">Contado {{ money(s.sales.cashTotal) }} · Crédito {{ money(s.sales.creditTotal) }} · Cambios ({{ s.changes.transactions }}) {{ money(s.changes.netTotal) }} · Ventas netas {{ money(s.netSalesTotal) }}. Ganancia estimada = ventas netas, sin el IVA que incluyen, menos lo que costó la mercancía vendida (con el costo guardado al vender). No descuenta gastos ni otros impuestos.</p>
+
+      <div class="report-grid">
+        <section class="report-box" aria-labelledby="report-chart-title">
+          <h3 id="report-chart-title">Ventas por día</h3>
+          @if (salesEmpty()) { <p class="report-empty">No hay ventas ni cambios en el período seleccionado.</p> } @else {
+            <p class="muted">Importes en pesos, con IVA incluido</p>
+            <div class="bars" role="img" [attr.aria-label]="'Ventas por día del ' + dateText(s.from) + ' al ' + dateText(s.to)">
+              @for (bar of salesBars(); track bar.date) {
+                <div class="bar" [attr.title]="bar.title"><span class="bar__value">{{ bar.label }}</span><div class="bar__track"><i class="bar__fill" [class.bar__fill--last]="$last" [style.height.%]="bar.height"></i></div><span class="bar__day">{{ bar.day }}</span></div>
+              }
+            </div>
+          }
+        </section>
+        <section class="report-box" aria-labelledby="report-methods-title">
+          <h3 id="report-methods-title">Medios de pago</h3>
+          @for (method of s.paymentMethods; track method.code; let i = $index) {
+            <div class="method"><div class="method__row"><span>{{ method.name }}</span><b>{{ percent(method.percentage) }}</b></div><div class="method__track"><i [attr.data-tone]="i % 3" [style.width.%]="method.percentage"></i></div><small>{{ money(method.total) }}</small></div>
+          } @empty { <p class="report-empty">Sin cobros inmediatos de contado en el período.</p> }
+          <p class="muted report-footnote">Porcentajes sobre {{ money(s.paymentMethodsTotal) }} cobrados en ventas de contado. Abonos, apartados y devoluciones están en Flujo de Caja.</p>
+        </section>
+      </div>
+
+      <section class="report-box" aria-labelledby="report-days-title">
+        <h3 id="report-days-title">Detalle por día</h3>
+        <div class="table-wrap report-table"><table><thead><tr><th>Fecha</th><th class="align-right">Ventas</th><th class="align-right">Cambios (neto)</th><th class="align-right">Ventas netas</th></tr></thead><tbody>
+          @for (day of s.days; track day.date) { <tr><td class="numeric">{{ dateText(day.date) }}</td><td class="align-right numeric">{{ money(day.salesTotal) }}</td><td class="align-right numeric">{{ money(day.changesNetTotal) }}</td><td class="align-right numeric">{{ money(day.netSalesTotal) }}</td></tr> }
+        </tbody></table></div>
+      </section>
+    } @else if (shown() === 'cash' && cash(); as c) {
+      <div class="report-cards report-cards--three">
+        <article class="report-card"><div><span>Aperturas</span><strong>{{ money(c.openingBalance) }}</strong><small>Suma de las aperturas del período</small></div><i class="report-card__badge" aria-hidden="true">A</i></article>
+        <article class="report-card"><div><span>Cobros netos</span><strong>{{ money(c.paymentTotal) }}</strong><small class="report-info">Ventas, abonos, apartados y cambios</small></div><i class="report-card__badge report-card__badge--success" aria-hidden="true">$</i></article>
+        <article class="report-card"><div><span>Movimientos manuales</span><strong>{{ money(c.manualTotal) }}</strong><small>Ingresos, gastos y sangrías</small></div><i class="report-card__badge report-card__badge--info" aria-hidden="true">M</i></article>
+      </div>
+      @if (cashEmpty()) { <p class="report-empty">No hay movimientos de caja en el período seleccionado.</p> } @else {
+        <div class="report-grid">
+          <section class="report-box" aria-labelledby="cash-days-title">
+            <h3 id="cash-days-title">Flujo por día</h3>
+            <div class="table-wrap report-table"><table><thead><tr><th>Fecha</th><th class="align-right">Apertura</th><th class="align-right">Cobros</th><th class="align-right">Manuales</th></tr></thead><tbody>
+              @for (day of c.days; track day.date) { <tr><td class="numeric">{{ dateText(day.date) }}</td><td class="align-right numeric">{{ money(day.openingBalance) }}</td><td class="align-right numeric">{{ money(day.paymentTotal) }}</td><td class="align-right numeric">{{ money(day.manualTotal) }}</td></tr> }
+            </tbody></table></div>
+          </section>
+          <section class="report-box" aria-labelledby="cash-origin-title">
+            <h3 id="cash-origin-title">Por origen y medio</h3>
+            <div class="table-wrap report-table"><table><thead><tr><th>Tipo</th><th>Origen</th><th>Medio</th><th class="align-right">Total</th></tr></thead><tbody>
+              @for (row of cashRows(); track row.kind + row.origin + row.method) { <tr><td>{{ row.kind }}</td><td>{{ origin(row.origin) }}</td><td>{{ method(row.method) }}</td><td class="align-right numeric">{{ money(row.total) }}</td></tr> }
+            </tbody></table></div>
+          </section>
+        </div>
+      }
+    } @else if (!loading() && !error()) {
+      <p class="report-empty">Elige el período y aplica los filtros para ver el reporte.</p>
+    }
+  </section>
+</section>

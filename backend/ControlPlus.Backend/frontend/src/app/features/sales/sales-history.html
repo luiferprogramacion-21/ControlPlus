@@ -1,0 +1,64 @@
+<section class="module-page directory-page">
+  <div class="module-heading"><div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="catalog" /></span><div><h2>Historial de ventas</h2><p>{{ listsAll ? 'Todas las ventas' : 'Tus ventas' }}</p></div></div><a class="button button--secondary" routerLink="/operacion/ventas">Volver a Ventas</a></div>
+  @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="reload()">Actualizar</button></div> }
+  @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
+  <section class="panel module-panel">
+    <div class="module-toolbar"><div><h3>Ventas registradas</h3><p class="muted">Consulta una venta para ver su detalle{{ session.has('SALES.VOID') ? ' o anularla' : '' }}.</p></div><button class="table-action" type="button" (click)="reload()">Actualizar</button></div>
+    @if (loading()) { <p class="muted" role="status">Cargando ventas…</p> }
+    <div class="table-wrap module-table-wrap"><table><thead><tr><th>Venta</th><th>Fecha</th><th class="align-right">Total</th><th>Estado</th><th class="align-right">Acciones</th></tr></thead><tbody>
+      @for (sale of result()?.items ?? []; track sale.id) {
+        <tr>
+          <td class="numeric">{{ sale.visibleNumber }}</td><td>{{ sale.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }}</td>
+          <td class="align-right numeric">{{ sale.total | currency:'COP':'symbol':'1.0-0' }}</td>
+          <td><span class="status-pill" [class.status-pill--warning]="sale.state === 'ANULADA'">{{ label(sale.state) }}</span></td>
+          <td class="align-right"><button class="table-action" type="button" (click)="open(sale)">Ver detalle</button>@if (canPrint(sale)) { <button class="table-action" type="button" [disabled]="printingId() === sale.id" (click)="print(sale)">Imprimir</button> }</td>
+        </tr>
+      } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="5">No hay ventas registradas.</td></tr> } }
+    </tbody></table></div>
+    @if (result(); as pageResult) { <mat-paginator [length]="pageResult.totalCount" [pageIndex]="page - 1" [pageSize]="pageSize" [pageSizeOptions]="[10,20,50]" (page)="pageChanged($event)" aria-label="Páginas de ventas" /> }
+  </section>
+
+  @if (detail(); as d) {
+    <section class="panel module-panel sale-detail" aria-label="Detalle de la venta">
+      <div class="module-toolbar"><div><h3>Venta {{ d.visibleNumber }}</h3><p>{{ d.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }} · {{ label(d.state) }}{{ d.creditId ? ' · a crédito' : '' }}</p></div><button class="table-action" type="button" (click)="closeDetail()">Cerrar</button></div>
+      <div class="sale-summary">
+        <div><span>Subtotal</span><strong>{{ d.grossSubtotal | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+        <div><span>Descuento</span><strong>{{ d.discountTotal | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+        <div><span>Total</span><strong>{{ d.total | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+        <div><span>Cambio entregado</span><strong>{{ d.change | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+      </div>
+      @if (canChange(d) || canCancel(d) || canReprint(d)) { <div class="sale-detail-actions">
+        @if (canReprint(d)) { <button class="button button--secondary" type="button" [disabled]="reprinting() || saving()" (click)="reprint()">{{ printStatus() === 'ERROR' ? 'Reintentar ticket' : 'Reimprimir ticket' }}</button> }
+        @if (canChange(d)) { <button class="button button--secondary" type="button" [disabled]="saving()" (click)="changing.set(true)">Cambio de productos</button> }
+        @if (canCancel(d)) { <button class="button button--secondary sale-cancel-action" type="button" [disabled]="saving()" (click)="startCancel()">Anular venta</button> }
+      </div> }
+      @if (printMessage() || printStatus()) { <p class="muted" role="status">{{ printMessage() || ('Último ticket: ' + printStatus()) }}</p> }
+      <h3>Productos</h3>
+      <div class="table-wrap module-table-wrap"><table><thead><tr><th>Código</th><th>Producto</th><th class="align-right">Cantidad</th><th class="align-right">Precio</th><th class="align-right">Subtotal</th></tr></thead><tbody>
+        @for (line of d.lines; track line.id) { <tr><td class="numeric">{{ line.productCode }}</td><td>{{ line.productName }}</td><td class="align-right numeric">{{ line.quantity }}</td><td class="align-right numeric">{{ line.unitPrice | currency:'COP':'symbol':'1.0-0' }}</td><td class="align-right numeric">{{ line.netAmount | currency:'COP':'symbol':'1.0-0' }}</td></tr> }
+      </tbody></table></div>
+      <h3>Pagos</h3>
+      <div class="table-wrap module-table-wrap"><table><thead><tr><th>Medio</th><th>Referencia</th><th class="align-right">Aplicado</th></tr></thead><tbody>
+        @for (payment of d.payments; track payment.id) { <tr><td>{{ payment.methodName }}</td><td>{{ payment.reference || '—' }}</td><td class="align-right numeric">{{ payment.appliedAmount | currency:'COP':'symbol':'1.0-0' }}</td></tr> }
+        @empty { <tr class="empty-row"><td colspan="3">{{ d.creditId ? 'Venta a crédito: sin pagos iniciales.' : 'Sin pagos registrados.' }}</td></tr> }
+      </tbody></table></div>
+    </section>
+  }
+
+  @if (changing() && detail(); as d) { <cp-sale-change [sale]="d" (changed)="changeDone($event)" (closed)="changing.set(false)" /> }
+
+  @if (cancelling() && detail(); as d) {
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="sale-cancel-title"><div class="module-form-sheet__backdrop" (click)="cancelling.set(false)"></div>
+      <form class="panel panel--padded module-form" (submit)="$event.preventDefault(); confirm()">
+        <div class="panel-heading"><h2 id="sale-cancel-title">Anular venta</h2><p>{{ d.visibleNumber }} · {{ d.total | currency:'COP':'symbol':'1.0-0' }}</p></div>
+        <p class="muted">Se repone el inventario y se revierten los pagos. Una venta a crédito solo se anula si no tiene abonos. Un Supervisor necesita la autorización de un Administrador; el Administrador anula sin segundo autorizador.</p>
+        <label class="field-label field-label--spaced" for="sale-cancel-reason">Motivo</label>
+        <select id="sale-cancel-reason" class="text-field" name="reason" [(ngModel)]="reasonId"><option value="">Selecciona un motivo</option>@for (reason of reasons(); track reason.id) { <option [value]="reason.id">{{ reason.name }}</option> }</select>
+        <label class="field-label field-label--spaced" for="sale-cancel-observation">Observación <span>{{ selectedReason?.code === 'OTRO' ? '(obligatoria)' : '(opcional)' }}</span></label>
+        <textarea id="sale-cancel-observation" class="text-field" name="observation" maxlength="500" [(ngModel)]="observation"></textarea>
+        @if (formError()) { <p class="field-error" role="alert">{{ formError() }}</p> }
+        <div class="form-actions"><button class="button button--secondary" type="button" (click)="cancelling.set(false)" [disabled]="saving()">Volver</button><button class="button button--primary" type="submit" [disabled]="saving()">Continuar</button></div>
+      </form>
+    </div>
+  }
+</section>

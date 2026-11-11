@@ -1,0 +1,54 @@
+<section class="dashboard-page" aria-labelledby="dashboard-title">
+  <div class="dashboard-heading">
+    <div>
+      <h2 id="dashboard-title">Dashboard</h2>
+      @if (summary(); as data) { <p>Resumen operativo del {{ date(data.operatingDate) }}</p> }
+      @else { <p>Resumen de la fecha operativa del establecimiento</p> }
+    </div>
+    <button class="button button--secondary" type="button" (click)="refresh()" [disabled]="loading()">Actualizar</button>
+  </div>
+
+  @if (loading() && !summary()) { <p class="dashboard-message" role="status">Cargando resumen…</p> }
+  @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="refresh()">Reintentar</button></div> }
+
+  @if (summary(); as data) {
+    <div class="dashboard-metrics">
+      <article class="dashboard-metric">
+        <div><span>Ventas de hoy</span><strong>{{ money(data.totalSales.total) }}</strong><small>Contado {{ money(data.cashSales.total) }} · Crédito {{ money(data.creditSales.total) }}</small></div>
+        <span class="dashboard-metric__badge dashboard-metric__badge--success" aria-hidden="true">$</span>
+      </article>
+      <article class="dashboard-metric">
+        <div><span>Transacciones</span><strong>{{ data.totalSales.transactions }}</strong><small>Promedio: {{ averageTicket(data) }}</small></div>
+        <span class="dashboard-metric__badge dashboard-metric__badge--info" aria-hidden="true">#</span>
+      </article>
+      <article class="dashboard-metric">
+        <div><span>Caja actual</span><strong class="dashboard-metric__unavailable">No disponible</strong><small>Flujo neto hoy: {{ money(data.netCashFlow) }}</small></div>
+        <span class="dashboard-metric__badge" aria-hidden="true">C</span>
+      </article>
+      <article class="dashboard-metric">
+        <div><span>Productos con alerta</span><strong class="dashboard-metric__unavailable">Pendiente</strong><small>Indicador por definir</small></div>
+        <span class="dashboard-metric__badge dashboard-metric__badge--warning" aria-hidden="true">!</span>
+      </article>
+    </div>
+
+    <div class="dashboard-panels">
+      <section class="dashboard-panel" aria-labelledby="dashboard-hourly-title">
+        <h3 id="dashboard-hourly-title">Ventas por hora</h3>
+        <p>Jornada actual · miles de pesos</p>
+        <div class="dashboard-pending">Pendiente de definir: el resumen actual no publica ventas por hora.</div>
+      </section>
+      <section class="dashboard-panel" aria-labelledby="dashboard-alerts-title">
+        <h3 id="dashboard-alerts-title">Alertas operativas</h3>
+        <p>Pendientes por revisar</p>
+        <div class="dashboard-pending">Pendiente de definir: stock bajo, créditos vencidos, apartados próximos y respaldo.</div>
+      </section>
+    </div>
+
+    <section class="dashboard-panel dashboard-activity" aria-labelledby="dashboard-activity-title">
+      <h3 id="dashboard-activity-title">Actividad reciente</h3>
+      <div class="dashboard-activity__table"><table><thead><tr><th>Hora</th><th>Documento</th><th>Cliente</th><th class="align-right">Total</th><th>Estado</th></tr></thead>
+        <tbody><tr><td colspan="5" class="dashboard-pending">Pendiente de definir: todavía no hay contrato de actividad reciente.</td></tr></tbody>
+      </table></div>
+    </section>
+  }
+</section>

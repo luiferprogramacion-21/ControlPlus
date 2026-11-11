@@ -1,0 +1,21 @@
+<div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="customer-history-title" (keydown.escape)="closed.emit()">
+  <div class="module-form-sheet__backdrop" (click)="closed.emit()"></div>
+  <section class="panel panel--padded module-form customer-history-sheet">
+    <div class="panel-heading"><h2 id="customer-history-title">Historial de {{ customer().fullName }}</h2><p>{{ customer().documentType && customer().documentNumber ? customer().documentType + ' ' + customer().documentNumber + ' · ' : '' }}{{ customer().phone || 'Sin teléfono' }}</p></div>
+    <p class="muted">Ventas, créditos, apartados y sus abonos, del más reciente al más antiguo. Solo ves los tipos de operación que tus permisos permiten.</p>
+    @if (error()) { <p class="field-error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="load()">Reintentar</button></p> }
+    @if (loading()) { <p class="muted" role="status">Cargando historial…</p> }
+    <div class="table-wrap module-table-wrap"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Número</th><th>Estado</th><th class="align-right">Valor</th><th class="align-right">Saldo</th></tr></thead><tbody>
+      @for (item of result()?.items ?? []; track item.type + item.id) {
+        <tr [class.is-payment]="isPayment(item.type)">
+          <td>{{ item.occurredAt | date:'dd/MM/yyyy HH:mm' }}</td><td>{{ isPayment(item.type) ? '↳ ' : '' }}{{ typeLabel(item.type) }}</td><td class="numeric">{{ item.number }}</td>
+          <td><span class="status-pill" [class.status-pill--warning]="item.status === 'ANULADA' || item.status === 'ANULADO' || item.status === 'VENCIDO'">{{ statusLabel(item.status) }}</span></td>
+          <td class="align-right numeric">{{ item.amount | currency:'COP':'symbol':'1.0-0' }}</td>
+          <td class="align-right numeric">{{ item.outstandingAmount === null ? '—' : (item.outstandingAmount | currency:'COP':'symbol':'1.0-0') }}</td>
+        </tr>
+      } @empty { @if (!loading() && !error()) { <tr class="empty-row"><td colspan="6"><span aria-hidden="true">◇</span><strong>Sin movimientos</strong><small>Este cliente no tiene operaciones visibles para ti.</small></td></tr> } }
+    </tbody></table></div>
+    @if (result(); as pageResult) { <mat-paginator [length]="pageResult.totalCount" [pageIndex]="page - 1" [pageSize]="pageSize" [pageSizeOptions]="[10,20,50]" (page)="pageChanged($event)" aria-label="Páginas del historial" /> }
+    <div class="form-actions"><button class="button button--primary" type="button" (click)="closed.emit()">Cerrar</button></div>
+  </section>
+</div>

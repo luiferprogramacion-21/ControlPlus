@@ -44,3 +44,6 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
     }),
   );
 };
+
+/** Request body of a second-user authorization: user name and password, or the scanned Code 128 credential. */
+export type AuthorizationBody = { userName: string; password: string } | { credentialToken: string };

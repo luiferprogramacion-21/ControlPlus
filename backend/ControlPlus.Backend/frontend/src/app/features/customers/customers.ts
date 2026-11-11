@@ -5,14 +5,18 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Customer, CustomerInput, CustomersApi } from './customers-api';
+import { CustomerHistory } from './customer-history';
 import { Icon } from '../../layout/icon';
-@Component({ selector: 'cp-customers', imports: [FormsModule, MatPaginatorModule, Icon], templateUrl: './customers.html', styleUrl: '../directory.scss' })
+@Component({ selector: 'cp-customers', imports: [FormsModule, MatPaginatorModule, Icon, CustomerHistory], templateUrl: './customers.html', styleUrl: '../directory.scss' })
 export class Customers implements OnInit {
   private readonly api = inject(CustomersApi);
   readonly session = inject(SessionService);
   readonly result = signal<Page<Customer> | null>(null);
   readonly selected = signal<Customer | null>(null);
   readonly editing = signal(false);
+  /** Customer whose commercial history is open. */
+  readonly historyOf = signal<Customer | null>(null);
+  get canReadHistory(): boolean { return this.session.has('CUSTOMERS.HISTORY_READ'); }
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly error = signal('');
