@@ -200,7 +200,9 @@ La migración sustituye solo `ventas.ck_detalle_apartado_iva_incluido` y `ventas
 
 Antes de abrir la ventana real, el operador debe ejecutar `BusinessVatWholePesoLayawaysChangesMigrationTests` y las pruebas focalizadas de `LayawayBusinessVatApiTests`, `SaleChangeBusinessVatApiTests` y `SalesOverview_ChangeReconcilesOriginalReturnedAndDeliveredHistoricalCosts` con `CONTROLPLUS_TEST_ADMIN_CONNECTION`. `LocalPostgresDatabase` debe crear exclusivamente bases `controlplus_test_*`. El resultado debe ser cero fallidas y cero omitidas.
 
-## Bloque único de activación para el operador
+## Bloque único de activación para el operador (segundo corte: ejecutado el 12 de noviembre de 2026; no volver a ejecutar)
+
+**Activación ejecutada por el operador el 12 de noviembre de 2026**: `BUSINESS_VAT_LAYAWAYS_CHANGES_ACTIVATION_OK`, historial 21→22. Evidencia en `C:\Users\luife\ControlPlus-Backups\BusinessVat-LayawaysChanges-20261112T140538Z-85af942f8ee645148f30f7084a8a2fc0`; respaldo SHA-256 `EBA10ACCB9E58A05BEAADF7F2E51482A4D5329E17A14E6A062371CA79ECC55E5`; API SHA-256 `D317110324379115741A9E7581CAB480D503B0794F97B564485D7D49628A3461`. El postflight y las huellas (cuatro tablas vacías, idénticas antes y después) quedaron conformes; la API respondió 200/200/200 y 401 en `/api/settings/vat` sin sesión. **No repetir ni ejecutar `Down`.** El bloque que sigue se conserva solo como registro.
 
 Detener API, frontend y cualquier otro cliente antes de ejecutarlo. El bloque exige PostgreSQL 18, historial exacto **21**, última `20261110020000_BusinessVatWholePesoSalesV1`, ausencia del objetivo y ningún otro cliente conectado. Publica la API en serie con `/warnaserror`, crea un respaldo nuevo, conserva su SHA-256, valida el TOC y una lectura completa, repite historial y huellas, hace una sola confirmación `--migrate-to`, y ejecuta el postflight de solo lectura. Ejecutar desde una consola PowerShell abierta por el operador; la contraseña se mantiene solo en memoria.
 
