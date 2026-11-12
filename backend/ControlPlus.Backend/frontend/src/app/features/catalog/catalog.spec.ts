@@ -78,6 +78,58 @@ describe('Catalog: existencias iniciales', () => {
     expect(component.notice()).toBe('');
   });
 
+  describe('IVA del producto (interruptor Sin IVA / Con IVA)', () => {
+    const existing = (taxPercentage: number | null) => ({
+      id: 'p1', version: 1, name: 'Producto', internalCode: 'P-000001', categoryId: 'category', measurementUnitId: 'unit', barcode: null,
+      supplierId: null, barcodeFormat: null, description: null, retailPrice: 1000, wholesalePrice: null, taxPercentage, minimumStock: 0,
+    }) as unknown as Product;
+
+    it('por defecto es Sin IVA: no pide porcentaje y envía nulo', async () => {
+      expect(component.hasTax()).toBe(false);
+      await component.saveProduct();
+      expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ taxPercentage: null }), true, expect.any(String));
+    });
+    it('Con IVA exige el porcentaje y luego lo envía', async () => {
+      component.setHasTax(true);
+      await component.saveProduct();
+      expect(api.createProduct).not.toHaveBeenCalled();
+      expect(component.productForm.controls.taxPercentage.invalid).toBe(true);
+      component.productForm.patchValue({ taxPercentage: '19' });
+      await component.saveProduct();
+      expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ taxPercentage: 19 }), true, expect.any(String));
+    });
+    it('rechaza un porcentaje fuera de 0 a 100', () => {
+      component.setHasTax(true);
+      component.productForm.patchValue({ taxPercentage: '101' });
+      expect(component.productForm.controls.taxPercentage.invalid).toBe(true);
+      component.productForm.patchValue({ taxPercentage: '19.5' });
+      expect(component.productForm.controls.taxPercentage.valid).toBe(true);
+    });
+    it('apagar el interruptor borra el porcentaje y no lo envía', async () => {
+      component.setHasTax(true);
+      component.productForm.patchValue({ taxPercentage: '19' });
+      component.setHasTax(false);
+      expect(component.productForm.controls.taxPercentage.value).toBe('');
+      await component.saveProduct();
+      expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ taxPercentage: null }), true, expect.any(String));
+    });
+    it('cada alta nueva vuelve a Sin IVA', () => {
+      component.setHasTax(true);
+      component.productForm.patchValue({ taxPercentage: '19' });
+      component.newProduct();
+      expect(component.hasTax()).toBe(false);
+      expect(component.productForm.controls.taxPercentage.value).toBe('');
+    });
+    it('al editar el interruptor refleja si el producto tiene IVA guardado', () => {
+      component.editProduct(existing(19));
+      expect(component.hasTax()).toBe(true);
+      expect(component.productForm.controls.taxPercentage.value).toBe('19');
+      component.editProduct(existing(null));
+      expect(component.hasTax()).toBe(false);
+      expect(component.productForm.controls.taxPercentage.value).toBe('');
+    });
+  });
+
   it('conserva el alta sin existencias', async () => {
     await component.saveProduct();
     expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ initialQuantity: 0, initialUnitCost: null }), true, expect.any(String));

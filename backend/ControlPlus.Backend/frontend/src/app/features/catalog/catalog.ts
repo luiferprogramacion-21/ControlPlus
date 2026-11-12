@@ -7,6 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatOptionModule } from '@angular/material/core';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { SessionService } from '../../core/session.service';
@@ -22,7 +23,7 @@ interface ProductCreateAttempt {
 
 @Component({
   selector: 'cp-catalog',
-  imports: [ReactiveFormsModule, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule, MatOptionModule, MatSelectModule, MatProgressSpinnerModule, MatPaginatorModule],
+  imports: [ReactiveFormsModule, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule, MatOptionModule, MatSelectModule, MatSlideToggleModule, MatProgressSpinnerModule, MatPaginatorModule],
   templateUrl: './catalog.html',
   styleUrl: './catalog.scss',
 })
@@ -55,6 +56,8 @@ export class Catalog implements OnInit {
   readonly productPageSize = signal(20);
   readonly categoryPageSize = signal(20);
   readonly generateBarcode = signal(false);
+  /** Product IVA switch: «Sin IVA» (default) sends no percentage; «Con IVA» asks for it. Optional information. */
+  readonly hasTax = signal(false);
   private requestId = 0;
   private createAttempt: ProductCreateAttempt | null = null;
   private readonly createAttemptStorageKey = 'controlplus.catalog.create-attempt';
@@ -82,6 +85,14 @@ export class Catalog implements OnInit {
     initialQuantity: [0, [Validators.required, Validators.min(0), Validators.max(2147483647), Validators.pattern(/^\d+$/)]],
     initialUnitCost: ['', Validators.pattern(/^\d{1,14}(?:\.\d{1,4})?$/)],
   });
+
+  setHasTax(enabled: boolean): void {
+    const control = this.productForm.controls.taxPercentage;
+    this.hasTax.set(enabled);
+    control.setValidators(enabled ? [Validators.required, Validators.min(0), Validators.max(100)] : [Validators.min(0), Validators.max(100)]);
+    if (!enabled) control.setValue('');
+    control.updateValueAndValidity();
+  }
 
   async ngOnInit(): Promise<void> {
     if (!this.session.has('PRODUCTS.READ') && this.session.has('CATEGORIES.READ')) this.tab.set('categories');
@@ -180,6 +191,7 @@ export class Catalog implements OnInit {
       taxPercentage: product.taxPercentage?.toString() ?? '', minimumStock: product.minimumStock,
       initialQuantity: 0, initialUnitCost: '',
     });
+    this.setHasTax(product.taxPercentage != null);
   }
   newProduct(): void {
     if (this.saving() || this.checkingCreate()) return;
@@ -191,6 +203,7 @@ export class Catalog implements OnInit {
       barcode: '', barcodeFormat: '', description: '', retailPrice: 0,
       wholesalePrice: '', taxPercentage: '', minimumStock: 0, initialQuantity: 0, initialUnitCost: '',
     });
+    this.setHasTax(false);
     this.applyDefaultUnit();
   }
   cancel(): void {
@@ -239,6 +252,7 @@ export class Catalog implements OnInit {
       taxPercentage: original.taxPercentage?.toString() ?? '', initialUnitCost: original.initialUnitCost?.toString() ?? '',
     });
     this.generateBarcode.set(original.generateBarcode);
+    this.setHasTax(original.taxPercentage != null);
     return true;
   }
 
@@ -304,7 +318,7 @@ export class Catalog implements OnInit {
         barcodeFormat: selected.id && f.barcode.trim() === (selected.barcode ?? '') ? selected.barcodeFormat : null,
         description: f.description.trim() || null, retailPrice: Number(f.retailPrice),
         wholesalePrice: f.wholesalePrice === '' ? null : Number(f.wholesalePrice),
-        taxPercentage: f.taxPercentage === '' ? null : Number(f.taxPercentage),
+        taxPercentage: this.hasTax() && f.taxPercentage !== '' ? Number(f.taxPercentage) : null,
         minimumStock: Number(f.minimumStock),
       };
       let saved: Product;
