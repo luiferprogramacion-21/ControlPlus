@@ -5,6 +5,7 @@ using Xunit;
 namespace ControlPlus.Api.Tests;
 
 [Collection(ControlledMigrationCollection.Name)]
+[Trait("Category", "Integration")]
 public sealed class ControlledInitialProductInventoryPreflightTests(ControlledMigrationPostgresFixture postgres)
 {
     private const string Previous = "20261021010000_LayawayCancellationOptionalReasonV1";

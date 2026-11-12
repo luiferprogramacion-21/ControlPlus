@@ -35,6 +35,7 @@ public sealed class ControlledMigrationPostgresFixture : IAsyncLifetime
 }
 
 [Collection(ControlledMigrationCollection.Name)]
+[Trait("Category", "Integration")]
 public sealed class ControlledMigrationTests(ControlledMigrationPostgresFixture postgres)
 {
     private const string PreviousMigration = "20260913010000_SeedMeasurementUnitsV1";
@@ -420,6 +421,7 @@ public sealed class ControlledMigrationTests(ControlledMigrationPostgresFixture 
 }
 
 [Collection(ControlledMigrationCollection.Name)]
+[Trait("Category", "Integration")]
 public sealed class ControlledPreflightTests(ControlledMigrationPostgresFixture postgres)
 {
     private const string PreviousMigration = "20260913010000_SeedMeasurementUnitsV1";

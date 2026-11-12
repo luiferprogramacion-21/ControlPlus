@@ -1,0 +1,179 @@
+# Integración continua de ControlPlus.
+#
+# Cuándo corre cada parte (el repositorio es privado: se cuidan los minutos):
+#   - push a main, pull request y ejecución manual:
+#       backend (compilación estricta y pruebas sin base de datos) y frontend.
+#   - pull request, ejecución manual y una vez por noche (02:00 en Colombia):
+#       además, las pruebas de backend con un PostgreSQL 18 descartable.
+#       La corrida nocturna se omite si no hubo commits en las últimas 24 horas.
+#
+# Este workflow nunca despliega, aplica migraciones a una base persistente ni usa
+# secretos reales. La base `controlplus` no existe en estas máquinas: cada prueba
+# crea y elimina su propia base `controlplus_test_*`.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * *'
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  SOLUTION: ControlPlus.Backend.slnx
+
+defaults:
+  run:
+    working-directory: backend/ControlPlus.Backend
+
+jobs:
+  backend:
+    name: Backend (compilación y pruebas sin base de datos)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restaurar paquetes
+        run: dotnet restore "$SOLUTION" -m:1 -p:BuildInParallel=false
+
+      - name: Compilar (Release, en serie, advertencias como errores)
+        run: dotnet build "$SOLUTION" -c Release --no-restore -m:1 -p:BuildInParallel=false -warnaserror
+
+      - name: Pruebas de dominio
+        run: dotnet test ControlPlus.Domain.Tests -c Release --no-build -m:1
+
+      # Las pruebas que usan PostgreSQL llevan [Trait("Category", "Integration")]
+      # y corren en el trabajo "database-tests".
+      - name: Pruebas de API sin base de datos
+        run: dotnet test ControlPlus.Api.Tests -c Release --no-build -m:1 --filter "Category!=Integration"
+
+      - name: Pruebas de Infrastructure sin base de datos
+        run: dotnet test ControlPlus.Infrastructure.Tests -c Release --no-build -m:1 --filter "Category!=Integration"
+
+  frontend:
+    name: Frontend (pruebas y build de producción)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NG_CLI_ANALYTICS: 'false'
+    defaults:
+      run:
+        working-directory: backend/ControlPlus.Backend/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/ControlPlus.Backend/frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Pruebas unitarias
+        run: npm test -- --watch=false
+
+      # Las advertencias de presupuesto de tamaño existentes no hacen fallar el build.
+      - name: Build de producción
+        run: npm run build
+
+  database-tests:
+    name: Backend con PostgreSQL 18
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          # Contenedor efímero accesible solo desde esta máquina; sin secretos reales.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decidir si hay algo nuevo que probar
+        id: gate
+        run: |
+          run=true
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            age=$(( $(date +%s) - $(git log -1 --format=%ct) ))
+            if [ "$age" -gt 86400 ]; then
+              run=false
+              echo "Sin commits en las últimas 24 horas: se omite la corrida nocturna."
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          dotnet-version: 10.0.x
+
+      # Las pruebas exigen PostgreSQL 18 y el rol controlplus_test_admin con CREATEDB
+      # y sin SUPERUSER, conectado a la base postgres en 127.0.0.1:5432.
+      - name: Crear el rol de pruebas
+        if: steps.gate.outputs.run == 'true'
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGDATABASE: postgres
+        run: |
+          test_password="$(openssl rand -hex 24)"
+          echo "::add-mask::$test_password"
+          psql -X -v ON_ERROR_STOP=1 -c "CREATE ROLE controlplus_test_admin LOGIN CREATEDB NOSUPERUSER PASSWORD '${test_password}'"
+          echo "CONTROLPLUS_TEST_ADMIN_CONNECTION=Host=127.0.0.1;Port=5432;Database=postgres;Username=controlplus_test_admin;Password=${test_password}" >> "$GITHUB_ENV"
+
+      - name: Restaurar paquetes
+        if: steps.gate.outputs.run == 'true'
+        run: dotnet restore "$SOLUTION" -m:1 -p:BuildInParallel=false
+
+      - name: Compilar (Release, en serie, advertencias como errores)
+        if: steps.gate.outputs.run == 'true'
+        run: dotnet build "$SOLUTION" -c Release --no-restore -m:1 -p:BuildInParallel=false -warnaserror
+
+      - name: Pruebas de dominio
+        if: steps.gate.outputs.run == 'true'
+        run: dotnet test ControlPlus.Domain.Tests -c Release --no-build -m:1 --results-directory "$RUNNER_TEMP/trx" --logger "trx;LogFileName=Domain.trx"
+
+      - name: Pruebas de Infrastructure
+        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' }}
+        run: dotnet test ControlPlus.Infrastructure.Tests -c Release --no-build -m:1 --results-directory "$RUNNER_TEMP/trx" --logger "trx;LogFileName=Infrastructure.trx"
+
+      - name: Pruebas de API
+        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' }}
+        run: dotnet test ControlPlus.Api.Tests -c Release --no-build -m:1 --results-directory "$RUNNER_TEMP/trx" --logger "trx;LogFileName=Api.trx"
+
+      - name: Guardar resultados (TRX)
+        if: ${{ !cancelled() && steps.gate.outputs.run == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-trx
+          path: ${{ runner.temp }}/trx
+          retention-days: 7

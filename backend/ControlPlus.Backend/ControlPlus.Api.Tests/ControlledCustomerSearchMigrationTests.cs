@@ -5,6 +5,7 @@ using Xunit;
 namespace ControlPlus.Api.Tests;
 
 [Collection(ControlledMigrationCollection.Name)]
+[Trait("Category", "Integration")]
 public sealed class ControlledCustomerSearchMigrationTests(ControlledMigrationPostgresFixture postgres)
 {
     private const string InventoryMigration = InventoryMigrationManifest.TargetMigration;

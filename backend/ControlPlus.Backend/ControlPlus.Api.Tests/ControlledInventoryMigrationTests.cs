@@ -7,6 +7,7 @@ using Xunit;
 namespace ControlPlus.Api.Tests;
 
 [Collection(ControlledMigrationCollection.Name)]
+[Trait("Category", "Integration")]
 public sealed class ControlledInventoryMigrationTests(ControlledMigrationPostgresFixture postgres)
 {
     private const string MeasurementMigration = "20260913010000_SeedMeasurementUnitsV1";

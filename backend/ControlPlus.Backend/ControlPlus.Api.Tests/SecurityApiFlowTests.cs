@@ -19,6 +19,7 @@ using Xunit;
 
 namespace ControlPlus.Api.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class SecurityApiFlowTests : IAsyncLifetime
 {
     private readonly string _masterKey = RandomSecret(48);
