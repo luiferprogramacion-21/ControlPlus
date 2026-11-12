@@ -32,6 +32,8 @@ public sealed class OpenApiLayawayContractTests
         AssertMethods(paths, "/api/layaways/{layawayId}/payments", "post");
         AssertMethods(paths, "/api/layaways/{layawayId}/delivery", "post");
         AssertMethods(paths, "/api/layaways/{layawayId}/cancellation", "post");
+        AssertMethods(paths, "/api/layaways/settings", "get", "put");
+        AssertMethods(paths, "/api/layaways/creation-rules", "get");
         AssertMethods(paths, "/api/document-numbering/layaways", "get", "post");
         AssertMethods(paths, "/api/document-numbering/layaway-payments", "get", "post");
 
@@ -92,6 +94,16 @@ public sealed class OpenApiLayawayContractTests
         foreach (var serverOwned in new[] { "total", "initialMinimumPercentage", "state",
                      "discount", "generalDiscount", "installationId", "shiftId" })
             Assert.False(create.TryGetProperty(serverOwned, out _), serverOwned);
+        var settings = schemas.GetProperty("LayawaySettingsDto").GetProperty("properties");
+        foreach (var field in new[] { "minimumPercentage", "defaultDays", "requireMinimumInitial", "version" })
+            Assert.True(settings.TryGetProperty(field, out _), field);
+        var updateSettings = schemas.GetProperty("UpdateLayawaySettingsRequest");
+        Assert.Contains("requireMinimumInitial", updateSettings.GetProperty("required")
+            .EnumerateArray().Select(x => x.GetString()));
+        var creationRules = schemas.GetProperty("LayawayCreationRulesDto").GetProperty("properties");
+        foreach (var field in new[] { "requireMinimumInitial", "minimumPercentage", "defaultDays" })
+            Assert.True(creationRules.TryGetProperty(field, out _), field);
+        Assert.False(creationRules.TryGetProperty("version", out _));
         var numbering = schemas.GetProperty("CreateLayawayDocumentNumberingRequest")
             .GetProperty("properties");
         Assert.True(numbering.TryGetProperty("prefix", out _));

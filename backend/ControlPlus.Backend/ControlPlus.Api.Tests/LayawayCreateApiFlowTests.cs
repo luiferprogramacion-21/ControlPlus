@@ -73,9 +73,14 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
         var session = await StartSessionAsync(client, scenario);
         SetBearer(client, scenario.Cashier.AccessToken);
         var before = await CaptureAsync(scenario, session.Id);
-        Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(client,
+        using var belowMinimum = await PostAsync(client,
             "layaway-below-rounded-minimum", Request(scenario,
-                [new CreateLayawayPaymentRequest("EFECTIVO", 200m, 200m, null)]))).StatusCode);
+                [new CreateLayawayPaymentRequest("EFECTIVO", 200m, 200m, null)]));
+        Assert.Equal(HttpStatusCode.BadRequest, belowMinimum.StatusCode);
+        Assert.Contains("201 pesos", await belowMinimum.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(client,
+            "layaway-above-total", Request(scenario,
+                [new CreateLayawayPaymentRequest("EFECTIVO", 1002m, 1002m, null)]))).StatusCode);
         Assert.Equal(before, await CaptureAsync(scenario, session.Id));
         var request = Request(scenario, [
             new("EFECTIVO", 101m, 200m, null),
@@ -547,6 +552,40 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
     }
 
     [Fact, Trait("Category", "Integration")]
+    public async Task DisabledMinimum_AcceptsOnePeso_RejectsZeroAndAboveTotal_AndSnapshotsAppliedRule()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        await SetMinimumRequirementAsync(false);
+        var session = await StartSessionAsync(client, scenario);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var before = await CaptureAsync(scenario, session.Id);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(client,
+            "layaway-disabled-zero", Request(scenario,
+                [new CreateLayawayPaymentRequest("EFECTIVO", 0m, 0m, null)]))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(client,
+            "layaway-disabled-above-total", Request(scenario,
+                [new CreateLayawayPaymentRequest("EFECTIVO", 1002m, 1002m, null)]))).StatusCode);
+        Assert.Equal(before, await CaptureAsync(scenario, session.Id));
+
+        var created = await ReadAsync<CreatedLayawayDto>(await PostAsync(client,
+            "layaway-disabled-one-peso", Request(scenario,
+                [new CreateLayawayPaymentRequest("EFECTIVO", 1m, 1m, null)])),
+            HttpStatusCode.Created);
+
+        Assert.Equal(0m, created.MinimumPercentage);
+        Assert.Equal(1m, created.MinimumInitialPayment);
+        Assert.Equal(1m, created.InitialPayment);
+        Assert.Equal(1000m, created.Balance);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var persisted = await db.Apartado.AsNoTracking().SingleAsync(x => x.Id == created.Id);
+        Assert.Equal(0m, persisted.PorcentajeMinimoInicial);
+        Assert.Equal(1m, persisted.AbonoInicial);
+    }
+
+    [Fact, Trait("Category", "Integration")]
     public async Task ConcurrentReservations_AllowOnlyAvailableStock_AndReplayHasNoSecondEffects()
     {
         using var setupClient = CreateClient();
@@ -678,6 +717,7 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
         var establishment = await db.Establecimiento.SingleAsync();
         establishment.DiasLimiteApartado = 15;
         establishment.PorcentajeMinimoApartado = 20m;
+        establishment.RequireMinimumInitial = true;
         var customer = new Cliente
         {
             Id = Guid.CreateVersion7(), TipoDocumento = "CC",
@@ -698,6 +738,15 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var establishment = await db.Establecimiento.SingleAsync();
         establishment.DiasLimiteApartado = days;
+        await db.SaveChangesAsync();
+    }
+
+    private async Task SetMinimumRequirementAsync(bool required)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var establishment = await db.Establecimiento.SingleAsync();
+        establishment.RequireMinimumInitial = required;
         await db.SaveChangesAsync();
     }
 

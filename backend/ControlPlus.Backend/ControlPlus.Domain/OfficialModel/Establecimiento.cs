@@ -32,6 +32,16 @@ public partial class Establecimiento
     /// </summary>
     public decimal PorcentajeMinimoApartado { get; set; }
 
+    /// <summary>
+    /// Indica si el porcentaje mínimo se exige en apartados nuevos. Si está apagado, se exige un peso.
+    /// </summary>
+    public bool RequireMinimumInitial { get; set; } = true;
+
+    /// <summary>
+    /// Plazo predeterminado para créditos nuevos. NULL significa que el vendedor elige la fecha cada vez.
+    /// </summary>
+    public int? DiasCreditoPredeterminado { get; set; }
+
     public int DiasLimiteCambio { get; set; }
 
     /// <summary>

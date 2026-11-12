@@ -1705,6 +1705,10 @@ public partial class OfficialControlPlusDbContext : DbContext
             entity.Property(e => e.DiasLimiteApartado)
                 .HasComment("Opcional. Si es NULL, el usuario debe escoger la fecha limite de cada apartado.")
                 .HasColumnName("dias_limite_apartado");
+            entity.Property(e => e.DiasCreditoPredeterminado)
+                .HasDefaultValue(30)
+                .HasComment("Opcional. Si es NULL, el vendedor debe escoger el vencimiento de cada credito.")
+                .HasColumnName("dias_credito_predeterminado");
             entity.Property(e => e.DiasLimiteCambio)
                 .HasDefaultValue(15)
                 .HasColumnName("dias_limite_cambio");
@@ -1745,6 +1749,10 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .HasDefaultValue(20m)
                 .HasComment("Porcentaje minimo configurable; el valor inicial aprobado es 20 por ciento.")
                 .HasColumnName("porcentaje_minimo_apartado");
+            entity.Property(e => e.RequireMinimumInitial)
+                .HasDefaultValue(true)
+                .HasComment("Si es false, los apartados nuevos exigen solo un peso de abono inicial.")
+                .HasColumnName("apartado_exige_minimo");
             entity.Property(e => e.RpoMinutos)
                 .HasDefaultValue(30)
                 .HasColumnName("rpo_minutos");

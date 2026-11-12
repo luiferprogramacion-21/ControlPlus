@@ -30,12 +30,16 @@ public sealed class OpenApiCreditsContractTests
         AssertOperations(paths, "/api/credits", "get");
         AssertOperations(paths, "/api/credits/{creditId}", "get");
         AssertOperations(paths, "/api/credits/{creditId}/payments", "get", "post");
+        AssertOperations(paths, "/api/credits/settings", "get", "put");
+        AssertOperations(paths, "/api/sales/credit-rules", "get");
         AssertOperations(paths, "/api/document-numbering/credit-payments", "get", "post", "put");
         AssertResponse(paths, "/api/credits", "get", "200", "application/json");
         AssertResponse(paths, "/api/credits", "get", "400", "application/problem+json");
         AssertResponse(paths, "/api/credits/{creditId}", "get", "404", "application/problem+json");
         AssertResponse(paths, "/api/credits/{creditId}/payments", "post", "201", "application/json");
         AssertResponse(paths, "/api/credits/{creditId}/payments", "post", "409", "application/problem+json");
+        AssertResponse(paths, "/api/credits/settings", "put", "409", "application/problem+json");
+        AssertResponse(paths, "/api/sales/credit-rules", "get", "404", "application/problem+json");
         AssertResponse(paths, "/api/document-numbering/credit-payments", "post", "201", "application/json");
         AssertResponse(paths, "/api/document-numbering/credit-payments", "put", "409", "application/problem+json");
 

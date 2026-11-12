@@ -225,9 +225,14 @@ public sealed class LayawayCreateService(
         try
         {
             initialPayment = CashMoney.Sum(input.Payments.Select(x => x.AppliedAmount));
-            minimumPayment = LayawayPolicy.MinimumInitialPayment(total, establishment.PorcentajeMinimoApartado);
-            if (initialPayment < minimumPayment || initialPayment > total)
-                return Fail(ApplicationError.Validation("El abono inicial debe cubrir el mínimo configurado sin superar el total."));
+            minimumPayment = establishment.RequireMinimumInitial
+                ? LayawayPolicy.MinimumInitialPayment(total, establishment.PorcentajeMinimoApartado)
+                : 1m;
+            if (initialPayment < minimumPayment)
+                return Fail(ApplicationError.Validation(
+                    $"El abono inicial mínimo es de {minimumPayment:0} pesos."));
+            if (initialPayment > total)
+                return Fail(ApplicationError.Validation("El abono inicial no puede superar el total del apartado."));
         }
         catch (CashMoneyException)
         {
@@ -262,7 +267,10 @@ public sealed class LayawayCreateService(
             AutorizacionOperacionId = Guid.CreateVersion7(), Prefijo = layawaySequence.Prefijo,
             Serie = layawaySequence.Serie, Consecutivo = layawaySequence.UltimoNumero,
             FechaHora = now.UtcDateTime, FechaLimite = dueDate,
-            AmbitoDescuento = "NINGUNO", PorcentajeMinimoInicial = establishment.PorcentajeMinimoApartado,
+            AmbitoDescuento = "NINGUNO",
+            PorcentajeMinimoInicial = establishment.RequireMinimumInitial
+                ? establishment.PorcentajeMinimoApartado
+                : 0m,
             AbonoInicial = initialPayment, SubtotalBruto = total, DescuentoTotal = 0,
             IvaDiscriminadoCompleto = true,
             BaseGravableTotal = taxBaseTotal, ImpuestoIncluidoTotal = taxTotal,

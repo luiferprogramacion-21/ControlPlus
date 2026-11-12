@@ -26,6 +26,7 @@ public sealed class InstallationBootstrapper(OfficialControlPlusDbContext dbCont
             Identificacion = Required(request.EstablishmentIdentification, nameof(request.EstablishmentIdentification)),
             ZonaHoraria = "America/Bogota",
             PorcentajeMinimoApartado = 20m,
+            DiasLimiteApartado = 15,
             DiasLimiteCambio = 15,
             ModoTurnoPredeterminado = "INDIVIDUAL",
             RpoMinutos = 30,

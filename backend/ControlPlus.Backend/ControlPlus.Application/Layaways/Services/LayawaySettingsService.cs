@@ -12,8 +12,8 @@ namespace ControlPlus.Application.Layaways.Services;
 
 /// <summary>
 /// Reads and updates the layaway parameters stored in the active establishment: the minimum initial
-/// payment percentage and the default due-date term. Only changes future layaways; existing ones keep
-/// the percentage and date they were created with. Requires CONFIGURATION.MANAGE.
+/// payment percentage, whether it is enforced and the default due-date term. Only changes future
+/// layaways; existing ones keep the rule and date they were created with.
 /// </summary>
 public sealed class LayawaySettingsService(
     ISalesRepository sales,
@@ -29,12 +29,32 @@ public sealed class LayawaySettingsService(
     {
         var snapshot = await users.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
         if (snapshot is null) return Result.Failure<LayawaySettingsDto>(ApplicationError.Unauthorized());
-        if (!snapshot.PermissionCodes.Contains(PermissionCodes.ConfigurationManage, StringComparer.OrdinalIgnoreCase))
+        if (snapshot.HighestRoleLevel != RoleLevel.Administrador ||
+            !snapshot.PermissionCodes.Contains(PermissionCodes.ConfigurationManage, StringComparer.OrdinalIgnoreCase))
             return Result.Failure<LayawaySettingsDto>(ApplicationError.Forbidden());
         var establishment = await sales.GetActiveEstablishmentAsync(cancellationToken);
         return establishment is null
             ? Result.Failure<LayawaySettingsDto>(ApplicationError.NotFound("el establecimiento activo"))
             : Result.Success(Map(establishment));
+    }
+
+    public async Task<Result<LayawayCreationRulesDto>> GetCreationRulesAsync(
+        ActorContext actor, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await users.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
+        if (snapshot is null) return Result.Failure<LayawayCreationRulesDto>(ApplicationError.Unauthorized());
+        if (!snapshot.PermissionCodes.Contains(PermissionCodes.LayawayManage, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<LayawayCreationRulesDto>(ApplicationError.Forbidden());
+        var installation = await sales.GetActiveInstallationAsync(cancellationToken);
+        if (installation is null)
+            return Result.Failure<LayawayCreationRulesDto>(ApplicationError.NotFound("la instalación activa"));
+        var establishment = await sales.GetActiveEstablishmentAsync(cancellationToken);
+        return establishment is null || establishment.Id != installation.EstablecimientoId
+            ? Result.Failure<LayawayCreationRulesDto>(ApplicationError.NotFound("el establecimiento activo"))
+            : Result.Success(new LayawayCreationRulesDto(
+                establishment.RequireMinimumInitial,
+                establishment.PorcentajeMinimoApartado,
+                establishment.DiasLimiteApartado));
     }
 
     public async Task<Result<LayawaySettingsDto>> UpdateAsync(ActorContext actor, UpdateLayawaySettingsRequest request,
@@ -48,7 +68,8 @@ public sealed class LayawaySettingsService(
         if (installation is null) return Result.Failure<LayawaySettingsDto>(ApplicationError.NotFound("la instalación activa"));
         var snapshot = await users.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
         if (snapshot is null) return Result.Failure<LayawaySettingsDto>(ApplicationError.Unauthorized());
-        if (!snapshot.PermissionCodes.Contains(PermissionCodes.ConfigurationManage, StringComparer.OrdinalIgnoreCase))
+        if (snapshot.HighestRoleLevel != RoleLevel.Administrador ||
+            !snapshot.PermissionCodes.Contains(PermissionCodes.ConfigurationManage, StringComparer.OrdinalIgnoreCase))
             return Result.Failure<LayawaySettingsDto>(ApplicationError.Forbidden());
         var establishment = await sales.GetActiveEstablishmentForUpdateAsync(cancellationToken);
         if (establishment is null || establishment.Id != installation.EstablecimientoId)
@@ -56,13 +77,28 @@ public sealed class LayawaySettingsService(
         if (establishment.Version != request.ExpectedVersion)
             return Result.Failure<LayawaySettingsDto>(ApplicationError.ConcurrencyConflict("La configuración fue modificada."));
 
-        var previous = new { Percentage = establishment.PorcentajeMinimoApartado, Days = establishment.DiasLimiteApartado };
+        var previous = new
+        {
+            Percentage = establishment.PorcentajeMinimoApartado,
+            Days = establishment.DiasLimiteApartado,
+            RequireMinimumInitial = establishment.RequireMinimumInitial
+        };
         establishment.PorcentajeMinimoApartado = request.MinimumPercentage;
         establishment.DiasLimiteApartado = request.DefaultDays;
+        establishment.RequireMinimumInitial = request.RequireMinimumInitial;
         establishment.FechaModificacion = clock.UtcNow.UtcDateTime;
         await AuditWriter.WriteCashAsync(audits, clock, actor.UserId, AuditAction.LayawaySettingsUpdated,
             nameof(Establecimiento), establishment.Id,
-            new { Previous = previous, New = new { Percentage = request.MinimumPercentage, Days = request.DefaultDays } },
+            new
+            {
+                Previous = previous,
+                New = new
+                {
+                    Percentage = request.MinimumPercentage,
+                    Days = request.DefaultDays,
+                    request.RequireMinimumInitial
+                }
+            },
             Guid.CreateVersion7(), null, null, null, null, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -81,5 +117,9 @@ public sealed class LayawaySettingsService(
         return null;
     }
 
-    private static LayawaySettingsDto Map(Establecimiento e) => new(e.PorcentajeMinimoApartado, e.DiasLimiteApartado, e.Version);
+    private static LayawaySettingsDto Map(Establecimiento e) => new(
+        e.PorcentajeMinimoApartado,
+        e.DiasLimiteApartado,
+        e.RequireMinimumInitial,
+        e.Version);
 }

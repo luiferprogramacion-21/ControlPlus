@@ -110,5 +110,6 @@ public enum AuditAction
     ProductDeleted = 101,
     SaleDiscountAuthorizationRejected = 102,
     LayawaySettingsUpdated = 103,
-    CashOpenAuthorizationRejected = 104
+    CashOpenAuthorizationRejected = 104,
+    CreditSettingsUpdated = 106
 }

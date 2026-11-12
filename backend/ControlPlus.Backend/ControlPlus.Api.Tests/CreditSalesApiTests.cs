@@ -8,6 +8,7 @@ using System.Text.Json;
 using ControlPlus.Application.Cash.Contracts;
 using ControlPlus.Application.Catalog.Contracts;
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Credits.Contracts;
 using ControlPlus.Application.Numbering.Contracts;
 using ControlPlus.Application.Sales.Contracts;
 using ControlPlus.Application.Security.Contracts;
@@ -152,6 +153,38 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         foreach (var sensitive in new[] { key, SupervisorPassword, CashierPassword,
                      scenario.Cashier.AccessToken, "Dirección privada de crédito", "correo-privado@prueba.invalid" })
             Assert.DoesNotContain(sensitive, audit, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task CreditSale_UsesTheProposedDate_AndChangingTheDefaultDoesNotChangeExistingCredit()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var rules = await ReadAsync<CreditRulesDto>(
+            await client.GetAsync("/api/sales/credit-rules"), HttpStatusCode.OK);
+        Assert.Equal(30, rules.DefaultDays);
+        var proposedDueDate = scenario.Shift.OperatingDate.AddDays(rules.DefaultDays!.Value);
+
+        _ = await StartSessionAsync(client, scenario, scenario.Cashier);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client,
+            "credit-proposed-default-date",
+            CreditRequest(scenario, scenario.CustomerId, proposedDueDate)), HttpStatusCode.Created);
+
+        SetBearer(client, scenario.Admin.AccessToken);
+        var settings = await ReadAsync<CreditSettingsDto>(
+            await client.GetAsync("/api/credits/settings"), HttpStatusCode.OK);
+        _ = await ReadAsync<CreditSettingsDto>(await client.PutAsJsonAsync(
+            "/api/credits/settings", new UpdateCreditSettingsRequest(45, settings.Version)),
+            HttpStatusCode.OK);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(proposedDueDate, await db.Credito.AsNoTracking()
+            .Where(x => x.Id == sale.CreditId)
+            .Select(x => x.FechaVencimiento).SingleAsync());
     }
 
     [Fact]
