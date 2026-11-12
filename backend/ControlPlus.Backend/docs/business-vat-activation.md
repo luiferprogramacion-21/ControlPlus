@@ -320,7 +320,9 @@ DO $guard$ BEGIN
           OR (conrelid = 'ventas.detalle_cambio_venta'::regclass AND conname = 'ck_detalle_cambio_iva_incluido'))
         AND position(', 4)' IN pg_get_constraintdef(oid)) > 0
         AND position(', 0)' IN pg_get_constraintdef(oid)) > 0
-        AND position('base_gravable + valor_iva = subtotal_neto' IN pg_get_constraintdef(oid)) > 0) <> 2
+        -- PostgreSQL devuelve la definición con paréntesis, p. ej. ((base_gravable + valor_iva) = subtotal_neto):
+        -- se compara sin paréntesis ni espacios para que coincida con cualquier forma normalizada.
+        AND position('base_gravable+valor_iva=subtotal_neto' IN regexp_replace(pg_get_constraintdef(oid), '[() ]', '', 'g')) > 0) <> 2
   THEN RAISE EXCEPTION 'BUSINESS_VAT_LAYAWAYS_CHANGES_POSTFLIGHT_REJECTED'; END IF;
 END $guard$;
 SELECT conrelid::regclass, conname, pg_get_constraintdef(oid)
