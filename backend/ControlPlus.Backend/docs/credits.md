@@ -16,6 +16,12 @@ El autorizador debe ser un usuario diferente del ejecutor, activo, no bloqueado,
 
 Venta, detalles, movimientos y stock de inventario, autorización, crédito, idempotencia, sesión compartida y auditoría se confirman o revierten juntos. El crédito inicia `PENDIENTE` con `monto_original`, `monto_ajustado` y `saldo_pendiente` iguales al total de la venta. Un replay compatible devuelve la venta original; reutilizar la clave con usuario, tipo o contenido incompatible devuelve `409`.
 
+### Plazo predeterminado (decisión del 12 de noviembre de 2026)
+
+`GET/PUT /api/credits/settings` permite al Administrador vigente con `CONFIGURATION.MANAGE` efectivo consultar y cambiar el plazo sugerido entre 1 y 90 días, o dejarlo nulo para elegir cada vencimiento. El valor inicial es 30. El PUT exige `expectedVersion`, rechaza propiedades desconocidas, devuelve `409 concurrency.conflict` ante una versión obsoleta y audita los valores anterior y nuevo en la misma transacción. Supervisor y Cajero reciben 403 incluso si se les concede individualmente `CONFIGURATION.MANAGE`.
+
+`GET /api/sales/credit-rules` exige únicamente `CREDIT.REQUEST` y devuelve `{ defaultDays }`, sin versión ni otros parámetros. La pantalla suma ese plazo a la fecha operativa para proponer `dueDate`; el valor sigue editable. El servidor no deriva ni sustituye la fecha: `POST /api/sales` continúa exigiéndola entre mañana y 90 días inclusive. Cambiar el plazo nunca modifica créditos existentes. El almacenamiento se incluye junto con la regla de apartados en la migración única `20261112010000_LayawayMinimumInitialPaymentV1`, activada en `controlplus` el 12 de noviembre de 2026; véase `docs/credit-default-term.md`.
+
 ## Estados y consultas
 
 | Estado | Regla |
@@ -33,6 +39,8 @@ Un crédito vencido puede recibir abonos. Si el cliente se inactiva después del
 | `GET` | `/api/credits/{creditId}` | `CREDIT.MANAGE` |
 | `GET` | `/api/credits/{creditId}/payments` | `CREDIT.MANAGE` y `CUSTOMERS.HISTORY_READ` |
 | `POST` | `/api/credits/{creditId}/payments` | `CREDIT.MANAGE` |
+| `GET/PUT` | `/api/credits/settings` | Administrador y `CONFIGURATION.MANAGE` |
+| `GET` | `/api/sales/credit-rules` | `CREDIT.REQUEST` |
 
 Lista e historial usan `page=1`, `pageSize=20`, máximo 100 y desempate estable por UUID. La lista acepta `state` (`PENDIENTE`, `VENCIDO`, `PAGADO`, `ANULADO`), `dueFrom`, `dueTo`, `customerId` y `saleNumber`; este último busca número completo o prefijo de venta sin comodín inicial. Los créditos se ordenan por fecha de otorgamiento e ID descendentes; los pagos por fecha e ID descendentes. Las lecturas no modifican estado ni versión.
 

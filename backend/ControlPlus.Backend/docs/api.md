@@ -51,7 +51,7 @@ Los únicos endpoints anónimos son los de salud y los flujos de autenticación 
 | Recepción de pedidos | `/api/purchase-orders/{orderId}/receipts` | Supervisor o Administrador con `PURCHASES.RECEIVE`; excepciones con autorización vigente `PURCHASES.RECEIVE_EXCEPTIONS` de Administrador |
 | Cierre y cancelación de pedidos | `/api/purchase-orders/{orderId}/close`, `/cancel` | Cierre con `PURCHASE_ORDERS.MANAGE`; cancelación con `PURCHASE_ORDERS.CANCEL`; ambos con reautenticación de Administrador |
 | Numeración de Compras | `/api/document-numbering/purchases` | `NUMBERING.MANAGE` efectivo |
-| Créditos y abonos | `/api/credits` | `CREDIT.MANAGE`; el historial añade `CUSTOMERS.HISTORY_READ` |
+| Créditos y abonos | `/api/credits`; reglas en `/api/sales/credit-rules` | `CREDIT.MANAGE`; configuración solo Administrador + `CONFIGURATION.MANAGE`; lectura de regla con `CREDIT.REQUEST` |
 | Numeración de abonos | `/api/document-numbering/credit-payments` | `NUMBERING.MANAGE` |
 
 Cada usuario tiene exactamente un rol principal. La reasignación se realiza con `POST /api/users/{userId}/roles`; no existe `DELETE /api/users/{userId}/roles/{roleId}` porque no sería válido retirar el único rol.
@@ -150,6 +150,8 @@ La respuesta `201` incluye la venta, líneas y pagos, sin exponer el costo hist�
 | `GET` | `/api/credits/{creditId}` | `CREDIT.MANAGE` | Detalle `200` o `404` |
 | `GET` | `/api/credits/{creditId}/payments` | `CREDIT.MANAGE` y `CUSTOMERS.HISTORY_READ` | Historial paginado `200` o `404` |
 | `POST` | `/api/credits/{creditId}/payments` | `CREDIT.MANAGE` | Abono `201`; exige `Idempotency-Key` y `expectedVersion` |
+| `GET/PUT` | `/api/credits/settings` | Administrador vigente y `CONFIGURATION.MANAGE` | Plazo predeterminado 1–90 o nulo, versionado |
+| `GET` | `/api/sales/credit-rules` | `CREDIT.REQUEST` | `{ defaultDays }` para proponer el vencimiento |
 
 `GET /api/credits` acepta `page` (1 por defecto), `pageSize` (20 por defecto, máximo 100), `state`, `dueFrom`, `dueTo`, `customerId` y `saleNumber`. `state` admite `PENDIENTE`, `VENCIDO`, `PAGADO` y `ANULADO`. `saleNumber` acepta número completo o prefijo sin comodín inicial. Los créditos se ordenan por otorgamiento e ID descendentes; los abonos por fecha e ID descendentes. Las lecturas proyectan `VENCIDO` cuando un `PENDIENTE` con saldo supera su fecha local de vencimiento, sin modificar la base.
 

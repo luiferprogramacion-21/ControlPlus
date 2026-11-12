@@ -354,3 +354,233 @@ ROLLBACK;
 ```
 
 La única escritura autorizada por el bloque es la confirmación del objetivo exacto mediante el migrador. Si cualquier etapa falla, conservar la API detenida y la carpeta de evidencia; no repetir, no ejecutar `Down` y no restaurar automáticamente el respaldo sobre la base real. Primero diagnosticar en lectura y ensayar cualquier recuperación en un clon nuevo.
+
+# Activación conjunta de reglas de apartados y créditos (historial 22→23)
+
+**Activada por el operador el 12 de noviembre de 2026 (`LAYAWAY_CREDIT_RULES_ACTIVATION_OK`; no repetir).** Objetivo único: `20261112010000_LayawayMinimumInitialPaymentV1`. Incluye el interruptor del pago inicial porcentual de apartados y el plazo predeterminado de créditos. El agente no consultó `controlplus` ni aplicó esta migración. La línea base obligatoria es de 22 migraciones, con `20261111010000_BusinessVatWholePesoLayawaysChangesV1` como última; esa migración ya fue aplicada una vez y no se repite.
+
+Antes de abrir la ventana real deben aprobar, con `CONTROLPLUS_TEST_ADMIN_CONNECTION` y exclusivamente sobre bases `controlplus_test_*`, `LayawayMinimumInitialPaymentMigrationTests`, `LayawaySettingsApiTests`, `LayawayCreateApiFlowTests`, `CreditSettingsApiTests` y `CreditSalesApiTests`, sin fallidas ni omitidas. También debe aprobar la compilación serial de la solución con `/warnaserror`. La API y el frontend deben estar detenidos y no puede existir otro cliente de base. Este bloque vuelve a compilar y congela el binario exacto que aplica.
+
+## Bloque único para el operador (ejecutado el 12 de noviembre de 2026; no repetir)
+
+```powershell
+& {
+  $ErrorActionPreference = 'Stop'
+  Set-Location 'C:\ControlPlus\backend\ControlPlus.Backend'
+  $target = '20261112010000_LayawayMinimumInitialPaymentV1'
+  $previous = '20261111010000_BusinessVatWholePesoLayawaysChangesV1'
+  $stamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ')
+  $evidence = Join-Path $env:USERPROFILE "ControlPlus-Backups\LayawayCreditRules-$stamp-$([guid]::NewGuid().ToString('N'))"
+  New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+  $publish = Join-Path $evidence 'api-bin'
+  dotnet publish .\ControlPlus.Api\ControlPlus.Api.csproj -c Release -o $publish -m:1 /p:BuildInParallel=false /warnaserror
+  if ($LASTEXITCODE -ne 0) { throw 'Falló la compilación; detener.' }
+  $apiDll = Join-Path $publish 'ControlPlus.Api.dll'
+  $binaryHash = (Get-FileHash -LiteralPath $apiDll -Algorithm SHA256).Hash
+
+  $password = Read-Host 'Contraseña de postgres' -AsSecureString
+  $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($password)
+  try { $env:PGPASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
+  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
+  $env:PGHOST = '127.0.0.1'
+  $env:PGPORT = '5432'
+  $env:PGUSER = 'postgres'
+  $env:PGDATABASE = 'controlplus'
+  $env:PGOPTIONS = '-c default_transaction_read_only=on'
+  $env:ConnectionStrings__ControlPlusDb = "Host=127.0.0.1;Port=5432;Database=controlplus;Username=postgres;Password=$($env:PGPASSWORD)"
+
+  function Read-Sql([string]$name, [string]$sql) {
+    $path = Join-Path $evidence "$name.sql"
+    [IO.File]::WriteAllText($path, $sql, [Text.UTF8Encoding]::new($false))
+    $out = & psql -X -v ON_ERROR_STOP=1 -A -t -f $path 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Falló $name`: $out" }
+    $out | Set-Content -LiteralPath (Join-Path $evidence "$name.txt") -Encoding UTF8
+    return @($out)
+  }
+
+  $historySql = @'
+BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+SELECT count(*)::text || '|' || max("MigrationId") FROM public."__EFMigrationsHistory";
+ROLLBACK;
+'@
+  function Assert-History([int]$count, [string]$last, [string]$stage) {
+    $rows = @(Read-Sql "history-$stage" $historySql | Where-Object { $_ -match '^\d+\|' })
+    if ($rows.Count -ne 1 -or $rows[0] -cne "$count|$last") {
+      throw "Historial inesperado en $stage`: $rows"
+    }
+  }
+
+  $fingerprintSql = @'
+BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+SELECT 'establecimiento|' || count(*) || '|' ||
+  coalesce(md5(string_agg(md5(((to_jsonb(e) - 'apartado_exige_minimo') - 'dias_credito_predeterminado')::text), '' ORDER BY e.id::text)), md5(''))
+FROM configuracion.establecimiento e;
+SELECT 'apartado|' || count(*) || '|' ||
+  coalesce(md5(string_agg(md5(row_to_json(a)::text), '' ORDER BY a.id::text)), md5(''))
+FROM ventas.apartado a;
+SELECT 'credito|' || count(*) || '|' ||
+  coalesce(md5(string_agg(md5(row_to_json(c)::text), '' ORDER BY c.id::text)), md5(''))
+FROM ventas.credito c;
+ROLLBACK;
+'@
+  function Read-Fingerprints([string]$stage) {
+    return @(Read-Sql "fingerprints-$stage" $fingerprintSql |
+      Where-Object { $_ -match '^(establecimiento|apartado|credito)\|' })
+  }
+
+  try {
+    $preflightSql = @'
+BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+DO $guard$ BEGIN
+  IF current_database() <> 'controlplus'
+     OR current_user <> 'postgres'
+     OR current_setting('transaction_read_only') <> 'on'
+     OR current_setting('server_version_num')::int NOT BETWEEN 180000 AND 189999
+     OR (SELECT count(*) FROM public."__EFMigrationsHistory") <> 22
+     OR (SELECT max("MigrationId") FROM public."__EFMigrationsHistory") <> '20261111010000_BusinessVatWholePesoLayawaysChangesV1'
+     OR EXISTS (SELECT 1 FROM public."__EFMigrationsHistory" WHERE "MigrationId" = '20261112010000_LayawayMinimumInitialPaymentV1')
+     OR EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type='client backend')
+     OR EXISTS (SELECT 1 FROM information_schema.columns
+                WHERE table_schema='configuracion' AND table_name='establecimiento'
+                  AND column_name IN ('apartado_exige_minimo','dias_credito_predeterminado'))
+     OR EXISTS (SELECT 1 FROM pg_constraint
+                WHERE conrelid='configuracion.establecimiento'::regclass
+                  AND conname='ck_establecimiento_dias_credito_predeterminado')
+     OR EXISTS (SELECT 1 FROM ventas.apartado
+                WHERE porcentaje_minimo_inicial > 0
+                  AND abono_inicial < ceil(total * porcentaje_minimo_inicial / 100))
+     OR (SELECT count(*) FROM pg_constraint
+         WHERE conrelid='ventas.apartado'::regclass AND conname='ck_apartado_montos') <> 1
+  THEN RAISE EXCEPTION 'LAYAWAY_CREDIT_RULES_PREFLIGHT_REJECTED'; END IF;
+END $guard$;
+SELECT 'LAYAWAY_CREDIT_RULES_PREFLIGHT_OK';
+ROLLBACK;
+'@
+    if (@(Read-Sql 'preflight' $preflightSql |
+        Where-Object { $_ -eq 'LAYAWAY_CREDIT_RULES_PREFLIGHT_OK' }).Count -ne 1) {
+      throw 'Preflight incompleto.'
+    }
+    Assert-History 22 $previous 'before'
+    $before = @(Read-Fingerprints 'before')
+    if ($before.Count -ne 3) { throw 'Huellas iniciales incompletas.' }
+
+    $dump = Join-Path $evidence 'controlplus-before.dump'
+    & pg_dump -Fc --no-owner --no-acl -f $dump controlplus
+    if ($LASTEXITCODE -ne 0) { throw 'Falló pg_dump.' }
+    $backupHash = (Get-FileHash -LiteralPath $dump -Algorithm SHA256).Hash
+    $backupHash | Set-Content -LiteralPath (Join-Path $evidence 'backup.sha256') -Encoding ASCII
+    & pg_restore --list $dump > (Join-Path $evidence 'backup.toc.txt')
+    if ($LASTEXITCODE -ne 0) { throw 'Respaldo sin TOC legible.' }
+    & pg_restore --file NUL $dump
+    if ($LASTEXITCODE -ne 0 -or
+        (Get-FileHash -LiteralPath $dump -Algorithm SHA256).Hash -cne $backupHash) {
+      throw 'Falló la verificación del respaldo.'
+    }
+    Assert-History 22 $previous 'after-backup'
+    $afterBackup = @(Read-Fingerprints 'after-backup')
+    if (($afterBackup -join "`n") -cne ($before -join "`n")) {
+      throw 'Los datos cambiaron durante el respaldo.'
+    }
+
+    if ((Get-FileHash -LiteralPath $apiDll -Algorithm SHA256).Hash -cne $binaryHash -or
+        (Get-FileHash -LiteralPath $dump -Algorithm SHA256).Hash -cne $backupHash) {
+      throw 'Cambió el binario o el respaldo antes de aplicar.'
+    }
+    Remove-Item Env:PGOPTIONS
+    $env:CONTROLPLUS_MIGRATIONS_ENABLED = 'true'
+    $applyOutput = & dotnet $apiDll --migrate-to $target 2>&1
+    $applyCode = $LASTEXITCODE
+    $applyOutput | Set-Content -LiteralPath (Join-Path $evidence "apply-$target.txt") -Encoding UTF8
+    if ($applyCode -ne 0) { throw 'El migrador falló; no reintentar automáticamente.' }
+
+    $env:PGOPTIONS = '-c default_transaction_read_only=on'
+    Assert-History 23 $target 'postflight'
+    $postflightSql = @'
+BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+DO $guard$ DECLARE credit_check text; layaway_check text; BEGIN
+  SELECT pg_get_constraintdef(oid) INTO credit_check
+  FROM pg_constraint
+  WHERE conrelid='configuracion.establecimiento'::regclass
+    AND conname='ck_establecimiento_dias_credito_predeterminado';
+  SELECT pg_get_constraintdef(oid) INTO layaway_check
+  FROM pg_constraint
+  WHERE conrelid='ventas.apartado'::regclass AND conname='ck_apartado_montos';
+  IF (SELECT count(*) FROM information_schema.columns
+      WHERE table_schema='configuracion' AND table_name='establecimiento'
+        AND ((column_name='apartado_exige_minimo' AND data_type='boolean' AND is_nullable='NO' AND column_default='true')
+          OR (column_name='dias_credito_predeterminado' AND data_type='integer' AND is_nullable='YES' AND column_default='30'))) <> 2
+     OR credit_check IS NULL
+     OR position('dias_credito_predeterminadoISNULL' IN regexp_replace(credit_check, '[() ]', '', 'g')) = 0
+     OR position('dias_credito_predeterminado>=1' IN regexp_replace(credit_check, '[() ]', '', 'g')) = 0
+     OR position('dias_credito_predeterminado<=90' IN regexp_replace(credit_check, '[() ]', '', 'g')) = 0
+     OR layaway_check IS NULL
+     OR position('porcentaje_minimo_inicial>=0' IN regexp_replace(layaway_check, '[() ]', '', 'g')) = 0
+     OR position('CASE' IN layaway_check) = 0
+     OR position('THEN1' IN regexp_replace(layaway_check, '[() ]', '', 'g')) = 0
+     OR position('ceil' IN lower(layaway_check)) = 0
+     OR EXISTS (SELECT 1 FROM configuracion.establecimiento
+                WHERE apartado_exige_minimo IS DISTINCT FROM true
+                   OR dias_credito_predeterminado IS DISTINCT FROM 30)
+     OR (EXISTS (SELECT 1 FROM pg_roles WHERE rolname='controlplus_app')
+         AND NOT has_table_privilege('controlplus_app','configuracion.establecimiento','SELECT,UPDATE'))
+  THEN RAISE EXCEPTION 'LAYAWAY_CREDIT_RULES_POSTFLIGHT_REJECTED'; END IF;
+END $guard$;
+SELECT column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_schema='configuracion' AND table_name='establecimiento'
+  AND column_name IN ('apartado_exige_minimo','dias_credito_predeterminado')
+ORDER BY column_name;
+SELECT conrelid::regclass, conname, pg_get_constraintdef(oid)
+FROM pg_constraint
+WHERE (conrelid='configuracion.establecimiento'::regclass
+       AND conname='ck_establecimiento_dias_credito_predeterminado')
+   OR (conrelid='ventas.apartado'::regclass AND conname='ck_apartado_montos')
+ORDER BY conrelid::regclass::text, conname;
+SELECT 'LAYAWAY_CREDIT_RULES_POSTFLIGHT_OK';
+ROLLBACK;
+'@
+    if (@(Read-Sql 'postflight' $postflightSql |
+        Where-Object { $_ -eq 'LAYAWAY_CREDIT_RULES_POSTFLIGHT_OK' }).Count -ne 1) {
+      throw 'Postflight incompleto; no iniciar la API.'
+    }
+    $after = @(Read-Fingerprints 'after')
+    if (($after -join "`n") -cne ($before -join "`n")) {
+      throw 'Las huellas históricas no se conservaron.'
+    }
+    if ((Get-FileHash -LiteralPath $dump -Algorithm SHA256).Hash -cne $backupHash -or
+        (Get-FileHash -LiteralPath $apiDll -Algorithm SHA256).Hash -cne $binaryHash) {
+      throw 'Cambió el respaldo o el binario después de aplicar.'
+    }
+    $fingerprintHash = (Get-FileHash -LiteralPath (Join-Path $evidence 'fingerprints-before.txt') -Algorithm SHA256).Hash
+    $result = [ordered]@{
+      result = 'LAYAWAY_CREDIT_RULES_ACTIVATION_OK'
+      target = $target
+      historyBefore = 22
+      historyAfter = 23
+      backupSha256 = $backupHash
+      apiSha256 = $binaryHash
+      fingerprintsSha256 = $fingerprintHash
+    }
+    $result | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'result.json') -Encoding UTF8
+    Write-Host "LAYAWAY_CREDIT_RULES_ACTIVATION_OK; evidencia: $evidence; respaldo SHA-256: $backupHash; API SHA-256: $binaryHash; huellas SHA-256: $fingerprintHash"
+  } finally {
+    Remove-Item Env:PGPASSWORD,Env:PGHOST,Env:PGPORT,Env:PGUSER,Env:PGDATABASE,Env:PGOPTIONS,Env:ConnectionStrings__ControlPlusDb,Env:CONTROLPLUS_MIGRATIONS_ENABLED -ErrorAction SilentlyContinue
+    if ($null -ne $password) { $password.Dispose() }
+    $password = $null
+  }
+}
+```
+
+La única escritura autorizada por este bloque es la migración objetivo exacta. Si cualquier etapa falla, conservar la API detenida y la evidencia; no repetir, no ejecutar `Down` y no restaurar automáticamente sobre `controlplus`. Diagnosticar en solo lectura y ensayar cualquier corrección en un clon nuevo.
+
+## Evidencia de la activación (12 de noviembre de 2026)
+
+Comunicada por el operador: `LAYAWAY_CREDIT_RULES_ACTIVATION_OK` en `C:\Users\luife\ControlPlus-Backups\LayawayCreditRules-20261112T162110Z-bd78f806dab4423e8c240678c13c5673`. El bloque terminó sin errores, por lo que el preflight (historial 22, última `20261111010000_BusinessVatWholePesoLayawaysChangesV1`, sin otros clientes), el respaldo verificado, el migrador, el postflight (columnas, CHECK 1–90, `ck_apartado_montos` y permisos de `controlplus_app`) y la igualdad de huellas de `establecimiento` (sin las dos columnas nuevas), `apartado` y `credito` resultaron conformes. Historial 22→23.
+
+- Respaldo previo SHA-256: `9940859DBC82C50E025D84DBF6128DCB04DF31BCDE0087E8B402E02D6FA6B856`.
+- API congelada SHA-256: `BD9D6E497645A8682380A8235968B6FCB099A623C9B22BC4E10F8D1F54D1EBD6`.
+- Huellas de conservación SHA-256: `7B308F791578B2C7034479FBDB2C316E89C74B5E2755D81836314B6C264F8CB9`.
+- Tras reiniciar la API: HTTP 200 en `/api/health`, `/api/health/database` y `/openapi/v1.json`; 401 sin sesión en `/api/credits/settings`, `/api/sales/credit-rules` y `/api/layaways/creation-rules`.
+- Revisión visual aprobada por el operador: Configuración → Créditos y Apartados, y fecha de vencimiento propuesta en la venta a crédito.
+
+**No repetir la migración ni ejecutar `Down`.** El agente no accedió a `controlplus`.
