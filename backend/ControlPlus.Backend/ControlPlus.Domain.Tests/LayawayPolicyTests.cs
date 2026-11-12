@@ -9,8 +9,8 @@ public sealed class LayawayPolicyTests
     public void IncludedTax_PreservesRoundingAndAcceptsRepresentableLimits()
     {
         var tax = LayawayPolicy.CalculateIncludedTax(1001m, 19m);
-        Assert.Equal(841.1765m, tax.Base);
-        Assert.Equal(159.8235m, tax.Tax);
+        Assert.Equal(841m, tax.Base);
+        Assert.Equal(160m, tax.Tax);
         Assert.Equal((99999999999999m, 0m), LayawayPolicy.CalculateIncludedTax(99999999999999m, 0m));
         Assert.Equal(99999999999999.9999m,
             LayawayPolicy.SumTaxAmounts([99999999999999m, 0.9999m]));

@@ -194,7 +194,8 @@ public sealed class LayawayCreateService(
                 CashMoney.Require(unitPrice.Value, allowNegative: false);
                 var lineTotal = CashMoney.Require(checked(unitPrice.Value * line.Quantity), allowNegative: false);
                 SalePricingPolicy.EnsureNotBelowCost(lineTotal, product.CostoPromedio.Value, line.Quantity);
-                var tax = LayawayPolicy.CalculateIncludedTax(lineTotal, product.PorcentajeIva);
+                var tax = LayawayPolicy.CalculateIncludedTax(lineTotal,
+                    establishment.VatEnabled ? establishment.VatPercentage : 0m);
                 prepared.Add(new PreparedLine(product, line.Quantity, line.PriceType, unitPrice.Value,
                     lineTotal, tax.Base, tax.Tax));
             }
@@ -263,7 +264,7 @@ public sealed class LayawayCreateService(
             FechaHora = now.UtcDateTime, FechaLimite = dueDate,
             AmbitoDescuento = "NINGUNO", PorcentajeMinimoInicial = establishment.PorcentajeMinimoApartado,
             AbonoInicial = initialPayment, SubtotalBruto = total, DescuentoTotal = 0,
-            IvaDiscriminadoCompleto = prepared.All(x => x.Product.PorcentajeIva is not null),
+            IvaDiscriminadoCompleto = true,
             BaseGravableTotal = taxBaseTotal, ImpuestoIncluidoTotal = taxTotal,
             Total = total, SaldoPendiente = total - initialPayment,
             Estado = initialPayment == total ? "PAGADO" : "ACTIVO",
@@ -283,7 +284,8 @@ public sealed class LayawayCreateService(
                 CodigoProducto = product.CodigoInterno, NombreProducto = product.Nombre,
                 UnidadMedida = unitNames[product.UnidadMedidaId], Cantidad = line.Quantity,
                 PrecioReserva = line.UnitPrice, CostoUnitario = product.CostoPromedio,
-                PorcentajeIva = product.PorcentajeIva, SubtotalBruto = line.Total,
+                PorcentajeIva = establishment.VatEnabled ? establishment.VatPercentage : 0m,
+                SubtotalBruto = line.Total,
                 OrigenDescuento = "NINGUNO", ValorDescuento = 0,
                 BaseGravable = line.TaxBase, ValorIva = line.TaxAmount,
                 SubtotalNeto = line.Total

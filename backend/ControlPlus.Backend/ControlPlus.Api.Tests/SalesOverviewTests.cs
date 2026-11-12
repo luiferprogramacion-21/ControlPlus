@@ -29,6 +29,22 @@ public sealed class SalesOverviewTests
     }
 
     [Fact]
+    public async Task Overview_DeductsSavedChangeVatFromEstimatedGain()
+    {
+        var repo = new Repository
+        {
+            Data = new SalesOverviewData(
+                [new(From, "CONTADO", 1, 119m)], [new(To, 1, 24m)],
+                new(60m, 0, 0), new(10m, 0, 0), new(20m, 0, 0), [], 19m, 4m)
+        };
+        var result = await new SalesOverviewService(new Checker(), repo).GetAsync(Actor(), From, To, default);
+        var report = Assert.IsType<SalesOverviewReport>(result.Value);
+        Assert.Equal(143m, report.NetSalesTotal);
+        Assert.Equal(50m, report.EstimatedMargin);
+        Assert.Equal(41.67m, report.EstimatedMarginPercentage);
+    }
+
+    [Fact]
     public async Task Overview_SeparatesChangesByShiftDateAndUsesHistoricalCostsAndAppliedPayments()
     {
         var repo = new Repository

@@ -15,7 +15,7 @@ public static class LayawayPolicy
         if (percentage is < 0 or > 100 || decimal.Round(percentage.Value, 2) != percentage.Value)
             throw new DomainRuleViolationException("El IVA debe ser un porcentaje válido con hasta dos decimales.");
 
-        var basis = decimal.Round(total * 100m / (100m + percentage.Value), 4,
+        var basis = decimal.Round(total * 100m / (100m + percentage.Value), 0,
             MidpointRounding.AwayFromZero);
         return (RequireTaxAmount(basis), RequireTaxAmount(total - basis));
     }

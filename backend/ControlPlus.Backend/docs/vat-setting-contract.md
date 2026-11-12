@@ -62,3 +62,34 @@ El ticket muestra el desglose de IVA **solo cuando la venta se hizo con el IVA a
 - **Instantáneas existentes:** no se reescriben ni se invalida su hash. Los campos son aditivos y opcionales: una instantánea antigua que no los tiene se lee con `null`. Al construir instantáneas nuevas se incluyen cuando corresponda. `schemaVersion` solo cambia si Codex lo considera necesario para el hash canónico.
 - **Presentación (ajustada por el usuario el 11 de noviembre de 2026):** con IVA activo el resumen se lee **Subtotal + IVA = TOTAL**: «Subtotal» es la base sin IVA, «IVA 19 %» es el impuesto y «TOTAL» es el valor que paga el cliente, que no cambia porque el precio ya incluía el IVA. Si hay descuento, antes del subtotal salen «Valor productos» (suma de líneas) y «Descuento». Sin ninguna nota adicional (el usuario pidió quitar «Precios con IVA incluido»). Con el IVA apagado el resumen queda como siempre (Subtotal, Descuento, TOTAL) y no aparece nada de IVA.
 - **Ticket de pantalla (frontend) y ticket térmico (`ReceiptTextRenderer`):** ambos implementan esa presentación con el mismo criterio de ocultarla cuando los tres campos no existen o el porcentaje es cero, y respetando el ancho de columnas.
+
+## Segundo corte: apartados y cambios de producto (aprobado por el usuario el 11 de noviembre de 2026)
+
+Regla: **cambios de producto usan el IVA de la venta original; un apartado conserva el IVA con el que se creó.** Nunca el vigente en la entrega o el cambio, y nunca el porcentaje propio de cada producto mientras exista el IVA del negocio.
+
+### Cambios de producto (`SalesChangeService`)
+
+- **Porcentaje:** el de la venta original (el de sus líneas: `detalle_venta.porcentaje_iva`). Si la venta original no tenía IVA (porcentaje 0 o sin desglose), el cambio tampoco lo desglosa.
+- **Líneas devueltas:** conservan el porcentaje de la línea original, como hoy.
+- **Líneas entregadas:** hoy usan `producto.porcentaje_iva`; deben usar el porcentaje de la venta original, no el del producto ni el del interruptor actual.
+- **Cálculo:** el mismo de las ventas. `base = ROUND(neto / (1 + porcentaje/100))` en COP enteros e `IVA = neto − base`, por línea, de modo que base más IVA suma exactamente el neto. Los totales, diferencias y pagos del cambio no cambian.
+- **Reporte C3:** la ganancia estimada debe descontar también el IVA incluido en el ajuste por cambios: IVA de lo entregado menos IVA de lo devuelto (cambios `CONFIRMADO` de ventas confirmadas, por la fecha operativa del turno del cambio, como ya se atribuye el ajuste). Solo para cambios con desglose guardado. El JSON y el PDF no cambian de forma.
+
+### Apartados (`LayawayCreateService`)
+
+- **Al crear:** usa la configuración de IVA del negocio vigente en ese momento, igual que una venta nueva (apagado: `0` e IVA cero; encendido: base e IVA enteros), y la guarda en `detalle_apartado` y en la cabecera con `iva_discriminado_completo = true`. Hoy usa `producto.porcentaje_iva` por línea.
+- **Después:** abonos, entrega y cancelación no recalculan nada. La entrega (que no crea una venta) no cambia el IVA guardado.
+- Los apartados ya existentes no se tocan.
+
+### Base de datos
+
+- Verificar los CHECK de `ventas.detalle_cambio_venta`, `ventas.detalle_apartado` y de sus cabeceras. Si alguno exige el redondeo a cuatro decimales (como pasaba con `ck_detalle_venta_iva_incluido`), crear una **migración compensatoria nueva** que admita también el redondeo a COP entero, conserve las filas históricas y `base + IVA = neto`, con su ensayo en base temporal. No aplicarla a `controlplus`: el operador la activa con respaldo, preflight y postflight, como las dos migraciones anteriores del IVA.
+- Si no hay restricciones que lo impidan, no se necesita migración.
+
+### Pruebas mínimas
+
+- Cambio sobre una venta hecha con IVA al 19 %: líneas devueltas y entregadas con 19 %, base e IVA enteros que suman el neto, totales iguales; un producto con `porcentaje_iva` distinto o el interruptor cambiado después se ignora.
+- Cambio sobre una venta hecha sin IVA: sin desglose, aunque el interruptor esté activado ahora.
+- Apartado creado con el IVA apagado y con el encendido; abonos, entrega y cancelación no cambian el IVA guardado.
+- C3 con un cambio: ganancia estimada coherente con base sin IVA (ventas y cambios) y sin descontar IVA cuando no hay desglose.
+- Regresión de los flujos existentes de ventas, apartados y cambios.

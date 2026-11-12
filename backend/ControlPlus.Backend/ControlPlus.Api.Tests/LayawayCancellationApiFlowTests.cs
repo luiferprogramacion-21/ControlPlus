@@ -150,9 +150,9 @@ public sealed partial class LayawayCreateApiFlowTests
         var first = await ReadAsync<LayawayCancellationDto>(await PostCancellationAsync(client,
             created.Id, "cancel-replay", request), HttpStatusCode.OK);
         var after = await CaptureAsync(scenario);
+        // The Administrator cancels without a second authorizer, so the replay is the identical request.
         var replay = await ReadAsync<LayawayCancellationDto>(await PostCancellationAsync(client,
-            created.Id, "cancel-replay", request with
-            { Authorization = new(SupervisorName, "ignored-on-replay") }), HttpStatusCode.OK);
+            created.Id, "cancel-replay", request), HttpStatusCode.OK);
         Assert.Equal(JsonSerializer.Serialize(first), JsonSerializer.Serialize(replay));
         Assert.Equal(after, await CaptureAsync(scenario));
         Assert.Equal(HttpStatusCode.Conflict, (await PostCancellationAsync(client, created.Id,
@@ -204,13 +204,14 @@ public sealed partial class LayawayCreateApiFlowTests
         admin = await LoginAsync(client, AdminName, AdminPassword);
         SetBearer(client, admin.AccessToken);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
-            $"/api/users/{scenario.Supervisor.User.Id}/permissions/{cancelId}",
+            $"/api/users/{scenario.Admin.User.Id}/permissions/{cancelId}",
             new SetUserPermissionRequest(false))).StatusCode);
-        admin = await LoginAsync(client, AdminName, AdminPassword);
-        SetBearer(client, admin.AccessToken);
+        var supervisor = await LoginAsync(client, SupervisorName, SupervisorPassword);
+        SetBearer(client, supervisor.AccessToken);
         before = await CaptureAsync(scenario);
         Assert.Equal(HttpStatusCode.Forbidden, (await PostCancellationAsync(client, created.Id,
-            "cancel-authorizer-revoked", request)).StatusCode);
+            "cancel-authorizer-revoked", request with
+            { Authorization = new(AdminName, AdminPassword) })).StatusCode);
         Assert.Equal(before, await CaptureAsync(scenario));
     }
 
@@ -438,7 +439,9 @@ public sealed partial class LayawayCreateApiFlowTests
                                              WHERE a.id = NEW.autorizacion_anulacion_id AND a.estado = 'UTILIZADA'
                                                AND a.resultado = 'EXITOSA' AND a.fecha_utilizacion IS NOT NULL
                                                AND a.usuario_solicitante_id = NEW.usuario_anulacion_id
-                                               AND a.usuario_autorizador_id <> NEW.usuario_anulacion_id
+                                               AND a.usuario_autorizador_id = NEW.usuario_anulacion_id
+                                               AND a.metodo_autenticacion = 'PASSWORD'
+                                               AND a.credencial_autorizador_id IS NULL
                                                AND a.correlacion_id = m.correlacion_id)
                                  AND EXISTS (SELECT 1 FROM auditoria.operacion_idempotente i
                                              WHERE i.entidad_id = NEW.id AND i.tipo_operacion = 'ANULAR_APARTADO'
@@ -487,7 +490,7 @@ public sealed partial class LayawayCreateApiFlowTests
         decimal cash, decimal nequi) => new(version, amount,
         (cash > 0 ? new[] { new LayawayRefundRequest("EFECTIVO", cash, null) } : [])
             .Concat(nequi > 0 ? new[] { new LayawayRefundRequest("NEQUI", nequi, "REF-NEQUI") } : [])
-            .ToArray(), null, null, new(SupervisorName, SupervisorPassword));
+            .ToArray(), null, null, null);
 
     private static async Task<HttpResponseMessage> PostCancellationAsync(HttpClient client,
         Guid layawayId, string key, CancelLayawayRequest request)

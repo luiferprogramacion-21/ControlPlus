@@ -41,6 +41,14 @@ public sealed class EfSalesOverviewRepository(OfficialControlPlusDbContext db) :
                 (x.Venta.TipoVenta == "CONTADO" || x.Venta.TipoVenta == "CREDITO"))
             .SumAsync(x => x.Venta.IvaDiscriminadoCompleto ? (x.ValorIva ?? 0m) : 0m, ct);
 
+        var includedChangeVat = await db.DetalleCambioVenta.AsNoTracking()
+            .Where(x => x.CambioVenta.InstalacionId == installationId &&
+                x.CambioVenta.Estado == "CONFIRMADO" && x.CambioVenta.Venta.Estado == "CONFIRMADA" &&
+                (x.CambioVenta.Venta.TipoVenta == "CONTADO" || x.CambioVenta.Venta.TipoVenta == "CREDITO") &&
+                x.CambioVenta.TurnoCaja.FechaOperativa >= from && x.CambioVenta.TurnoCaja.FechaOperativa <= to &&
+                x.CambioVenta.Venta.IvaDiscriminadoCompleto)
+            .SumAsync(x => x.TipoDetalle == "ENTREGADO" ? (x.ValorIva ?? 0m) : -(x.ValorIva ?? 0m), ct);
+
         var originalCost = await db.DetalleVenta.AsNoTracking()
             .Where(x => x.Venta.InstalacionId == installationId && x.Venta.FechaOperativa >= from &&
                 x.Venta.FechaOperativa <= to && x.Venta.Estado == "CONFIRMADA" &&
@@ -103,6 +111,7 @@ public sealed class EfSalesOverviewRepository(OfficialControlPlusDbContext db) :
             .Select(g => new OverviewPaymentRow(g.Key.Codigo, g.Key.Nombre, g.Sum(x => x.ValorAplicado)))
             .ToListAsync(ct);
         await snapshot.CommitAsync(ct);
-        return new SalesOverviewData(sales, changes, originalCost, returnedCost, deliveredCost, payments, includedVat);
+        return new SalesOverviewData(sales, changes, originalCost, returnedCost, deliveredCost,
+            payments, includedVat, includedChangeVat);
     }
 }

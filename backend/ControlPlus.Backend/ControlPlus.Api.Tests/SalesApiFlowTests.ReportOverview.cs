@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using ControlPlus.Api.Controllers;
 using System.Text;
 using ControlPlus.Application.Reports;
@@ -19,6 +20,9 @@ public sealed partial class SalesApiFlowTests
         using var client = CreateClient();
         var scenario = await BootstrapAsync(client);
         await ConfigureChangeNumberingAsync(client, scenario.Admin.AccessToken);
+        SetBearer(client, scenario.Admin.AccessToken);
+        _ = await ReadAsync<VatSettingDto>(await client.PutAsJsonAsync(
+            "/api/settings/vat", new UpdateVatSettingRequest(true, 19m, 0)), HttpStatusCode.OK);
         await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
         _ = await StartSessionAsync(client, scenario.Admin.AccessToken,
             scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
@@ -41,6 +45,8 @@ public sealed partial class SalesApiFlowTests
         var delivered = await db.MovimientoInventario.AsNoTracking().SingleAsync(x =>
             x.CambioVentaId == change.Id && x.TipoMovimiento == "CAMBIO_ENTREGA");
         var persistedChange = await db.CambioVenta.AsNoTracking().SingleAsync(x => x.Id == change.Id);
+        var changeLines = await db.DetalleCambioVenta.AsNoTracking()
+            .Where(x => x.CambioVentaId == change.Id).ToArrayAsync();
         var shift = await db.TurnoCaja.AsNoTracking().SingleAsync(x => x.Id == persistedChange.TurnoCajaId);
         var report = await ReadAsync<SalesOverviewReport>(await client.GetAsync(
             $"/api/reports/sales/overview?from={shift.FechaOperativa:yyyy-MM-dd}&to={shift.FechaOperativa:yyyy-MM-dd}"), HttpStatusCode.OK);
@@ -50,8 +56,12 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal("COMPLETE", report.CostCompleteness);
         var expectedCost = original.CostoUnitario!.Value * original.Cantidad -
                            original.CostoUnitario.Value + delivered.CostoPromedioAnterior!.Value;
+        var includedChangeVat = changeLines.Sum(x => x.TipoDetalle == "ENTREGADO"
+            ? x.ValorIva!.Value : -x.ValorIva!.Value);
+        var expectedCommercialBase = report.NetSalesTotal - original.ValorIva!.Value - includedChangeVat;
+        Assert.All(changeLines, x => Assert.Equal(19m, x.PorcentajeIva));
         Assert.Equal(expectedCost, report.EstimatedCost);
-        Assert.Equal(report.NetSalesTotal - expectedCost, report.EstimatedMargin);
+        Assert.Equal(expectedCommercialBase - expectedCost, report.EstimatedMargin);
     }
 
     [Fact]

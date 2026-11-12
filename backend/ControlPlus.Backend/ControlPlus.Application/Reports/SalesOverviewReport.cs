@@ -21,7 +21,8 @@ public sealed record OverviewPaymentRow(string Code, string Name, decimal Total)
 public sealed record SalesOverviewData(IReadOnlyList<OverviewSaleRow> Sales,
     IReadOnlyList<OverviewChangeRow> Changes, OverviewCostRow OriginalCost,
     OverviewCostRow ReturnedCost, OverviewCostRow DeliveredCost,
-    IReadOnlyList<OverviewPaymentRow> Payments, decimal IncludedVat = 0m);
+    IReadOnlyList<OverviewPaymentRow> Payments, decimal IncludedVat = 0m,
+    decimal IncludedChangeVat = 0m);
 
 public interface ISalesOverviewRepository
 {
@@ -76,7 +77,7 @@ public sealed class SalesOverviewService(IPermissionChecker permissions,
                               data.DeliveredCost.MissingMovementLines;
         decimal? cost = missingCost + missingMovement == 0
             ? data.OriginalCost.KnownCost - data.ReturnedCost.KnownCost + data.DeliveredCost.KnownCost : null;
-        var commercialBase = net - data.IncludedVat;
+        var commercialBase = net - data.IncludedVat - data.IncludedChangeVat;
         decimal? margin = cost is decimal completeCost ? commercialBase - completeCost : null;
         var salesByDate = currentSales.GroupBy(x => x.Date).ToDictionary(x => x.Key, x => x.Sum(y => y.Total));
         var changesByDate = data.Changes.GroupBy(x => x.Date).ToDictionary(x => x.Key, x => x.Sum(y => y.NetTotal));

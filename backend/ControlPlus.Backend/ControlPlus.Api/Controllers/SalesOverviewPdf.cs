@@ -203,7 +203,7 @@ public static class SalesOverviewPdf
         // Notes
         var notes = new[]
         {
-            "La ganancia es una estimación: las ventas, sin el IVA que incluyen, menos lo que costaron los productos vendidos. No descuenta los gastos del negocio ni otros impuestos.",
+            "La ganancia es una estimación: las ventas y los cambios, sin el IVA que incluyen, menos lo que costaron los productos. No descuenta los gastos del negocio ni otros impuestos.",
             "Los cambios de productos se cuentan en el día en que se registraron, y no como una venta nueva."
         };
         foreach (var note in notes)

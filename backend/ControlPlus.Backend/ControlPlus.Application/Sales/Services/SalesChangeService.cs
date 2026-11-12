@@ -151,7 +151,9 @@ public sealed partial class SalesService
             var gross = checked(original.PrecioUnitario * returned.Quantity);
             detailRows.Add(NewChangeDetail(original.ProductoId, original.Id, "DEVUELTO",
                 original.CodigoProducto, original.NombreProducto, original.UnidadMedida,
-                returned.Quantity, original.PrecioUnitario, gross - net, original.PorcentajeIva, net));
+                returned.Quantity, original.PrecioUnitario, gross - net,
+                sale.IvaDiscriminadoCompleto && original.PorcentajeIva is > 0
+                    ? original.PorcentajeIva : null, net));
             totalReturned = CashMoney.Add(totalReturned, net);
         }
         foreach (var delivered in request.Delivered.OrderBy(x => x.ProductId))
@@ -168,7 +170,9 @@ public sealed partial class SalesService
             var net = CashMoney.Require(checked(price.Value * delivered.Quantity), false);
             detailRows.Add(NewChangeDetail(product.Id, null, "ENTREGADO", product.CodigoInterno,
                 product.Nombre, unitNames[product.UnidadMedidaId], delivered.Quantity,
-                price.Value, 0m, product.PorcentajeIva, net));
+                price.Value, 0m, sale.IvaDiscriminadoCompleto &&
+                    sale.DetalleVenta.FirstOrDefault()?.PorcentajeIva is > 0
+                    ? sale.DetalleVenta.First().PorcentajeIva : null, net));
             totalDelivered = CashMoney.Add(totalDelivered, net);
         }
         var difference = CashMoney.Subtract(totalDelivered, totalReturned);
@@ -315,7 +319,7 @@ public sealed partial class SalesService
         decimal discount, decimal? taxRate, decimal net)
     {
         decimal? taxBase = taxRate is decimal percentage
-            ? decimal.Round(net * 100m / (100m + percentage), 4, MidpointRounding.AwayFromZero)
+            ? decimal.Round(net * 100m / (100m + percentage), 0, MidpointRounding.AwayFromZero)
             : null;
         return new DetalleCambioVenta
         {

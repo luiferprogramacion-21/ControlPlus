@@ -304,7 +304,8 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         "20261105010000_SupervisorLayawayRefundDecisionV1",
         "20261106010000_ProductPhysicalDeletionPrivilegesV1",
         "20261110010000_BusinessVatSettingV1",
-        "20261110020000_BusinessVatWholePesoSalesV1"
+        "20261110020000_BusinessVatWholePesoSalesV1",
+        "20261111010000_BusinessVatWholePesoLayawaysChangesV1"
     ];
 
     private readonly string _masterKey = RandomSecret(48);
