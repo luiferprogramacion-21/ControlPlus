@@ -4,7 +4,7 @@ import { CatalogApi, Product } from '../catalog/catalog-api';
 import { CustomersApi, Customer } from '../customers/customers-api';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationDialog, AuthorizationPrompt } from '../../shared/authorization-dialog';
-import { LayawayCreate } from './layaway-create';
+import { dateInDays, LayawayCreate, minimumInitialPayment } from './layaway-create';
 import { LayawaysApi } from './layaways-api';
 
 const product = (extra: Partial<Product> = {}): Product => ({ id: 'p1', internalCode: 'PAP-000001', name: 'Cuaderno', retailPrice: 10000, wholesalePrice: 8000,
@@ -12,7 +12,7 @@ const product = (extra: Partial<Product> = {}): Product => ({ id: 'p1', internal
 const customer = { id: 'c1', fullName: 'Ana', documentNumber: '123', phone: null, address: 'Calle 1', isActive: true } as Customer;
 
 describe('LayawayCreate: nuevo apartado', () => {
-  const api = { create: vi.fn() };
+  const api = { create: vi.fn(), creationRules: vi.fn() };
   const customers = { list: vi.fn() };
   const catalog = { products: vi.fn() };
   const state = { roles: ['CAJERO'] };
@@ -34,6 +34,7 @@ describe('LayawayCreate: nuevo apartado', () => {
     state.roles = ['CAJERO'];
     vi.clearAllMocks(); prompt = null; dialogError = undefined; credentials = { userName: 'supervisor', password: 'secreto' };
     api.create.mockResolvedValue({ id: 'a1', visibleNumber: 'APT-1', total: 10000, balance: 0 });
+    api.creationRules.mockResolvedValue({ requireMinimumInitial: true, minimumPercentage: 20, defaultDays: 15 });
     customers.list.mockResolvedValue({ items: [customer], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 });
     catalog.products.mockResolvedValue({ items: [product()], page: 1, pageSize: 30, totalCount: 1, totalPages: 1 });
     TestBed.configureTestingModule({ providers: [
@@ -204,5 +205,61 @@ describe('LayawayCreate: nuevo apartado', () => {
     expect(dialog.open).toHaveBeenCalledOnce();
     expect(prompt!.requireDifferentUser).toBe(true);
     expect(api.create.mock.lastCall![0].authorization).toEqual({ userName: 'supervisor', password: 'secreto' });
+  });
+  describe('regla del pago inicial mínimo y plazo de la fecha límite', () => {
+    const loaded = async () => { await Promise.resolve(); await Promise.resolve(); };
+
+    it('calcula el mínimo como el servidor: techo del porcentaje, al menos un peso y nunca más que el total', () => {
+      const on = { requireMinimumInitial: true, minimumPercentage: 20 };
+      expect(minimumInitialPayment(10000, on)).toBe(2000);
+      expect(minimumInitialPayment(1001, on)).toBe(201);
+      expect(minimumInitialPayment(5, { requireMinimumInitial: true, minimumPercentage: 0.01 })).toBe(1);
+      expect(minimumInitialPayment(1001, { requireMinimumInitial: true, minimumPercentage: 100 })).toBe(1001);
+      expect(minimumInitialPayment(10000, { requireMinimumInitial: true, minimumPercentage: 33.33 })).toBe(3333);
+      expect(minimumInitialPayment(10000, { requireMinimumInitial: false, minimumPercentage: 20 })).toBe(1);
+      expect(minimumInitialPayment(0, on)).toBeNull(); expect(minimumInitialPayment(10000, null)).toBeNull();
+    });
+
+    it('muestra el mínimo en pesos según el total y rechaza un pago inicial menor', async () => {
+      await loaded(); fill(); component.drafts = [{ methodCode: 'EFECTIVO', appliedAmount: 1000, receivedAmount: 1000, reference: '' }];
+      expect(component.rules()?.minimumPercentage).toBe(20); expect(component.minimumInitial()).toBe(2000);
+      expect(component.validation()).toContain('al menos'); expect(component.validation()).toContain('2.000');
+      component.drafts = [{ methodCode: 'EFECTIVO', appliedAmount: 2000, receivedAmount: 2000, reference: '' }];
+      expect(component.validation()).toBe('');
+    });
+
+    it('con la exigencia apagada el mínimo es un peso', async () => {
+      api.creationRules.mockResolvedValue({ requireMinimumInitial: false, minimumPercentage: 20, defaultDays: 15 });
+      component = TestBed.runInInjectionContext(() => new LayawayCreate()); await loaded(); fill();
+      expect(component.minimumInitial()).toBe(1);
+      component.drafts = [{ methodCode: 'EFECTIVO', appliedAmount: 1, receivedAmount: 1, reference: '' }];
+      expect(component.validation()).toBe('');
+    });
+
+    it('muestra el plazo predeterminado con su fecha y aclara que se puede cambiar', async () => {
+      await loaded();
+      expect(component.defaultDue()).toEqual({ days: 15, date: dateInDays(15) }); expect(component.dueRequired).toBe(false);
+      const fixture = TestBed.createComponent(LayawayCreate); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+      const text = (fixture.nativeElement.textContent ?? '').replace(/\s+/g, ' ');
+      expect(text).toContain('Plazo predeterminado: 15 días'); expect(text).toContain(dateInDays(15)); expect(text).toContain('elige otra fecha para cambiarlo');
+      expect(text).toContain('opcional'); expect(text).toContain('al menos el 20 % del total');
+    });
+
+    it('sin plazo predeterminado la fecha es obligatoria', async () => {
+      api.creationRules.mockResolvedValue({ requireMinimumInitial: true, minimumPercentage: 20, defaultDays: null });
+      component = TestBed.runInInjectionContext(() => new LayawayCreate()); await loaded(); fill();
+      expect(component.dueRequired).toBe(true); expect(component.defaultDue()).toBeNull();
+      expect(component.validation()).toContain('fecha límite'); component.dueDate = '2026-12-01'; expect(component.validation()).toBe('');
+      const fixture = TestBed.createComponent(LayawayCreate); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+      const text = (fixture.nativeElement.textContent ?? '').replace(/\s+/g, ' ');
+      expect(text).toContain('obligatoria'); expect(text).toContain('No hay un plazo predeterminado');
+    });
+
+    it('si no se pueden leer las reglas conserva el texto genérico y no bloquea (decide el servidor)', async () => {
+      api.creationRules.mockRejectedValue(new HttpErrorResponse({ status: 403 }));
+      component = TestBed.runInInjectionContext(() => new LayawayCreate()); await loaded(); fill();
+      expect(component.rules()).toBeNull(); expect(component.minimumInitial()).toBeNull(); expect(component.dueRequired).toBe(false);
+      expect(component.validation()).toBe('');
+    });
   });
 });

@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
-import { ChangePolicy, ConfigApi, LayawaySettings } from './config-api';
+import { ChangePolicy, ConfigApi, CreditSettings, LayawaySettings } from './config-api';
 
 /** Time limit for product changes and the parameters of layaways. Both only affect documents created afterwards. */
 @Component({
@@ -27,8 +27,10 @@ import { ChangePolicy, ConfigApi, LayawaySettings } from './config-api';
       <div class="module-toolbar"><div><h3>Apartados</h3><p class="muted">Pago inicial mínimo y plazo para retirar los productos. Los apartados existentes conservan lo que tenían al crearse.</p></div></div>
       @if (layaway(); as current) {
         <form class="settings-form" (submit)="$event.preventDefault(); saveLayaway()">
-          <label class="field-label" for="layaway-percentage">Porcentaje mínimo del pago inicial</label>
-          <div class="money-field"><span>%</span><input id="layaway-percentage" name="layawayPercentage" type="number" min="0.01" max="100" step="0.01" [(ngModel)]="percentage"><b>del total</b></div>
+          <label class="settings-check"><input id="layaway-require-minimum" type="checkbox" role="switch" name="requireMinimum" [(ngModel)]="requireMinimum"> Exigir un pago inicial mínimo al crear el apartado</label>
+          <p class="field-hint">{{ requireMinimum ? 'Quien crea el apartado debe cobrar al menos este porcentaje del total.' : 'Sin exigencia: el pago inicial puede ser cualquier valor mayor que cero.' }}</p>
+          <label class="field-label field-label--spaced" for="layaway-percentage">Porcentaje mínimo del pago inicial</label>
+          <div class="money-field"><span>%</span><input id="layaway-percentage" name="layawayPercentage" type="number" min="0.01" max="100" step="0.01" [(ngModel)]="percentage" [disabled]="!requireMinimum"><b>del total</b></div>
           <label class="field-label field-label--spaced" for="layaway-days">Plazo por defecto</label>
           <div class="money-field"><span>#</span><input id="layaway-days" name="layawayDays" type="number" min="1" max="365" step="1" [(ngModel)]="layawayDays" [disabled]="chooseEachDate"><b>días</b></div>
           <label class="settings-check"><input type="checkbox" name="chooseEachDate" [(ngModel)]="chooseEachDate"> Elegir la fecha límite en cada apartado</label>
@@ -37,6 +39,21 @@ import { ChangePolicy, ConfigApi, LayawaySettings } from './config-api';
           <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="savingLayaway() || !layawayChanged(current)">{{ savingLayaway() ? 'Guardando…' : 'Guardar apartados' }}</button></div>
         </form>
       } @else if (!loadError()) { <p class="muted" role="status">Cargando…</p> }
+    </section>
+
+    <section class="panel module-panel">
+      <div class="module-toolbar"><div><h3>Créditos</h3><p class="muted">Plazo predeterminado del vencimiento al vender a crédito. Quien vende puede cambiar la fecha entre mañana y 90 días. Los créditos existentes conservan su vencimiento.</p></div></div>
+      @if (credit(); as current) {
+        <form class="settings-form" (submit)="$event.preventDefault(); saveCredit()">
+          <label class="field-label" for="credit-days">Plazo predeterminado</label>
+          <div class="money-field"><span>#</span><input id="credit-days" name="creditDays" type="number" min="1" max="90" step="1" [(ngModel)]="creditDays" [disabled]="creditChooseEachTime"><b>días</b></div>
+          <label class="settings-check"><input type="checkbox" name="creditChooseEachTime" [(ngModel)]="creditChooseEachTime"> Elegir el vencimiento en cada crédito (sin plazo predeterminado)</label>
+          @if (creditError()) { <p class="field-error" role="alert">{{ creditError() }}</p> }
+          @if (creditNotice()) { <p class="field-hint" role="status">{{ creditNotice() }}</p> }
+          <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="savingCredit() || !creditChanged(current)">{{ savingCredit() ? 'Guardando…' : 'Guardar créditos' }}</button></div>
+        </form>
+      } @else if (creditLoadError()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ creditLoadError() }} <button class="link-button" type="button" (click)="loadCredit()">Reintentar</button></div>
+      } @else { <p class="muted" role="status">Cargando…</p> }
     </section>`,
   styles: ['.settings-form { max-width: 460px; } .settings-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; }'],
 })
@@ -46,16 +63,23 @@ export class SettingsPanel implements OnInit {
   readonly policy = signal<ChangePolicy | null>(null);
   readonly layaway = signal<LayawaySettings | null>(null);
   readonly loadError = signal('');
+  readonly credit = signal<CreditSettings | null>(null);
+  readonly creditLoadError = signal('');
+  readonly savingCredit = signal(false);
+  readonly creditError = signal(''); readonly creditNotice = signal('');
+  creditDays: number | null = 30;
+  creditChooseEachTime = false;
   readonly savingPolicy = signal(false);
   readonly savingLayaway = signal(false);
   readonly policyError = signal(''); readonly policyNotice = signal('');
   readonly layawayError = signal(''); readonly layawayNotice = signal('');
   days = 15;
   percentage = 20;
+  requireMinimum = true;
   layawayDays: number | null = 15;
   chooseEachDate = false;
 
-  ngOnInit(): void { void this.load(); }
+  ngOnInit(): void { void this.load(); void this.loadCredit(); }
 
   async load(): Promise<void> {
     this.loadError.set('');
@@ -64,9 +88,34 @@ export class SettingsPanel implements OnInit {
       this.applyPolicy(policy); this.applyLayaway(layaway);
     } catch (e) { this.loadError.set(errorText(e)); }
   }
+  /** Loaded on its own so that the rest of the panel keeps working if this setting cannot be read. */
+  async loadCredit(): Promise<void> {
+    this.creditLoadError.set('');
+    try { this.applyCredit(await this.api.creditSettings()); } catch (e) { this.creditLoadError.set(errorText(e)); }
+  }
+  private applyCredit(settings: CreditSettings): void {
+    this.credit.set(settings); this.creditChooseEachTime = settings.defaultDays === null; this.creditDays = settings.defaultDays ?? 30;
+  }
+  creditChanged(current: CreditSettings): boolean { return (this.creditChooseEachTime ? null : Number(this.creditDays)) !== current.defaultDays; }
+  validateCredit(): string {
+    if (this.creditChooseEachTime) return '';
+    const days = Number(this.creditDays);
+    return Number.isInteger(days) && days >= 1 && days <= 90 ? '' : 'El plazo debe ser un entero entre 1 y 90 días.';
+  }
+  async saveCredit(): Promise<void> {
+    const current = this.credit(); if (!current || this.savingCredit()) return;
+    const issue = this.validateCredit(); if (issue) { this.creditError.set(issue); return; }
+    this.savingCredit.set(true); this.creditError.set(''); this.creditNotice.set('');
+    try {
+      this.applyCredit(await this.api.updateCreditSettings(this.creditChooseEachTime ? null : Number(this.creditDays), current.version));
+      this.creditNotice.set('Plazo guardado. Aplica a los créditos nuevos.');
+    } catch (e) { this.creditError.set(errorText(e)); try { this.credit.set(await this.api.creditSettings()); } catch { /* el error ya se muestra */ } }
+    finally { this.savingCredit.set(false); }
+  }
+
   private applyPolicy(policy: ChangePolicy): void { this.policy.set(policy); this.days = policy.days; }
   private applyLayaway(settings: LayawaySettings): void {
-    this.layaway.set(settings); this.percentage = settings.minimumPercentage;
+    this.layaway.set(settings); this.percentage = settings.minimumPercentage; this.requireMinimum = settings.requireMinimumInitial;
     this.chooseEachDate = settings.defaultDays === null; this.layawayDays = settings.defaultDays ?? 15;
   }
 
@@ -83,10 +132,11 @@ export class SettingsPanel implements OnInit {
 
   layawayChanged(current: LayawaySettings): boolean {
     const days = this.chooseEachDate ? null : Number(this.layawayDays);
-    return Number(this.percentage) !== current.minimumPercentage || days !== current.defaultDays;
+    return Number(this.percentage) !== current.minimumPercentage || days !== current.defaultDays || this.requireMinimum !== current.requireMinimumInitial;
   }
   validateLayaway(): string {
     const percentage = Number(this.percentage);
+    // The percentage is kept even when the minimum is not required, so it must stay valid.
     if (!Number.isFinite(percentage) || percentage <= 0 || percentage > 100) return 'El porcentaje debe ser mayor que cero y no superar 100.';
     if (Math.round(percentage * 100) !== percentage * 100) return 'El porcentaje admite hasta dos decimales.';
     if (!this.chooseEachDate) { const days = Number(this.layawayDays); if (!Number.isInteger(days) || days < 1 || days > 365) return 'El plazo debe ser un entero entre 1 y 365 días.'; }
@@ -97,7 +147,7 @@ export class SettingsPanel implements OnInit {
     const issue = this.validateLayaway(); if (issue) { this.layawayError.set(issue); return; }
     this.savingLayaway.set(true); this.layawayError.set(''); this.layawayNotice.set('');
     try {
-      this.applyLayaway(await this.api.updateLayawaySettings(Number(this.percentage), this.chooseEachDate ? null : Number(this.layawayDays), current.version));
+      this.applyLayaway(await this.api.updateLayawaySettings(Number(this.percentage), this.chooseEachDate ? null : Number(this.layawayDays), this.requireMinimum, current.version));
       this.layawayNotice.set('Parámetros guardados. Aplican a los apartados nuevos.');
     } catch (e) { this.layawayError.set(errorText(e)); try { this.layaway.set(await this.api.layawaySettings()); } catch { /* el error ya se muestra */ } }
     finally { this.savingLayaway.set(false); }

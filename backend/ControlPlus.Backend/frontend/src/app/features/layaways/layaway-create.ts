@@ -6,10 +6,25 @@ import { SessionService } from '../../core/session.service';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { CatalogApi, Product } from '../catalog/catalog-api';
 import { Customer, CustomersApi } from '../customers/customers-api';
-import { CreateLayawayInput, CreatedLayaway, LayawayPriceType, LayawaysApi } from './layaways-api';
+import { CreateLayawayInput, CreatedLayaway, LayawayCreationRules, LayawayPriceType, LayawaysApi } from './layaways-api';
 import { appliedTotal, cashChange, emptyDraft, money, PaymentDraft, PaymentMethods, toPayments, validateDrafts } from './payment-methods';
 
 export interface CreateLine { product: Product; quantity: number; priceType: LayawayPriceType; }
+
+/** Same rule as the server: ceil(total x percentage / 100), at least one peso; one peso when the minimum is not required. */
+export function minimumInitialPayment(total: number, rules: Pick<LayawayCreationRules, 'requireMinimumInitial' | 'minimumPercentage'> | null): number | null {
+  if (!rules || !Number.isFinite(total) || total <= 0) return null;
+  if (!rules.requireMinimumInitial) return 1;
+  const hundredths = BigInt(Math.round(rules.minimumPercentage * 100));
+  const minimum = (BigInt(Math.round(total)) * hundredths + 9999n) / 10000n;
+  return Math.min(Math.round(total), Math.max(1, Number(minimum)));
+}
+
+/** Local calendar date n days from today, formatted dd/MM/yyyy (the server decides with its own operating date). */
+export function dateInDays(days: number, from = new Date()): string {
+  const date = new Date(from.getFullYear(), from.getMonth(), from.getDate() + days);
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
 interface Pending { key: string; fingerprint: string; authorizerUserName: string | null; }
 
 @Component({
@@ -32,11 +47,25 @@ export class LayawayCreate {
   readonly lines = signal<CreateLine[]>([]);
   readonly saving = signal(false);
   readonly error = signal('');
+  /** Minimum initial payment rule and default term; null until loaded or if the server could not be read. */
+  readonly rules = signal<LayawayCreationRules | null>(null);
   readonly total = computed(() => this.lines().reduce((sum, line) => sum + this.unitPrice(line) * Number(line.quantity || 0), 0));
   customerSearch = ''; productSearch = ''; dueDate = '';
   drafts: PaymentDraft[] = [emptyDraft()];
   readonly money = money;
   private pending: Pending | null = null;
+  readonly minimumInitial = computed(() => minimumInitialPayment(this.total(), this.rules()));
+  /** Default due date term and the date it would give; null when there is no default or the rules are unknown. */
+  readonly defaultDue = computed(() => { const days = this.rules()?.defaultDays; return days == null ? null : { days, date: dateInDays(days) }; });
+
+  constructor() { void this.loadRules(); }
+
+  private async loadRules(): Promise<void> {
+    try { this.rules.set(await this.api.creationRules()); }
+    catch { /* The server still enforces the rules; the screen keeps its generic texts. */ }
+  }
+  get dueRequired(): boolean { return this.rules()?.defaultDays === null; }
+  pct(value: number): string { return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(value); }
 
   get initialPayment(): number { return appliedTotal(this.drafts); }
   get change(): number { return cashChange(this.drafts); }
@@ -87,7 +116,12 @@ export class LayawayCreate {
     if (this.lines().some(l => !Number.isSafeInteger(Number(l.quantity)) || l.quantity < 1 || l.quantity > l.product.availableStock)) return 'Revisa las cantidades: deben ser enteras y no superar la existencia disponible.';
     if (this.lines().some(l => l.priceType === 'MAYORISTA' && !l.product.wholesalePrice)) return 'Hay un producto sin precio mayorista.';
     if (this.total() <= 0) return 'El total del apartado debe ser mayor que cero.';
-    return validateDrafts(this.drafts, { mode: 'payment', max: this.total(), overMessage: 'El pago inicial supera el total del apartado.' });
+    const paymentIssue = validateDrafts(this.drafts, { mode: 'payment', max: this.total(), overMessage: 'El pago inicial supera el total del apartado.' });
+    if (paymentIssue) return paymentIssue;
+    if (this.dueRequired && !this.dueDate) return 'Elige la fecha límite del apartado: no hay un plazo predeterminado.';
+    const minimum = this.minimumInitial();
+    if (minimum !== null && this.initialPayment < minimum) return `El pago inicial debe ser al menos ${money(minimum)}.`;
+    return '';
   }
 
   private input(): Omit<CreateLayawayInput, 'authorization'> {

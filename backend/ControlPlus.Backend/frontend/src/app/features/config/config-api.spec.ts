@@ -41,6 +41,16 @@ describe('ConfigApi', () => {
     await updated;
   });
 
+  it('los créditos leen y guardan el plazo predeterminado (o nulo) con la versión esperada', async () => {
+    const read = api.creditSettings(); http.expectOne('/api/credits/settings').flush({ defaultDays: 30, version: 1 }); expect((await read).defaultDays).toBe(30);
+    const task = api.updateCreditSettings(45, 1);
+    const put = http.expectOne('/api/credits/settings');
+    expect([put.request.method, put.request.body]).toEqual(['PUT', { defaultDays: 45, expectedVersion: 1 }]); put.flush({ defaultDays: 45, version: 2 });
+    await task;
+    const none = api.updateCreditSettings(null, 2); const putNone = http.expectOne('/api/credits/settings');
+    expect(putNone.request.body).toEqual({ defaultDays: null, expectedVersion: 2 }); putNone.flush({ defaultDays: null, version: 3 }); await none;
+  });
+
   it('la política de cambios envía los días y la versión esperada', async () => {
     const task = api.updateChangePolicy(20, 4);
     const put = http.expectOne('/api/sales/change-policy');
@@ -49,9 +59,9 @@ describe('ConfigApi', () => {
   });
 
   it('los apartados envían porcentaje, plazo (o nulo) y versión', async () => {
-    const task = api.updateLayawaySettings(25.5, null, 2);
+    const task = api.updateLayawaySettings(25.5, null, false, 2);
     const put = http.expectOne('/api/layaways/settings');
-    expect([put.request.method, put.request.body]).toEqual(['PUT', { minimumPercentage: 25.5, defaultDays: null, expectedVersion: 2 }]); put.flush({ minimumPercentage: 25.5, defaultDays: null, version: 3 });
+    expect([put.request.method, put.request.body]).toEqual(['PUT', { minimumPercentage: 25.5, defaultDays: null, requireMinimumInitial: false, expectedVersion: 2 }]); put.flush({ minimumPercentage: 25.5, defaultDays: null, requireMinimumInitial: false, version: 3 });
     await task;
   });
 

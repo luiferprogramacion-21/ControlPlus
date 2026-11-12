@@ -78,6 +78,9 @@ export class Sales implements OnInit, OnDestroy {
   private concessionAuthorization: AuthorizationCredentials | null = null;
   readonly concessionAuthorizedBy = signal('');
   dueDate = '';
+  /** Default term of the credit due date, set by the Administrator; null until read or when the seller must choose. */
+  readonly creditDefaultDays = signal<number | null>(null);
+  readonly creditRulesKnown = signal(false);
   private pending: { key: string; input: SaleInput; authorizerUserName: string | null } | null = null;
   private suggestTimer: ReturnType<typeof setTimeout> | undefined;
   private suggestSeq = 0;
@@ -87,13 +90,20 @@ export class Sales implements OnInit, OnDestroy {
   private static loadAutoPrint(): boolean { try { return localStorage.getItem(Sales.AUTO_PRINT_KEY) !== '0'; } catch { return true; } }
   setAutoPrint(value: boolean): void { this.autoPrint.set(value); try { localStorage.setItem(Sales.AUTO_PRINT_KEY, value ? '1' : '0'); } catch { /* sin almacenamiento: queda solo en esta sesión */ } }
 
-  ngOnInit(): void { if (this.route.snapshot.queryParamMap.get('modalidad') === 'credito' && this.canRequestCredit) this.saleType.set('CREDITO'); void this.refreshCash(); }
+  ngOnInit(): void { if (this.route.snapshot.queryParamMap.get('modalidad') === 'credito' && this.canRequestCredit) this.saleType.set('CREDITO'); void this.refreshCash(); if (this.canRequestCredit) void this.loadCreditRules(); }
+  private async loadCreditRules(): Promise<void> {
+    try { this.creditDefaultDays.set((await this.api.creditRules()).defaultDays); this.creditRulesKnown.set(true); }
+    catch { /* The server still validates the due date; the screen keeps asking for it. */ }
+  }
   ngOnDestroy(): void { clearTimeout(this.suggestTimer); }
   get hasCustomerAccess(): boolean { return this.session.has('CUSTOMERS.BASIC_MANAGE') || this.session.has('CUSTOMERS.MANAGE'); }
   get canRequestCredit(): boolean { return this.session.has('SALES.CREATE') && this.session.has('CREDIT.REQUEST'); }
   get operatingDate(): string { return this.cashState()?.currentShift?.operatingDate ?? ''; }
   get minimumDueDate(): string { return this.offsetDate(this.operatingDate, 1); }
   get maximumDueDate(): string { return this.offsetDate(this.operatingDate, 90); }
+  /** Due date the default term gives from the cash operating date, never beyond the 90-day limit. */
+  get defaultDueDate(): string { const days = this.creditDefaultDays(); return days === null ? '' : this.offsetDate(this.operatingDate, Math.min(days, 90)); }
+  get defaultDueDateText(): string { return this.defaultDueDate.split('-').reverse().join('/'); }
   private offsetDate(date: string, days: number): string { if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return ''; const value = new Date(`${date}T00:00:00Z`); value.setUTCDate(value.getUTCDate() + days); return value.toISOString().slice(0, 10); }
   get locked(): boolean { return this.pending !== null; }
   get subtotal(): number { return this.cart().reduce((sum, line) => sum + this.price(line) * line.quantity, 0); }
@@ -221,6 +231,8 @@ export class Sales implements OnInit, OnDestroy {
       this.activePayments.set(['EFECTIVO']); this.transferApplied = this.nequiApplied = 0; this.transferReference = this.nequiReference = '';
       this.cashApplied = this.cashReceived = this.estimate;
     }
+    // The Administrator's default term is proposed, but the seller can change it; a date already chosen is kept.
+    if (this.saleType() === 'CREDITO' && !this.dueDate && this.defaultDueDate) this.dueDate = this.defaultDueDate;
     this.checkoutMode.set(true);
     this.focusField('cash-received', 'credit-due-date');
   }

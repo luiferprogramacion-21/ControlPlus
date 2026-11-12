@@ -8,6 +8,8 @@ export interface Layaway {
   id: string; number: string; customerId: string; customerName: string; createdAtUtc: string; dueOn: string;
   total: number; initialPayment: number; balance: number; state: string; version: number; isOverdue: boolean;
 }
+/** What whoever creates a layaway needs to know: the minimum initial payment rule and the default term of the due date. */
+export interface LayawayCreationRules { requireMinimumInitial: boolean; minimumPercentage: number; defaultDays: number | null; }
 export interface LayawayLine { productId: string; productCode: string; productName: string; unit: string; quantity: number; unitPrice: number; subtotal: number; }
 export interface LayawayPayment {
   id: string; number: string; methodCode: string; methodName: string; appliedAmount: number; receivedAmount: number | null;
@@ -66,6 +68,7 @@ export class LayawaysApi {
     return firstValueFrom(this.http.post<LayawayPaymentResult>(`/api/layaways/${layaway.id}/payments`,
       { expectedVersion: layaway.version, payments }, { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
   }
+  creationRules(): Promise<LayawayCreationRules> { return firstValueFrom(this.http.get<LayawayCreationRules>('/api/layaways/creation-rules')); }
   create(input: CreateLayawayInput, key: string): Promise<CreatedLayaway> {
     return firstValueFrom(this.http.post<CreatedLayaway>('/api/layaways', input, { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
   }

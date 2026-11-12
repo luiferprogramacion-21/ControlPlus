@@ -23,10 +23,14 @@ export const NUMBERING_KINDS: NumberingKind[] = [
 ];
 
 export interface ChangePolicy { days: number; version: number; }
-export interface LayawaySettings { minimumPercentage: number; defaultDays: number | null; version: number; }
+/** `requireMinimumInitial` off means any initial payment above zero is accepted; the percentage is kept for when it is switched on again. */
+export interface LayawaySettings { minimumPercentage: number; defaultDays: number | null; requireMinimumInitial: boolean; version: number; }
 
 /** Business-wide VAT switch. `percentage` is null until the Administrator sets it for the first time. */
 export interface VatSettings { enabled: boolean; percentage: number | null; version: number; updatedAtUtc: string | null; }
+
+/** Default due-date term of a credit sale in days (1 to 90); null means the seller must choose the date each time. */
+export interface CreditSettings { defaultDays: number | null; version: number; }
 
 export interface ReasonItem { id: string; code: string; name: string; displayOrder?: number; isActive?: boolean; }
 export interface ReasonGroup { key: string; label: string; list: string; initialize: string; }
@@ -60,8 +64,13 @@ export class ConfigApi {
   }
 
   layawaySettings(): Promise<LayawaySettings> { return firstValueFrom(this.http.get<LayawaySettings>('/api/layaways/settings')); }
-  updateLayawaySettings(minimumPercentage: number, defaultDays: number | null, expectedVersion: number): Promise<LayawaySettings> {
-    return firstValueFrom(this.http.put<LayawaySettings>('/api/layaways/settings', { minimumPercentage, defaultDays, expectedVersion }));
+  updateLayawaySettings(minimumPercentage: number, defaultDays: number | null, requireMinimumInitial: boolean, expectedVersion: number): Promise<LayawaySettings> {
+    return firstValueFrom(this.http.put<LayawaySettings>('/api/layaways/settings', { minimumPercentage, defaultDays, requireMinimumInitial, expectedVersion }));
+  }
+
+  creditSettings(): Promise<CreditSettings> { return firstValueFrom(this.http.get<CreditSettings>('/api/credits/settings')); }
+  updateCreditSettings(defaultDays: number | null, expectedVersion: number): Promise<CreditSettings> {
+    return firstValueFrom(this.http.put<CreditSettings>('/api/credits/settings', { defaultDays, expectedVersion }));
   }
 
   vatSettings(): Promise<VatSettings> { return firstValueFrom(this.http.get<VatSettings>('/api/settings/vat')); }

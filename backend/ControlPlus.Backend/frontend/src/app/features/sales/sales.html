@@ -116,7 +116,10 @@
       <section class="panel panel--padded checkout-main" (keydown.enter)="checkoutEnter($event)">
         <div class="checkout-heading"><div class="panel-heading"><h2>{{ saleType() === 'CREDITO' ? 'Venta a crédito' : 'Cobro de la venta' }}</h2></div><div class="amount-due"><span>{{ saleType() === 'CREDITO' ? 'Total del crédito' : 'Total a cobrar' }}</span><strong>{{ estimate | currency:'COP':'symbol':'1.0-0' }}</strong></div></div>
         @if (saleType() === 'CREDITO') {
-          <div class="credit-checkout-fields"><label class="field-label" for="credit-due-date">Fecha de vencimiento</label><input id="credit-due-date" class="text-field" type="date" [min]="minimumDueDate" [max]="maximumDueDate" [(ngModel)]="dueDate" [disabled]="locked || busy()"></div>
+          <div class="credit-checkout-fields"><label class="field-label" for="credit-due-date">Fecha de vencimiento</label><input id="credit-due-date" class="text-field" type="date" [min]="minimumDueDate" [max]="maximumDueDate" [(ngModel)]="dueDate" [disabled]="locked || busy()">
+            @if (creditDefaultDays() !== null) { <p class="form-hint">Plazo predeterminado: <strong>{{ creditDefaultDays() }} {{ creditDefaultDays() === 1 ? 'día' : 'días' }}</strong>@if (defaultDueDateText) { (vence el <strong>{{ defaultDueDateText }}</strong>) }. Puedes cambiar la fecha entre mañana y 90 días.</p> }
+            @else if (creditRulesKnown()) { <p class="form-hint">No hay un plazo predeterminado: elige la fecha de vencimiento, entre mañana y 90 días.</p> }
+          </div>
         } @else {
         <div class="change-highlight" [class.change-highlight--active]="change > 0" role="status" aria-live="polite"><span>CAMBIO A DEVOLVER</span><strong>{{ change | currency:'COP':'symbol':'1.0-0' }}</strong><small>{{ change > 0 ? 'Entregar al cliente' : 'Sin cambio' }}</small></div>
         <div class="payment-toolbar"><span class="badge" [class.badge--success]="remaining === 0" [class.badge--warning]="remaining !== 0">{{ remaining >= 0 ? 'Faltante' : 'Excede' }} {{ (remaining < 0 ? -remaining : remaining) | currency:'COP':'symbol':'1.0-0' }}</span><button class="button button--secondary" type="button" (click)="addPayment()" [disabled]="activePayments().length >= 3 || busy()">+ Pago mixto</button></div>

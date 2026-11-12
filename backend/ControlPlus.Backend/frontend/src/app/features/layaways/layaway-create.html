@@ -32,12 +32,28 @@
     <p class="layaway-total">Total del apartado <strong>{{ money(total()) }}</strong></p>
 
     <h3>Fecha límite</h3>
-    <label class="field-label" for="create-due">Fecha límite <span>(opcional)</span></label>
+    <label class="field-label" for="create-due">Fecha límite <span>({{ dueRequired ? 'obligatoria' : 'opcional' }})</span></label>
     <input id="create-due" class="text-field layaway-due" type="date" name="dueDate" [(ngModel)]="dueDate">
-    <p class="form-hint">Si la dejas vacía, el servidor aplica el plazo configurado.</p>
+    @if (defaultDue(); as due) {
+      <p class="form-hint">Plazo predeterminado: <strong>{{ due.days }} {{ due.days === 1 ? 'día' : 'días' }}</strong>, hasta el <strong>{{ due.date }}</strong>. Déjala vacía para usarlo o elige otra fecha para cambiarlo.</p>
+    } @else if (rules()) {
+      <p class="form-hint">No hay un plazo predeterminado: elige la fecha límite del apartado.</p>
+    } @else {
+      <p class="form-hint">Si la dejas vacía, el servidor aplica el plazo configurado.</p>
+    }
 
     <h3>Pago inicial</h3>
-    <p class="form-hint">El servidor exige el pago inicial mínimo configurado (20 % por defecto).</p>
+    @if (rules(); as r) {
+      <p class="form-hint">
+        @if (r.requireMinimumInitial) {
+          Se exige un pago inicial de al menos el <strong>{{ pct(r.minimumPercentage) }} %</strong> del total@if (minimumInitial() !== null) {: <strong>{{ money(minimumInitial()!) }}</strong>}.
+        } @else {
+          No se exige un porcentaje: el pago inicial mínimo es <strong>{{ money(1) }}</strong>.
+        }
+      </p>
+    } @else {
+      <p class="form-hint">El servidor exige el pago inicial mínimo configurado (20 % por defecto).</p>
+    }
     <cp-payment-methods [drafts]="drafts" mode="payment" idPrefix="create" />
     <div class="layaway-totals"><span>Pago inicial <strong>{{ money(initialPayment) }}</strong></span><span class="layaway-change">Cambio <strong>{{ money(change) }}</strong></span></div>
 

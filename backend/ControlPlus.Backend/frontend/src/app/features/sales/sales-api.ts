@@ -17,6 +17,8 @@ export interface Sale {
 export interface SaleReprintRequest { requestId: string; saleId: string; requestedAtUtc: string; status: string; }
 
 export interface SaleSummary { id: string; visibleNumber: string; userId: string; customerId: string | null; occurredAtUtc: string; operatingDate: string; total: number; state: string; }
+/** Default due-date term of a credit sale in days; null when the seller must choose the date. The range of 1 to 90 days is enforced by the server. */
+export interface CreditRules { defaultDays: number | null; }
 export interface SaleLine { id: string; productId: string; productCode: string; productName: string; measurementUnit: string; quantity: number; priceType: string; unitPrice: number; discountAmount: number; grossAmount: number; netAmount: number; }
 export interface SalePaymentLine { id: string; methodCode: string; methodName: string; appliedAmount: number; receivedAmount: number | null; change: number; reference: string | null; }
 export interface SaleDetail { id: string; visibleNumber: string; occurredAtUtc: string; operatingDate: string; grossSubtotal: number; discountTotal: number; total: number; change: number; state: string; version: number; creditId: string | null; lines: SaleLine[]; payments: SalePaymentLine[]; }
@@ -82,6 +84,7 @@ export class SalesApi {
   confirmChange(saleId: string, input: ConfirmChangeInput, key: string): Promise<ConfirmedChange> {
     return firstValueFrom(this.http.post<ConfirmedChange>(`/api/sales/${saleId}/changes`, input, { headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined }));
   }
+  creditRules(): Promise<CreditRules> { return firstValueFrom(this.http.get<CreditRules>('/api/sales/credit-rules')); }
   customers(search: string): Promise<Page<Customer>> { return this.customersApi.list({ search, status: 'active', page: 1, pageSize: 20 }); }
   printJobs(saleId: string, page = 1, pageSize = 20): Promise<Page<PrintJob>> { return firstValueFrom(this.http.get<Page<PrintJob>>(`/api/sales/${saleId}/print-jobs`, { params: { page, pageSize } })); }
   printingStatus(): Promise<PrintStatus> { return firstValueFrom(this.http.get<PrintStatus>('/api/printing/status')); }
