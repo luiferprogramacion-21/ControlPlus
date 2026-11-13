@@ -15,18 +15,8 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
     ILoginAttemptCoordinator loginAttempts,
     IAuditRepository audit, IUnitOfWork unitOfWork, IClock clock) : IPurchaseOrderService
 {
-    private static readonly (string Code, string Name)[] CloseCatalog =
-    [
-        ("PROVEEDOR_NO_ENTREGARA", "Proveedor no entregará el pendiente"),
-        ("PENDIENTE_NO_REQUERIDO", "Pendiente ya no requerido"),
-        ("OTRO", "Otro")
-    ];
-    private static readonly (string Code, string Name)[] CancelCatalog =
-    [
-        ("ERROR_PEDIDO", "Error en el pedido"),
-        ("PROVEEDOR_NO_ATIENDE", "Proveedor no atiende el pedido"),
-        ("OTRO", "Otro")
-    ];
+    private static readonly (string Code, string Name)[] CloseCatalog = ApprovedReasonCatalogs.PurchaseOrderClose;
+    private static readonly (string Code, string Name)[] CancelCatalog = ApprovedReasonCatalogs.PurchaseOrderCancel;
 
     public async Task<Result<PagedResult<PurchaseOrderSummaryDto>>> ListAsync(ActorContext actor,
         PurchaseOrderListQuery query, CancellationToken ct = default)
@@ -68,6 +58,13 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
         var installation = await repository.GetActiveInstallationAsync(ct);
         if (installation is null) return Missing<PurchaseOrderNumberingDto>("la instalación activa");
         var sequence = await repository.GetNumberingAsync(installation.Id, installation.Serie, ct);
+        if (sequence is null)
+        {
+            // The consecutive is created automatically (installation or first use); this covers an installation
+            // that was created before that rule.
+            await repository.EnsureNumberingAsync(installation.Id, installation.Serie, ct);
+            sequence = await repository.GetNumberingAsync(installation.Id, installation.Serie, ct);
+        }
         return sequence is null ? Missing<PurchaseOrderNumberingDto>("el consecutivo de pedidos")
             : sequence.UltimoNumero == long.MaxValue
                 ? Result.Failure<PurchaseOrderNumberingDto>(ApplicationError.NumberingExhausted("El consecutivo de pedidos está agotado."))
@@ -107,9 +104,11 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
             return Denied<PurchaseOrderDto>();
         var supplier = await repository.GetSupplierForUpdateAsync(request!.SupplierId, ct);
         if (supplier is null || !supplier.Activo) return Missing<PurchaseOrderDto>("el proveedor activo");
+        // The consecutive is created on first use when it does not exist yet (inside this transaction).
+        await repository.EnsureNumberingAsync(installation.Id, installation.Serie, ct);
         var sequence = await repository.GetNumberingForUpdateAsync(installation.Id, installation.Serie, ct);
         if (sequence is null || sequence.Prefijo != "PED" || sequence.UltimoNumero < 0)
-            return Conflict<PurchaseOrderDto>("Configure primero el consecutivo PEDIDO_COMPRA con prefijo PED.");
+            return Conflict<PurchaseOrderDto>("El consecutivo PEDIDO_COMPRA debe usar el prefijo PED.");
         if (sequence.UltimoNumero == long.MaxValue)
             return Result.Failure<PurchaseOrderDto>(ApplicationError.NumberingExhausted("El consecutivo de pedidos está agotado."));
         if (await repository.HasDraftForSupplierAsync(installation.Id, supplier.Id, null, ct))
@@ -344,18 +343,31 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
         var installation = await repository.GetActiveInstallationAsync(ct);
         if (installation is null) return Missing<IReadOnlyCollection<PurchaseOrderReasonDto>>("la instalación activa");
         var reasons = await repository.ListReasonsAsync(installation.EstablecimientoId, type, ct);
+        var approvedCatalog = type == "CANCELACION_PEDIDO" ? CancelCatalog : CloseCatalog;
+        if (approvedCatalog.Any(c => !reasons.Any(r => r.Codigo == c.Code)))
+        {
+            // First use: the approved reasons that do not exist yet are created automatically, without asking
+            // for more permission than listing them. If the catalog cannot be completed (an incompatible code),
+            // the existing approved reasons are listed as before.
+            var completed = await InitializeReasonsCoreAsync(actor, kind, requirePermission: false, ct);
+            if (completed.IsSuccess) return completed;
+        }
         return Result.Success<IReadOnlyCollection<PurchaseOrderReasonDto>>(reasons.Where(x => Approved(x, type)).Select(MapReason).ToArray());
     }
 
-    public async Task<Result<IReadOnlyCollection<PurchaseOrderReasonDto>>> InitializeReasonsAsync(
-        ActorContext actor, string kind, CancellationToken ct = default)
+    public Task<Result<IReadOnlyCollection<PurchaseOrderReasonDto>>> InitializeReasonsAsync(
+        ActorContext actor, string kind, CancellationToken ct = default) =>
+        InitializeReasonsCoreAsync(actor, kind, requirePermission: true, ct);
+
+    private async Task<Result<IReadOnlyCollection<PurchaseOrderReasonDto>>> InitializeReasonsCoreAsync(
+        ActorContext actor, string kind, bool requirePermission, CancellationToken ct)
     {
         var type = ReasonType(kind);
         if (type is null) return Invalid<IReadOnlyCollection<PurchaseOrderReasonDto>>("Tipo de motivo inválido.");
         await using var transaction = await repository.BeginAsync(ct);
         var installation = await repository.GetActiveInstallationForUpdateAsync(ct);
         if (installation is null) return Missing<IReadOnlyCollection<PurchaseOrderReasonDto>>("la instalación activa");
-        if (!await AllowedAsync(actor.UserId, type == "CANCELACION_PEDIDO" ? PermissionCodes.PurchaseOrdersCancel :
+        if (requirePermission && !await AllowedAsync(actor.UserId, type == "CANCELACION_PEDIDO" ? PermissionCodes.PurchaseOrdersCancel :
             PermissionCodes.PurchaseOrdersManage, RoleLevel.Administrador, ct)) return Denied<IReadOnlyCollection<PurchaseOrderReasonDto>>();
         var existing = await repository.ListReasonsAsync(installation.EstablecimientoId, type, ct);
         var catalog = type == "CANCELACION_PEDIDO" ? CancelCatalog : CloseCatalog;

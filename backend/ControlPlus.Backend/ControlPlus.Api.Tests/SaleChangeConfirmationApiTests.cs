@@ -454,9 +454,6 @@ public sealed partial class SalesApiFlowTests
         var setup = await BootstrapAsync(client);
         var customerId = await CreateCustomerAsync(setup.Admin.User.Id, true, "CHANGE-EXCESS");
         await ConfigureChangeNumberingAsync(client, setup.Admin.AccessToken);
-        _ = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/credit-payments", new CreateSalesDocumentNumberingRequest("ABO", 1)),
-            HttpStatusCode.Created);
         await OpenSharedShiftAsync(client, setup.Admin.AccessToken);
         var state = await ReadAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
         _ = await StartSessionAsync(client, setup.Admin.AccessToken,
@@ -603,9 +600,6 @@ public sealed partial class SalesApiFlowTests
         var setup = await BootstrapAsync(client);
         var customerId = await CreateCustomerAsync(setup.Admin.User.Id, true, "CHANGE-ROLLBACK");
         await ConfigureChangeNumberingAsync(client, setup.Admin.AccessToken);
-        _ = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/credit-payments", new CreateSalesDocumentNumberingRequest("ABO", 1)),
-            HttpStatusCode.Created);
         await OpenSharedShiftAsync(client, setup.Admin.AccessToken);
         var state = await ReadAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
         _ = await StartSessionAsync(client, setup.Admin.AccessToken,
@@ -709,13 +703,17 @@ public sealed partial class SalesApiFlowTests
         return (bool)(await command.ExecuteScalarAsync())!;
     }
 
+    /// <summary>
+    /// The CAM consecutive is created by the installation itself: this only selects the Administrator and checks
+    /// that it is there, ready to number the first change.
+    /// </summary>
     private static async Task ConfigureChangeNumberingAsync(HttpClient client, string adminToken)
     {
         SetBearer(client, adminToken);
-        var numbering = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/sale-changes", new CreateSalesDocumentNumberingRequest("CAM", 1)),
-            HttpStatusCode.Created);
+        var numbering = await ReadAsync<SalesDocumentNumberingDto>(
+            await client.GetAsync("/api/document-numbering/sale-changes"), HttpStatusCode.OK);
         Assert.Equal("CAM", numbering.Prefix);
+        Assert.Equal(0, numbering.LastNumber);
     }
 
     private static async Task<HttpResponseMessage> PostChangeAsync(HttpClient client,

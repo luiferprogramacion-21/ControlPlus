@@ -433,39 +433,38 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
     }
 
     [Fact, Trait("Category", "Integration")]
-    public async Task MissingNumbering_RequiresExplicitInitializationBeforeCreation()
+    public async Task MissingNumbering_IsCreatedOnTheFirstLayaway_WithoutAnyConfiguration()
     {
         using var client = CreateClient();
-        var scenario = await BootstrapAsync(client, initializeNumbering: false);
-        var session = await StartSessionAsync(client, scenario);
+        var scenario = await BootstrapAsync(client);
+        // An installation created before the consecutives were automatic has neither APT nor PAP.
+        await RemoveLayawayNumberingAsync();
+        _ = await StartSessionAsync(client, scenario);
         SetBearer(client, scenario.Cashier.AccessToken);
         var request = Request(scenario, [new("EFECTIVO", 201m, 201m, null)]);
 
-        Assert.Equal(HttpStatusCode.Conflict,
-            (await PostAsync(client, "layaway-numbering-required", request)).StatusCode);
-        await using (var scope = _factory!.Services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
-            Assert.Equal(0, await db.ConsecutivoDocumento.CountAsync());
-            Assert.Equal(0, await db.Apartado.CountAsync());
-            Assert.Equal(0, await db.OperacionIdempotente.CountAsync());
-            Assert.Equal(0, await db.Producto.Where(x => x.Id == scenario.ProductId)
-                .Select(x => x.StockReservado).SingleAsync());
-            Assert.Equal("ACTIVA", await db.SesionOperador.Where(x => x.Id == session.Id)
-                .Select(x => x.Estado).SingleAsync());
-        }
-
-        SetBearer(client, scenario.Admin.AccessToken);
-        _ = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/layaways",
-            new CreateLayawayDocumentNumberingRequest("APT", 1)), HttpStatusCode.Created);
-        _ = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/layaway-payments",
-            new CreateLayawayDocumentNumberingRequest("PAP", 1)), HttpStatusCode.Created);
-        SetBearer(client, scenario.Cashier.AccessToken);
         var created = await ReadAsync<CreatedLayawayDto>(await PostAsync(client,
-            "layaway-numbering-required", request), HttpStatusCode.Created);
+            "layaway-numbering-created-on-use", request), HttpStatusCode.Created);
+
         Assert.Equal("APT-LAYAWAY1-1", created.VisibleNumber);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var rows = await db.ConsecutivoDocumento.AsNoTracking()
+            .Where(x => x.TipoDocumento == "APARTADO" || x.TipoDocumento == "PAGO_APARTADO")
+            .OrderBy(x => x.TipoDocumento).ToArrayAsync();
+        Assert.Equal(["APT", "PAP"], rows.Select(x => x.Prefijo).ToArray());
+        Assert.All(rows, x => Assert.Equal(1, x.UltimoNumero));
+    }
+
+    /// <summary>Simulates an installation created before the consecutives were automatic.</summary>
+    private async Task RemoveLayawayNumberingAsync()
+    {
+        await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM configuracion.consecutivo_documento " +
+            "WHERE tipo_documento IN ('APARTADO', 'PAGO_APARTADO')", connection);
+        Assert.Equal(2, await command.ExecuteNonQueryAsync());
     }
 
     [Theory, Trait("Category", "Integration")]
@@ -649,7 +648,7 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
     }
 
     private async Task<Scenario> BootstrapAsync(HttpClient client, bool sharedShift = true,
-        int stock = 5, bool initializeNumbering = true)
+        int stock = 5)
     {
         using (var message = new HttpRequestMessage(HttpMethod.Post, "/api/auth/setup")
                { Content = JsonContent.Create(new SetupFirstAdministratorRequest(
@@ -679,15 +678,7 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
             new CreateProductRequest(category.Id, unitId, null, "LAYAWAY-CREATE-ITEM", null,
                 null, true, "Producto ficticio de apartado", null, 1001m,
                 null, null, 0)), HttpStatusCode.Created);
-        if (initializeNumbering)
-        {
-            _ = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-                "/api/document-numbering/layaways",
-                new CreateLayawayDocumentNumberingRequest("APT", 1)), HttpStatusCode.Created);
-            _ = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-                "/api/document-numbering/layaway-payments",
-                new CreateLayawayDocumentNumberingRequest("PAP", 1)), HttpStatusCode.Created);
-        }
+        // The APT and PAP consecutives are created by the installation itself.
         var customerId = await SeedProductCustomerAndSettingsAsync(admin.User.Id, product.Id, stock);
         _ = await ReadAsync<CashRegisterDto>(await client.PostAsJsonAsync("/api/cash/register",
             new ConfigureCashRegisterRequest("LAYAWAY-CASH", "Caja ficticia de apartados")), HttpStatusCode.Created);

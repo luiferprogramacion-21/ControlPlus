@@ -1,4 +1,5 @@
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Numbering;
 using ControlPlus.Application.Purchases.Contracts;
 using ControlPlus.Application.Purchases.Ports;
 using ControlPlus.Domain.OfficialModel;
@@ -73,10 +74,16 @@ public sealed class EfPurchaseRepository(OfficialControlPlusDbContext db) : IPur
     }
 
     public async Task<ConsecutivoDocumento?> GetSequenceForUpdateAsync(Guid installationId, string series,
-        CancellationToken ct = default) =>
-        (await db.ConsecutivoDocumento.FromSqlInterpolated(
+        CancellationToken ct = default)
+    {
+        // Confirming a purchase (or receiving an order) is the first use: the consecutive is created here
+        // when it does not exist yet.
+        await DocumentSequenceProvisioner.EnsureAsync(
+            db, installationId, series, DocumentNumberingDefaults.Purchases, ct);
+        return (await db.ConsecutivoDocumento.FromSqlInterpolated(
             $"SELECT c.* FROM configuracion.consecutivo_documento AS c WHERE c.instalacion_id = {installationId} AND c.tipo_documento = 'COMPRA' AND c.serie = {series} FOR UPDATE")
             .AsTracking().ToArrayAsync(ct)).SingleOrDefault();
+    }
 
     public Task<OperacionIdempotente?> GetIdempotencyAsync(Guid installationId, string key, CancellationToken ct = default) =>
         db.OperacionIdempotente.AsNoTracking().SingleOrDefaultAsync(

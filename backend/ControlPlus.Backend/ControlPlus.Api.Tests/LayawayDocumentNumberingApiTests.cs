@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Numbering;
 using ControlPlus.Application.Numbering.Contracts;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Infrastructure.Persistence;
@@ -15,6 +16,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using Xunit;
 
 namespace ControlPlus.Api.Tests;
@@ -63,15 +65,44 @@ public sealed class LayawayDocumentNumberingApiTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task ExplicitInitialization_CreatesEachApprovedSequenceOnce_AndAudits()
+    public async Task Setup_CreatesEachApprovedSequence_WithoutAnyConfiguration()
     {
         using var client = CreateClient();
         SetBearer(client, (await SetupAndLoginAsync(client)).AccessToken);
 
+        foreach (var (route, documentType, prefix) in new[]
+                 { (LayawaysRoute, "APARTADO", "APT"), (PaymentsRoute, "PAGO_APARTADO", "PAP") })
+        {
+            var numbering = await ReadAsync<SalesDocumentNumberingDto>(
+                await client.GetAsync(route), HttpStatusCode.OK);
+            Assert.Equal(documentType, numbering.DocumentType);
+            Assert.Equal(prefix, numbering.Prefix);
+            Assert.Equal(0, numbering.LastNumber);
+            Assert.Equal(1, numbering.NextNumber);
+            Assert.Equal(1, numbering.Version);
+            // It already exists, so creating it explicitly is a conflict.
+            Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(route,
+                new CreateLayawayDocumentNumberingRequest(prefix, 1))).StatusCode);
+        }
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(0, await db.EventoAuditoria.CountAsync(x =>
+            x.Accion == "LAYAWAYNUMBERINGCREATED" ||
+            x.Accion == "LAYAWAYPAYMENTNUMBERINGCREATED"));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task ExplicitCreation_RepairsAMissingSequenceOnce_AndAudits()
+    {
+        using var client = CreateClient();
+        SetBearer(client, (await SetupAndLoginAsync(client)).AccessToken);
+        await RemoveSequencesAsync();
+
         foreach (var (route, prefix) in new[]
                  { (LayawaysRoute, "APT"), (PaymentsRoute, "PAP") })
         {
-            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(route)).StatusCode);
             Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(route,
                 new CreateLayawayDocumentNumberingRequest("OTHER", 1))).StatusCode);
             Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(route,
@@ -92,6 +123,7 @@ public sealed class LayawayDocumentNumberingApiTests : IAsyncLifetime
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var rows = await db.ConsecutivoDocumento.AsNoTracking()
+            .Where(x => x.TipoDocumento == "APARTADO" || x.TipoDocumento == "PAGO_APARTADO")
             .OrderBy(x => x.TipoDocumento).ToArrayAsync();
         Assert.Equal(2, rows.Length);
         Assert.All(rows, row =>
@@ -133,7 +165,8 @@ public sealed class LayawayDocumentNumberingApiTests : IAsyncLifetime
         foreach (var (route, prefix) in new[]
                  { (LayawaysRoute, "APT"), (PaymentsRoute, "PAP") })
         {
-            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(route)).StatusCode);
+            // The effective permission lets the Supervisor read it; only an Administrator may create it.
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(route)).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync(route,
                 new CreateLayawayDocumentNumberingRequest(prefix, 1))).StatusCode);
         }
@@ -153,7 +186,22 @@ public sealed class LayawayDocumentNumberingApiTests : IAsyncLifetime
 
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
-        Assert.Equal(0, await db.ConsecutivoDocumento.CountAsync());
+        // Nobody created anything explicitly: only the installation's own rows exist.
+        Assert.Equal(DocumentNumberingDefaults.All.Count, await db.ConsecutivoDocumento.CountAsync());
+        Assert.Equal(0, await db.EventoAuditoria.CountAsync(x =>
+            x.Accion == "LAYAWAYNUMBERINGCREATED" ||
+            x.Accion == "LAYAWAYPAYMENTNUMBERINGCREATED"));
+    }
+
+    /// <summary>Simulates an installation created before the consecutives were automatic.</summary>
+    private async Task RemoveSequencesAsync()
+    {
+        await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM configuracion.consecutivo_documento " +
+            "WHERE tipo_documento IN ('APARTADO', 'PAGO_APARTADO')", connection);
+        Assert.Equal(2, await command.ExecuteNonQueryAsync());
     }
 
     private static async Task AssertNumberingAsync(

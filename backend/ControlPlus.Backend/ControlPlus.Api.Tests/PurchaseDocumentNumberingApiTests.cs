@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using Xunit;
 
 namespace ControlPlus.Api.Tests;
@@ -65,12 +66,35 @@ public sealed class PurchaseDocumentNumberingApiTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task PurchaseNumbering_CreatesOneCmpSequence_UpdatesOnlyWithCurrentVersion_AndAudits()
+    public async Task PurchaseNumbering_IsCreatedByTheInstallation_AndNeedsNoConfiguration()
     {
         using var client = CreateClient();
         SetBearer(client, (await SetupAndLoginAsync(client)).AccessToken);
 
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(Route)).StatusCode);
+        var numbering = await ReadAsync<PurchaseDocumentNumberingDto>(
+            await client.GetAsync(Route), HttpStatusCode.OK);
+
+        Assert.Equal("COMPRA", numbering.DocumentType);
+        Assert.Equal("NUMBER1", numbering.Series);
+        Assert.Equal("CMP", numbering.Prefix);
+        Assert.Equal(0, numbering.LastNumber);
+        Assert.Equal(1, numbering.NextNumber);
+        Assert.Equal(1, numbering.Version);
+        Assert.True(numbering.CanCorrect);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(0, await db.EventoAuditoria.CountAsync(x =>
+            x.Accion.StartsWith("PURCHASEDOCUMENTNUMBERING")));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task PurchaseNumbering_ExplicitCreationRepairsAMissingCmpSequence_UpdatesOnlyWithCurrentVersion_AndAudits()
+    {
+        using var client = CreateClient();
+        SetBearer(client, (await SetupAndLoginAsync(client)).AccessToken);
+        await RemovePurchaseNumberingAsync();
+
         Assert.Equal(HttpStatusCode.BadRequest,
             (await client.PostAsJsonAsync(Route,
                 new CreatePurchaseDocumentNumberingRequest("OTHER", 1))).StatusCode);
@@ -115,7 +139,8 @@ public sealed class PurchaseDocumentNumberingApiTests : IAsyncLifetime
 
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
-        var persisted = await db.ConsecutivoDocumento.AsNoTracking().SingleAsync();
+        var persisted = await db.ConsecutivoDocumento.AsNoTracking()
+            .SingleAsync(x => x.TipoDocumento == "COMPRA");
         Assert.Equal("COMPRA", persisted.TipoDocumento);
         Assert.Equal("CMP", persisted.Prefijo);
         Assert.Equal(11, persisted.UltimoNumero);
@@ -150,9 +175,7 @@ public sealed class PurchaseDocumentNumberingApiTests : IAsyncLifetime
         }
 
         var created = await ReadAsync<PurchaseDocumentNumberingDto>(
-            await client.PostAsJsonAsync(Route,
-                new CreatePurchaseDocumentNumberingRequest("CMP", 1)),
-            HttpStatusCode.Created);
+            await client.GetAsync(Route), HttpStatusCode.OK);
         foreach (var field in new[] { "installationId", "series", "documentType", "lastNumber", "purchaseId" })
         {
             var payload = new Dictionary<string, object?>
@@ -199,11 +222,12 @@ public sealed class PurchaseDocumentNumberingApiTests : IAsyncLifetime
                 new SetUserPermissionRequest(true))).StatusCode);
         supervisor = await LoginAsync(client, SupervisorUser, SupervisorPassword);
         SetBearer(client, supervisor.AccessToken);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(Route)).StatusCode);
+        // The effective permission lets the Supervisor read it: the installation already created it.
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(Route)).StatusCode);
 
         SetBearer(client, admin.AccessToken);
-        _ = await ReadAsync<PurchaseDocumentNumberingDto>(await client.PostAsJsonAsync(Route,
-            new CreatePurchaseDocumentNumberingRequest("CMP", 1)), HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(Route,
+            new CreatePurchaseDocumentNumberingRequest("CMP", 1))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent,
             (await client.PutAsJsonAsync($"/api/users/{adminId}/permissions/{permissionId}",
                 new SetUserPermissionRequest(false))).StatusCode);
@@ -233,6 +257,16 @@ public sealed class PurchaseDocumentNumberingApiTests : IAsyncLifetime
         Assert.False(path.TryGetProperty("delete", out _));
         Assert.DoesNotContain(openApi.RootElement.GetProperty("paths")
             .EnumerateObject(), x => x.Name.StartsWith(Route + "/", StringComparison.Ordinal));
+    }
+
+    /// <summary>Simulates an installation created before the consecutives were automatic.</summary>
+    private async Task RemovePurchaseNumberingAsync()
+    {
+        await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM configuracion.consecutivo_documento WHERE tipo_documento = 'COMPRA'", connection);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
     }
 
     private HttpClient CreateClient() => _factory!.CreateClient(new WebApplicationFactoryClientOptions

@@ -40,12 +40,7 @@ public sealed class CashService(
     }
 
     private static readonly (string Code, string Name)[] DefaultDifferenceReasons =
-    [
-        ("FALTANTE_EFECTIVO", "Faltante de efectivo"),
-        ("SOBRANTE_EFECTIVO", "Sobrante de efectivo"),
-        ("ERROR_DE_CONTEO", "Error de conteo"),
-        ("OTRO", "Otro")
-    ];
+        ApprovedReasonCatalogs.CashClosureDifference;
 
     /// <summary>Creates the default reasons that are missing (never touches existing ones) and returns every reason.</summary>
     private async Task<IReadOnlyCollection<MotivoOperacion>> EnsureDefaultDifferenceReasonsAsync(

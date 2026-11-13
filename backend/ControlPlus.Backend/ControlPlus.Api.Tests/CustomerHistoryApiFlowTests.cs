@@ -343,9 +343,6 @@ public sealed class CustomerHistoryApiFlowTests : IAsyncLifetime
         var product = await ReadAsync<ProductDto>(await PostAsync(client, "/api/products", new CreateProductRequest(
             category.Id, units.Single(x => x.Code == "UNIDAD").Id, null, "HISTORY-ITEM", null, null, true,
             "Producto historial", null, 1000m, null, null, 0, InitialQuantity: 100, InitialUnitCost: 137m)), HttpStatusCode.Created);
-        foreach (var (path, prefix) in new[] { ("sales", "VTA"), ("credit-payments", "ABO"), ("layaways", "APT"), ("layaway-payments", "PAP") })
-            Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/document-numbering/" + path,
-                new CreateSalesDocumentNumberingRequest(prefix, 1))).StatusCode);
         var customer = await CreateCustomerAsync(client, admin.AccessToken, "Cliente historial");
         _ = await ReadAsync<CashRegisterDto>(await client.PostAsJsonAsync("/api/cash/register", new ConfigureCashRegisterRequest("HISTORY-CASH", "Caja historial")), HttpStatusCode.Created);
         var state = await ReadAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);

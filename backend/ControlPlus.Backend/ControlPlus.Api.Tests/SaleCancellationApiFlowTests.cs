@@ -35,9 +35,6 @@ public sealed partial class SalesApiFlowTests
                 new SaleCreditAuthorizationRequest(SupervisorUser, SupervisorPassword))),
             HttpStatusCode.Created);
         SetBearer(client, scenario.Admin.AccessToken);
-        await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/credit-payments",
-            new CreateSalesDocumentNumberingRequest("ABO", 1)), HttpStatusCode.Created);
         _ = await StartSessionAsync(client, scenario.Admin.AccessToken,
             scenario.Admin.AccessToken, scenario.Admin.User.Id);
         using (var paymentRequest = new HttpRequestMessage(HttpMethod.Post,

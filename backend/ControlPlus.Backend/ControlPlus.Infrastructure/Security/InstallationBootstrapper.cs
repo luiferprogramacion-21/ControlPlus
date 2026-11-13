@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using ControlPlus.Application.Common;
+using ControlPlus.Application.Numbering;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Infrastructure.Persistence.Official;
@@ -76,10 +78,26 @@ public sealed class InstallationBootstrapper(OfficialControlPlusDbContext dbCont
             Establecimiento = establishment
         }).ToArray();
 
+        // Configuration that carries no business choice is created here, so the Administrator never has to:
+        // every document consecutive (fixed prefix, first number 1) and every approved reason catalog.
+        var sequences = DocumentNumberingDefaults.All.Select(x => new ConsecutivoDocumento
+        {
+            Id = Guid.CreateVersion7(),
+            InstalacionId = installation.Id,
+            TipoDocumento = x.DocumentType,
+            Prefijo = x.Prefix,
+            Serie = installation.Serie,
+            UltimoNumero = 0,
+            Version = 1
+        }).ToArray();
+        var approvedReasons = ApprovedReasonCatalogs.BuildAll(establishment.Id, now);
+
         await dbContext.Establecimiento.AddAsync(establishment, cancellationToken);
         await dbContext.Instalacion.AddAsync(installation, cancellationToken);
         await dbContext.Terminal.AddAsync(terminal, cancellationToken);
+        await dbContext.ConsecutivoDocumento.AddRangeAsync(sequences, cancellationToken);
         await dbContext.MotivoOperacion.AddRangeAsync(inventoryReasons, cancellationToken);
+        await dbContext.MotivoOperacion.AddRangeAsync(approvedReasons, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

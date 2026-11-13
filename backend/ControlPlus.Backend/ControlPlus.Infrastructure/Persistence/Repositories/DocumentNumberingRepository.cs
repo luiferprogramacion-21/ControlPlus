@@ -34,6 +34,12 @@ public sealed class EfDocumentNumberingRepository(OfficialControlPlusDbContext d
         CancellationToken cancellationToken = default) =>
         GetLayawaySequenceAsync(installationId, series, "CAMBIO_VENTA", forUpdate, cancellationToken);
 
+    public Task EnsureNumberingAsync(
+        Guid installationId, string series, string documentType,
+        CancellationToken cancellationToken = default) =>
+        DocumentSequenceProvisioner.EnsureAsync(
+            dbContext, installationId, series, documentType, cancellationToken);
+
     public async Task<Instalacion?> GetActiveInstallationAsync(
         bool forUpdate,
         CancellationToken cancellationToken = default)

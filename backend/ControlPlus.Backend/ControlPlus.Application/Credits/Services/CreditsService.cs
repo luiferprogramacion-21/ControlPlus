@@ -5,6 +5,7 @@ using System.Text.Json;
 using ControlPlus.Application.Common;
 using ControlPlus.Application.Credits.Contracts;
 using ControlPlus.Application.Credits.Ports;
+using ControlPlus.Application.Numbering;
 using ControlPlus.Application.Numbering.Ports;
 using ControlPlus.Application.Sales.Ports;
 using ControlPlus.Application.Security.Contracts;
@@ -143,8 +144,11 @@ public sealed class CreditsService(ICreditsRepository credits, ISalesRepository 
         }
         else return Result.Failure<CreditPaymentOperationDto>(ApplicationError.Conflict("Modalidad de turno inválida."));
 
+        // The consecutive is created on first use when it does not exist yet (inside this transaction).
+        await numbering.EnsureNumberingAsync(installation.Id, installation.Serie,
+            DocumentNumberingDefaults.CreditPayments, cancellationToken);
         var sequence = await numbering.GetCreditPaymentNumberingAsync(installation.Id, installation.Serie, true, cancellationToken);
-        if (sequence is null) return Result.Failure<CreditPaymentOperationDto>(ApplicationError.Conflict("Debe configurar el consecutivo PAGO_CREDITO antes de abonar."));
+        if (sequence is null) return Result.Failure<CreditPaymentOperationDto>(ApplicationError.Conflict("No se pudo obtener el consecutivo PAGO_CREDITO."));
         if (sequence.UltimoNumero > long.MaxValue - payments.Length)
             return Result.Failure<CreditPaymentOperationDto>(ApplicationError.NumberingExhausted("El consecutivo de abonos está agotado."));
         var credit = await credits.GetForUpdateAsync(creditId, cancellationToken);

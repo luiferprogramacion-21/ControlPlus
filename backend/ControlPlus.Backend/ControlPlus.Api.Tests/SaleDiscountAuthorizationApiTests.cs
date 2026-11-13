@@ -471,8 +471,6 @@ public sealed class SaleDiscountAuthorizationApiTests : IAsyncLifetime
         var second = await ReadAsync<ProductDto>(await client.PostAsJsonAsync("/api/products",
             new CreateProductRequest(category.Id, unit, null, "DISCOUNT-AUTH-ITEM-2", null, null, true,
                 "Segundo producto aislado", null, 2_000m, null, null, 0)), HttpStatusCode.Created);
-        await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/sales", new CreateSalesDocumentNumberingRequest("VTA", 1)), HttpStatusCode.Created);
         await using (var scope = _factory!.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
