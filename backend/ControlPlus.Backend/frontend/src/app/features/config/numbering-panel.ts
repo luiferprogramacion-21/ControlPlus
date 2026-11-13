@@ -11,7 +11,7 @@ interface Row { kind: NumberingKind; numbering: Numbering | null; error: string;
   imports: [FormsModule],
   template: `
     <section class="panel module-panel">
-      <div class="module-toolbar"><div><h3>Numeración de documentos</h3><p class="muted">El prefijo identifica el documento (VTA, ABO, CMP…). El sistema agrega la serie y asigna el siguiente número al registrarlo. «Número anterior» es la base del consecutivo: 0 indica que empieza en 1. Los documentos anteriores conservan su número. Sin consecutivo configurado no se pueden registrar nuevos documentos.</p></div><button class="table-action" type="button" (click)="load()" [disabled]="loading()">Actualizar</button></div>
+      <div class="module-toolbar"><div><h3>Numeración de documentos</h3><p class="muted">El prefijo identifica el documento (VTA, ABO, CMP…). El sistema agrega la serie y asigna el siguiente número al registrarlo. «Número anterior» es la base del consecutivo: 0 indica que empieza en 1. Los documentos anteriores conservan su número. Los consecutivos se crean solos al instalar y al emitir el primer documento: aquí se consultan y, mientras no se haya emitido ninguno, se pueden ajustar.</p></div><button class="table-action" type="button" (click)="load()" [disabled]="loading()">Actualizar</button></div>
       @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
       @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
       <div class="table-wrap module-table-wrap"><table><thead><tr><th>Documento</th><th>Prefijo</th><th class="align-right">Número anterior</th><th class="align-right">Siguiente</th><th>Estado</th><th class="align-right">Acciones</th></tr></thead><tbody>
@@ -21,7 +21,7 @@ interface Row { kind: NumberingKind; numbering: Numbering | null; error: string;
             <td class="numeric">{{ row.numbering?.prefix || '—' }}</td>
             <td class="align-right numeric">{{ row.numbering ? row.numbering.lastNumber : '—' }}</td>
             <td class="align-right numeric">{{ row.numbering ? row.numbering.nextNumber : '—' }}</td>
-            <td>@if (row.error) { <span class="status-pill status-pill--warning">{{ row.error }}</span> } @else { <span class="status-pill" [class.status-pill--warning]="!row.numbering">{{ row.numbering ? 'Configurado' : 'Sin configurar' }}</span> }</td>
+            <td>@if (row.error) { <span class="status-pill status-pill--warning">{{ row.error }}</span> } @else { <span class="status-pill" [class.status-pill--warning]="!row.numbering">{{ row.numbering ? 'Listo' : 'Se crea al usarlo' }}</span> }</td>
             <td class="align-right">
               @if (!row.numbering && !row.error) { <button class="table-action" type="button" (click)="open(row)">Configurar</button> }
               @if (canCorrect(row)) { <button class="table-action" type="button" (click)="open(row)">Ajustar</button> }

@@ -4,20 +4,20 @@ import { ConfigApi, ReasonGroup, ReasonItem, REASON_GROUPS } from './config-api'
 
 interface GroupState { group: ReasonGroup; reasons: ReasonItem[] | null; error: string; busy: boolean; }
 
-/** Approved reasons used when annulling or closing documents. The catalog is created explicitly, never silently. */
+/** Approved reasons used when annulling or closing documents. The backend creates them by itself; this panel shows them and can repair a catalog that lacks one. */
 @Component({
   selector: 'cp-reasons-panel',
   template: `
     <section class="panel module-panel">
-      <div class="module-toolbar"><div><h3>Motivos</h3><p class="muted">Sin motivos inicializados no se pueden anular ventas ni compras, ni cerrar o cancelar pedidos. Inicializar solo crea los que faltan.</p></div><button class="table-action" type="button" (click)="load()">Actualizar</button></div>
+      <div class="module-toolbar"><div><h3>Motivos</h3><p class="muted">Los motivos aprobados para anular ventas y compras y para cerrar o cancelar pedidos se crean solos al instalar y al consultarlos. Aquí se ven; «Completar faltantes» repara un grupo al que le falte alguno.</p></div><button class="table-action" type="button" (click)="load()">Actualizar</button></div>
       @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
       <div class="table-wrap module-table-wrap"><table><thead><tr><th>Uso</th><th>Motivos</th><th>Estado</th><th class="align-right">Acciones</th></tr></thead><tbody>
         @for (state of states(); track state.group.key) {
           <tr>
             <td><strong>{{ state.group.label }}</strong></td>
             <td>@if (state.reasons?.length) { {{ names(state) }} } @else { — }</td>
-            <td>@if (state.error) { <span class="status-pill status-pill--warning">{{ state.error }}</span> } @else if (state.reasons === null) { Cargando… } @else { <span class="status-pill" [class.status-pill--warning]="!state.reasons.length">{{ state.reasons.length ? state.reasons.length + ' disponibles' : 'Sin inicializar' }}</span> }</td>
-            <td class="align-right"><button class="table-action" type="button" (click)="initialize(state)" [disabled]="state.busy || state.reasons === null">{{ state.busy ? 'Inicializando…' : (state.reasons?.length ? 'Completar faltantes' : 'Inicializar') }}</button></td>
+            <td>@if (state.error) { <span class="status-pill status-pill--warning">{{ state.error }}</span> } @else if (state.reasons === null) { Cargando… } @else { <span class="status-pill" [class.status-pill--warning]="!state.reasons.length">{{ state.reasons.length ? state.reasons.length + ' disponibles' : 'Incompleto' }}</span> }</td>
+            <td class="align-right"><button class="table-action" type="button" (click)="initialize(state)" [disabled]="state.busy || state.reasons === null">{{ state.busy ? 'Completando…' : 'Completar faltantes' }}</button></td>
           </tr>
         }
       </tbody></table></div>
