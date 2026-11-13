@@ -6,8 +6,12 @@
 Administrador con `NUMBERING.MANAGE` lo crea expresamente en
 `POST /api/purchase-orders/numbering/initialize`; comienza en 1 y se consume
 al crear el borrador. `GET /api/purchase-orders/numbering` consulta el estado.
-No se siembra al arrancar. Solo hay un borrador por proveedor e instalación;
-sus productos activos deben estar asignados a ese proveedor.
+**Cambio aprobado el 13 de noviembre de 2026 (implementación en curso):** el
+backend crea `PED` por sí mismo, al instalar y, si faltara, al primer uso, y los
+`POST .../initialize` pasan a ser solo una reparación; véase AGENTS.md. Hasta
+terminar la implementación, lo descrito arriba sigue siendo el comportamiento
+vigente y no se siembra al arrancar. Solo hay un borrador por proveedor e
+instalación; sus productos activos deben estar asignados a ese proveedor.
 
 `GET/POST /api/purchase-orders`, `GET/PUT /api/purchase-orders/{orderId}` y
 `POST /api/purchase-orders/{orderId}/send` exigen Supervisor o Administrador y
@@ -47,12 +51,15 @@ revierte compras ni inventario ya recibidos.
 
 Los catálogos se consultan en `GET /api/purchase-orders/reasons/close` y
 `/reasons/cancel` y se inicializan expresamente mediante los correspondientes
-`POST .../initialize`. Se proponen los códigos `PROVEEDOR_NO_ENTREGARA`,
-`PENDIENTE_NO_REQUERIDO`, `OTRO` para cierre y `ERROR_PEDIDO`,
-`PROVEEDOR_NO_ATIENDE`, `OTRO` para cancelación. `OTRO` exige observación.
-Las pruebas integradas del corte 3 se completaron el 18 de octubre de 2026.
-La aprobación funcional de los códigos sigue pendiente antes de inicializar
-los catálogos en PostgreSQL persistente.
+`POST .../initialize`. El 12 de noviembre de 2026, el usuario aprobó los seis
+motivos tal como están implementados: para cierre,
+`PROVEEDOR_NO_ENTREGARA` («Proveedor no entregará el pendiente»),
+`PENDIENTE_NO_REQUERIDO` («Pendiente ya no requerido») y `OTRO` («Otro»); para
+cancelación, `ERROR_PEDIDO` («Error en el pedido»),
+`PROVEEDOR_NO_ATIENDE` («Proveedor no atiende el pedido») y `OTRO` («Otro»).
+`OTRO` exige observación. El usuario autorizó inicializarlos en `controlplus`;
+la verificación del mismo día encontró ambos catálogos ya completos. Las pruebas
+integradas del corte 3 se completaron el 18 de octubre de 2026.
 
 La compilación del corte 3 terminó correctamente y la suite completa de API
 registró **329/329**, sin fallidas ni omitidas. El mismo bloque ejecutó antes
@@ -60,6 +67,61 @@ Domain e Infrastructure con salida exitosa; los conteos de esas dos suites no
 figuran en el extracto conservado. Las pruebas utilizaron bases locales
 temporales y no inicializaron catálogos ni numeración en `controlplus`.
 Véase [testing.md](testing.md) para el alcance de esta evidencia.
+
+El 12 de noviembre de 2026, el panel de Configuración del frontend incorporó
+la numeración de **Pedidos de compra**. Consulta la ruta propia
+`GET /api/purchase-orders/numbering` y, si aún no existe, permite crear una
+sola vez el consecutivo fijo `PED`, desde 1, mediante
+`POST /api/purchase-orders/numbering/initialize`. Los cuatro grupos de motivos
+de ventas, compras y pedidos ya se administran en el mismo módulo mediante sus
+endpoints explícitos de inicialización. Este cambio de interfaz no inicializó
+la numeración ni los motivos en `controlplus`.
+
+El comando histórico del bloque ejecutado en la instalación local, desde la
+raíz del backend en Windows PowerShell 5.1 y con la API en
+`http://localhost:5000`, fue:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Initialize-ApprovedPurchaseOrderSetup.ps1
+```
+
+El bloque solicita en la misma consola la contraseña de `postgres` para verificar
+`127.0.0.1:5432/controlplus` y su conexión con la API; después solicita el
+usuario y la contraseña de un Administrador con `NUMBERING.MANAGE`, `PURCHASE_ORDERS.MANAGE` y
+`PURCHASE_ORDERS.CANCEL`. Verifica el historial de 23 migraciones, el respaldo
+y su SHA-256 antes de cualquier POST
+de configuración. Consulta el estado actual, crea `PED` solo si falta y completa
+solo los catálogos incompletos; verifica después los seis motivos y la
+numeración. La evidencia se guarda bajo `ControlPlus-Backups/PurchaseOrderSetup-*`
+fuera del repositorio. Un fallo se detiene con `PURCHASE_ORDER_SETUP_STOPPED` y
+debe revisarse en `failure.json` antes de cualquier reintento. `-ExecutionPolicy Bypass` se limita
+al proceso que ejecuta este archivo; no cambia la política del equipo. La
+verificación del respaldo comprueba su huella, TOC y extracción legible a `NUL`,
+pero no equivale a una restauración de ensayo.
+
+El primer intento del operador, el 12 de noviembre de 2026, se detuvo con
+`PURCHASE_ORDER_SETUP_STOPPED` en `api-preflight`; la evidencia quedó en
+`PurchaseOrderSetup-20261112T195228Z-354aeece787f4e1f998e183ccc968d20`.
+No llegó al respaldo ni a los POST de numeración y motivos. El rechazo del
+catálogo fue falso: Windows PowerShell 5.1 interpretó el archivo UTF-8 sin BOM
+con otra codificación, y la devolución directa de `Invoke-RestMethod` envolvía
+la respuesta JSON vacía `[]` como un elemento. El script quedó corregido con
+BOM UTF-8 y devolución mediante una variable.
+
+El reintento del operador terminó el 12 de noviembre de 2026 con
+`PURCHASE_ORDER_SETUP_OK`. El recibo está en
+`C:\Users\luife\ControlPlus-Backups\PurchaseOrderSetup-20261112T200134Z-f5e80b503fa04e54800aa1128a1ab56d`.
+El respaldo previo mide 547234 bytes, tiene TOC legible y su SHA-256
+`D8CA59C82C6350B2DA9A21542AFAFE716A8C962E1444F4D039C6633DE020F675`
+coincide con el archivo y el recibo; no se ensayó una restauración. El bloque
+confirmó la conexión de la API a `controlplus`, el historial de 23 migraciones,
+una fila `PEDIDO_COMPRA` para la serie activa `CP-2026-01`, tres motivos físicos
+de cierre y tres de cancelación, y las seis respuestas funcionales aprobadas.
+`PED` conservó `lastNumber=0` y `nextNumber=1`. `completed=[]` significa que
+no se enviaron POST de configuración: la numeración y los motivos ya estaban
+presentes antes del bloque. El recibo no identifica cuándo ni quién los creó.
+La configuración de este paso está cerrada; no repetir el bloque sobre
+`controlplus` sin una nueva necesidad y revisión del estado actual.
 
 ## Corte 2: anulación completa
 

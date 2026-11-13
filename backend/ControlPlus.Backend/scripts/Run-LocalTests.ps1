@@ -1,4 +1,7 @@
-﻿$ErrorActionPreference = 'Stop'
+﻿[CmdletBinding()]
+param([ValidateSet('PurchaseCancellation')][string]$Focus)
+
+$ErrorActionPreference = 'Stop'
 $solutionRoot = Split-Path -Parent $PSScriptRoot
 
 function Assert-SuiteTrx {
@@ -99,12 +102,20 @@ try {
             'CONTROLPLUS_TEST_ADMIN_CONNECTION', $connection.psbase.ConnectionString, 'Process')
 
         $failedSuites = @()
-        foreach ($name in @('Domain', 'Infrastructure', 'Api')) {
+        $suiteNames = if ($Focus -eq 'PurchaseCancellation') { @('Api') } else { @('Domain', 'Infrastructure', 'Api') }
+        foreach ($name in $suiteNames) {
             $project = "ControlPlus.$name.Tests"
             $trxName = "$name.trx"
             $trxPath = Join-Path $resultsDir $trxName
-            & dotnet test $project --no-build --no-restore -m:1 /p:BuildInParallel=false `
-                --results-directory $resultsDir --logger "trx;LogFileName=$trxName"
+            if ($Focus -eq 'PurchaseCancellation') {
+                & dotnet test $project --no-build --no-restore -m:1 /p:BuildInParallel=false `
+                    --filter 'FullyQualifiedName~ControlPlus.Api.Tests.PurchasesApiFlowTests.Cancel_' `
+                    --results-directory $resultsDir --logger "trx;LogFileName=$trxName"
+            }
+            else {
+                & dotnet test $project --no-build --no-restore -m:1 /p:BuildInParallel=false `
+                    --results-directory $resultsDir --logger "trx;LogFileName=$trxName"
+            }
             $testExit = $LASTEXITCODE
 
             $verified = $false
@@ -123,7 +134,12 @@ try {
         if ($failedSuites.Count -ne 0) {
             throw "No se validaron las suites: $($failedSuites -join ', ')."
         }
-        Write-Host 'Las tres suites terminaron con salida 0 y sin pruebas fallidas u omitidas.'
+        if ($Focus -eq 'PurchaseCancellation') {
+            Write-Host 'Las pruebas focalizadas de anulación de compras terminaron con salida 0 y sin fallas ni omisiones.'
+        }
+        else {
+            Write-Host 'Las tres suites terminaron con salida 0 y sin pruebas fallidas u omitidas.'
+        }
     }
     finally {
         Pop-Location

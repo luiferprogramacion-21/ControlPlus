@@ -198,6 +198,8 @@ La anulación admite JSON estricto con `expectedVersion`, `reasonId`, `observati
 
 Las tres operaciones requieren `NUMBERING.MANAGE` efectivo y mantienen las restricciones actuales del proyecto. Tipo, instalación y serie se resuelven en el servidor; la corrección exige versión vigente. No existe `DELETE` ni se crea el consecutivo automáticamente al crear un borrador. Numeración y recepción se confirman o revierten juntas.
 
+El número visible sigue el formato `<prefijo>-<serie>-<consecutivo>`, sin relleno de ceros añadido por el frontend. `lastNumber` es la base del siguiente número y puede no corresponder a un documento emitido; por ejemplo, `0` indica que el próximo será `1`. Una corrección afecta únicamente documentos futuros. En Ventas, Abonos de crédito y Compras, `canCorrect` informa si la corrección sigue permitida al consultar; el `PUT` vuelve a comprobarlo. Los prefijos `ABO` y `CMP` son fijos.
+
 ## Numeración de Ventas
 
 | Método | Ruta | Resultado |
@@ -206,7 +208,7 @@ Las tres operaciones requieren `NUMBERING.MANAGE` efectivo y mantienen las restr
 | `POST` | `/api/document-numbering/sales` | Crea la configuración única; `firstNumber: 1` persiste `lastNumber: 0` |
 | `PUT` | `/api/document-numbering/sales` | Corrige prefijo y primer número solamente antes de la primera venta confirmada |
 
-Los tres endpoints exigen el permiso efectivo `NUMBERING.MANAGE`. Instalación, serie y tipo `VENTA` se resuelven en el servidor y no forman parte de las solicitudes. El prefijo se recorta, se normaliza a mayúsculas, no puede quedar vacío, contener caracteres de control ni superar 10 caracteres. La corrección exige `version`; una versión obsoleta o cualquier venta confirmada para la instalación y serie produce `409`. No existe endpoint de eliminación. Las respuestas solo muestran tipo, serie, prefijo, último número, próximo número y versión.
+Los tres endpoints exigen el permiso efectivo `NUMBERING.MANAGE`. Instalación, serie y tipo `VENTA` se resuelven en el servidor y no forman parte de las solicitudes. El prefijo se recorta, se normaliza a mayúsculas, no puede quedar vacío, contener caracteres de control ni superar 10 caracteres. La corrección exige `version`; una versión obsoleta o cualquier venta confirmada para la instalación y serie produce `409`. No existe endpoint de eliminación. Las respuestas muestran tipo, serie, prefijo, número anterior, próximo número, versión y `canCorrect`. Este último indica si el servidor permite una corrección en el momento de la consulta; el `PUT` revalida la condición y puede devolver `409` si entretanto se confirmó una venta.
 
 ## Numeración de abonos
 
@@ -216,7 +218,7 @@ Los tres endpoints exigen el permiso efectivo `NUMBERING.MANAGE`. Instalación, 
 | `POST` | `/api/document-numbering/credit-payments` | Crea el consecutivo con prefijo obligatorio `ABO`; `firstNumber: 1` guarda `lastNumber: 0` |
 | `PUT` | `/api/document-numbering/credit-payments` | Corrige antes del primer abono, con `version` vigente |
 
-Requieren `NUMBERING.MANAGE`. Tipo, instalación y serie se resuelven solo en servidor y los contratos JSON rechazan campos internos y propiedades desconocidas. La configuración inicial aprobada usa `firstNumber: 1`; las correcciones antes del primer pago admiten un número inicial positivo. No existe `DELETE`. Tras la publicación del commit y el despliegue local de la imagen API, ABO quedó presente y certificado mediante la API en PostgreSQL persistente local/de desarrollo con `prefix=ABO`, `lastNumber=0`, `nextNumber=1` y `version` válida. Este corte no creó migración ni configuró el consecutivo automáticamente; no se usó `PUT` para cambiar ABO.
+Requieren `NUMBERING.MANAGE`. Tipo, instalación y serie se resuelven solo en servidor y los contratos JSON rechazan campos internos y propiedades desconocidas. La configuración inicial aprobada usa `firstNumber: 1`; las correcciones antes del primer pago admiten un número inicial positivo y conservan el prefijo fijo `ABO`. Las respuestas incluyen `canCorrect`, calculado según la existencia de abonos al consultar y revalidado por el `PUT`. No existe `DELETE`. Tras la publicación del commit y el despliegue local de la imagen API, ABO quedó presente y certificado mediante la API en PostgreSQL persistente local/de desarrollo con `prefix=ABO`, `lastNumber=0`, `nextNumber=1` y `version` válida. Este corte no creó migración ni configuró el consecutivo automáticamente; no se usó `PUT` para cambiar ABO.
 
 ## Respuestas de error
 
