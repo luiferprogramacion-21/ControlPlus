@@ -301,6 +301,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         Assert.Equal("ABO", created.Prefix);
         Assert.Equal(0, created.LastNumber);
         Assert.Equal(1, created.NextNumber);
+        Assert.True(created.CanCorrect);
         Assert.Equal(created, await ReadAsync<SalesDocumentNumberingDto>(
             await client.GetAsync("/api/document-numbering/credit-payments"), HttpStatusCode.OK));
         await AssertProblemAsync(await client.PostAsJsonAsync("/api/document-numbering/credit-payments",
@@ -312,6 +313,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         Assert.Equal(4, corrected.LastNumber);
         Assert.Equal(5, corrected.NextNumber);
         Assert.Equal(2, corrected.Version);
+        Assert.True(corrected.CanCorrect);
         await AssertProblemAsync(await client.PutAsJsonAsync("/api/document-numbering/credit-payments",
             new UpdateSalesDocumentNumberingRequest("ABO", 1, created.Version)), HttpStatusCode.Conflict);
         await AssertProblemAsync(await client.PutAsJsonAsync("/api/document-numbering/credit-payments",
@@ -322,6 +324,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
             new ApplyCreditPaymentRequest(1, [new("EFECTIVO", 100m, 100m, null)])), HttpStatusCode.Created);
         var afterPayment = await ReadAsync<SalesDocumentNumberingDto>(await client.GetAsync(
             "/api/document-numbering/credit-payments"), HttpStatusCode.OK);
+        Assert.False(afterPayment.CanCorrect);
         await AssertProblemAsync(await client.PutAsJsonAsync("/api/document-numbering/credit-payments",
             new UpdateSalesDocumentNumberingRequest("ABO", 1, afterPayment.Version)), HttpStatusCode.Conflict);
         var persisted = await ReadAsync<SalesDocumentNumberingDto>(await client.GetAsync(

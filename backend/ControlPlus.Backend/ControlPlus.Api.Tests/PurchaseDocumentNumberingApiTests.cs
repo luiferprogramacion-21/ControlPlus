@@ -88,6 +88,7 @@ public sealed class PurchaseDocumentNumberingApiTests : IAsyncLifetime
         Assert.Equal(0, created.LastNumber);
         Assert.Equal(1, created.NextNumber);
         Assert.Equal(1, created.Version);
+        Assert.True(created.CanCorrect);
         Assert.Equal(created,
             await ReadAsync<PurchaseDocumentNumberingDto>(await client.GetAsync(Route), HttpStatusCode.OK));
         Assert.Equal(HttpStatusCode.Conflict,
@@ -101,6 +102,7 @@ public sealed class PurchaseDocumentNumberingApiTests : IAsyncLifetime
         Assert.Equal(11, updated.LastNumber);
         Assert.Equal(12, updated.NextNumber);
         Assert.Equal(2, updated.Version);
+        Assert.True(updated.CanCorrect);
         Assert.Equal(HttpStatusCode.Conflict,
             (await client.PutAsJsonAsync(Route,
                 new UpdatePurchaseDocumentNumberingRequest("CMP", 13, created.Version))).StatusCode);

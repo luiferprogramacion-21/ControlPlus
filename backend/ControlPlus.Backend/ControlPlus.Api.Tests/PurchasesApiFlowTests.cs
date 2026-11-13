@@ -659,13 +659,28 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
             new { prefix = "CMP", firstNumber = 1 }), HttpStatusCode.Created);
         Assert.Equal(0, created.GetProperty("lastNumber").GetInt64());
         Assert.Equal(1, created.GetProperty("nextNumber").GetInt64());
+        Assert.True(created.GetProperty("canCorrect").GetBoolean());
         await ProblemAsync(await client.PostAsJsonAsync("/api/document-numbering/purchases",
             new { prefix = "CMP", firstNumber = 1 }), HttpStatusCode.Conflict);
         var changed = await ReadJsonAsync(await client.PutAsJsonAsync("/api/document-numbering/purchases",
             new { prefix = "CMP", firstNumber = 2, version = created.GetProperty("version").GetInt64() }), HttpStatusCode.OK);
         Assert.Equal(2, changed.GetProperty("nextNumber").GetInt64());
+        Assert.True(changed.GetProperty("canCorrect").GetBoolean());
         await ProblemAsync(await client.PutAsJsonAsync("/api/document-numbering/purchases",
             new { prefix = "CMP", firstNumber = 3, version = created.GetProperty("version").GetInt64() }), HttpStatusCode.Conflict);
+
+        var supplier = await SupplierAsync(client, "Proveedor de consecutivo");
+        var product = await ProductAsync(client, supplier.Id, "PUR-NUMBERING", null);
+        var draft = await CreateDraftAsync(client, Body(supplier.Id, null, "NO_DISCRIMINADO",
+            new Line(product.Id, 1, 100m)));
+        _ = await ReadJsonAsync(await ConfirmAsync(client, draft.GetProperty("id").GetGuid(),
+            "purchase-numbering-first-confirmation", draft.GetProperty("version").GetInt64()), HttpStatusCode.OK);
+        var afterPurchase = await ReadJsonAsync(await client.GetAsync("/api/document-numbering/purchases"),
+            HttpStatusCode.OK);
+        Assert.False(afterPurchase.GetProperty("canCorrect").GetBoolean());
+        await ProblemAsync(await client.PutAsJsonAsync("/api/document-numbering/purchases",
+            new { prefix = "CMP", firstNumber = 3, version = afterPurchase.GetProperty("version").GetInt64() }),
+            HttpStatusCode.Conflict);
         Assert.Equal(HttpStatusCode.MethodNotAllowed,
             (await client.DeleteAsync("/api/document-numbering/purchases")).StatusCode);
     }

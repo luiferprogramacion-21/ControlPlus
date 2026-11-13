@@ -378,6 +378,10 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
     {
         using var client = CreateClient();
         var scenario = await BootstrapAsync(client);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var beforeSale = await ReadAsync<SalesDocumentNumberingDto>(
+            await client.GetAsync("/api/document-numbering/sales"), HttpStatusCode.OK);
+        Assert.True(beforeSale.CanCorrect);
         await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
         var credential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
         _ = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
@@ -388,6 +392,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         SetBearer(client, scenario.Admin.AccessToken);
         var numbering = await ReadAsync<SalesDocumentNumberingDto>(
             await client.GetAsync("/api/document-numbering/sales"), HttpStatusCode.OK);
+        Assert.False(numbering.CanCorrect);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync(
             "/api/document-numbering/sales",
             new UpdateSalesDocumentNumberingRequest("ALT", 10, numbering.Version))).StatusCode);

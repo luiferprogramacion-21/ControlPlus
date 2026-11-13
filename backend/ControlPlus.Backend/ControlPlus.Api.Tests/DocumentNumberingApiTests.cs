@@ -105,6 +105,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
         Assert.Equal(0, created.LastNumber);
         Assert.Equal(1, created.NextNumber);
         Assert.Equal(1, created.Version);
+        Assert.True(created.CanCorrect);
 
         var getResponse = await client.GetAsync("/api/document-numbering/sales");
         Assert.Equal("application/json", getResponse.Content.Headers.ContentType?.MediaType);
@@ -287,6 +288,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
         Assert.Equal(9, updated.LastNumber);
         Assert.Equal(10, updated.NextNumber);
         Assert.Equal(2, updated.Version);
+        Assert.True(updated.CanCorrect);
 
         Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync(
             "/api/document-numbering/sales",
