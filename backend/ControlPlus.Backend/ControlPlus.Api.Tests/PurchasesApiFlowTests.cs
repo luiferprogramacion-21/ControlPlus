@@ -283,19 +283,6 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
 
     private static LocalPostgresDatabase NewPostgres() => new LocalPostgresDatabase();
 
-    private async Task RestartAtPreviousMigrationAsync()
-    {
-        if (_factory is not null) await _factory.DisposeAsync();
-        await _postgres.DisposeAsync();
-        _postgres = NewPostgres();
-        await _postgres.StartAsync();
-
-        await using var migrations = new ControlPlusDbContext(new DbContextOptionsBuilder<ControlPlusDbContext>()
-            .UseNpgsql(_postgres.GetConnectionString()).Options);
-        await migrations.GetService<IMigrator>().MigrateAsync("20261005010000_CustomerSearchIndexesV1");
-        _factory = CreateFactory();
-    }
-
     public async Task DisposeAsync()
     {
         if (_factory is not null) await _factory.DisposeAsync();
@@ -707,11 +694,12 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var again = await ReadJsonAsync(await client.PostAsync("/api/purchases/cancellation-reasons/initialize", null), HttpStatusCode.OK);
         Assert.Equal(initialized.GetRawText(), again.GetRawText());
         var beforePurchase = await PurchasePersistenceAsync(id, first.Id, second.Id);
-        var request = new { expectedVersion = 2, reasonId = reason, observation = "Registro equivocado",
-            authorization = new { userName = AdminName, password = _adminPassword } };
+        // El Administrador anula sin segundo autorizador: sus propias credenciales no son las de un rol
+        // estrictamente superior (regla del 5 de noviembre) y el servicio las rechaza con 401.
+        var request = new { expectedVersion = 2, reasonId = reason, observation = "Registro equivocado" };
         using var invalid = new HttpRequestMessage(HttpMethod.Post, $"/api/purchases/{id}/cancel")
         { Content = JsonContent.Create(new { request.expectedVersion, request.reasonId,
-            request.observation, request.authorization, stock = 0 }) };
+            request.observation, stock = 0 }) };
         invalid.Headers.Add("Idempotency-Key", "cancel-invalid-json");
         await ProblemAsync(await client.SendAsync(invalid), HttpStatusCode.BadRequest);
         await ProblemCodeAsync(await PostCancelAsync(client, id, "cancel-invalid-authorization",
@@ -851,8 +839,7 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var id = confirmed.GetProperty("id").GetGuid();
         var version = confirmed.GetProperty("version").GetInt64();
         var cancelPermission = await PermissionIdAsync(client, PermissionCodes.PurchasesCancel);
-        var request = new { expectedVersion = version, reasonId = setup.ReasonId,
-            authorization = new { userName = AdminName, password = _adminPassword } };
+        var request = new { expectedVersion = version, reasonId = setup.ReasonId };
         var before = await PurchasePersistenceAsync(id, product.Id);
 
         Bearer(client, setup.Users.Supervisor.Token.AccessToken);
@@ -886,7 +873,7 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task Cancel_AcceptsAnotherActiveAdministrator_RejectsInvalidCredentialsWithoutLeaks()
+    public async Task Cancel_RejectsCredentialsOfAnotherAdministrator_WithoutLeaksOrEffects()
     {
         using var client = Client();
         var setup = await PrepareCancellationAsync(client, "PUR-AUTH-OTHER");
@@ -898,23 +885,31 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var before = await PurchasePersistenceAsync(id, product.Id);
         var invalidPassword = $"Invalid-Cancel-{Secret(24)}!";
 
-        var invalidResponse = await PostCancelAsync(client, id, "auth-other-cancel", new
+        // Anular es una operación de Administrador, el rol más alto: ninguna credencial enviada puede ser de un
+        // rol estrictamente superior (regla del 5 de noviembre). Ni la contraseña incorrecta ni la correcta de
+        // otro Administrador activo se aceptan, y la respuesta es idéntica y sin datos sensibles.
+        foreach (var password in new[] { invalidPassword, second.Password })
         {
-            expectedVersion = version, reasonId = setup.ReasonId,
-            authorization = new { userName = second.User.User.UserName, password = invalidPassword }
-        });
-        var invalidBody = await invalidResponse.Content.ReadAsStringAsync();
-        Assert.Equal(HttpStatusCode.Unauthorized, invalidResponse.StatusCode);
-        Assert.Equal("application/problem+json", invalidResponse.Content.Headers.ContentType?.MediaType);
-        Assert.DoesNotContain(invalidPassword, invalidBody);
-        Assert.DoesNotContain(second.Password, invalidBody);
-        Assert.DoesNotContain(_adminPassword, invalidBody);
-        Assert.Equal(before, await PurchasePersistenceAsync(id, product.Id));
+            var rejected = await PostCancelAsync(client, id, "auth-other-cancel", new
+            {
+                expectedVersion = version, reasonId = setup.ReasonId,
+                authorization = new { userName = second.User.User.UserName, password }
+            });
+            var rejectedBody = await rejected.Content.ReadAsStringAsync();
+            Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
+            Assert.Equal("application/problem+json", rejected.Content.Headers.ContentType?.MediaType);
+            using (var problem = JsonDocument.Parse(rejectedBody))
+                Assert.Equal("authentication.unauthorized", problem.RootElement.GetProperty("code").GetString());
+            Assert.DoesNotContain(invalidPassword, rejectedBody);
+            Assert.DoesNotContain(second.Password, rejectedBody);
+            Assert.DoesNotContain(_adminPassword, rejectedBody);
+            Assert.Equal(before, await PurchasePersistenceAsync(id, product.Id));
+        }
 
+        // La anulación válida del Administrador es la propia, sin segundo autorizador.
         var cancelled = await ReadJsonAsync(await PostCancelAsync(client, id, "auth-other-cancel", new
         {
-            expectedVersion = version, reasonId = setup.ReasonId,
-            authorization = new { userName = second.User.User.UserName, password = second.Password }
+            expectedVersion = version, reasonId = setup.ReasonId
         }), HttpStatusCode.OK);
         Assert.Equal("ANULADA", cancelled.GetProperty("status").GetString());
         await using var scope = _factory!.Services.CreateAsyncScope();
@@ -922,7 +917,8 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var purchase = await db.Compra.AsNoTracking().SingleAsync(x => x.Id == id);
         var authorization = await db.AutorizacionOperacion.AsNoTracking().SingleAsync(x => x.Id == purchase.AutorizacionAnulacionId);
         Assert.Equal(setup.Users.Admin.User.Id, authorization.UsuarioSolicitanteId);
-        Assert.Equal(second.User.User.Id, authorization.UsuarioAutorizadorId);
+        Assert.Equal(setup.Users.Admin.User.Id, authorization.UsuarioAutorizadorId);
+        Assert.NotEqual(second.User.User.Id, authorization.UsuarioAutorizadorId);
         Assert.Equal("UTILIZADA", authorization.Estado);
         var allPersisted = await AllSecurityPersistenceTextAsync(db);
         foreach (var credential in new[] { invalidPassword, second.Password, _adminPassword })
@@ -1187,8 +1183,7 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var differentId = different.GetProperty("id").GetGuid();
         var differentExpectedCost = await AssertCancellationCostBaselineAsync(differentId, differentProduct.Id,
             differentOriginalCost, differentBefore.AverageCost);
-        var sameBody = new { expectedVersion = sameVersion, reasonId = setup.ReasonId,
-            authorization = new { userName = AdminName, password = _adminPassword } };
+        var sameBody = new { expectedVersion = sameVersion, reasonId = setup.ReasonId };
         var sameResponses = await Task.WhenAll(
             PostCancelAsync(firstClient, sameId, "race-same-cancel", sameBody),
             PostCancelAsync(secondClient, sameId, "race-same-cancel", sameBody));
@@ -1200,8 +1195,7 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
             sameBefore, sameExpectedCost);
 
         var differentVersion = different.GetProperty("version").GetInt64();
-        var differentBody = new { expectedVersion = differentVersion, reasonId = setup.ReasonId,
-            authorization = new { userName = AdminName, password = _adminPassword } };
+        var differentBody = new { expectedVersion = differentVersion, reasonId = setup.ReasonId };
         var responses = await Task.WhenAll(
             PostCancelAsync(firstClient, differentId, "race-different-a", differentBody),
             PostCancelAsync(secondClient, differentId, "race-different-b", differentBody));
@@ -1233,8 +1227,7 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var product = await ProductAsync(client, setup.Supplier.Id, "PUR-CANCEL-ROLLBACK-P", null);
         var first = await CreateConfirmedAsync(client, setup.Supplier.Id, product.Id, "rollback-first-confirm");
         var firstId = first.GetProperty("id").GetGuid();
-        var firstBody = new { expectedVersion = first.GetProperty("version").GetInt64(), reasonId = setup.ReasonId,
-            authorization = new { userName = AdminName, password = _adminPassword } };
+        var firstBody = new { expectedVersion = first.GetProperty("version").GetInt64(), reasonId = setup.ReasonId };
         var beforeLateFailure = await PurchasePersistenceAsync(firstId, product.Id);
         await InstallCancellationFailureAsync(firstId, deferred: false);
         await ProblemAsync(await PostCancelAsync(client, firstId, "rollback-late", firstBody), HttpStatusCode.Conflict);
@@ -1248,8 +1241,7 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var secondProduct = await ProductAsync(client, setup.Supplier.Id, "PUR-CANCEL-DEFERRED-P", null);
         var second = await CreateConfirmedAsync(client, setup.Supplier.Id, secondProduct.Id, "rollback-second-confirm");
         var secondId = second.GetProperty("id").GetGuid();
-        var secondBody = new { expectedVersion = second.GetProperty("version").GetInt64(), reasonId = setup.ReasonId,
-            authorization = new { userName = AdminName, password = _adminPassword } };
+        var secondBody = new { expectedVersion = second.GetProperty("version").GetInt64(), reasonId = setup.ReasonId };
         var beforeCommitFailure = await PurchasePersistenceAsync(secondId, secondProduct.Id);
         await InstallCancellationFailureAsync(secondId, deferred: true);
         await ProblemAsync(await PostCancelAsync(client, secondId, "rollback-deferred", secondBody), HttpStatusCode.Conflict);
@@ -1265,48 +1257,38 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
     [Trait("Category", "Integration")]
     public async Task Cancel_HistoricalPurchaseFromPreviousMigration_RejectsWithoutAnyEffects()
     {
-        await RestartAtPreviousMigrationAsync();
         using var client = Client();
         var setup = await PrepareCancellationAsync(client, "Proveedor histórico anterior a orden");
-        // The schema is intentionally older than the product reference migrations, so the product
-        // cannot be created through the current API; seed it with the minimal historical columns.
-        var product = await HistoricalProductAsync(setup.Supplier.Id, setup.Users.Admin.User.Id, "PUR-HIST-NULL");
-        var draft = await CreateDraftAsync(client, Body(setup.Supplier.Id, null, "NO_DISCRIMINADO",
-            new Line(product.Id, 2, 10m)));
-        var purchaseId = draft.GetProperty("id").GetGuid();
-        var movementId = Guid.CreateVersion7();
+        var product = await ProductAsync(client, setup.Supplier.Id, "PUR-HIST-NULL", null);
+        var confirmed = await CreateConfirmedAsync(client, setup.Supplier.Id, product.Id,
+            "historical-null-order-confirm");
+        var purchaseId = confirmed.GetProperty("id").GetGuid();
+        var version = confirmed.GetProperty("version").GetInt64();
+        // Una compra anterior a 20261014010000 no tiene orden_registro. El esquema actual lo asigna siempre
+        // y lo protege como inmutable, así que se simula dejándolo nulo con el trigger de protección
+        // desactivado solo durante esta sentencia (la prueba es dueña de sus tablas y, al ser una sola
+        // sentencia múltiple, un fallo revierte también la desactivación).
         await using (var connection = new NpgsqlConnection(_postgres.GetConnectionString()))
         {
             await connection.OpenAsync();
-            await using var transaction = await connection.BeginTransactionAsync();
             await using var command = new NpgsqlCommand(
                 """
-                UPDATE compras.detalle_compra
-                SET costo_promedio_anterior=NULL, costo_promedio_resultante=10
-                WHERE compra_id=@purchase;
-                UPDATE catalogo.producto SET stock_actual=2, costo_promedio=10 WHERE id=@product;
-                UPDATE configuracion.consecutivo_documento
-                SET ultimo_numero=1 WHERE tipo_documento='COMPRA';
-                UPDATE compras.compra SET estado='CONFIRMADA', prefijo='CMP', serie='PURCHASES1',
-                    consecutivo=1, numero_documento_proveedor='HIST-NULL-ORDER',
-                    fecha_hora_confirmacion=CURRENT_TIMESTAMP, version=2
-                WHERE id=@purchase;
-                INSERT INTO compras.movimiento_inventario
-                    (id,producto_id,usuario_id,compra_id,tipo_movimiento,cantidad_stock,
-                     stock_anterior,stock_posterior,reservado_anterior,reservado_posterior,
-                     costo_promedio_anterior,costo_promedio_posterior,correlacion_id)
-                VALUES (@movement,@product,@user,@purchase,'COMPRA',2,0,2,0,0,NULL,10,@movement);
-                """, connection, transaction);
+                ALTER TABLE compras.movimiento_inventario
+                    DISABLE TRIGGER trg_movimiento_inventario_proteger_orden_registro;
+                UPDATE compras.movimiento_inventario SET orden_registro = NULL WHERE compra_id = @purchase;
+                ALTER TABLE compras.movimiento_inventario
+                    ENABLE TRIGGER trg_movimiento_inventario_proteger_orden_registro;
+                """, connection);
             command.Parameters.AddWithValue("purchase", purchaseId);
-            command.Parameters.AddWithValue("product", product.Id);
-            command.Parameters.AddWithValue("user", setup.Users.Admin.User.Id);
-            command.Parameters.AddWithValue("movement", movementId);
             await command.ExecuteNonQueryAsync();
-            await transaction.CommitAsync();
         }
-        await using (var migrations = new ControlPlusDbContext(new DbContextOptionsBuilder<ControlPlusDbContext>()
-            .UseNpgsql(_postgres.GetConnectionString()).Options))
-            await migrations.GetService<IMigrator>().MigrateAsync("20261014010000_InventoryMovementRegistrationOrderV1");
+        Guid movementId;
+        await using (var movementScope = _factory!.Services.CreateAsyncScope())
+        {
+            var movementDb = movementScope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            movementId = (await movementDb.MovimientoInventario.AsNoTracking()
+                .FirstAsync(x => x.CompraId == purchaseId)).Id;
+        }
 
         await using (var scope = _factory!.Services.CreateAsyncScope())
         {
@@ -1323,8 +1305,7 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         }
         var response = await PostCancelAsync(client, purchaseId, "historical-null-order", new
         {
-            expectedVersion = 2L, reasonId = setup.ReasonId,
-            authorization = new { userName = AdminName, password = _adminPassword }
+            expectedVersion = version, reasonId = setup.ReasonId
         });
         await ProblemCodeAsync(response, HttpStatusCode.Conflict, "resource.conflict");
         Assert.Equal(before, await PurchasePersistenceAsync(purchaseId, product.Id));
@@ -1670,8 +1651,6 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
                 null, taxPercentage, 0)), HttpStatusCode.Created);
     }
 
-    private sealed record HistoricalProduct(Guid Id);
-
     private string NextCategoryAbbreviation()
     {
         var sequence = Interlocked.Increment(ref _categorySequence);
@@ -1682,29 +1661,6 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
             sequence /= 26;
         }
         return "CMP" + new string(letters);
-    }
-
-    private async Task<HistoricalProduct> HistoricalProductAsync(Guid supplierId, Guid userId, string code)
-    {
-        var productId = Guid.CreateVersion7();
-        await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
-        await connection.OpenAsync();
-        await using var command = new NpgsqlCommand(
-            """
-            INSERT INTO catalogo.categoria(id,nombre,usuario_creacion_id) VALUES (@category,@categoryName,@user);
-            INSERT INTO catalogo.producto(id,categoria_id,unidad_medida_id,proveedor_id,codigo_interno,nombre,precio_minorista,usuario_creacion_id)
-            SELECT @product,@category,u.id,@supplier,@code,@name,1000,@user
-            FROM catalogo.unidad_medida u WHERE u.codigo='UNIDAD';
-            """, connection);
-        command.Parameters.AddWithValue("category", Guid.CreateVersion7());
-        command.Parameters.AddWithValue("categoryName", $"Categoría {code}");
-        command.Parameters.AddWithValue("product", productId);
-        command.Parameters.AddWithValue("supplier", supplierId);
-        command.Parameters.AddWithValue("user", userId);
-        command.Parameters.AddWithValue("code", code);
-        command.Parameters.AddWithValue("name", $"Producto {code}");
-        Assert.Equal(2, await command.ExecuteNonQueryAsync());
-        return new HistoricalProduct(productId);
     }
 
     private async Task SeedStockAsync(Guid productId, int stock, decimal? averageCost)
