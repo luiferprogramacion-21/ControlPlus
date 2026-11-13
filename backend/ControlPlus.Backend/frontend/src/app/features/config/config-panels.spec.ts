@@ -29,11 +29,23 @@ describe('Configuración', () => {
   describe('NumberingPanel', () => {
     async function open() { const f = TestBed.createComponent(NumberingPanel); f.detectChanges(); await f.whenStable(); await f.componentInstance.load(); return f.componentInstance; }
 
-    it('lista los seis documentos y distingue configurados de sin configurar', async () => {
+    it('lista los siete documentos y distingue configurados de sin configurar', async () => {
       api.numbering.mockImplementation(async (k: { key: string }) => k.key === 'sales' ? numbering({ lastNumber: 9, nextNumber: 10 }) : null);
       const c = await open();
       expect(c.rows()).toHaveLength(NUMBERING_KINDS.length);
       expect(c.rows().filter(r => r.numbering).map(r => r.kind.key)).toEqual(['sales']);
+    });
+
+    it('muestra el próximo número real y no ofrece ajustes cuando el servidor los bloquea', async () => {
+      api.numbering.mockImplementation(async (k: { key: string }) => k.key === 'sales'
+        ? numbering({ series: 'CP-2026-01', lastNumber: 13, nextNumber: 14, canCorrect: false }) : null);
+      const fixture = TestBed.createComponent(NumberingPanel);
+      fixture.detectChanges(); await fixture.whenStable(); await fixture.componentInstance.load(); fixture.detectChanges();
+      const salesRow = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
+      expect(salesRow.textContent).toContain('Próximo: VTA-CP-2026-01-14');
+      expect(salesRow.textContent).toContain('Ya no editable');
+      expect(salesRow.textContent).not.toContain('VTA-001-000001');
+      expect(salesRow.querySelector('button')).toBeNull();
     });
 
     it('un error al consultar un tipo no tumba a los demás', async () => {
@@ -58,12 +70,46 @@ describe('Configuración', () => {
       c.first = 1; expect(c.validation(row)).toBe('');
     });
 
+    it('configura PED con el prefijo y primer número fijos', async () => {
+      const c = await open(); const row = c.rows().find(r => r.kind.key === 'purchase-orders')!;
+      c.open(row); expect([c.prefix, c.first]).toEqual(['PED', 1]);
+      expect(c.preview(row)).toBe('PED-[serie]-1');
+      api.createNumbering.mockResolvedValue(numbering({ documentType: 'PEDIDO_COMPRA', prefix: 'PED' }));
+      await c.save();
+      expect(api.createNumbering).toHaveBeenCalledWith(row.kind, 'PED', 1);
+      expect(c.notice()).toContain('pedidos de compra');
+    });
+
     it('corrige un consecutivo existente con su versión y muestra el error del servidor', async () => {
-      api.numbering.mockImplementation(async (k: { key: string }) => k.key === 'sales' ? numbering({ version: 7, nextNumber: 4 }) : null);
+      api.numbering.mockImplementation(async (k: { key: string }) => k.key === 'sales' ? numbering({ version: 7, canCorrect: true }) : null);
       const c = await open(); const row = c.rows().find(r => r.kind.key === 'sales')!;
       c.open(row); c.first = 100; api.updateNumbering.mockRejectedValueOnce(new HttpErrorResponse({ status: 409, error: { title: 'No puede modificarse después de la primera venta.' } }));
       await c.save();
       expect(api.updateNumbering).toHaveBeenCalledWith(row.kind, 'VTA', 100, 7); expect(c.formError()).toContain('primera venta'); expect(c.editing()).not.toBeNull();
+    });
+
+    it('no envía una corrección si no se cambió ningún valor', async () => {
+      api.numbering.mockImplementation(async (k: { key: string }) => k.key === 'credit-payments'
+        ? numbering({ prefix: 'ABO', canCorrect: true }) : null);
+      const c = await open(); const row = c.rows().find(r => r.kind.key === 'credit-payments')!;
+      c.open(row); await c.save();
+      expect(api.updateNumbering).not.toHaveBeenCalled();
+      expect(c.formError()).toContain('No hay cambios');
+      expect(c.editing()).not.toBeNull();
+    });
+
+    it('un ajuste permitido actualiza el próximo número visible', async () => {
+      let nextNumber = 1;
+      api.numbering.mockImplementation(async (k: { key: string }) => k.key === 'purchases'
+        ? numbering({ prefix: 'CMP', series: 'CP-2026-01', lastNumber: nextNumber - 1, nextNumber, canCorrect: true }) : null);
+      const c = await open(); const row = c.rows().find(r => r.kind.key === 'purchases')!;
+      c.open(row); c.first = 5;
+      api.updateNumbering.mockImplementation(async () => { nextNumber = 5; return numbering({ prefix: 'CMP', nextNumber: 5 }); });
+      await c.save();
+      expect(api.updateNumbering).toHaveBeenCalledWith(row.kind, 'CMP', 5, row.numbering!.version);
+      const updated = c.rows().find(r => r.kind.key === 'purchases')!;
+      expect(updated.numbering?.nextNumber).toBe(5);
+      expect(c.visibleNumber(updated.numbering!)).toBe('CMP-CP-2026-01-5');
     });
 
     it('valida prefijo vacío o largo y primer número no entero', async () => {
