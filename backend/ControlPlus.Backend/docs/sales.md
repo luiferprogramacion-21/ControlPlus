@@ -7,7 +7,7 @@ El cambio posterior de productos se documenta en [sales-changes.md](sales-change
 
 Ventas confirma `CONTADO` y `CREDITO`. Si falta `saleType`, se mantiene `CONTADO` como valor predeterminado. Contado admite cliente opcional, precios minorista y mayorista, y pagos con Efectivo, Transferencia, Nequi o una combinación de estos. Crédito exige cliente activo, vencimiento y autorización, sin pago inicial. Los abonos se describen en [credits.md](credits.md). La anulación y el cambio posterior tienen cortes propios; la prueba física de impresión permanece pendiente. Véase [printing-implementation.md](printing-implementation.md).
 
-La numeración usa el registro oficial `configuracion.consecutivo_documento` de tipo `VENTA` para la instalación y serie activas. Si ese consecutivo no existe, la confirmación responde `409`; la API no inventa prefijos ni series.
+La numeración usa el registro oficial `configuracion.consecutivo_documento` de tipo `VENTA` para la instalación y serie activas. El consecutivo `VTA` se crea al instalar y, si faltara, al confirmar la primera venta (decisión del 13 de noviembre de 2026): ninguna venta se rechaza por falta de configuración. El prefijo y la serie salen siempre de la instalación activa y se pueden ajustar antes de la primera venta confirmada.
 
 ## Confirmación y transacción
 

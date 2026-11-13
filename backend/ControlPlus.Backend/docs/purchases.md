@@ -2,15 +2,13 @@
 
 ## Corte 3: pedidos y recepción parcial
 
-`PEDIDO_COMPRA` usa prefijo `PED` y la serie de la instalación activa. El
-Administrador con `NUMBERING.MANAGE` lo crea expresamente en
-`POST /api/purchase-orders/numbering/initialize`; comienza en 1 y se consume
-al crear el borrador. `GET /api/purchase-orders/numbering` consulta el estado.
-**Cambio aprobado el 13 de noviembre de 2026 (implementación en curso):** el
-backend crea `PED` por sí mismo, al instalar y, si faltara, al primer uso, y los
-`POST .../initialize` pasan a ser solo una reparación; véase AGENTS.md. Hasta
-terminar la implementación, lo descrito arriba sigue siendo el comportamiento
-vigente y no se siembra al arrancar. Solo hay un borrador por proveedor e
+`PEDIDO_COMPRA` usa prefijo `PED` y la serie de la instalación activa; comienza
+en 1 y se consume al crear el borrador. Desde la decisión del 13 de noviembre de
+2026 el backend lo crea por sí mismo: al instalar y, si faltara, al consultarlo
+con `GET /api/purchase-orders/numbering` o al crear el primer borrador, sin que
+el Administrador tenga que configurarlo. `POST /api/purchase-orders/numbering/initialize`
+(`NUMBERING.MANAGE`, Administrador) queda como reparación: crea `PED` solo si
+falta y responde `409` si ya existe. Solo hay un borrador por proveedor e
 instalación; sus productos activos deben estar asignados a ese proveedor.
 
 `GET/POST /api/purchase-orders`, `GET/PUT /api/purchase-orders/{orderId}` y
@@ -145,8 +143,9 @@ anular la misma compra. Credenciales, documento del proveedor, costos y texto
 libre no aparecen en la auditoría de la anulación.
 
 `GET /api/purchases/cancellation-reasons` consulta los motivos activos;
-`POST /api/purchases/cancellation-reasons/initialize` crea explícitamente los
-faltantes. Ambas rutas exigen JWT, Administrador vigente y `PURCHASES.CANCEL`
+`POST /api/purchases/cancellation-reasons/initialize` repara de forma idempotente
+los faltantes; los motivos se crean solos al instalar y, si faltaran, al
+consultarlos. Ambas rutas exigen JWT, Administrador vigente y `PURCHASES.CANCEL`
 efectivo. Los códigos oficiales del tipo `ANULACION_COMPRA` son
 `ERROR_REGISTRO`, `COMPRA_DUPLICADA`, `DOCUMENTO_PROVEEDOR_ANULADO`,
 `MERCANCIA_NO_RECIBIDA` y `OTRO`; este último exige observación no vacía.
@@ -216,7 +215,7 @@ El corte 1 registra compras **independientes** (`pedido_compra_id = NULL`). Crea
 | POST | `/api/purchases/{purchaseId}/confirm` | Confirmar y recibir todo con `expectedVersion` e `Idempotency-Key` |
 | POST | `/api/purchases/{purchaseId}/cancel` | Anular una compra independiente confirmada; Administrador y `PURCHASES.CANCEL` |
 | GET | `/api/purchases/cancellation-reasons` | Consultar motivos oficiales activos; Administrador y `PURCHASES.CANCEL` |
-| POST | `/api/purchases/cancellation-reasons/initialize` | Crear explícitamente motivos faltantes; Administrador y `PURCHASES.CANCEL` |
+| POST | `/api/purchases/cancellation-reasons/initialize` | Reparar motivos faltantes (idempotente); Administrador y `PURCHASES.CANCEL` |
 | GET | `/api/document-numbering/purchases` | Consultar consecutivo `COMPRA` |
 | POST | `/api/document-numbering/purchases` | Configurar `CMP`, `firstNumber = 1` |
 | PUT | `/api/document-numbering/purchases` | Corregir antes de la primera compra numerada, con `version` |
