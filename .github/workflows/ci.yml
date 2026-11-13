@@ -105,8 +105,10 @@ jobs:
       postgres:
         image: postgres:18
         env:
-          # Contenedor efímero accesible solo desde esta máquina; sin secretos reales.
-          POSTGRES_HOST_AUTH_METHOD: trust
+          # Contenedor efímero accesible solo desde esta máquina; esta contraseña no es un
+          # secreto y deja de existir al terminar la corrida. No usar el método "trust":
+          # varias pruebas comprueban que una contraseña incorrecta sea rechazada.
+          POSTGRES_PASSWORD: ci-pg-${{ github.run_id }}-${{ github.run_attempt }}
         ports:
           - 5432:5432
         options: >-
@@ -144,6 +146,7 @@ jobs:
           PGPORT: '5432'
           PGUSER: postgres
           PGDATABASE: postgres
+          PGPASSWORD: ci-pg-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           test_password="$(openssl rand -hex 24)"
           echo "::add-mask::$test_password"

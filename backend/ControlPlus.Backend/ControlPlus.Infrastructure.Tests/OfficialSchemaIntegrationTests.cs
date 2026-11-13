@@ -106,7 +106,8 @@ public sealed class OfficialSchemaIntegrationTests
               AND constraint_name = 'ck_usuario_permiso_efecto'
             """));
 
-        Assert.Equal(58L, await ScalarAsync(context.Database.GetDbConnection(),
+        // 58 permisos de la base aprobada más TAXES.MANAGE, que añade 20261110010000_BusinessVatSettingV1.
+        Assert.Equal(59L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*) FROM seguridad.permiso
             """));

@@ -388,7 +388,10 @@ public sealed class CustomerHistoryApiFlowTests : IAsyncLifetime
             customerId, [new(scenario.ProductId, 1, "MINORISTA")], null, null,
             credit ? [] : [new("EFECTIVO", 1000m, 1000m, null)], credit ? "CREDITO" : "CONTADO",
             credit ? scenario.Shift.OperatingDate.AddDays(10) : null,
-            credit ? new(SupervisorName, _supervisorPassword) : null)), HttpStatusCode.Created);
+            // El Administrador autoriza su propio crédito sin segundo autorizador: un Supervisor no es
+            // estrictamente superior a él, así que sus credenciales serían rechazadas (regla del 5 de noviembre).
+            credit && actor.User.Id != scenario.Admin.User.Id ? new(SupervisorName, _supervisorPassword) : null)),
+            HttpStatusCode.Created);
     }
 
     private async Task StartSessionAsync(HttpClient client, Scenario scenario, AuthenticationResult actor)
