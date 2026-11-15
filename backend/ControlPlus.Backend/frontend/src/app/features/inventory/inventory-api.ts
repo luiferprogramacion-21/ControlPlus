@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { AuthorizationBody, authorizationContext } from '../../core/api';
@@ -11,7 +11,16 @@ export interface Adjustment { productId: string; quantityDelta: number; reasonId
 export class InventoryApi {
   private readonly http = inject(HttpClient);
   stock(params: { search: string; includeInactive: boolean; page: number; pageSize: number }): Promise<Page<Stock>> { return firstValueFrom(this.http.get<Page<Stock>>('/api/inventory/stock', { params })); }
-  movements(params: { productId: string; type?: string; fromUtc?: string; toUtc?: string; page: number; pageSize: number }): Promise<Page<Movement>> { return firstValueFrom(this.http.get<Page<Movement>>('/api/inventory/movements', { params })); }
+  movements(params: { productId: string; type?: string; fromUtc?: string; toUtc?: string; page: number; pageSize: number }): Promise<Page<Movement>> {
+    let query = new HttpParams()
+      .set('productId', params.productId)
+      .set('page', params.page)
+      .set('pageSize', params.pageSize);
+    if (params.type) query = query.set('type', params.type);
+    if (params.fromUtc) query = query.set('fromUtc', params.fromUtc);
+    if (params.toUtc) query = query.set('toUtc', params.toUtc);
+    return firstValueFrom(this.http.get<Page<Movement>>('/api/inventory/movements', { params: query }));
+  }
   reasons(): Promise<Reason[]> { return firstValueFrom(this.http.get<Reason[]>('/api/inventory/adjustment-reasons')); }
   adjust(input: Adjustment, key: string): Promise<Movement> { return firstValueFrom(this.http.post<Movement>('/api/inventory/adjustments', input, { headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined })); }
 }

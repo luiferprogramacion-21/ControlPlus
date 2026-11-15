@@ -12,6 +12,15 @@ describe('InventoryApi', () => {
     const req = http.expectOne(r => r.url === '/api/inventory/stock' && r.params.get('search') === 'ABC' && r.params.get('page') === '3');
     req.flush({ items: [], page: 3, pageSize: 20, totalCount: 0, totalPages: 0 }); expect((await task).items).toEqual([]);
   });
+  it('omite los filtros vacíos al consultar movimientos', async () => {
+    const task = api.movements({ productId: 'p1', page: 1, pageSize: 20 });
+    const req = http.expectOne(r => r.url === '/api/inventory/movements' && r.params.get('productId') === 'p1');
+    expect(req.request.params.has('type')).toBe(false);
+    expect(req.request.params.has('fromUtc')).toBe(false);
+    expect(req.request.params.has('toUtc')).toBe(false);
+    req.flush({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    expect((await task).items).toEqual([]);
+  });
   it('envía versión y clave idempotente en un ajuste', async () => {
     const input = { productId: 'p', quantityDelta: -2, reasonId: 'r', expectedVersion: 7, observation: null, authorization: { userName: 'supervisor', password: 'secreto' } };
     const task = api.adjust(input, 'key-1'); const req = http.expectOne('/api/inventory/adjustments');

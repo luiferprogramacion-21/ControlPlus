@@ -1,3 +1,4 @@
+import { A11yModule } from '@angular/cdk/a11y';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -8,7 +9,7 @@ import { SessionService } from '../../core/session.service';
 import { Adjustment, InventoryApi, Movement, Reason, Stock } from './inventory-api';
 import { Icon } from '../../layout/icon';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
-@Component({ selector: 'cp-inventory', imports: [FormsModule, MatPaginatorModule, DatePipe, Icon], templateUrl: './inventory.html', styleUrl: '../directory.scss' })
+@Component({ selector: 'cp-inventory', imports: [A11yModule, FormsModule, MatPaginatorModule, DatePipe, Icon], templateUrl: './inventory.html', styleUrls: ['../directory.scss', './inventory.scss'] })
 export class Inventory implements OnInit {
   private readonly api = inject(InventoryApi);
   private readonly authorization = inject(AuthorizationDialog);
@@ -17,6 +18,7 @@ export class Inventory implements OnInit {
   readonly movements = signal<Page<Movement> | null>(null);
   readonly reasons = signal<Reason[]>([]);
   readonly selected = signal<Stock | null>(null);
+  readonly historyOpen = signal(false);
   readonly adjustmentOpen = signal(false);
   readonly adjustmentProductId = signal('');
   readonly loading = signal(false); readonly historyLoading = signal(false); readonly saving = signal(false);
@@ -32,16 +34,18 @@ export class Inventory implements OnInit {
   find(): void { this.page = 1; void this.reload(); }
   stockPage(e: PageEvent): void { this.page = e.pageIndex + 1; this.pageSize = e.pageSize; void this.reload(); }
   async loadReasons(): Promise<void> { try { this.reasons.set(await this.api.reasons()); } catch (e) { this.error.set(errorText(e)); } }
-  select(stock: Stock): void { if (this.pending && !confirm('Hay un ajuste con respuesta incierta. ¿Descartar su clave y cambiar de producto?')) return; this.selected.set(stock); this.movementPage = 1; this.pending = null; this.conflict.set(false); this.resetForm(); void this.loadMovements(); }
-  openAdjustment(stock?: Stock): void { if (this.pending) return; if (stock) this.select(stock); else { this.selected.set(null); this.movements.set(null); } this.adjustmentProductId.set(stock?.productId ?? ''); this.adjustmentOpen.set(true); this.error.set(''); }
+  select(stock: Stock): boolean { const selected = this.selectStock(stock); if (selected) void this.loadMovements(); return selected; }
+  private selectStock(stock: Stock): boolean { if (this.pending && !confirm('Hay un ajuste con respuesta incierta. ¿Descartar su clave y cambiar de producto?')) return false; this.selected.set(stock); this.movements.set(null); this.movementPage = 1; this.pending = null; this.conflict.set(false); this.resetForm(); return true; }
+  openHistory(stock: Stock): void { if (this.select(stock)) this.historyOpen.set(true); }
+  openAdjustment(stock?: Stock): void { if (this.pending) return; if (stock && !this.selectStock(stock)) return; else if (!stock) { this.selected.set(null); this.movements.set(null); } this.adjustmentProductId.set(stock?.productId ?? ''); this.adjustmentOpen.set(true); this.error.set(''); }
   closeAdjustment(): void { if (this.saving()) return; if (this.pending && !confirm('El ajuste tiene respuesta incierta. ¿Descartar la clave?')) return; this.pending = null; this.adjustmentOpen.set(false); this.conflict.set(false); this.error.set(''); }
-  chooseAdjustmentProduct(id: string): void { const stock = this.stocks()?.items.find(x => x.productId === id); this.adjustmentProductId.set(id); if (stock) this.select(stock); else this.selected.set(null); }
-  closeHistory(): void { this.selected.set(null); this.movements.set(null); }
+  chooseAdjustmentProduct(id: string): void { const stock = this.stocks()?.items.find(x => x.productId === id); this.adjustmentProductId.set(id); if (stock) this.selectStock(stock); else this.selected.set(null); }
+  closeHistory(): void { this.historyOpen.set(false); this.selected.set(null); this.movements.set(null); this.error.set(''); }
   private resetForm(): void { this.quantityDelta = 0; this.reasonId = ''; this.observation = ''; }
   async loadMovements(): Promise<void> { const stock = this.selected(); if (!stock) return; this.historyLoading.set(true); this.error.set(''); try { this.movements.set(await this.api.movements({ productId: stock.productId, type: this.movementType || undefined, fromUtc: this.from ? new Date(this.from).toISOString() : undefined, toUtc: this.to ? new Date(this.to).toISOString() : undefined, page: this.movementPage, pageSize: 20 })); } catch (e) { this.error.set(errorText(e)); } finally { this.historyLoading.set(false); } }
   historyPage(e: PageEvent): void { this.movementPage = e.pageIndex + 1; void this.loadMovements(); }
   historyFilter(): void { this.movementPage = 1; void this.loadMovements(); }
-  async refreshSelected(): Promise<void> { const id = this.selected()?.productId; this.pending = null; this.conflict.set(false); this.resetForm(); await this.reload(); const current = this.stocks()?.items.find(x => x.productId === id); if (current) this.select(current); else { this.selected.set(null); this.movements.set(null); this.notice.set('Busca el producto para ver su versión actual.'); } }
+  async refreshSelected(): Promise<void> { const id = this.selected()?.productId; this.pending = null; this.conflict.set(false); this.resetForm(); await this.reload(); const current = this.stocks()?.items.find(x => x.productId === id); if (current) this.selectStock(current); else { this.selected.set(null); this.movements.set(null); this.notice.set('Busca el producto para ver su versión actual.'); } }
   async adjust(): Promise<void> {
     const stock = this.selected(); if (!stock || !this.canAdjust || this.saving() || this.conflict()) return;
     if (!this.pending) {
