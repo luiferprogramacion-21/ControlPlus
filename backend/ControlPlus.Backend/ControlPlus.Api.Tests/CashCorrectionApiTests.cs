@@ -491,7 +491,12 @@ public sealed partial class CashApiFlowTests
             await install.ExecuteNonQueryAsync();
         // Setup and login share one controlled instant. Make the successful
         // reauthorization observable as a real user update on every retry.
-        _clock.Advance(TimeSpan.FromSeconds(1));
+        // PostgreSQL validates the authorization against its own statement_timestamp(), so the controlled
+        // instant must never run ahead of real time: wait until real time has passed the setup instant
+        // and then follow it. Advancing the clock by a fixed second raced on fast machines, where setup
+        // finished in under a second and the trigger rejected a "future" request with a 409 and no retry.
+        await Task.Delay(TimeSpan.FromMilliseconds(50));
+        _clock.Set(DateTimeOffset.UtcNow);
         var before = await ReadAuthenticationStateAsync(scenario.Administrator.User.Id);
         var response = await client.PostAsJsonAsync($"/api/cash/shifts/{scenario.Shift.Id}/close", close);
         var expectedStatus = alwaysFail ? HttpStatusCode.Conflict : HttpStatusCode.OK;
