@@ -50,7 +50,7 @@
     <div class="dashboard-panels">
       <section class="dashboard-panel" aria-labelledby="dashboard-hourly-title">
         <h3 id="dashboard-hourly-title">Ventas por hora</h3>
-        <p>Jornada actual · miles de pesos</p>
+        <p>Jornada actual · pase el cursor por una barra para ver el detalle</p>
         @if (bars().length > 0) {
           <div class="dashboard-chart" role="list" aria-label="Ventas por hora de la jornada actual">
             @for (bar of bars(); track bar.label) {

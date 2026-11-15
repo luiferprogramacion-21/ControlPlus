@@ -74,6 +74,7 @@ describe('Dashboard', () => {
     expect(text).toContain('Abierta desde');
     expect(text).toContain(fixture.componentInstance.time('2026-11-10T15:00:00Z'));
     expect(text).toContain('Ventas por hora');
+    expect(text).not.toContain('miles de pesos');
     expect(text).not.toContain('3.845.600');
   });
 
