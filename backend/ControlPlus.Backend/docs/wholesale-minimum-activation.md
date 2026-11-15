@@ -47,4 +47,6 @@ Después, iniciar la API como siempre (`dotnet run` en `ControlPlus.Api`) y comp
 
 Un primer intento (`WholesaleMinimum-20261115T223349Z-5b6b7cdbdd394c5a8e121bc93bed186a`) se detuvo en el preflight sin respaldo ni migración: seguía corriendo en segundo plano, sin ventana, la API publicada por la activación de la referencia opcional desde su carpeta de evidencia. Se detuvo ese proceso y se repitió.
 
-**No repetir la migración ni ejecutar `Down`.** Pendiente: comprobación HTTP y revisión visual tras iniciar la API.
+Después de iniciar la API con el código nuevo, el operador comunicó HTTP 200 en `/api/health` y `/api/health/database`, y aprobó en pantalla el mínimo mayorista en Configuración, Ventas, Apartados y Cambio de venta. En la revisión se corrigió que Apartados y Cambio de venta dejaban elegir «Mayorista» por debajo del mínimo (el servidor ya lo rechazaba); ahora la opción se desactiva como en el punto de venta.
+
+**No repetir la migración ni ejecutar `Down`.**
