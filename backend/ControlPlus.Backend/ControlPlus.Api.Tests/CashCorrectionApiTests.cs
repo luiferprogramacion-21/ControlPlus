@@ -494,7 +494,11 @@ public sealed partial class CashApiFlowTests
         _clock.Advance(TimeSpan.FromSeconds(1));
         var before = await ReadAuthenticationStateAsync(scenario.Administrator.User.Id);
         var response = await client.PostAsJsonAsync($"/api/cash/shifts/{scenario.Shift.Id}/close", close);
-        Assert.Equal(alwaysFail ? HttpStatusCode.Conflict : HttpStatusCode.OK, response.StatusCode);
+        var expectedStatus = alwaysFail ? HttpStatusCode.Conflict : HttpStatusCode.OK;
+        // The body is a uniform problem document without secrets; it names the cause when the retries do not recover.
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Assert.True(response.StatusCode == expectedStatus,
+            $"Expected {(int)expectedStatus} but received {(int)response.StatusCode}. Body: {responseBody}");
         await using var attempts = new NpgsqlCommand("SELECT last_value FROM caja.test_serialization_attempt", connection);
         Assert.Equal(3L, await attempts.ExecuteScalarAsync());
         await using var scope = _factory!.Services.CreateAsyncScope();
