@@ -1,6 +1,19 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { errorText } from '../../core/api';
-import { DashboardApi, DashboardSummary } from './dashboard-api';
+import { DashboardActivity, DashboardApi, DashboardSummary } from './dashboard-api';
+
+export interface HourBar {
+  label: string;
+  /** Height as a percentage of the busiest hour; a non-empty hour is never invisible. */
+  heightPercent: number;
+  peak: boolean;
+  description: string;
+}
+
+export interface ComparisonText {
+  text: string;
+  tone: 'up' | 'down' | 'flat' | 'none';
+}
 
 @Component({
   selector: 'cp-dashboard',
@@ -12,6 +25,17 @@ export class Dashboard implements OnInit {
   readonly summary = signal<DashboardSummary | null>(null);
   readonly loading = signal(false);
   readonly error = signal('');
+
+  readonly bars = computed<HourBar[]>(() => {
+    const hours = this.summary()?.hourlySales ?? [];
+    const max = Math.max(0, ...hours.map((hour) => hour.total));
+    return hours.map((hour) => ({
+      label: `${hour.hour}:00`,
+      heightPercent: max > 0 && hour.total > 0 ? Math.max(4, Math.round((hour.total / max) * 100)) : 0,
+      peak: max > 0 && hour.total === max,
+      description: `${hour.hour}:00 · ${this.money(hour.total)} · ${this.count(hour.transactions, 'venta', 'ventas')}`,
+    }));
+  });
 
   ngOnInit(): void { void this.refresh(); }
 
@@ -38,7 +62,48 @@ export class Dashboard implements OnInit {
     return new Intl.DateTimeFormat('es-CO', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, day)));
   }
 
+  time(iso: string): string {
+    return new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
+  }
+
   averageTicket(data: DashboardSummary): string {
     return data.totalSales.transactions === 0 ? 'No disponible' : this.money(data.totalSales.total / data.totalSales.transactions);
+  }
+
+  count(amount: number, singular: string, plural: string): string {
+    return `${amount} ${amount === 1 ? singular : plural}`;
+  }
+
+  /** An empty alert reads "Ninguno" instead of a zero count. */
+  alertValue(amount: number, singular: string, plural: string): string {
+    return amount === 0 ? 'Ninguno' : this.count(amount, singular, plural);
+  }
+
+  /** Today against yesterday up to the same time, never against the whole previous day. */
+  comparison(data: DashboardSummary): ComparisonText {
+    const percent = data.comparison.percentChange;
+    if (percent === null) return { text: 'Sin ventas ayer a esta hora', tone: 'none' };
+    if (percent === 0) return { text: 'Igual que ayer a esta hora', tone: 'flat' };
+    return { text: `${percent > 0 ? '+' : '-'}${Math.abs(percent)} % frente a ayer a esta hora`, tone: percent > 0 ? 'up' : 'down' };
+  }
+
+  /** An open shift from a previous day also shows its date, so it is not mistaken for today's. */
+  openedText(data: DashboardSummary): string {
+    const cash = data.currentCash;
+    if (!cash) return '';
+    const opened = new Date(cash.openedAt);
+    const sameDay = new Intl.DateTimeFormat('en-CA').format(opened) === data.operatingDate;
+    const day = new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: '2-digit' }).format(opened);
+    return `Abierta desde ${sameDay ? '' : `${day} `}${this.time(cash.openedAt)}`;
+  }
+
+  statusLabel(activity: DashboardActivity): string {
+    if (activity.state === 'ANULADA') return 'Anulada';
+    return activity.saleType === 'CREDITO' ? 'Crédito' : 'Confirmada';
+  }
+
+  statusClass(activity: DashboardActivity): string {
+    if (activity.state === 'ANULADA') return 'badge--error';
+    return activity.saleType === 'CREDITO' ? 'badge--warning' : 'badge--success';
   }
 }

@@ -28,3 +28,35 @@
 .dashboard-activity td.dashboard-pending { display: table-cell; min-height: 0; padding: 25px 18px; text-align: center; }
 @media (max-width: 1050px) { .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .dashboard-metrics, .dashboard-panels { grid-template-columns: 1fr; } .dashboard-heading { align-items: flex-start; } }
+
+/* Comparación con ayer y atención del indicador de stock. */
+.dashboard-metric .dashboard-comparison { font-weight: 600; }
+.dashboard-metric .dashboard-comparison--up { color: var(--cp-success); }
+.dashboard-metric .dashboard-comparison--down { color: var(--cp-error); }
+.dashboard-metric .dashboard-comparison--flat, .dashboard-metric .dashboard-comparison--none { color: var(--cp-text-muted); font-weight: 400; }
+.dashboard-metric small.dashboard-metric__attention { color: var(--cp-warning); font-weight: 600; }
+
+/* Ventas por hora: una barra por hora local; la hora con más ventas se resalta. */
+.dashboard-chart { display: flex; align-items: flex-end; gap: 14px; margin-top: 18px; }
+.dashboard-chart__column { display: flex; flex: 1 1 0; min-width: 0; flex-direction: column; align-items: center; gap: 10px; }
+.dashboard-chart__plot { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 190px; border-bottom: 1px solid var(--cp-border); }
+.dashboard-chart__bar { width: 100%; max-width: 38px; min-height: 0; border-radius: 6px 6px 0 0; background: color-mix(in srgb, var(--cp-primary) 38%, var(--cp-surface)); }
+.dashboard-chart__bar--peak { background: var(--cp-primary); }
+.dashboard-chart__column > span { color: var(--cp-text-muted); font-size: 12px; white-space: nowrap; }
+
+/* Alertas operativas. */
+.dashboard-alerts { display: flex; flex-direction: column; gap: 14px; margin: 18px 0 0; padding: 0; list-style: none; }
+.dashboard-alerts li { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dashboard-alerts strong { color: var(--cp-text-secondary); font-size: 13px; text-align: right; }
+.dashboard-alerts .dashboard-alerts__pending { color: var(--cp-text-muted); font-weight: 400; }
+.dashboard-pill { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.dashboard-pill--warning { background: var(--cp-warning-soft); color: var(--cp-warning); }
+.dashboard-pill--danger { background: var(--cp-error-soft); color: var(--cp-error); }
+.dashboard-pill--info { background: var(--cp-primary-soft); color: #285593; }
+.dashboard-pill--success { background: var(--cp-success-soft); color: var(--cp-success); }
+.dashboard-pill--clear { background: var(--cp-surface-muted); color: var(--cp-text-muted); }
+
+/* Actividad reciente. */
+.dashboard-activity td { padding: 11px 14px; border-top: 1px solid var(--cp-border); font-size: 14px; }
+.badge--error { background: var(--cp-error-soft); color: var(--cp-error); }
+@media (max-width: 700px) { .dashboard-chart { gap: 6px; } .dashboard-alerts li { flex-wrap: wrap; } }

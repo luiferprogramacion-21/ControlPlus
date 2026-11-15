@@ -14,7 +14,12 @@
   @if (summary(); as data) {
     <div class="dashboard-metrics">
       <article class="dashboard-metric">
-        <div><span>Ventas de hoy</span><strong>{{ money(data.totalSales.total) }}</strong><small>Contado {{ money(data.cashSales.total) }} · Crédito {{ money(data.creditSales.total) }}</small></div>
+        <div>
+          <span>Ventas de hoy</span>
+          <strong>{{ money(data.totalSales.total) }}</strong>
+          <small>Contado {{ money(data.cashSales.total) }} · Crédito {{ money(data.creditSales.total) }}</small>
+          <small class="dashboard-comparison dashboard-comparison--{{ comparison(data).tone }}" [title]="'Ayer hasta esta hora: ' + money(data.comparison.previousTotal)">{{ comparison(data).text }}</small>
+        </div>
         <span class="dashboard-metric__badge dashboard-metric__badge--success" aria-hidden="true">$</span>
       </article>
       <article class="dashboard-metric">
@@ -22,11 +27,20 @@
         <span class="dashboard-metric__badge dashboard-metric__badge--info" aria-hidden="true">#</span>
       </article>
       <article class="dashboard-metric">
-        <div><span>Caja actual</span><strong class="dashboard-metric__unavailable">No disponible</strong><small>Flujo neto hoy: {{ money(data.netCashFlow) }}</small></div>
+        @if (data.currentCash; as cash) {
+          <div><span>Caja actual</span><strong>{{ money(cash.expectedCash) }}</strong><small>{{ openedText(data) }} · Flujo neto hoy: {{ money(data.netCashFlow) }}</small></div>
+        } @else {
+          <div><span>Caja actual</span><strong class="dashboard-metric__unavailable">Sin turno abierto</strong><small>Flujo neto hoy: {{ money(data.netCashFlow) }}</small></div>
+        }
         <span class="dashboard-metric__badge" aria-hidden="true">C</span>
       </article>
       <article class="dashboard-metric">
-        <div><span>Productos con alerta</span><strong class="dashboard-metric__unavailable">Pendiente</strong><small>Indicador por definir</small></div>
+        <div>
+          <span>Productos con alerta</span>
+          <strong>{{ data.alerts.lowStockProducts }}</strong>
+          @if (data.alerts.lowStockProducts > 0) { <small class="dashboard-metric__attention">Requieren revisión</small> }
+          @else { <small>Ninguno por reponer</small> }
+        </div>
         <span class="dashboard-metric__badge dashboard-metric__badge--warning" aria-hidden="true">!</span>
       </article>
     </div>
@@ -35,19 +49,59 @@
       <section class="dashboard-panel" aria-labelledby="dashboard-hourly-title">
         <h3 id="dashboard-hourly-title">Ventas por hora</h3>
         <p>Jornada actual · miles de pesos</p>
-        <div class="dashboard-pending">Pendiente de definir: el resumen actual no publica ventas por hora.</div>
+        @if (bars().length > 0) {
+          <div class="dashboard-chart" role="list" aria-label="Ventas por hora de la jornada actual">
+            @for (bar of bars(); track bar.label) {
+              <div class="dashboard-chart__column" role="listitem" [attr.aria-label]="bar.description" [title]="bar.description">
+                <div class="dashboard-chart__plot"><div class="dashboard-chart__bar" [class.dashboard-chart__bar--peak]="bar.peak" [style.height.%]="bar.heightPercent"></div></div>
+                <span>{{ bar.label }}</span>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="dashboard-pending">Todavía no hay ventas registradas hoy.</div>
+        }
       </section>
       <section class="dashboard-panel" aria-labelledby="dashboard-alerts-title">
         <h3 id="dashboard-alerts-title">Alertas operativas</h3>
         <p>Pendientes por revisar</p>
-        <div class="dashboard-pending">Pendiente de definir: stock bajo, créditos vencidos, apartados próximos y respaldo.</div>
+        <ul class="dashboard-alerts">
+          <li>
+            <span class="dashboard-pill dashboard-pill--warning" [class.dashboard-pill--clear]="data.alerts.lowStockProducts === 0">Stock bajo</span>
+            <strong>{{ alertValue(data.alerts.lowStockProducts, 'producto', 'productos') }}</strong>
+          </li>
+          <li>
+            <span class="dashboard-pill dashboard-pill--danger" [class.dashboard-pill--clear]="data.alerts.overdueCreditCustomers === 0">Créditos vencidos</span>
+            <strong>{{ alertValue(data.alerts.overdueCreditCustomers, 'cliente', 'clientes') }}</strong>
+          </li>
+          <li>
+            <span class="dashboard-pill dashboard-pill--info" [class.dashboard-pill--clear]="data.alerts.upcomingLayaways === 0" [title]="'Apartados activos que vencen en los próximos ' + data.alerts.upcomingLayawayDays + ' días'">Apartados próximos</span>
+            <strong>{{ alertValue(data.alerts.upcomingLayaways, 'apartado', 'apartados') }}</strong>
+          </li>
+          <li>
+            <span class="dashboard-pill dashboard-pill--success">Respaldo externo</span>
+            <strong class="dashboard-alerts__pending">Pendiente de definir</strong>
+          </li>
+        </ul>
       </section>
     </div>
 
     <section class="dashboard-panel dashboard-activity" aria-labelledby="dashboard-activity-title">
       <h3 id="dashboard-activity-title">Actividad reciente</h3>
       <div class="dashboard-activity__table"><table><thead><tr><th>Hora</th><th>Documento</th><th>Cliente</th><th class="align-right">Total</th><th>Estado</th></tr></thead>
-        <tbody><tr><td colspan="5" class="dashboard-pending">Pendiente de definir: todavía no hay contrato de actividad reciente.</td></tr></tbody>
+        <tbody>
+          @for (activity of data.recentActivity; track activity.saleId) {
+            <tr>
+              <td>{{ time(activity.occurredAt) }}</td>
+              <td>{{ activity.number }}</td>
+              <td>{{ activity.customerName ?? 'Consumidor final' }}</td>
+              <td class="align-right">{{ money(activity.total) }}</td>
+              <td><span class="badge {{ statusClass(activity) }}">{{ statusLabel(activity) }}</span></td>
+            </tr>
+          } @empty {
+            <tr><td colspan="5" class="dashboard-pending">Todavía no hay ventas registradas hoy.</td></tr>
+          }
+        </tbody>
       </table></div>
     </section>
   }

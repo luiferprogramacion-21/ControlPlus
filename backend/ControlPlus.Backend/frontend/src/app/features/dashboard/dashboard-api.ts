@@ -7,6 +7,43 @@ export interface DashboardAmount {
   total: number;
 }
 
+/** Today's sales against yesterday up to the same time; `percentChange` is null when yesterday had no sales. */
+export interface DashboardComparison {
+  previousDate: string;
+  previousTotal: number;
+  percentChange: number | null;
+}
+
+/** Expected cash of the open shift, the same figure the cash count shows. */
+export interface DashboardCash {
+  openedAt: string;
+  expectedCash: number;
+}
+
+export interface DashboardAlerts {
+  lowStockProducts: number;
+  overdueCreditCustomers: number;
+  upcomingLayaways: number;
+  upcomingLayawayDays: number;
+}
+
+/** Confirmed sales of one local hour of the establishment. */
+export interface DashboardHour {
+  hour: number;
+  transactions: number;
+  total: number;
+}
+
+export interface DashboardActivity {
+  saleId: string;
+  number: string;
+  occurredAt: string;
+  customerName: string | null;
+  total: number;
+  saleType: 'CONTADO' | 'CREDITO';
+  state: 'CONFIRMADA' | 'ANULADA';
+}
+
 /** Figures belong to the establishment's current operating date, chosen by the server. */
 export interface DashboardSummary {
   operatingDate: string;
@@ -17,6 +54,12 @@ export interface DashboardSummary {
   paymentTotal: number;
   manualTotal: number;
   netCashFlow: number;
+  comparison: DashboardComparison;
+  /** Null when there is no open shift. */
+  currentCash: DashboardCash | null;
+  alerts: DashboardAlerts;
+  hourlySales: DashboardHour[];
+  recentActivity: DashboardActivity[];
 }
 
 @Injectable({ providedIn: 'root' })
