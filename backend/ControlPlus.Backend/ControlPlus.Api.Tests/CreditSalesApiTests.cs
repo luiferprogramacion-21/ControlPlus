@@ -559,9 +559,6 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
             new CreateProductRequest(category.Id, units.Single(x => x.Code == "UNIDAD").Id,
                 null, "CREDIT-SALE-ITEM", null, null, true, "Producto aislado de crédito",
                 null, 1_000m, null, null, 0)), HttpStatusCode.Created);
-        await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/sales", new CreateSalesDocumentNumberingRequest("VTA", 1)),
-            HttpStatusCode.Created);
         await using (var scope = _factory!.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();

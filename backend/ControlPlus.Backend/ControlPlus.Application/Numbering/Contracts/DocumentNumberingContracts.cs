@@ -10,7 +10,8 @@ public sealed record SalesDocumentNumberingDto(
     string Prefix,
     long LastNumber,
     long NextNumber,
-    long Version);
+    long Version,
+    bool CanCorrect = false);
 
 public sealed record PurchaseDocumentNumberingDto(
     string DocumentType,
@@ -18,7 +19,8 @@ public sealed record PurchaseDocumentNumberingDto(
     string Prefix,
     long LastNumber,
     long NextNumber,
-    long Version);
+    long Version,
+    bool CanCorrect = false);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CreateSalesDocumentNumberingRequest(string Prefix, long FirstNumber);

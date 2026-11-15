@@ -22,6 +22,8 @@ public interface IPurchaseOrderRepository
     Task<ConsecutivoDocumento?> GetNumberingAsync(
         Guid installationId, string series, CancellationToken ct = default);
     Task AddNumberingAsync(ConsecutivoDocumento numbering, CancellationToken ct = default);
+    /// <summary>Creates the PED consecutive (prefix PED, starting at 1) when it does not exist; never touches an existing one.</summary>
+    Task EnsureNumberingAsync(Guid installationId, string series, CancellationToken ct = default);
     Task<PedidoCompra?> GetForUpdateAsync(Guid id, CancellationToken ct = default);
     Task<PedidoCompra?> GetAsync(Guid id, CancellationToken ct = default);
     Task<PagedResult<PedidoCompra>> ListAsync(Guid installationId, PurchaseOrderListQuery query, int offset,

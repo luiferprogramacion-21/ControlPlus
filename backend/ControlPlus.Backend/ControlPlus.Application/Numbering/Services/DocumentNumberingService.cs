@@ -25,8 +25,8 @@ public sealed partial class DocumentNumberingService(
 
     public Task<Result<SalesDocumentNumberingDto>> GetLayawaysAsync(
         ActorContext actor, CancellationToken cancellationToken = default) =>
-        GetLayawayNumberingAsync(actor, "apartados", repository.GetLayawayNumberingAsync,
-            cancellationToken);
+        GetLayawayNumberingAsync(actor, "apartados", DocumentNumberingDefaults.Layaways,
+            repository.GetLayawayNumberingAsync, cancellationToken);
 
     public Task<Result<SalesDocumentNumberingDto>> CreateLayawaysAsync(
         ActorContext actor, CreateLayawayDocumentNumberingRequest request,
@@ -37,7 +37,7 @@ public sealed partial class DocumentNumberingService(
 
     public Task<Result<SalesDocumentNumberingDto>> GetLayawayPaymentsAsync(
         ActorContext actor, CancellationToken cancellationToken = default) =>
-        GetLayawayNumberingAsync(actor, "pagos de apartados",
+        GetLayawayNumberingAsync(actor, "pagos de apartados", DocumentNumberingDefaults.LayawayPayments,
             repository.GetLayawayPaymentNumberingAsync, cancellationToken);
 
     public Task<Result<SalesDocumentNumberingDto>> CreateLayawayPaymentsAsync(
@@ -47,8 +47,23 @@ public sealed partial class DocumentNumberingService(
             "pagos de apartados", AuditAction.LayawayPaymentNumberingCreated,
             repository.GetLayawayPaymentNumberingAsync, cancellationToken);
 
+    /// <summary>
+    /// Reads a consecutive and, when it does not exist yet, creates it with its fixed prefix (starting at 1)
+    /// and reads it again. The backend creates every consecutive by itself, so the Administrator never has to.
+    /// </summary>
+    private async Task<ConsecutivoDocumento?> GetOrEnsureAsync(
+        Guid installationId, string series, string documentType,
+        Func<Guid, string, bool, CancellationToken, Task<ConsecutivoDocumento?>> getNumbering,
+        CancellationToken cancellationToken)
+    {
+        var numbering = await getNumbering(installationId, series, false, cancellationToken);
+        if (numbering is not null) return numbering;
+        await repository.EnsureNumberingAsync(installationId, series, documentType, cancellationToken);
+        return await getNumbering(installationId, series, false, cancellationToken);
+    }
+
     private async Task<Result<SalesDocumentNumberingDto>> GetLayawayNumberingAsync(
-        ActorContext actor, string label,
+        ActorContext actor, string label, string documentType,
         Func<Guid, string, bool, CancellationToken, Task<ConsecutivoDocumento?>> getNumbering,
         CancellationToken cancellationToken)
     {
@@ -59,7 +74,8 @@ public sealed partial class DocumentNumberingService(
         if (installation is null)
             return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("la instalación activa"));
 
-        var numbering = await getNumbering(installation.Id, installation.Serie, false, cancellationToken);
+        var numbering = await GetOrEnsureAsync(installation.Id, installation.Serie, documentType,
+            getNumbering, cancellationToken);
         return numbering is null
             ? Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound($"el consecutivo de {label}"))
             : MapResult(numbering);
@@ -131,12 +147,14 @@ public sealed partial class DocumentNumberingService(
             return Result.Failure<PurchaseDocumentNumberingDto>(
                 ApplicationError.NotFound("la instalación activa"));
 
-        var numbering = await repository.GetPurchaseNumberingAsync(
-            installation.Id, installation.Serie, false, cancellationToken);
-        return numbering is null
-            ? Result.Failure<PurchaseDocumentNumberingDto>(
-                ApplicationError.NotFound("el consecutivo de compras"))
-            : MapPurchaseResult(numbering);
+        var numbering = await GetOrEnsureAsync(installation.Id, installation.Serie, PurchaseDocumentType,
+            repository.GetPurchaseNumberingAsync, cancellationToken);
+        if (numbering is null)
+            return Result.Failure<PurchaseDocumentNumberingDto>(
+                ApplicationError.NotFound("el consecutivo de compras"));
+        var canCorrect = !await repository.HasNumberedPurchasesAsync(
+            installation.Id, installation.Serie, cancellationToken);
+        return MapPurchaseResult(numbering, canCorrect);
     }
 
     public async Task<Result<PurchaseDocumentNumberingDto>> CreatePurchasesAsync(
@@ -184,7 +202,7 @@ public sealed partial class DocumentNumberingService(
                 PrimerNumero = request.FirstNumber }, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return MapPurchaseResult(numbering);
+        return MapPurchaseResult(numbering, canCorrect: true);
     }
 
     public async Task<Result<PurchaseDocumentNumberingDto>> UpdatePurchasesAsync(
@@ -234,7 +252,7 @@ public sealed partial class DocumentNumberingService(
                 PrimerNumeroNuevo = request.FirstNumber }, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return MapPurchaseResult(numbering);
+        return MapPurchaseResult(numbering, canCorrect: true);
     }
 
     public async Task<Result<SalesDocumentNumberingDto>> GetCreditPaymentsAsync(
@@ -244,10 +262,13 @@ public sealed partial class DocumentNumberingService(
         if (error is not null) return Result.Failure<SalesDocumentNumberingDto>(error);
         var installation = await repository.GetActiveInstallationAsync(false, cancellationToken);
         if (installation is null) return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("la instalación activa"));
-        var numbering = await repository.GetCreditPaymentNumberingAsync(installation.Id, installation.Serie, false, cancellationToken);
-        return numbering is null
-            ? Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("el consecutivo de abonos"))
-            : MapResult(numbering);
+        var numbering = await GetOrEnsureAsync(installation.Id, installation.Serie,
+            DocumentNumberingDefaults.CreditPayments, repository.GetCreditPaymentNumberingAsync, cancellationToken);
+        if (numbering is null)
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("el consecutivo de abonos"));
+        var canCorrect = !await repository.HasCreditPaymentsAsync(
+            installation.Id, installation.Serie, cancellationToken);
+        return MapResult(numbering, canCorrect);
     }
 
     public async Task<Result<SalesDocumentNumberingDto>> CreateCreditPaymentsAsync(
@@ -275,7 +296,7 @@ public sealed partial class DocumentNumberingService(
             new { numbering.TipoDocumento, numbering.Serie, numbering.Prefijo, request.FirstNumber }, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return MapResult(numbering);
+        return MapResult(numbering, canCorrect: true);
     }
 
     public async Task<Result<SalesDocumentNumberingDto>> UpdateCreditPaymentsAsync(
@@ -303,7 +324,7 @@ public sealed partial class DocumentNumberingService(
             new { numbering.TipoDocumento, numbering.Serie, numbering.Prefijo, request.FirstNumber }, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return MapResult(numbering);
+        return MapResult(numbering, canCorrect: true);
     }
 
     public async Task<Result<SalesDocumentNumberingDto>> GetSalesAsync(
@@ -317,11 +338,13 @@ public sealed partial class DocumentNumberingService(
         if (installation is null)
             return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("la instalación activa"));
 
-        var numbering = await repository.GetSalesNumberingAsync(
-            installation.Id, installation.Serie, false, cancellationToken);
-        return numbering is null
-            ? Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("el consecutivo de VENTAS"))
-            : MapResult(numbering);
+        var numbering = await GetOrEnsureAsync(installation.Id, installation.Serie, SalesDocumentType,
+            repository.GetSalesNumberingAsync, cancellationToken);
+        if (numbering is null)
+            return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NotFound("el consecutivo de VENTAS"));
+        var canCorrect = !await repository.HasConfirmedSalesAsync(
+            installation.Id, installation.Serie, cancellationToken);
+        return MapResult(numbering, canCorrect);
     }
 
     public async Task<Result<SalesDocumentNumberingDto>> CreateSalesAsync(
@@ -374,7 +397,7 @@ public sealed partial class DocumentNumberingService(
             cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return MapResult(numbering);
+        return MapResult(numbering, canCorrect: true);
     }
 
     public async Task<Result<SalesDocumentNumberingDto>> UpdateSalesAsync(
@@ -429,7 +452,7 @@ public sealed partial class DocumentNumberingService(
             cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return MapResult(numbering);
+        return MapResult(numbering, canCorrect: true);
     }
 
     private async Task<ApplicationError?> RequirePermissionAsync(
@@ -457,7 +480,8 @@ public sealed partial class DocumentNumberingService(
         return (normalized, checked(firstNumber - 1), null);
     }
 
-    private static Result<SalesDocumentNumberingDto> MapResult(ConsecutivoDocumento numbering)
+    private static Result<SalesDocumentNumberingDto> MapResult(
+        ConsecutivoDocumento numbering, bool canCorrect = false)
     {
         if (numbering.UltimoNumero == long.MaxValue)
             return Result.Failure<SalesDocumentNumberingDto>(ApplicationError.NumberingExhausted(
@@ -474,11 +498,12 @@ public sealed partial class DocumentNumberingService(
             numbering.Prefijo,
             numbering.UltimoNumero,
             numbering.UltimoNumero + 1,
-            numbering.Version));
+            numbering.Version,
+            canCorrect));
     }
 
     private static Result<PurchaseDocumentNumberingDto> MapPurchaseResult(
-        ConsecutivoDocumento numbering)
+        ConsecutivoDocumento numbering, bool canCorrect)
     {
         if (numbering.UltimoNumero == long.MaxValue)
             return Result.Failure<PurchaseDocumentNumberingDto>(
@@ -490,7 +515,8 @@ public sealed partial class DocumentNumberingService(
             numbering.Prefijo,
             numbering.UltimoNumero,
             numbering.UltimoNumero + 1,
-            numbering.Version));
+            numbering.Version,
+            canCorrect));
     }
 
     private static readonly ApplicationError VersionConflict =

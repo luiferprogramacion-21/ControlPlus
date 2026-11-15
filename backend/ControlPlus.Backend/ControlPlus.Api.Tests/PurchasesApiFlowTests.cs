@@ -49,12 +49,11 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var supplier = await SupplierAsync(client, "Proveedor de pedido parcial");
         var first = await ProductAsync(client, supplier.Id, "ORD-PART-A", null);
         var second = await ProductAsync(client, supplier.Id, "ORD-PART-B", null);
+        // The installation created the PED and CMP consecutives by itself.
         var orderNumbering = await ReadJsonAsync(
-            await client.PostAsync("/api/purchase-orders/numbering/initialize", null), HttpStatusCode.OK);
+            await client.GetAsync("/api/purchase-orders/numbering"), HttpStatusCode.OK);
         Assert.Equal("PED", orderNumbering.GetProperty("prefix").GetString());
         Assert.Equal(1, orderNumbering.GetProperty("nextNumber").GetInt64());
-        _ = await ReadJsonAsync(await client.PostAsJsonAsync("/api/document-numbering/purchases",
-            new { prefix = "CMP", firstNumber = 1 }), HttpStatusCode.Created);
         var body = new { supplierId = supplier.Id, lines = new[]
         {
             new { productId = first.Id, requestedQuantity = 4, estimatedUnitCost = 10m },
@@ -132,9 +131,6 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var requested = await ProductAsync(client, supplier.Id, "ORD-REQ", null);
         var substitute = await ProductAsync(client, supplier.Id, "ORD-SUB", null);
         var pending = await ProductAsync(client, supplier.Id, "ORD-PENDING", null);
-        _ = await ReadJsonAsync(await client.PostAsync("/api/purchase-orders/numbering/initialize", null), HttpStatusCode.OK);
-        _ = await ReadJsonAsync(await client.PostAsJsonAsync("/api/document-numbering/purchases",
-            new { prefix = "CMP", firstNumber = 1 }), HttpStatusCode.Created);
         var reasons = await ReadJsonAsync(await client.PostAsync(
             "/api/purchase-orders/reasons/close/initialize", null), HttpStatusCode.OK);
         var closeReason = reasons.EnumerateArray().Single(x => x.GetProperty("code").GetString() == "PENDIENTE_NO_REQUERIDO")
@@ -218,7 +214,6 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         Bearer(client, users.Admin.Token.AccessToken);
         var supplier = await SupplierAsync(client, "Proveedor de pedido cancelado");
         var product = await ProductAsync(client, supplier.Id, "ORD-CANCEL", null);
-        _ = await ReadJsonAsync(await client.PostAsync("/api/purchase-orders/numbering/initialize", null), HttpStatusCode.OK);
         var reasons = await ReadJsonAsync(await client.PostAsync(
             "/api/purchase-orders/reasons/cancel/initialize", null), HttpStatusCode.OK);
         var reasonId = reasons.EnumerateArray().Single(x => x.GetProperty("code").GetString() == "ERROR_PEDIDO")
@@ -323,7 +318,8 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
             Assert.Equal(25m, detail.SubtotalBruto);
             Assert.Equal(12.50m, detail.CostoUnitarioDocumento);
             Assert.Equal(25m, purchase.Total);
-            Assert.Equal(0, await db.ConsecutivoDocumento.CountAsync(x => x.TipoDocumento == "COMPRA"));
+            Assert.Equal(0, await db.ConsecutivoDocumento.Where(x => x.TipoDocumento == "COMPRA")
+                .Select(x => x.UltimoNumero).SingleAsync());
             Assert.Equal(0, await db.MovimientoInventario.CountAsync(x => x.CompraId == id));
             var audit = await db.EventoAuditoria.AsNoTracking().SingleAsync(x => x.EntidadId == id);
             AssertAuditSanitized(audit.DatosAnteriores, audit.DatosNuevos, audit.Motivo);
@@ -475,9 +471,9 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         await SeedStockAsync(stockProduct.Id, 5, 10m);
         await SeedStockAsync(unknownAverageProduct.Id, 4, null);
 
-        await ProblemAsync(await client.GetAsync("/api/document-numbering/purchases"), HttpStatusCode.NotFound);
-        var numbering = await ReadJsonAsync(await client.PostAsJsonAsync("/api/document-numbering/purchases",
-            new { prefix = " cmp ", firstNumber = 1 }), HttpStatusCode.Created);
+        // The installation created the CMP consecutive by itself.
+        var numbering = await ReadJsonAsync(await client.GetAsync("/api/document-numbering/purchases"),
+            HttpStatusCode.OK);
         Assert.Equal("COMPRA", numbering.GetProperty("documentType").GetString());
         Assert.Equal("CMP", numbering.GetProperty("prefix").GetString());
         Assert.Equal(0, numbering.GetProperty("lastNumber").GetInt64());
@@ -592,8 +588,6 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         Bearer(secondClient, users.Admin.Token.AccessToken);
         var supplier = await SupplierAsync(firstClient, "Proveedor de concurrencia");
         var product = await ProductAsync(firstClient, supplier.Id, "PUR-RACE", null);
-        _ = await ReadJsonAsync(await firstClient.PostAsJsonAsync("/api/document-numbering/purchases",
-            new { prefix = "CMP", firstNumber = 1 }), HttpStatusCode.Created);
         var draft = await CreateDraftAsync(firstClient, Body(supplier.Id, null, "NO_DISCRIMINADO",
             new Line(product.Id, 2, 10m)));
         var id = draft.GetProperty("id").GetGuid();
@@ -652,20 +646,35 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         Bearer(client, users.Cashier.Token.AccessToken);
         await ProblemAsync(await client.GetAsync("/api/document-numbering/purchases"), HttpStatusCode.Forbidden);
         Bearer(client, users.Admin.Token.AccessToken);
-        await ProblemAsync(await client.GetAsync("/api/document-numbering/purchases"), HttpStatusCode.NotFound);
+        // The installation created it by itself: it is there to be read, adjusted and never created by hand.
+        var created = await ReadJsonAsync(await client.GetAsync("/api/document-numbering/purchases"),
+            HttpStatusCode.OK);
         await ProblemAsync(await client.PostAsJsonAsync("/api/document-numbering/purchases",
             new { prefix = "CMP", firstNumber = 1, documentType = "COMPRA" }), HttpStatusCode.BadRequest);
-        var created = await ReadJsonAsync(await client.PostAsJsonAsync("/api/document-numbering/purchases",
-            new { prefix = "CMP", firstNumber = 1 }), HttpStatusCode.Created);
         Assert.Equal(0, created.GetProperty("lastNumber").GetInt64());
         Assert.Equal(1, created.GetProperty("nextNumber").GetInt64());
+        Assert.True(created.GetProperty("canCorrect").GetBoolean());
         await ProblemAsync(await client.PostAsJsonAsync("/api/document-numbering/purchases",
             new { prefix = "CMP", firstNumber = 1 }), HttpStatusCode.Conflict);
         var changed = await ReadJsonAsync(await client.PutAsJsonAsync("/api/document-numbering/purchases",
             new { prefix = "CMP", firstNumber = 2, version = created.GetProperty("version").GetInt64() }), HttpStatusCode.OK);
         Assert.Equal(2, changed.GetProperty("nextNumber").GetInt64());
+        Assert.True(changed.GetProperty("canCorrect").GetBoolean());
         await ProblemAsync(await client.PutAsJsonAsync("/api/document-numbering/purchases",
             new { prefix = "CMP", firstNumber = 3, version = created.GetProperty("version").GetInt64() }), HttpStatusCode.Conflict);
+
+        var supplier = await SupplierAsync(client, "Proveedor de consecutivo");
+        var product = await ProductAsync(client, supplier.Id, "PUR-NUMBERING", null);
+        var draft = await CreateDraftAsync(client, Body(supplier.Id, null, "NO_DISCRIMINADO",
+            new Line(product.Id, 1, 100m)));
+        _ = await ReadJsonAsync(await ConfirmAsync(client, draft.GetProperty("id").GetGuid(),
+            "purchase-numbering-first-confirmation", draft.GetProperty("version").GetInt64()), HttpStatusCode.OK);
+        var afterPurchase = await ReadJsonAsync(await client.GetAsync("/api/document-numbering/purchases"),
+            HttpStatusCode.OK);
+        Assert.False(afterPurchase.GetProperty("canCorrect").GetBoolean());
+        await ProblemAsync(await client.PutAsJsonAsync("/api/document-numbering/purchases",
+            new { prefix = "CMP", firstNumber = 3, version = afterPurchase.GetProperty("version").GetInt64() }),
+            HttpStatusCode.Conflict);
         Assert.Equal(HttpStatusCode.MethodNotAllowed,
             (await client.DeleteAsync("/api/document-numbering/purchases")).StatusCode);
     }
@@ -681,8 +690,6 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var first = await ProductAsync(client, supplier.Id, "PUR-CANCEL-A", null);
         var second = await ProductAsync(client, supplier.Id, "PUR-CANCEL-B", null);
         await SeedStockAsync(first.Id, 4, 8m);
-        _ = await ReadJsonAsync(await client.PostAsJsonAsync("/api/document-numbering/purchases",
-            new { prefix = "CMP", firstNumber = 1 }), HttpStatusCode.Created);
         var draft = await CreateDraftAsync(client, Body(supplier.Id, null, "NO_DISCRIMINADO",
             new Line(first.Id, 2, 10m), new Line(second.Id, 3, 12m)));
         var id = draft.GetProperty("id").GetGuid();
@@ -942,13 +949,15 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         await ProblemCodeAsync(await client.PostAsync("/api/purchases/cancellation-reasons/initialize", null),
             HttpStatusCode.Forbidden, "authorization.forbidden");
         Bearer(client, users.Admin.Token.AccessToken);
+        // The installation created the approved catalog by itself: it is already complete when it is read.
         var before = await ReadJsonAsync(await client.GetAsync("/api/purchases/cancellation-reasons"), HttpStatusCode.OK);
-        Assert.Empty(before.EnumerateArray());
-        var initialized = await ReadJsonAsync(await client.PostAsync("/api/purchases/cancellation-reasons/initialize", null), HttpStatusCode.OK);
         Assert.Equal(new[] { "ERROR_REGISTRO", "COMPRA_DUPLICADA", "DOCUMENTO_PROVEEDOR_ANULADO",
             "MERCANCIA_NO_RECIBIDA", "OTRO" },
-            initialized.EnumerateArray().Select(x => x.GetProperty("code").GetString()));
-        Assert.All(initialized.EnumerateArray(), x => Assert.Equal('7', x.GetProperty("id").GetGuid().ToString("D")[14]));
+            before.EnumerateArray().Select(x => x.GetProperty("code").GetString()));
+        Assert.All(before.EnumerateArray(), x => Assert.Equal('7', x.GetProperty("id").GetGuid().ToString("D")[14]));
+        // The explicit initialization is an idempotent repair: with nothing missing it returns the same catalog.
+        var initialized = await ReadJsonAsync(await client.PostAsync("/api/purchases/cancellation-reasons/initialize", null), HttpStatusCode.OK);
+        Assert.Equal(before.GetRawText(), initialized.GetRawText());
         Assert.Equal(initialized.GetRawText(), (await ReadJsonAsync(
             await client.PostAsync("/api/purchases/cancellation-reasons/initialize", null), HttpStatusCode.OK)).GetRawText());
         Assert.Equal(initialized.GetRawText(), (await ReadJsonAsync(
@@ -991,21 +1000,21 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         Bearer(client, users.Admin.Token.AccessToken);
         var supplier = await SupplierAsync(client, "Proveedor cancelación inválida");
         var product = await ProductAsync(client, supplier.Id, "PUR-CANCEL-INVALID", null);
-        _ = await ReadJsonAsync(await client.PostAsJsonAsync("/api/document-numbering/purchases",
-            new { prefix = "CMP", firstNumber = 1 }), HttpStatusCode.Created);
         var confirmed = await CreateConfirmedAsync(client, supplier.Id, product.Id, "cancel-invalid-confirm");
         var id = confirmed.GetProperty("id").GetGuid();
         var version = confirmed.GetProperty("version").GetInt64();
         var draft = await CreateDraftAsync(client, Body(supplier.Id, null, "NO_DISCRIMINADO",
             new Line(product.Id, 1, 7m)));
         var before = await PurchasePersistenceAsync(id, product.Id);
-        var notInitializedReason = Guid.NewGuid();
-        await ProblemCodeAsync(await PostCancelAsync(client, id, "cancel-reason-before-initialize", new
+        var unknownReason = Guid.NewGuid();
+        var reasonCount = await CancellationReasonCountAsync();
+        Assert.Equal(ApprovedReasonCatalogs.PurchaseCancellation.Length, reasonCount);
+        await ProblemCodeAsync(await PostCancelAsync(client, id, "cancel-unknown-reason", new
         {
-            expectedVersion = version, reasonId = notInitializedReason,
+            expectedVersion = version, reasonId = unknownReason,
             authorization = new { userName = AdminName, password = _adminPassword }
         }), HttpStatusCode.NotFound, "resource.not_found");
-        Assert.Equal(0, await CancellationReasonCountAsync());
+        Assert.Equal(reasonCount, await CancellationReasonCountAsync());
         var reasons = await ReadJsonAsync(await client.PostAsync("/api/purchases/cancellation-reasons/initialize", null), HttpStatusCode.OK);
         var reason = reasons.EnumerateArray().Single(x => x.GetProperty("code").GetString() == "ERROR_REGISTRO").GetProperty("id").GetGuid();
         var other = reasons.EnumerateArray().Single(x => x.GetProperty("code").GetString() == "OTRO").GetProperty("id").GetGuid();
@@ -1388,8 +1397,6 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
         var users = await BootstrapAsync(client);
         Bearer(client, users.Admin.Token.AccessToken);
         var supplier = await SupplierAsync(client, supplierName);
-        _ = await ReadJsonAsync(await client.PostAsJsonAsync("/api/document-numbering/purchases",
-            new { prefix = "CMP", firstNumber = 1 }), HttpStatusCode.Created);
         var reasons = await ReadJsonAsync(await client.PostAsync("/api/purchases/cancellation-reasons/initialize", null), HttpStatusCode.OK);
         return new CancellationSetup(users, supplier, reasons.EnumerateArray()
             .Single(x => x.GetProperty("code").GetString() == "ERROR_REGISTRO").GetProperty("id").GetGuid());

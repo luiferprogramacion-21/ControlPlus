@@ -12,6 +12,15 @@ public interface IDocumentNumberingRepository
         bool forUpdate,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Creates the consecutive of a document type (its fixed prefix, starting at number 1) when it does not exist
+    /// for the installation and series. It runs inside the caller's transaction when there is one, is safe under
+    /// concurrency and never modifies an existing consecutive.
+    /// </summary>
+    Task EnsureNumberingAsync(
+        Guid installationId, string series, string documentType,
+        CancellationToken cancellationToken = default);
+
     Task<ConsecutivoDocumento?> GetSalesNumberingAsync(
         Guid installationId,
         string series,

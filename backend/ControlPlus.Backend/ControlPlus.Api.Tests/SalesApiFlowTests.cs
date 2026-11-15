@@ -348,10 +348,11 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task Sale_StillReturnsConflict_WhenSalesNumberingDoesNotExist()
+    public async Task Sale_CreatesTheSalesNumberingOnFirstUse_WhenItDoesNotExist()
     {
         using var client = CreateClient();
         var scenario = await BootstrapAsync(client);
+        // An installation created before the consecutives were automatic has no VENTA row.
         await using (var scope = _factory!.Services.CreateAsyncScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
@@ -364,12 +365,16 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         _ = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
 
         SetBearer(client, scenario.Cashier.AccessToken);
-        var conflict = await PostSaleAsync(
+        var sale = await PostSaleAsync(
             client, "missing-sales-numbering", CashRequest(scenario.Products.Standard, 1, 1_000m));
-        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
-        Assert.Equal("application/problem+json", conflict.Content.Headers.ContentType?.MediaType);
-        using var problem = JsonDocument.Parse(await conflict.Content.ReadAsStringAsync());
-        Assert.Equal("resource.conflict", problem.RootElement.GetProperty("code").GetString());
+
+        Assert.Equal(HttpStatusCode.Created, sale.StatusCode);
+        await using var verification = _factory!.Services.CreateAsyncScope();
+        var db = verification.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var numbering = await db.ConsecutivoDocumento.AsNoTracking().SingleAsync(x => x.TipoDocumento == "VENTA");
+        Assert.Equal("VTA", numbering.Prefijo);
+        Assert.Equal(1, numbering.UltimoNumero);
+        Assert.Equal(1, await db.Venta.CountAsync());
     }
 
     [Fact]
@@ -378,6 +383,10 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
     {
         using var client = CreateClient();
         var scenario = await BootstrapAsync(client);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var beforeSale = await ReadAsync<SalesDocumentNumberingDto>(
+            await client.GetAsync("/api/document-numbering/sales"), HttpStatusCode.OK);
+        Assert.True(beforeSale.CanCorrect);
         await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
         var credential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.Cashier.Id);
         _ = await StartSessionAsync(client, scenario.Cashier.AccessToken, credential);
@@ -388,6 +397,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         SetBearer(client, scenario.Admin.AccessToken);
         var numbering = await ReadAsync<SalesDocumentNumberingDto>(
             await client.GetAsync("/api/document-numbering/sales"), HttpStatusCode.OK);
+        Assert.False(numbering.CanCorrect);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync(
             "/api/document-numbering/sales",
             new UpdateSalesDocumentNumberingRequest("ALT", 10, numbering.Version))).StatusCode);
@@ -1214,12 +1224,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
 
         await using var scope = _factory!.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
-        var installation = await context.Instalacion.SingleAsync();
-        context.ConsecutivoDocumento.Add(new ConsecutivoDocumento
-        {
-            Id = Guid.CreateVersion7(), InstalacionId = installation.Id, TipoDocumento = "VENTA",
-            Prefijo = "VTA", Serie = installation.Serie, UltimoNumero = 0, Version = 1
-        });
+        // The VTA consecutive is created by the installation itself.
         var rows = await context.Producto.Where(x => new[]
         {
             products.Standard, products.ResidueA, products.ResidueB, products.ResidueC, products.UnknownCost,

@@ -36,6 +36,10 @@ public sealed class EfLayawayCreateRepository(OfficialControlPlusDbContext dbCon
     public async Task<ConsecutivoDocumento?> GetSequenceForUpdateAsync(
         Guid installationId, string series, string documentType, CancellationToken cancellationToken)
     {
+        // Creating a layaway or taking a payment is the first use: the consecutive is created here when it
+        // does not exist yet.
+        await DocumentSequenceProvisioner.EnsureAsync(
+            dbContext, installationId, series, documentType, cancellationToken);
         var rows = await dbContext.ConsecutivoDocumento.FromSqlInterpolated(
             $"""
              SELECT c.* FROM configuracion.consecutivo_documento AS c

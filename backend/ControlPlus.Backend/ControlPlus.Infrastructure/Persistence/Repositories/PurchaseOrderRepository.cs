@@ -1,4 +1,5 @@
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Numbering;
 using ControlPlus.Application.PurchaseOrders.Contracts;
 using ControlPlus.Application.PurchaseOrders.Ports;
 using ControlPlus.Domain.OfficialModel;
@@ -49,6 +50,10 @@ public sealed class EfPurchaseOrderRepository(OfficialControlPlusDbContext db) :
 
     public Task AddNumberingAsync(ConsecutivoDocumento numbering, CancellationToken ct = default) =>
         db.ConsecutivoDocumento.AddAsync(numbering, ct).AsTask();
+
+    public Task EnsureNumberingAsync(Guid installationId, string series, CancellationToken ct = default) =>
+        DocumentSequenceProvisioner.EnsureAsync(
+            db, installationId, series, DocumentNumberingDefaults.PurchaseOrders, ct);
 
     public async Task<PedidoCompra?> GetForUpdateAsync(Guid id, CancellationToken ct = default)
     {

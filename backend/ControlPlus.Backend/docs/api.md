@@ -127,7 +127,7 @@ Las respuestas separan `cashDifference` (contado de efectivo menos esperado de e
 
 ## Ventas
 
-`GET /api/sales/cancellation-reasons` consulta los motivos aprobados y `POST /api/sales/cancellation-reasons/initialize` inicializa explícitamente los tres códigos para anulación de venta y pago. `POST /api/sales/{saleId}/cancel` exige `SALES.VOID`, rol Supervisor o Administrador, `Idempotency-Key`, `{ expectedVersion, reasonId, observation?, authorization? }` y devuelve `CancelSaleDto`. Una operación nueva requiere credenciales de otro Supervisor/Administrador; un replay exacto puede omitirlas. Ver [sales-cancellation.md](sales-cancellation.md) para devolución por los medios originales, crédito sin abonos, permisos, estados y errores.
+`GET /api/sales/cancellation-reasons` consulta los motivos aprobados (se crean solos al instalar y, si faltaran, al consultarlos) y `POST /api/sales/cancellation-reasons/initialize` los repara de forma idempotente para anulación de venta y pago. `POST /api/sales/{saleId}/cancel` exige `SALES.VOID`, rol Supervisor o Administrador, `Idempotency-Key`, `{ expectedVersion, reasonId, observation?, authorization? }` y devuelve `CancelSaleDto`. Una operación nueva requiere credenciales de otro Supervisor/Administrador; un replay exacto puede omitirlas. Ver [sales-cancellation.md](sales-cancellation.md) para devolución por los medios originales, crédito sin abonos, permisos, estados y errores.
 
 `GET /api/sales/{saleId}/receipt` devuelve el mismo contrato de comprobante para una venta confirmada con `SALES.ALL_READ` o `SALES.OWN_READ` para la propia. Para ventas nuevas consulta la copia inmutable de datos históricos; para ventas anteriores sin copia conserva la reconstrucción actual, sin escribir ni crear una copia retroactiva. `POST /api/sales/{saleId}/reprint-requests` exige además `SALES.REPRINT` e `Idempotency-Key`; registra la solicitud auditada y devuelve estado `SOLICITADA`, incluso en un replay exacto. Ninguna ruta envía un ticket ni comunica éxito físico de impresión. Véase [sales.md](sales.md) para el contenido del snapshot y sus límites.
 
@@ -168,15 +168,15 @@ El cuerpo de abono contiene `expectedVersion` y `payments`, una a tres filas con
 | `POST` | `/api/purchases/{purchaseId}/confirm` | Confirmación y recepción completa (`200`); exige `expectedVersion` e `Idempotency-Key` |
 | `POST` | `/api/purchases/{purchaseId}/cancel` | Anulación completa de compra independiente confirmada (`200`); exige `expectedVersion`, `reasonId` e `Idempotency-Key` |
 | `GET` | `/api/purchases/cancellation-reasons` | Motivos oficiales activos (`200`) |
-| `POST` | `/api/purchases/cancellation-reasons/initialize` | Inicialización explícita e idempotente de motivos faltantes (`200`) |
+| `POST` | `/api/purchases/cancellation-reasons/initialize` | Reparación idempotente de motivos faltantes (`200`); los motivos se crean solos al instalar y al consultarlos |
 | `GET/POST` | `/api/purchase-orders` | Listar por proveedor/estado o crear borrador numerado `PED` |
 | `GET/PUT` | `/api/purchase-orders/{orderId}` | Consultar o editar borrador con versión |
 | `POST` | `/api/purchase-orders/{orderId}/send` | Enviar borrador con versión |
 | `POST` | `/api/purchase-orders/{orderId}/receipts` | Confirmar una recepción parcial con versión de pedido e `Idempotency-Key` (`201`) |
 | `POST` | `/api/purchase-orders/{orderId}/close` | Cerrar con pendientes, motivo y reautenticación |
 | `POST` | `/api/purchase-orders/{orderId}/cancel` | Cancelar borrador o enviado, motivo y reautenticación |
-| `GET/POST` | `/api/purchase-orders/reasons/{close|cancel}[/initialize]` | Consultar o inicializar expresamente motivos de pedido |
-| `GET/POST` | `/api/purchase-orders/numbering[/initialize]` | Consultar o configurar una sola vez `PED`, primer número 1 |
+| `GET/POST` | `/api/purchase-orders/reasons/{close|cancel}[/initialize]` | Consultar (completa los faltantes) o reparar motivos de pedido |
+| `GET/POST` | `/api/purchase-orders/numbering[/initialize]` | Consultar (crea `PED` desde 1 si faltara) o repararlo con `POST` (`409` si ya existe) |
 
 Las cinco rutas del corte 1 exigen JWT, rol vigente Administrador o Supervisor y `PURCHASES.RECEIVE` efectivo. Las tres rutas del corte 2 exigen JWT, Administrador vigente y `PURCHASES.CANCEL` efectivo. Una revocación individual bloquea el acceso y una concesión válida se evalúa con la plantilla híbrida. Cajero no accede. Los importes y costos se muestran dentro del permiso de recepción de Compras; `PRODUCTS.COSTS_READ` no se amplía para las rutas de Productos, Inventario o historial de costos.
 
@@ -192,31 +192,33 @@ La anulación admite JSON estricto con `expectedVersion`, `reasonId`, `observati
 
 | Método | Ruta | Resultado |
 |---|---|---|
-| `GET` | `/api/document-numbering/purchases` | Consulta `COMPRA` para instalación y serie activas (`200` o `404`) |
-| `POST` | `/api/document-numbering/purchases` | Crea una configuración única de `COMPRA` (`201`) |
+| `GET` | `/api/document-numbering/purchases` | Consulta `COMPRA` para instalación y serie activas; si faltara, la crea (`200`) |
+| `POST` | `/api/document-numbering/purchases` | Repara una configuración faltante de `COMPRA` (`201`); `409` si ya existe |
 | `PUT` | `/api/document-numbering/purchases` | Corrige la configuración antes de la primera compra confirmada (`200`) |
 
 Las tres operaciones requieren `NUMBERING.MANAGE` efectivo y mantienen las restricciones actuales del proyecto. Tipo, instalación y serie se resuelven en el servidor; la corrección exige versión vigente. No existe `DELETE` ni se crea el consecutivo automáticamente al crear un borrador. Numeración y recepción se confirman o revierten juntas.
+
+El número visible sigue el formato `<prefijo>-<serie>-<consecutivo>`, sin relleno de ceros añadido por el frontend. `lastNumber` es la base del siguiente número y puede no corresponder a un documento emitido; por ejemplo, `0` indica que el próximo será `1`. Una corrección afecta únicamente documentos futuros. En Ventas, Abonos de crédito y Compras, `canCorrect` informa si la corrección sigue permitida al consultar; el `PUT` vuelve a comprobarlo. Los prefijos `ABO` y `CMP` son fijos.
 
 ## Numeración de Ventas
 
 | Método | Ruta | Resultado |
 |---|---|---|
-| `GET` | `/api/document-numbering/sales` | Consulta la configuración `VENTA` de la instalación y serie activas; `404` si falta |
-| `POST` | `/api/document-numbering/sales` | Crea la configuración única; `firstNumber: 1` persiste `lastNumber: 0` |
+| `GET` | `/api/document-numbering/sales` | Consulta la configuración `VENTA` de la instalación y serie activas; si faltara, la crea con `VTA` desde 1 (`200`) |
+| `POST` | `/api/document-numbering/sales` | Repara una configuración faltante; `firstNumber: 1` persiste `lastNumber: 0`; `409` si ya existe |
 | `PUT` | `/api/document-numbering/sales` | Corrige prefijo y primer número solamente antes de la primera venta confirmada |
 
-Los tres endpoints exigen el permiso efectivo `NUMBERING.MANAGE`. Instalación, serie y tipo `VENTA` se resuelven en el servidor y no forman parte de las solicitudes. El prefijo se recorta, se normaliza a mayúsculas, no puede quedar vacío, contener caracteres de control ni superar 10 caracteres. La corrección exige `version`; una versión obsoleta o cualquier venta confirmada para la instalación y serie produce `409`. No existe endpoint de eliminación. Las respuestas solo muestran tipo, serie, prefijo, último número, próximo número y versión.
+Los tres endpoints exigen el permiso efectivo `NUMBERING.MANAGE`. Instalación, serie y tipo `VENTA` se resuelven en el servidor y no forman parte de las solicitudes. El prefijo se recorta, se normaliza a mayúsculas, no puede quedar vacío, contener caracteres de control ni superar 10 caracteres. La corrección exige `version`; una versión obsoleta o cualquier venta confirmada para la instalación y serie produce `409`. No existe endpoint de eliminación. Las respuestas muestran tipo, serie, prefijo, número anterior, próximo número, versión y `canCorrect`. Este último indica si el servidor permite una corrección en el momento de la consulta; el `PUT` revalida la condición y puede devolver `409` si entretanto se confirmó una venta.
 
 ## Numeración de abonos
 
 | Método | Ruta | Resultado |
 |---|---|---|
-| `GET` | `/api/document-numbering/credit-payments` | Consulta `PAGO_CREDITO` para instalación y serie activas; `404` si falta |
-| `POST` | `/api/document-numbering/credit-payments` | Crea el consecutivo con prefijo obligatorio `ABO`; `firstNumber: 1` guarda `lastNumber: 0` |
+| `GET` | `/api/document-numbering/credit-payments` | Consulta `PAGO_CREDITO` para instalación y serie activas; si faltara, la crea con `ABO` desde 1 (`200`) |
+| `POST` | `/api/document-numbering/credit-payments` | Repara el consecutivo faltante con prefijo obligatorio `ABO`; `firstNumber: 1` guarda `lastNumber: 0`; `409` si ya existe |
 | `PUT` | `/api/document-numbering/credit-payments` | Corrige antes del primer abono, con `version` vigente |
 
-Requieren `NUMBERING.MANAGE`. Tipo, instalación y serie se resuelven solo en servidor y los contratos JSON rechazan campos internos y propiedades desconocidas. La configuración inicial aprobada usa `firstNumber: 1`; las correcciones antes del primer pago admiten un número inicial positivo. No existe `DELETE`. Tras la publicación del commit y el despliegue local de la imagen API, ABO quedó presente y certificado mediante la API en PostgreSQL persistente local/de desarrollo con `prefix=ABO`, `lastNumber=0`, `nextNumber=1` y `version` válida. Este corte no creó migración ni configuró el consecutivo automáticamente; no se usó `PUT` para cambiar ABO.
+Requieren `NUMBERING.MANAGE`. Tipo, instalación y serie se resuelven solo en servidor y los contratos JSON rechazan campos internos y propiedades desconocidas. La configuración inicial aprobada usa `firstNumber: 1`; las correcciones antes del primer pago admiten un número inicial positivo y conservan el prefijo fijo `ABO`. Las respuestas incluyen `canCorrect`, calculado según la existencia de abonos al consultar y revalidado por el `PUT`. No existe `DELETE`. Tras la publicación del commit y el despliegue local de la imagen API, ABO quedó presente y certificado mediante la API en PostgreSQL persistente local/de desarrollo con `prefix=ABO`, `lastNumber=0`, `nextNumber=1` y `version` válida. Este corte no creó migración ni configuró el consecutivo automáticamente; no se usó `PUT` para cambiar ABO.
 
 ## Respuestas de error
 

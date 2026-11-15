@@ -644,12 +644,7 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
             var row = await context.Producto.SingleAsync(x => x.Id == product.Id);
             row.StockActual = initialStock;
             row.CostoPromedio = 40m;
-            var installation = await context.Instalacion.SingleAsync();
-            context.ConsecutivoDocumento.Add(new ConsecutivoDocumento
-            {
-                Id = Guid.CreateVersion7(), InstalacionId = installation.Id, TipoDocumento = "VENTA",
-                Prefijo = "VTA", Serie = installation.Serie, UltimoNumero = 0, Version = 1
-            });
+            // The VTA consecutive is created by the installation itself.
             await context.SaveChangesAsync();
             version = row.Version;
         }

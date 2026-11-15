@@ -12,7 +12,7 @@ Este corte usa las tablas oficiales `ventas.cambio_venta`, `detalle_cambio_venta
 
 El plazo inicial es 15 días. `GET/PUT /api/sales/change-policy` requiere `CONFIGURATION.MANAGE` efectivo. El `PUT` recibe `{ "days": 20, "expectedVersion": 1 }`, exige días positivos, verifica la versión oficial de `Establecimiento` y audita el cambio. La política se aplica cuando se crea cada venta; su `changeDeadline` histórico no se recalcula al modificar el plazo. La fecha local del establecimiento se compara de forma inclusiva con ese límite. No se altera una venta anterior por cambiar la política.
 
-El Administrador configura una vez el consecutivo explícito con `POST /api/document-numbering/sale-changes` y `{ "prefix": "CAM", "firstNumber": 1 }`; `GET` consulta la configuración. Requiere `NUMBERING.MANAGE` efectivo y el rol Administrador vigente para crearla. El servidor fija `CAMBIO_VENTA`, instalación y serie. Si falta el consecutivo, confirmar devuelve `409` sin efectos. El número resultante es `CAM-<serie>-<consecutivo>`.
+El consecutivo `CAM` (`CAMBIO_VENTA`) se crea solo al instalar y, si faltara, al confirmar el primer cambio (decisión del 13 de noviembre de 2026); nadie tiene que configurarlo. `GET /api/document-numbering/sale-changes` lo consulta y `POST` con `{ "prefix": "CAM", "firstNumber": 1 }` solo lo repara si faltara (409 si ya existe); requiere `NUMBERING.MANAGE` efectivo y el rol Administrador vigente. El servidor fija `CAMBIO_VENTA`, instalación y serie. El número resultante es `CAM-<serie>-<consecutivo>`.
 
 ## Confirmación
 

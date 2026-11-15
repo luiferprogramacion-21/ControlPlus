@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Numbering;
 using ControlPlus.Application.Numbering.Contracts;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Infrastructure.Persistence;
@@ -87,14 +88,98 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task CreateAndGet_NormalizeVta_PersistLastZero_ExposeNextOne_AndAuditSafely()
+    public async Task Setup_CreatesSalesNumberingAutomatically_AndGetExposesItWithoutAudit()
     {
         using var client = CreateClient();
         var admin = await SetupAndLoginAsync(client);
         SetBearer(client, admin.AccessToken);
 
-        Assert.Equal(HttpStatusCode.NotFound,
-            (await client.GetAsync("/api/document-numbering/sales")).StatusCode);
+        var getResponse = await client.GetAsync("/api/document-numbering/sales");
+        Assert.Equal("application/json", getResponse.Content.Headers.ContentType?.MediaType);
+        var queried = await ReadAsync<SalesDocumentNumberingDto>(getResponse, HttpStatusCode.OK);
+        Assert.Equal("VENTA", queried.DocumentType);
+        Assert.Equal("NUMBER1", queried.Series);
+        Assert.Equal("VTA", queried.Prefix);
+        Assert.Equal(0, queried.LastNumber);
+        Assert.Equal(1, queried.NextNumber);
+        Assert.Equal(1, queried.Version);
+        Assert.True(queried.CanCorrect);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var persisted = await context.ConsecutivoDocumento.AsNoTracking()
+            .SingleAsync(x => x.TipoDocumento == "VENTA");
+        Assert.Equal(0, persisted.UltimoNumero);
+        Assert.Equal("VTA", persisted.Prefijo);
+        // The installation creates it by itself: it is not an action of a user, so nothing is audited.
+        Assert.Equal(0, await context.EventoAuditoria.CountAsync(x =>
+            x.Accion == "SALESDOCUMENTNUMBERINGCREATED"));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task Setup_CreatesEveryConsecutiveAndEveryApprovedReasonCatalog()
+    {
+        using var client = CreateClient();
+        _ = await SetupAndLoginAsync(client);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+
+        var sequences = await context.ConsecutivoDocumento.AsNoTracking().ToArrayAsync();
+        Assert.Equal(
+            DocumentNumberingDefaults.All.OrderBy(x => x.DocumentType).Select(x => $"{x.DocumentType}:{x.Prefix}"),
+            sequences.OrderBy(x => x.TipoDocumento).Select(x => $"{x.TipoDocumento}:{x.Prefijo}"));
+        Assert.All(sequences, x =>
+        {
+            Assert.Equal("NUMBER1", x.Serie);
+            Assert.Equal(0, x.UltimoNumero);
+            Assert.Equal(1, x.Version);
+        });
+
+        var expectedReasons = ApprovedReasonCatalogs.All.ToDictionary(x => x.OperationType, x => x.Entries.Length);
+        expectedReasons["AJUSTE_INVENTARIO"] = 4;
+        var reasons = await context.MotivoOperacion.AsNoTracking().GroupBy(x => x.TipoOperacion)
+            .Select(x => new { x.Key, Count = x.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count);
+        Assert.Equal(expectedReasons.OrderBy(x => x.Key), reasons.OrderBy(x => x.Key));
+        Assert.Empty(await context.MotivoOperacion.AsNoTracking().Where(x => !x.Activo).ToArrayAsync());
+
+        Assert.Equal(0, await context.EventoAuditoria.CountAsync(x => x.Accion.Contains("NUMBERINGCREATED")));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task Get_CreatesAMissingConsecutiveTheFirstTimeItIsRead_WithoutAudit()
+    {
+        using var client = CreateClient();
+        var admin = await SetupAndLoginAsync(client);
+        SetBearer(client, admin.AccessToken);
+        await RemoveSalesNumberingAsync();
+
+        var first = await GetSalesNumberingAsync(client);
+        var second = await GetSalesNumberingAsync(client);
+
+        Assert.Equal("VTA", first.Prefix);
+        Assert.Equal(0, first.LastNumber);
+        Assert.Equal(1, first.NextNumber);
+        Assert.Equal(1, first.Version);
+        Assert.Equal(first, second);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(1, await context.ConsecutivoDocumento.CountAsync(x => x.TipoDocumento == "VENTA"));
+        Assert.Equal(0, await context.EventoAuditoria.CountAsync(x =>
+            x.Accion == "SALESDOCUMENTNUMBERINGCREATED"));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task Create_RepairsAMissingNumbering_NormalizesVta_PersistLastZero_AndAuditsSafely()
+    {
+        using var client = CreateClient();
+        var admin = await SetupAndLoginAsync(client);
+        SetBearer(client, admin.AccessToken);
+        await RemoveSalesNumberingAsync();
+
         var created = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
             "/api/document-numbering/sales",
             new CreateSalesDocumentNumberingRequest(" vta ", 1)), HttpStatusCode.Created);
@@ -105,15 +190,17 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
         Assert.Equal(0, created.LastNumber);
         Assert.Equal(1, created.NextNumber);
         Assert.Equal(1, created.Version);
-
-        var getResponse = await client.GetAsync("/api/document-numbering/sales");
-        Assert.Equal("application/json", getResponse.Content.Headers.ContentType?.MediaType);
-        var queried = await ReadAsync<SalesDocumentNumberingDto>(getResponse, HttpStatusCode.OK);
-        Assert.Equal(created, queried);
+        Assert.True(created.CanCorrect);
+        Assert.Equal(created, await GetSalesNumberingAsync(client));
+        // Once it exists, the explicit creation is a conflict.
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(
+            "/api/document-numbering/sales",
+            new CreateSalesDocumentNumberingRequest("VTA", 1))).StatusCode);
 
         await using var scope = _factory!.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
-        var persisted = await context.ConsecutivoDocumento.AsNoTracking().SingleAsync();
+        var persisted = await context.ConsecutivoDocumento.AsNoTracking()
+            .SingleAsync(x => x.TipoDocumento == "VENTA");
         Assert.Equal(0, persisted.UltimoNumero);
         Assert.Equal("VTA", persisted.Prefijo);
         var audit = await context.EventoAuditoria.AsNoTracking().SingleAsync(x =>
@@ -149,6 +236,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
         using var client = CreateClient();
         var admin = await SetupAndLoginAsync(client);
         SetBearer(client, admin.AccessToken);
+        await RemoveSalesNumberingAsync();
 
         var created = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
             "/api/document-numbering/sales",
@@ -168,6 +256,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
         var admin = await SetupAndLoginAsync(firstClient);
         SetBearer(firstClient, admin.AccessToken);
         SetBearer(secondClient, admin.AccessToken);
+        await RemoveSalesNumberingAsync();
 
         var responses = await Task.WhenAll(
             firstClient.PostAsJsonAsync("/api/document-numbering/sales",
@@ -183,7 +272,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
 
         await using var scope = _factory!.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
-        Assert.Equal(1, await context.ConsecutivoDocumento.CountAsync());
+        Assert.Equal(1, await context.ConsecutivoDocumento.CountAsync(x => x.TipoDocumento == "VENTA"));
         Assert.Equal(1, await context.EventoAuditoria.CountAsync(x =>
             x.Accion == "SALESDOCUMENTNUMBERINGCREATED"));
     }
@@ -199,9 +288,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
         SetBearer(setupClient, admin.AccessToken);
         SetBearer(firstClient, admin.AccessToken);
         SetBearer(secondClient, admin.AccessToken);
-        var created = await ReadAsync<SalesDocumentNumberingDto>(await setupClient.PostAsJsonAsync(
-            "/api/document-numbering/sales",
-            new CreateSalesDocumentNumberingRequest("VTA", 1)), HttpStatusCode.Created);
+        var created = await GetSalesNumberingAsync(setupClient);
 
         await using var blocker = new NpgsqlConnection(_postgres.GetConnectionString());
         await blocker.OpenAsync();
@@ -246,9 +333,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
             (await client.GetAsync("/api/document-numbering/sales")).StatusCode);
 
         SetBearer(client, admin.AccessToken);
-        var created = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/sales",
-            new CreateSalesDocumentNumberingRequest("VTA", 1)), HttpStatusCode.Created);
+        var created = await GetSalesNumberingAsync(client);
         var users = await ReadAsync<PagedResult<UserDto>>(
             await client.GetAsync("/api/users?page=1&pageSize=100"), HttpStatusCode.OK);
         var administratorId = users.Items.Single(x => x.UserName == AdminUser).Id;
@@ -276,9 +361,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
         using var client = CreateClient();
         var admin = await SetupAndLoginAsync(client);
         SetBearer(client, admin.AccessToken);
-        var created = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/sales",
-            new CreateSalesDocumentNumberingRequest("VTA", 1)), HttpStatusCode.Created);
+        var created = await GetSalesNumberingAsync(client);
 
         var updated = await ReadAsync<SalesDocumentNumberingDto>(await client.PutAsJsonAsync(
             "/api/document-numbering/sales",
@@ -287,6 +370,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
         Assert.Equal(9, updated.LastNumber);
         Assert.Equal(10, updated.NextNumber);
         Assert.Equal(2, updated.Version);
+        Assert.True(updated.CanCorrect);
 
         Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync(
             "/api/document-numbering/sales",
@@ -312,9 +396,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
         using var client = CreateClient();
         var admin = await SetupAndLoginAsync(client);
         SetBearer(client, admin.AccessToken);
-        var created = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/sales",
-            new CreateSalesDocumentNumberingRequest("VTA", 1)), HttpStatusCode.Created);
+        var created = await GetSalesNumberingAsync(client);
 
         var boundary = await ReadAsync<SalesDocumentNumberingDto>(await client.PutAsJsonAsync(
             "/api/document-numbering/sales",
@@ -368,9 +450,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
             Assert.Equal(createBefore, await CaptureNumberingStateAsync());
         }
 
-        var created = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/sales",
-            new CreateSalesDocumentNumberingRequest("VTA", 1)), HttpStatusCode.Created);
+        var created = await GetSalesNumberingAsync(client);
         var updateBefore = await CaptureNumberingStateAsync();
         var forbiddenUpdateFields = new Dictionary<string, object?>
         {
@@ -402,9 +482,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
         using var client = CreateClient();
         var admin = await SetupAndLoginAsync(client);
         SetBearer(client, admin.AccessToken);
-        var created = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/sales",
-            new CreateSalesDocumentNumberingRequest("VTA", 1)), HttpStatusCode.Created);
+        var created = await GetSalesNumberingAsync(client);
         var before = await CaptureNumberingStateAsync();
         await InstallDeferredNumberingUpdateFailureAsync();
 
@@ -421,16 +499,31 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
     {
         await using var scope = _factory!.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
-        var numbering = await context.ConsecutivoDocumento.AsNoTracking().SingleOrDefaultAsync();
+        var numbering = await context.ConsecutivoDocumento.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.TipoDocumento == "VENTA");
         return new NumberingPersistenceState(
             numbering?.Prefijo,
             numbering?.UltimoNumero,
             numbering?.Version,
-            await context.ConsecutivoDocumento.CountAsync(),
+            await context.ConsecutivoDocumento.CountAsync(x => x.TipoDocumento == "VENTA"),
             await context.EventoAuditoria.CountAsync(),
             await context.EventoAuditoria.CountAsync(x =>
                 x.Accion == "SALESDOCUMENTNUMBERINGUPDATED"));
     }
+
+    /// <summary>Simulates an installation created before the consecutives were automatic.</summary>
+    private async Task RemoveSalesNumberingAsync()
+    {
+        await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM configuracion.consecutivo_documento WHERE tipo_documento = 'VENTA'", connection);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
+    private static async Task<SalesDocumentNumberingDto> GetSalesNumberingAsync(HttpClient client) =>
+        await ReadAsync<SalesDocumentNumberingDto>(
+            await client.GetAsync("/api/document-numbering/sales"), HttpStatusCode.OK);
 
     private static async Task LockActiveInstallationAsync(
         NpgsqlConnection connection,

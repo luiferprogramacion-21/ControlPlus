@@ -156,7 +156,7 @@ La reserva incrementa `producto.stock_reservado` y crea un `RESERVA_APARTADO` po
 
 ## Numeración explícita
 
-`GET/POST /api/document-numbering/layaways` consulta o inicializa `APARTADO` con prefijo fijo `APT`. `GET/POST /api/document-numbering/layaway-payments` hace lo mismo para `PAGO_APARTADO` con prefijo `PAP`. La inicialización exige `firstNumber: 1`, Administrador vigente y `NUMBERING.MANAGE` efectivo; es explícita, auditada y de una sola ejecución por tipo, instalación y serie. Si falta cualquiera de los consecutivos, la creación responde `409` sin escribir. No se inicializan al arrancar ni se necesitan migraciones para este corte.
+Los consecutivos `APARTADO` (prefijo fijo `APT`) y `PAGO_APARTADO` (`PAP`) se crean solos al instalar y, si faltaran, al crear el primer apartado o registrar el primer pago (decisión del 13 de noviembre de 2026). `GET /api/document-numbering/layaways` y `/layaway-payments` los consultan; `POST` solo los repara si faltaran: exige `firstNumber: 1`, Administrador vigente y `NUMBERING.MANAGE` efectivo, es auditada y responde `409` si ya existen. No se necesitan migraciones.
 
 ## Límites
 

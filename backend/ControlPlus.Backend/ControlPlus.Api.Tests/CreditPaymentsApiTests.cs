@@ -243,18 +243,38 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
     }
 
     [Fact, Trait("Category", "Integration")]
-    public async Task MissingAndExhaustedAboNumbering_RejectWithoutFinancialEffects()
+    public async Task MissingAboNumbering_IsCreatedOnTheFirstPayment_WithoutAnyConfiguration()
     {
         using var client = CreateClient();
-        var setup = await BootstrapAsync(client, configureAbo: false);
+        var setup = await BootstrapAsync(client);
         var creditId = (await CreateCreditAsync(client, setup, "credit-missing-abo-sale")).CreditId!.Value;
-        var before = await SnapshotAsync(creditId, setup.ProductId);
-        await AssertProblemAsync(await PayAsync(client, creditId, "missing-abo-payment",
-            new ApplyCreditPaymentRequest(1, [new("EFECTIVO", 100m, 100m, null)])), HttpStatusCode.Conflict);
-        Assert.Equal(before, await SnapshotAsync(creditId, setup.ProductId));
+        // An installation created before the consecutives were automatic has no ABO row.
+        await RemoveAboNumberingAsync();
+        Assert.Null((await SnapshotAsync(creditId, setup.ProductId)).LastAbo);
 
-        await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync("/api/document-numbering/credit-payments",
-            new CreateSalesDocumentNumberingRequest("ABO", long.MaxValue)), HttpStatusCode.Created);
+        var payment = await ReadAsync<CreditPaymentOperationDto>(await PayAsync(client, creditId, "missing-abo-payment",
+            new ApplyCreditPaymentRequest(1, [new("EFECTIVO", 100m, 100m, null)])), HttpStatusCode.Created);
+
+        Assert.EndsWith("-1", Assert.Single(payment.Payments).Number, StringComparison.Ordinal);
+        Assert.StartsWith("ABO-", Assert.Single(payment.Payments).Number, StringComparison.Ordinal);
+        Assert.Equal(1L, (await SnapshotAsync(creditId, setup.ProductId)).LastAbo);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var row = await db.ConsecutivoDocumento.AsNoTracking().SingleAsync(x => x.TipoDocumento == "PAGO_CREDITO");
+        Assert.Equal("ABO", row.Prefijo);
+        Assert.Equal("CRD1", row.Serie);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task ExhaustedAboNumbering_RejectsWithoutFinancialEffects()
+    {
+        using var client = CreateClient();
+        var setup = await BootstrapAsync(client);
+        var creditId = (await CreateCreditAsync(client, setup, "credit-exhausted-abo-sale")).CreditId!.Value;
+        var current = await ReadAsync<SalesDocumentNumberingDto>(await client.GetAsync(
+            "/api/document-numbering/credit-payments"), HttpStatusCode.OK);
+        await ReadAsync<SalesDocumentNumberingDto>(await client.PutAsJsonAsync("/api/document-numbering/credit-payments",
+            new UpdateSalesDocumentNumberingRequest("ABO", long.MaxValue, current.Version)), HttpStatusCode.OK);
         var last = await ReadAsync<CreditPaymentOperationDto>(await PayAsync(client, creditId, "last-abo-payment",
             new ApplyCreditPaymentRequest(1, [new("EFECTIVO", 100m, 100m, null)])), HttpStatusCode.Created);
         Assert.EndsWith($"-{long.MaxValue}", Assert.Single(last.Payments).Number, StringComparison.Ordinal);
@@ -283,8 +303,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
     public async Task AboNumbering_IsServerOwnedStrictVersionedAndUneditableAfterFirstPayment()
     {
         using var client = CreateClient();
-        var setup = await BootstrapAsync(client, configureAbo: false);
-        await AssertProblemAsync(await client.GetAsync("/api/document-numbering/credit-payments"), HttpStatusCode.NotFound);
+        var setup = await BootstrapAsync(client);
         foreach (var invalid in new[]
                  {
                      new CreateSalesDocumentNumberingRequest("VTA", 1),
@@ -293,16 +312,16 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
                  })
             await AssertProblemAsync(await client.PostAsJsonAsync("/api/document-numbering/credit-payments", invalid),
                 HttpStatusCode.BadRequest);
-        var created = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/credit-payments", new CreateSalesDocumentNumberingRequest(" abo ", 1)),
-            HttpStatusCode.Created);
+        // The installation created it by itself: ABO, starting at 1, ready to be adjusted before any payment.
+        var created = await ReadAsync<SalesDocumentNumberingDto>(
+            await client.GetAsync("/api/document-numbering/credit-payments"), HttpStatusCode.OK);
         Assert.Equal("PAGO_CREDITO", created.DocumentType);
         Assert.Equal("CRD1", created.Series);
         Assert.Equal("ABO", created.Prefix);
         Assert.Equal(0, created.LastNumber);
         Assert.Equal(1, created.NextNumber);
-        Assert.Equal(created, await ReadAsync<SalesDocumentNumberingDto>(
-            await client.GetAsync("/api/document-numbering/credit-payments"), HttpStatusCode.OK));
+        Assert.Equal(1, created.Version);
+        Assert.True(created.CanCorrect);
         await AssertProblemAsync(await client.PostAsJsonAsync("/api/document-numbering/credit-payments",
             new CreateSalesDocumentNumberingRequest("ABO", 1)), HttpStatusCode.Conflict);
 
@@ -312,6 +331,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         Assert.Equal(4, corrected.LastNumber);
         Assert.Equal(5, corrected.NextNumber);
         Assert.Equal(2, corrected.Version);
+        Assert.True(corrected.CanCorrect);
         await AssertProblemAsync(await client.PutAsJsonAsync("/api/document-numbering/credit-payments",
             new UpdateSalesDocumentNumberingRequest("ABO", 1, created.Version)), HttpStatusCode.Conflict);
         await AssertProblemAsync(await client.PutAsJsonAsync("/api/document-numbering/credit-payments",
@@ -322,6 +342,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
             new ApplyCreditPaymentRequest(1, [new("EFECTIVO", 100m, 100m, null)])), HttpStatusCode.Created);
         var afterPayment = await ReadAsync<SalesDocumentNumberingDto>(await client.GetAsync(
             "/api/document-numbering/credit-payments"), HttpStatusCode.OK);
+        Assert.False(afterPayment.CanCorrect);
         await AssertProblemAsync(await client.PutAsJsonAsync("/api/document-numbering/credit-payments",
             new UpdateSalesDocumentNumberingRequest("ABO", 1, afterPayment.Version)), HttpStatusCode.Conflict);
         var persisted = await ReadAsync<SalesDocumentNumberingDto>(await client.GetAsync(
@@ -330,19 +351,40 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
     }
 
     [Fact, Trait("Category", "Integration")]
+    public async Task AboNumbering_ExplicitCreation_RepairsAMissingConsecutive()
+    {
+        using var client = CreateClient();
+        _ = await BootstrapAsync(client);
+        await RemoveAboNumberingAsync();
+
+        var created = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
+            "/api/document-numbering/credit-payments", new CreateSalesDocumentNumberingRequest(" abo ", 1)),
+            HttpStatusCode.Created);
+
+        Assert.Equal("PAGO_CREDITO", created.DocumentType);
+        Assert.Equal("ABO", created.Prefix);
+        Assert.Equal(0, created.LastNumber);
+        Assert.Equal(1, created.NextNumber);
+        Assert.True(created.CanCorrect);
+        Assert.Equal(created, await ReadAsync<SalesDocumentNumberingDto>(
+            await client.GetAsync("/api/document-numbering/credit-payments"), HttpStatusCode.OK));
+        await AssertProblemAsync(await client.PostAsJsonAsync("/api/document-numbering/credit-payments",
+            new CreateSalesDocumentNumberingRequest("ABO", 1)), HttpStatusCode.Conflict);
+    }
+
+    [Fact, Trait("Category", "Integration")]
     public async Task AboNumbering_RejectsInternalJsonFieldsAndHonorsIndividualRevocation()
     {
         using var client = CreateClient();
-        var setup = await BootstrapAsync(client, configureAbo: false);
+        var setup = await BootstrapAsync(client);
         foreach (var field in new[] { "installationId", "series", "documentType", "lastNumber", "version", "unknownRoot" })
         {
             await AssertProblemAsync(await RawJsonAsync(client, HttpMethod.Post,
                 "/api/document-numbering/credit-payments", new Dictionary<string, object?>
                 { ["prefix"] = "ABO", ["firstNumber"] = 1, [field] = "client-value" }), HttpStatusCode.BadRequest);
         }
-        var created = await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-            "/api/document-numbering/credit-payments", new CreateSalesDocumentNumberingRequest("ABO", 1)),
-            HttpStatusCode.Created);
+        var created = await ReadAsync<SalesDocumentNumberingDto>(
+            await client.GetAsync("/api/document-numbering/credit-payments"), HttpStatusCode.OK);
         foreach (var field in new[] { "installationId", "series", "documentType", "lastNumber", "persistedVersion", "unknownRoot" })
         {
             await AssertProblemAsync(await RawJsonAsync(client, HttpMethod.Put,
@@ -695,7 +737,17 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         Assert.Equal(expected.Sum(x => x.ExpectedAmount), entries.Sum(x => x.Amount));
     }
 
-    private async Task<Setup> BootstrapAsync(HttpClient client, bool configureAbo = true, bool shared = false)
+    /// <summary>Simulates an installation created before the consecutives were automatic.</summary>
+    private async Task RemoveAboNumberingAsync()
+    {
+        await using var connection = new NpgsqlConnection(_postgres.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM configuracion.consecutivo_documento WHERE tipo_documento = 'PAGO_CREDITO'", connection);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
+    private async Task<Setup> BootstrapAsync(HttpClient client, bool shared = false)
     {
         using var setupRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/setup")
         {
@@ -736,12 +788,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
             row.CostoPromedio = 500m;
             await db.SaveChangesAsync();
         }
-        await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync("/api/document-numbering/sales",
-            new CreateSalesDocumentNumberingRequest("VTA", 1)), HttpStatusCode.Created);
-        if (configureAbo)
-            await ReadAsync<SalesDocumentNumberingDto>(await client.PostAsJsonAsync(
-                "/api/document-numbering/credit-payments", new CreateSalesDocumentNumberingRequest("ABO", 1)),
-                HttpStatusCode.Created);
+        // The consecutives (VTA, ABO…) are created by the installation itself.
         await ReadAsync<CashRegisterDto>(await client.PostAsJsonAsync("/api/cash/register",
             new ConfigureCashRegisterRequest("CREDIT-CASH", "Caja ficticia de Créditos")), HttpStatusCode.Created);
         if (shared)

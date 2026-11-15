@@ -1,5 +1,6 @@
 using System.Data;
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Numbering;
 using ControlPlus.Application.Sales.Contracts;
 using ControlPlus.Application.Sales.Ports;
 using ControlPlus.Domain.OfficialModel;
@@ -106,6 +107,9 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
         string series,
         CancellationToken cancellationToken = default)
     {
+        // Issuing a sale is the first use: the consecutive is created here when it does not exist yet.
+        await DocumentSequenceProvisioner.EnsureAsync(
+            dbContext, installationId, series, DocumentNumberingDefaults.Sales, cancellationToken);
         var rows = await dbContext.ConsecutivoDocumento.FromSqlInterpolated(
             $"""
              SELECT c.*
@@ -285,6 +289,9 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
     public async Task<ConsecutivoDocumento?> GetChangeSequenceForUpdateAsync(Guid installationId,
         string series, CancellationToken cancellationToken = default)
     {
+        // Confirming the first change is the first use: the consecutive is created here when it does not exist.
+        await DocumentSequenceProvisioner.EnsureAsync(
+            dbContext, installationId, series, DocumentNumberingDefaults.SaleChanges, cancellationToken);
         var rows = await dbContext.ConsecutivoDocumento.FromSqlInterpolated($"""
             SELECT c.* FROM configuracion.consecutivo_documento AS c
             WHERE c.instalacion_id = {installationId}

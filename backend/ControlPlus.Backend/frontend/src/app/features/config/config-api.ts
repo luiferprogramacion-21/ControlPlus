@@ -2,24 +2,27 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
-export interface Numbering { documentType: string; series: string; prefix: string; lastNumber: number; nextNumber: number; version: number; }
+export interface Numbering { documentType?: string; series: string; prefix: string; lastNumber: number; nextNumber: number; version: number; canCorrect?: boolean; }
 
 /** A document type that has its own visible numbering. */
 export interface NumberingKind {
   key: string; label: string; path: string; defaultPrefix: string;
+  /** Exceptional endpoints used by document types whose numbering is initialized by their own module. */
+  endpoint?: string; initializeEndpoint?: string;
   /** The server fixes the prefix of every type except sales. */
   fixedPrefix: boolean;
   /** Types with PUT can be corrected until their first document exists. */
-  canEdit: boolean; editNote: string; sample: string;
+  canEdit: boolean; editNote: string;
 }
 
 export const NUMBERING_KINDS: NumberingKind[] = [
-  { key: 'sales', label: 'Ventas', path: 'sales', defaultPrefix: 'VTA', fixedPrefix: false, canEdit: true, editNote: 'Se puede corregir hasta confirmar la primera venta.', sample: 'VTA-001-000001' },
-  { key: 'credit-payments', label: 'Abonos de crédito', path: 'credit-payments', defaultPrefix: 'ABO', fixedPrefix: true, canEdit: true, editNote: 'Se puede corregir hasta registrar el primer abono.', sample: 'ABO-001-000001' },
-  { key: 'layaways', label: 'Apartados', path: 'layaways', defaultPrefix: 'APT', fixedPrefix: true, canEdit: false, editNote: 'Una vez creado, no se puede modificar.', sample: 'APT-001-000001' },
-  { key: 'layaway-payments', label: 'Abonos de apartado', path: 'layaway-payments', defaultPrefix: 'PAP', fixedPrefix: true, canEdit: false, editNote: 'Una vez creado, no se puede modificar.', sample: 'PAP-001-000001' },
-  { key: 'purchases', label: 'Compras', path: 'purchases', defaultPrefix: 'CMP', fixedPrefix: true, canEdit: true, editNote: 'Se puede corregir hasta confirmar la primera compra.', sample: 'CMP-001-000001' },
-  { key: 'sale-changes', label: 'Cambios de venta', path: 'sale-changes', defaultPrefix: 'CAM', fixedPrefix: true, canEdit: false, editNote: 'Una vez creado, no se puede modificar. Sin este consecutivo no se pueden registrar cambios de productos.', sample: 'CAM-001-000001' },
+  { key: 'sales', label: 'Ventas', path: 'sales', defaultPrefix: 'VTA', fixedPrefix: false, canEdit: true, editNote: 'Solo se puede cambiar antes de confirmar la primera venta.' },
+  { key: 'credit-payments', label: 'Abonos de crédito', path: 'credit-payments', defaultPrefix: 'ABO', fixedPrefix: true, canEdit: true, editNote: 'Solo se puede ajustar el próximo número antes del primer abono.' },
+  { key: 'layaways', label: 'Apartados', path: 'layaways', defaultPrefix: 'APT', fixedPrefix: true, canEdit: false, editNote: 'Una vez creado, no se puede modificar.' },
+  { key: 'layaway-payments', label: 'Abonos de apartado', path: 'layaway-payments', defaultPrefix: 'PAP', fixedPrefix: true, canEdit: false, editNote: 'Una vez creado, no se puede modificar.' },
+  { key: 'purchases', label: 'Compras', path: 'purchases', defaultPrefix: 'CMP', fixedPrefix: true, canEdit: true, editNote: 'Solo se puede ajustar el próximo número antes de la primera compra confirmada.' },
+  { key: 'purchase-orders', label: 'Pedidos de compra', path: 'purchase-orders', endpoint: '/api/purchase-orders/numbering', initializeEndpoint: '/api/purchase-orders/numbering/initialize', defaultPrefix: 'PED', fixedPrefix: true, canEdit: false, editNote: 'Empieza en 1 y, una vez creado, no se puede modificar.' },
+  { key: 'sale-changes', label: 'Cambios de venta', path: 'sale-changes', defaultPrefix: 'CAM', fixedPrefix: true, canEdit: false, editNote: 'Una vez creado, no se puede modificar. Sin este consecutivo no se pueden registrar cambios de productos.' },
 ];
 
 export interface ChangePolicy { days: number; version: number; }
@@ -44,7 +47,7 @@ export const REASON_GROUPS: ReasonGroup[] = [
 @Injectable({ providedIn: 'root' })
 export class ConfigApi {
   private readonly http = inject(HttpClient);
-  private url(kind: NumberingKind): string { return `/api/document-numbering/${kind.path}`; }
+  private url(kind: NumberingKind): string { return kind.endpoint ?? `/api/document-numbering/${kind.path}`; }
 
   /** Resolves null when the numbering has not been configured yet (the server answers 404). */
   async numbering(kind: NumberingKind): Promise<Numbering | null> {
@@ -52,6 +55,7 @@ export class ConfigApi {
     catch (error) { if (error instanceof HttpErrorResponse && error.status === 404) return null; throw error; }
   }
   createNumbering(kind: NumberingKind, prefix: string, firstNumber: number): Promise<Numbering> {
+    if (kind.initializeEndpoint) return firstValueFrom(this.http.post<Numbering>(kind.initializeEndpoint, null));
     return firstValueFrom(this.http.post<Numbering>(this.url(kind), { prefix, firstNumber }));
   }
   updateNumbering(kind: NumberingKind, prefix: string, firstNumber: number, version: number): Promise<Numbering> {

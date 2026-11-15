@@ -13,8 +13,8 @@ describe('ConfigApi', () => {
   afterEach(() => http.verify());
 
   it('cada tipo de documento usa su ruta y los prefijos fijos son los aprobados', () => {
-    expect(NUMBERING_KINDS.map(k => k.path)).toEqual(['sales', 'credit-payments', 'layaways', 'layaway-payments', 'purchases', 'sale-changes']);
-    expect(NUMBERING_KINDS.filter(k => k.fixedPrefix).map(k => k.defaultPrefix)).toEqual(['ABO', 'APT', 'PAP', 'CMP', 'CAM']);
+    expect(NUMBERING_KINDS.map(k => k.path)).toEqual(['sales', 'credit-payments', 'layaways', 'layaway-payments', 'purchases', 'purchase-orders', 'sale-changes']);
+    expect(NUMBERING_KINDS.filter(k => k.fixedPrefix).map(k => k.defaultPrefix)).toEqual(['ABO', 'APT', 'PAP', 'CMP', 'PED', 'CAM']);
     expect(kind('sales').fixedPrefix).toBe(false);
   });
 
@@ -39,6 +39,19 @@ describe('ConfigApi', () => {
     const put = http.expectOne('/api/document-numbering/purchases');
     expect([put.request.method, put.request.body]).toEqual(['PUT', { prefix: 'CMP', firstNumber: 5, version: 3 }]); put.flush({});
     await updated;
+  });
+
+  it('consulta e inicializa PED con las rutas propias de pedidos y sin cuerpo configurable', async () => {
+    const purchaseOrders = kind('purchase-orders');
+    const read = api.numbering(purchaseOrders);
+    http.expectOne('/api/purchase-orders/numbering').flush({ prefix: 'PED', series: '001', lastNumber: 0, nextNumber: 1, version: 1 });
+    expect((await read)?.prefix).toBe('PED');
+
+    const created = api.createNumbering(purchaseOrders, 'PED', 1);
+    const post = http.expectOne('/api/purchase-orders/numbering/initialize');
+    expect([post.request.method, post.request.body]).toEqual(['POST', null]);
+    post.flush({ prefix: 'PED', series: '001', lastNumber: 0, nextNumber: 1, version: 1 });
+    expect((await created).nextNumber).toBe(1);
   });
 
   it('los créditos leen y guardan el plazo predeterminado (o nulo) con la versión esperada', async () => {

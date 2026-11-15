@@ -9,7 +9,7 @@ public sealed partial class DocumentNumberingService
 {
     public Task<Result<SalesDocumentNumberingDto>> GetSaleChangesAsync(
         ActorContext actor, CancellationToken cancellationToken = default) =>
-        GetLayawayNumberingAsync(actor, "cambios de venta",
+        GetLayawayNumberingAsync(actor, "cambios de venta", DocumentNumberingDefaults.SaleChanges,
             repository.GetSaleChangeNumberingAsync, cancellationToken);
 
     public Task<Result<SalesDocumentNumberingDto>> CreateSaleChangesAsync(

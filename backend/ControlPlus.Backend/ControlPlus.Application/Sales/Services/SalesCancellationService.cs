@@ -15,11 +15,7 @@ namespace ControlPlus.Application.Sales.Services;
 public sealed partial class SalesService
 {
     private static readonly (string Code, string Name)[] SaleCancellationCatalog =
-    [
-        ("ERROR_REGISTRO", "Error de registro"),
-        ("SOLICITUD_CLIENTE", "Solicitud del cliente"),
-        ("OTRO", "Otro")
-    ];
+        ApprovedReasonCatalogs.SaleCancellation;
 
     public async Task<Result<IReadOnlyCollection<SaleCancellationReasonDto>>> ListCancellationReasonsAsync(
         ActorContext actor, CancellationToken cancellationToken = default)
@@ -31,18 +27,33 @@ public sealed partial class SalesService
             return Result.Failure<IReadOnlyCollection<SaleCancellationReasonDto>>(ApplicationError.NotFound("la instalación activa"));
         var reasons = await repository.GetCancellationReasonsAsync(installation.EstablecimientoId,
             "ANULACION_VENTA", cancellationToken);
+        var paymentReasons = await repository.GetCancellationReasonsAsync(installation.EstablecimientoId,
+            "ANULACION_PAGO", cancellationToken);
+        if (SaleCancellationCatalog.Any(c => !reasons.Any(r => r.Codigo == c.Code) ||
+                                             !paymentReasons.Any(r => r.Codigo == c.Code)))
+        {
+            // First use: the approved reasons that do not exist yet are created automatically. If the catalog
+            // cannot be completed (an incompatible code), the existing approved reasons are listed as before.
+            var completed = await InitializeCancellationReasonsCoreAsync(actor, requireVoidPermission: false,
+                cancellationToken);
+            if (completed.IsSuccess) return completed;
+        }
         return Result.Success<IReadOnlyCollection<SaleCancellationReasonDto>>(reasons
             .Where(IsApprovedSaleReason).Select(ToCancellationReason).ToArray());
     }
 
-    public async Task<Result<IReadOnlyCollection<SaleCancellationReasonDto>>> InitializeCancellationReasonsAsync(
-        ActorContext actor, CancellationToken cancellationToken = default)
+    public Task<Result<IReadOnlyCollection<SaleCancellationReasonDto>>> InitializeCancellationReasonsAsync(
+        ActorContext actor, CancellationToken cancellationToken = default) =>
+        InitializeCancellationReasonsCoreAsync(actor, requireVoidPermission: true, cancellationToken);
+
+    private async Task<Result<IReadOnlyCollection<SaleCancellationReasonDto>>> InitializeCancellationReasonsCoreAsync(
+        ActorContext actor, bool requireVoidPermission, CancellationToken cancellationToken)
     {
         await using var transaction = await transactionManager.BeginAsync(cancellationToken: cancellationToken);
         var installation = await repository.GetActiveInstallationForUpdateAsync(cancellationToken);
         if (installation is null)
             return Result.Failure<IReadOnlyCollection<SaleCancellationReasonDto>>(ApplicationError.NotFound("la instalación activa"));
-        if (!await CanVoidAsync(actor.UserId, cancellationToken))
+        if (requireVoidPermission && !await CanVoidAsync(actor.UserId, cancellationToken))
             return Result.Failure<IReadOnlyCollection<SaleCancellationReasonDto>>(ApplicationError.Forbidden());
         var existing = await repository.GetCancellationReasonsAsync(installation.EstablecimientoId,
             "ANULACION_VENTA", cancellationToken);
