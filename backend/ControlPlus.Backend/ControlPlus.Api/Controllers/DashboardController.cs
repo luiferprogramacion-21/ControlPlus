@@ -10,7 +10,10 @@ namespace ControlPlus.Api.Controllers;
 public sealed class DashboardController(CurrentActorContextResolver actorContextResolver,
     IDashboardSummaryService service) : ApiControllerBase(actorContextResolver)
 {
-    /// <summary>Resumen de ventas y flujo de Caja para la fecha operativa del establecimiento activo.</summary>
+    /// <summary>
+    /// Resumen de la fecha operativa del establecimiento activo: ventas, flujo de Caja, comparación con el mismo lapso
+    /// de ayer, efectivo esperado del turno abierto, alertas operativas, ventas por hora y actividad reciente.
+    /// </summary>
     [HttpGet("summary")]
     [PermissionAuthorize(PermissionCodes.FinancialReportsRead)]
     [ProducesResponseType<DashboardSummary>(StatusCodes.Status200OK, "application/json")]

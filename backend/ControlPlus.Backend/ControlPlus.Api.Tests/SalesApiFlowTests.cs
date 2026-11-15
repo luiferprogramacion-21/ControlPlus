@@ -250,6 +250,42 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         Assert.Equal(manual.Valor, response.ManualTotal);
         Assert.Equal(payments.Sum(x => x.ValorAplicado) + manual.Valor, response.NetCashFlow);
 
+        // Comparación: ayer no hubo ventas, así que no hay porcentaje que calcular.
+        Assert.Equal(expectedDate.AddDays(-1), response.Comparison.PreviousDate);
+        Assert.Equal(0m, response.Comparison.PreviousTotal);
+        Assert.Null(response.Comparison.PercentChange);
+
+        // Caja actual: el mismo efectivo esperado del arqueo (apertura + cobro en efectivo + ingreso manual);
+        // la parte pagada por transferencia no es efectivo.
+        var cashMethodId = await context.MetodoPago.AsNoTracking()
+            .Where(x => x.Codigo == "EFECTIVO").Select(x => x.Id).SingleAsync();
+        var cashPaid = payments.Where(x => x.MetodoPagoId == cashMethodId).Sum(x => x.ValorAplicado);
+        Assert.NotNull(response.CurrentCash);
+        Assert.Equal(shift.MontoInicial + cashPaid + manual.Valor, response.CurrentCash!.ExpectedCash);
+        Assert.Equal(new DateTimeOffset(DateTime.SpecifyKind(shift.FechaHoraApertura, DateTimeKind.Utc)),
+            response.CurrentCash.OpenedAt);
+
+        // Ventas por hora: la única venta cae en su hora local del establecimiento.
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(installation.Establecimiento.ZonaHoraria);
+        var saleHour = TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.SpecifyKind(persistedSale.FechaHora, DateTimeKind.Utc), zone).Hour;
+        Assert.Equal(persistedSale.Total, response.HourlySales.Sum(x => x.Total));
+        Assert.Equal(1, response.HourlySales.Sum(x => x.Transactions));
+        Assert.Contains(response.HourlySales, x => x.Hour == saleHour && x.Transactions == 1);
+
+        // Actividad reciente: la venta con su número visible, sin cliente.
+        var activity = Assert.Single(response.RecentActivity);
+        Assert.Equal(sale.Id, activity.SaleId);
+        Assert.Equal($"{persistedSale.Prefijo}-{persistedSale.Serie}-{persistedSale.Consecutivo}", activity.Number);
+        Assert.Null(activity.CustomerName);
+        Assert.Equal(persistedSale.Total, activity.Total);
+        Assert.Equal(("CONTADO", "CONFIRMADA"), (activity.SaleType, activity.State));
+
+        // Alertas: el stock bajo se cuenta aparte, en memoria, con el criterio de la vista oficial de reposición.
+        var expectedLowStock = (await context.Producto.AsNoTracking().ToArrayAsync()).Count(p => p.Activo &&
+            (p.StockActual - p.StockReservado == 0 || p.StockActual - p.StockReservado < p.StockMinimo));
+        Assert.Equal(new DashboardAlerts(expectedLowStock, 0, 0, DashboardRules.UpcomingLayawayDays), response.Alerts);
+
         var permissionId = await GetPermissionIdAsync(client, PermissionCodes.FinancialReportsRead);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
             $"/api/users/{scenario.Users.Supervisor.Id}/permissions/{permissionId}",

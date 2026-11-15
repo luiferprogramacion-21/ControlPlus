@@ -33,7 +33,8 @@ public sealed class OpenApiDashboardContractTests
         var fields = document.RootElement.GetProperty("components").GetProperty("schemas")
             .GetProperty("DashboardSummary").GetProperty("properties");
         foreach (var field in new[] { "operatingDate", "cashSales", "creditSales", "totalSales",
-                     "openingBalance", "paymentTotal", "manualTotal", "netCashFlow" })
+                     "openingBalance", "paymentTotal", "manualTotal", "netCashFlow",
+                     "comparison", "currentCash", "alerts", "hourlySales", "recentActivity" })
             Assert.True(fields.TryGetProperty(field, out _), field);
     }
 }
