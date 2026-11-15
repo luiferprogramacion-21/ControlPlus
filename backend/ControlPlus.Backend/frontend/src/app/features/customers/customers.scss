@@ -1,0 +1,14 @@
+.module-form.customer-status-dialog { display: block; width: min(100%, 500px); margin: 0; text-align: left; }
+.customer-status-heading { margin-bottom: 18px; }
+.customer-status-heading h2 { margin: 0 0 4px; font-size: 20px; }
+.customer-status-heading p { margin: 0; color: var(--cp-text-secondary); }
+.customer-status-summary { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border: 1px solid var(--cp-border); border-radius: 10px; background: var(--cp-table-head); }
+.customer-status-summary span { color: var(--cp-text-muted); font-size: 13px; }
+.customer-status-message { margin: 16px 0 0; color: var(--cp-text-secondary); line-height: 1.5; }
+.customer-status-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--cp-border); }
+.customer-status-confirm--danger { border-color: var(--cp-error); background: var(--cp-error); }
+@media (max-width: 520px) {
+  .module-form.customer-status-dialog { padding: 16px; }
+  .customer-status-actions { flex-direction: column-reverse; }
+  .customer-status-actions .button { width: 100%; }
+}

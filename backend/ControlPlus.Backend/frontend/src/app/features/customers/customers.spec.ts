@@ -19,4 +19,12 @@ describe('Customers', () => {
     component.newCustomer(); component.form.fullName = ' Ana '; component.form.address = ' Calle 1 '; component.form.documentType = 'CC'; component.form.documentNumber = ' 123 ';
     await component.save(); expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ fullName: 'Ana', address: 'Calle 1', documentNumber: '123' }));
   });
+  it('pide confirmacion propia antes de inactivar un cliente', async () => {
+    const customer = { id: 'c1', fullName: 'Ana', isActive: true, version: 2 } as never;
+    api.status.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    component.toggle(customer);
+    expect(component.statusTarget()).toBe(customer); expect(api.status).not.toHaveBeenCalled();
+    await component.confirmStatusChange();
+    expect(api.status).toHaveBeenCalledWith(customer); expect(component.statusTarget()).toBeNull(); expect(component.notice()).toContain('inactivado');
+  });
 });

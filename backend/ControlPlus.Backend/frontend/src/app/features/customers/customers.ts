@@ -1,3 +1,4 @@
+import { A11yModule } from '@angular/cdk/a11y';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -7,13 +8,14 @@ import { SessionService } from '../../core/session.service';
 import { Customer, CustomerInput, CustomersApi } from './customers-api';
 import { CustomerHistory } from './customer-history';
 import { Icon } from '../../layout/icon';
-@Component({ selector: 'cp-customers', imports: [FormsModule, MatPaginatorModule, Icon, CustomerHistory], templateUrl: './customers.html', styleUrl: '../directory.scss' })
+@Component({ selector: 'cp-customers', imports: [A11yModule, FormsModule, MatPaginatorModule, Icon, CustomerHistory], templateUrl: './customers.html', styleUrls: ['../directory.scss', './customers.scss'] })
 export class Customers implements OnInit {
   private readonly api = inject(CustomersApi);
   readonly session = inject(SessionService);
   readonly result = signal<Page<Customer> | null>(null);
   readonly selected = signal<Customer | null>(null);
   readonly editing = signal(false);
+  readonly statusTarget = signal<Customer | null>(null);
   /** Customer whose commercial history is open. */
   readonly historyOf = signal<Customer | null>(null);
   get canReadHistory(): boolean { return this.session.has('CUSTOMERS.HISTORY_READ'); }
@@ -57,10 +59,17 @@ export class Customers implements OnInit {
     finally { this.saving.set(false); }
   }
   async refreshSelected(): Promise<void> { const selected = this.selected(); if (!selected) return; try { this.edit(await this.api.get(selected.id)); await this.reload(); } catch (e) { this.error.set(errorText(e)); } }
-  async toggle(customer: Customer): Promise<void> {
-    if (!this.full || this.saving() || !confirm(`${customer.isActive ? 'Inactivar' : 'Activar'} a ${customer.fullName}?`)) return;
+  requestStatusChange(customer: Customer): void {
+    if (!this.full || this.saving()) return;
+    this.error.set(''); this.notice.set(''); this.statusTarget.set(customer);
+  }
+  toggle(customer: Customer): void { this.requestStatusChange(customer); }
+  cancelStatusChange(): void { if (!this.saving()) { this.statusTarget.set(null); this.error.set(''); } }
+  async confirmStatusChange(): Promise<void> {
+    const customer = this.statusTarget();
+    if (!customer || !this.full || this.saving()) return;
     this.saving.set(true); this.error.set(''); this.notice.set('');
-    try { await this.api.status(customer); this.notice.set('Estado actualizado.'); await this.reload(); }
+    try { await this.api.status(customer); this.statusTarget.set(null); this.notice.set(customer.isActive ? 'Cliente inactivado.' : 'Cliente activado.'); await this.reload(); }
     catch (e) { this.error.set(e instanceof HttpErrorResponse && e.status === 409 ? 'El cliente cambió. Actualiza la lista antes de intentar otra vez.' : errorText(e)); }
     finally { this.saving.set(false); }
   }

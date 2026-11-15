@@ -1,6 +1,6 @@
 <section class="module-page directory-page">
   <div class="module-heading"><div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="customers" /></span><div><h2>Clientes</h2></div></div><button class="button button--primary" type="button" (click)="newCustomer()">Nuevo cliente</button></div>
-  @if (error() && !editing()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="reload()">Actualizar</button></div> }
+  @if (error() && !editing() && !statusTarget()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="reload()">Actualizar</button></div> }
   @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
   <section class="panel module-panel">
     <div class="module-toolbar"><h3>Directorio de clientes</h3><form class="directory-filters" (submit)="$event.preventDefault(); find()"><label class="sr-only" for="customers-search">Nombre, documento o teléfono</label><input id="customers-search" class="text-field" name="search" [(ngModel)]="search" placeholder="Nombre, documento o teléfono"><button class="button button--secondary" type="submit">Buscar</button>@if (full) { <label class="sr-only" for="customers-status">Estado</label><select id="customers-status" class="text-field" name="status" [(ngModel)]="status" (ngModelChange)="find()"><option value="active">Activos</option><option value="inactive">Inactivos</option><option value="all">Todos</option></select> }</form></div>
@@ -19,5 +19,17 @@
     @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
     <div class="form-actions"><button class="button button--secondary" type="button" (click)="cancel()">Cancelar</button>@if (selected()) { <button class="button button--secondary" type="button" (click)="refreshSelected()">Actualizar ficha</button> }<button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button></div>
   </form></div> }
+  @if (statusTarget(); as customer) {
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="customer-status-title" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown.escape)="$event.stopPropagation(); cancelStatusChange()">
+      <div class="module-form-sheet__backdrop" (click)="cancelStatusChange()"></div>
+      <section class="panel panel--padded module-form customer-status-dialog">
+        <div class="customer-status-heading"><h2 id="customer-status-title">{{ customer.isActive ? 'Inactivar cliente' : 'Activar cliente' }}</h2><p>Confirma el cambio antes de continuar.</p></div>
+        <div class="customer-status-summary"><strong>{{ customer.fullName }}</strong><span>{{ customer.documentType && customer.documentNumber ? customer.documentType + ' ' + customer.documentNumber : (customer.phone || 'Sin documento ni tel\u00e9fono') }}</span></div>
+        <p class="customer-status-message">{{ customer.isActive ? 'El cliente dejar\u00e1 de aparecer en los listados activos, pero su historial se conservar\u00e1.' : 'El cliente volver\u00e1 a estar disponible en los listados y operaciones.' }}</p>
+        @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+        <div class="customer-status-actions"><button class="button button--secondary" type="button" autofocus [disabled]="saving()" (click)="cancelStatusChange()">Cancelar</button><button class="button button--primary" [class.customer-status-confirm--danger]="customer.isActive" type="button" [disabled]="saving()" (click)="confirmStatusChange()">{{ saving() ? 'Guardando...' : (customer.isActive ? 'Confirmar inactivaci\u00f3n' : 'Confirmar activaci\u00f3n') }}</button></div>
+      </section>
+    </div>
+  }
   @if (historyOf(); as target) { <cp-customer-history [customer]="target" (closed)="historyOf.set(null)" /> }
 </section>
