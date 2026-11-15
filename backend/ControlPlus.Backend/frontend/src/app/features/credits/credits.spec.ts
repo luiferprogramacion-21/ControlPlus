@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { SessionService } from '../../core/session.service';
@@ -8,12 +8,12 @@ import { Credits } from './credits';
 const credit = { id: 'credit-id', saleNumber: 'VTA-1', customerName: 'Ana', adjustedAmount: 10000, balance: 5000, state: 'PENDIENTE', version: 4 } as Credit;
 
 describe('Credits', () => {
-  let component: Credits; let http: HttpTestingController;
+  let component: Credits; let fixture: ComponentFixture<Credits>; let http: HttpTestingController;
   let onRequest: ((url: string) => void) | null;
   beforeEach(async () => {
     onRequest = null;
     await TestBed.configureTestingModule({ imports: [Credits], providers: [provideHttpClient(withInterceptors([(request, next) => { onRequest?.(request.url); return next(request); }])), provideHttpClientTesting(), { provide: SessionService, useValue: { has: (permission: string) => permission === 'CREDIT.MANAGE' } }] }).compileComponents();
-    component = TestBed.createComponent(Credits).componentInstance; http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(Credits); component = fixture.componentInstance; http = TestBed.inject(HttpTestingController);
   });
   afterEach(() => http.verify());
   it('impide abonos superiores al saldo y medios repetidos antes de enviar', () => {
@@ -22,6 +22,16 @@ describe('Credits', () => {
     expect(component.validation()).toContain('supera el saldo');
     component.drafts = [{ methodCode: 'NEQUI', appliedAmount: 2000, receivedAmount: null, reference: 'A' }, { methodCode: 'NEQUI', appliedAmount: 2000, receivedAmount: null, reference: 'B' }];
     expect(component.validation()).toContain('una sola vez');
+  });
+  it('muestra el detalle en una ventana modal y no debajo de la lista', () => {
+    component.selected.set(credit); component.detailOpen.set(true); fixture.detectChanges();
+    http.expectOne(r => r.url === '/api/credits').flush({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    fixture.detectChanges();
+    const modal = fixture.nativeElement.querySelector('[role="dialog"][aria-labelledby="credit-detail-title"]');
+    expect(modal).toBeTruthy(); expect(modal.textContent).toContain('VTA-1');
+    expect(fixture.nativeElement.querySelector('section.credit-detail')).toBeNull();
+    modal.querySelector('.module-form-sheet__backdrop').click(); fixture.detectChanges();
+    expect(component.detailOpen()).toBe(false);
   });
   it('bloquea un segundo envío mientras espera respuesta y usa saldo del servidor', async () => {
     let detailRequested!: () => void;

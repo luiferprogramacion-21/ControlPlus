@@ -5,15 +5,40 @@
 .credit-customer-filter .field-label { width: 100%; }
 .credit-customer-filter .text-field { max-width: 290px; }
 .credit-matches { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-.credit-detail { margin-top: 16px; }
-.credit-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.credit-summary > div { display: flex; flex-direction: column; gap: 4px; }
+.module-form.credits-detail-dialog { display: block; width: min(100%, 720px); margin: 0; text-align: left; }
+.credit-detail-heading { margin-bottom: 18px; }
+.credit-detail-heading h2 { margin: 0 0 4px; font-size: 20px; }
+.credit-detail-heading p { margin: 0; color: var(--cp-text-secondary); }
+.credit-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.credit-summary > div { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 9px; background: var(--cp-table-head); }
 .credit-summary span { color: var(--cp-text-muted); font-size: 12px; }
 .credit-summary strong { font-size: 18px; }
-.credit-detail-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 16px 0; }
+.credits-detail-dialog h3 { margin: 18px 0 8px; }
+.credit-history-list { width: 100%; overflow: hidden; border: 1px solid var(--cp-border); border-radius: 10px; }
+.credit-history-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 20px; padding: 12px 14px; border-bottom: 1px solid var(--cp-border); }
+.credit-history-row:last-child { border-bottom: 0; }
+.credit-history-row__description, .credit-history-row__values { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.credit-history-row__description strong { overflow-wrap: break-word; }
+.credit-history-row__description span, .credit-history-row__values span, .credit-history-row__values small { color: var(--cp-text-muted); font-size: 12px; }
+.credit-history-row__values { align-items: flex-end; text-align: right; }
+.credit-history-empty { margin: 0; padding: 14px; color: var(--cp-text-muted); text-align: center; }
+.credits-detail-dialog mat-paginator { display: block; max-width: 100%; }
+.credit-detail-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--cp-border); }
+.credit-detail-close { margin-left: auto; }
 .credit-payment-row { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--cp-border); }
 .credit-payment-row .table-action { margin-top: 10px; }
 .credit-totals { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; }
 .credit-totals span { display: flex; flex-direction: column; }
 .credit-totals strong { font-size: 22px; }
-@media (max-width: 700px) { .credit-summary { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) {
+  .credit-detail-sheet { padding: 10px; }
+  .module-form.credits-detail-dialog { max-height: calc(100dvh - 20px); padding: 16px; }
+  .credit-detail-actions .button { flex: 1 1 calc(50% - 4px); }
+  .credit-detail-close { margin-left: 0; }
+}
+@media (max-width: 460px) {
+  .credit-summary { grid-template-columns: 1fr; }
+  .credit-history-row { grid-template-columns: 1fr; gap: 8px; }
+  .credit-history-row__values { align-items: flex-start; text-align: left; }
+  .credit-detail-actions .button { flex-basis: 100%; }
+}

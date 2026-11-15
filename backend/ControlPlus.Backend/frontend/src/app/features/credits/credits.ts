@@ -1,3 +1,5 @@
+import { A11yModule } from '@angular/cdk/a11y';
+import { DatePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -11,13 +13,14 @@ import { Credit, CreditPayment, CreditsApi, PaymentMethodInput } from './credits
 type Method = PaymentMethodInput['methodCode'];
 type Draft = { methodCode: Method; appliedAmount: number; receivedAmount: number | null; reference: string; };
 const LIMIT = Number.MAX_SAFE_INTEGER;
-@Component({ selector: 'cp-credits', imports: [FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './credits.html', styleUrls: ['../directory.scss', './credits.scss'] })
+@Component({ selector: 'cp-credits', imports: [A11yModule, DatePipe, FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './credits.html', styleUrls: ['../directory.scss', './credits.scss'] })
 export class Credits implements OnInit {
   private readonly api = inject(CreditsApi);
   private readonly customersApi = inject(CustomersApi);
   readonly session = inject(SessionService);
   readonly result = signal<Page<Credit> | null>(null);
   readonly selected = signal<Credit | null>(null);
+  readonly detailOpen = signal(false);
   readonly history = signal<Page<CreditPayment> | null>(null);
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -62,7 +65,7 @@ export class Credits implements OnInit {
   selectCustomer(customer: Customer): void { this.customerId = customer.id; this.customerLabel.set(customer.fullName); this.customerSearch = customer.fullName; this.customerMatches.set([]); this.find(); }
   clearCustomer(): void { this.customerId = ''; this.customerSearch = ''; this.customerLabel.set(''); this.customerMatches.set([]); this.find(); }
   async open(credit: Credit): Promise<void> {
-    this.selected.set(credit); this.history.set(null); this.historyPage = 1; this.error.set(''); this.notice.set('');
+    this.selected.set(credit); this.detailOpen.set(true); this.history.set(null); this.historyPage = 1; this.error.set(''); this.notice.set('');
     await this.refreshSelected();
   }
   async refreshSelected(): Promise<void> {
@@ -79,7 +82,7 @@ export class Credits implements OnInit {
     catch (e) { this.error.set(errorText(e)); }
   }
   historyChanged(e: PageEvent): void { this.historyPage = e.pageIndex + 1; this.historyPageSize = e.pageSize; void this.loadHistory(); }
-  close(): void { if (this.saving()) return; this.selected.set(null); this.dialog.set(false); this.history.set(null); this.pendingKey = null; }
+  close(): void { if (this.saving()) return; this.selected.set(null); this.detailOpen.set(false); this.dialog.set(false); this.history.set(null); this.pendingKey = null; this.error.set(''); }
   openPayment(credit: Credit): void { if (credit.state === 'PAGADO' || credit.state === 'ANULADO' || credit.balance <= 0) return; this.selected.set(credit); this.drafts = [this.emptyDraft()]; this.pendingKey = null; this.dialog.set(true); this.error.set(''); }
   addMethod(): void { if (this.drafts.length < 3) { const next = (['EFECTIVO', 'TRANSFERENCIA', 'NEQUI'] as Method[]).find(m => !this.drafts.some(d => d.methodCode === m)); if (next) this.drafts.push({ methodCode: next, appliedAmount: 0, receivedAmount: null, reference: '' }); } }
   removeMethod(index: number): void { if (this.drafts.length > 1) this.drafts.splice(index, 1); }
