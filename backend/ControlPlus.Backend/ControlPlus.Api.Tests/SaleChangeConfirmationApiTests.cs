@@ -415,6 +415,8 @@ public sealed partial class SalesApiFlowTests
     {
         using var client = CreateClient();
         var setup = await BootstrapAsync(client);
+        // Esta prueba trata del precio mayorista vigente en un aumento de crédito, no del mínimo de unidades.
+        await SetWholesaleMinimumAsync(1);
         var customerId = await CreateCustomerAsync(setup.Admin.User.Id, true, "CHANGE-INCREASE");
         await ConfigureChangeNumberingAsync(client, setup.Admin.AccessToken);
         await OpenSharedShiftAsync(client, setup.Admin.AccessToken);
@@ -445,6 +447,71 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(900m, await db.Credito.Where(x => x.Id == sale.CreditId)
             .Select(x => x.SaldoPendiente).SingleAsync());
         Assert.Equal(0, await db.MovimientoCaja.CountAsync(x => x.CategoriaMovimiento == "CAMBIO_VENTA"));
+        // El Cajero entregó a precio mayorista: queda la autorización del Supervisor con la correlación del cambio.
+        var changeAuthorization = await db.AutorizacionOperacion.AsNoTracking().SingleAsync(x => x.TipoOperacion == "CAMBIO_VENTA");
+        var wholesaleAuthorization = await db.AutorizacionOperacion.AsNoTracking().SingleAsync(x =>
+            x.TipoOperacion == "PRECIO_MAYORISTA" && x.CorrelacionId == changeAuthorization.CorrelacionId);
+        Assert.Equal(setup.Users.Supervisor.Id, wholesaleAuthorization.UsuarioAutorizadorId);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task SaleChange_CashierWholesaleDelivery_NeedsTheConfiguredMinimumAndADiscountAuthorizer()
+    {
+        using var client = CreateClient();
+        var setup = await BootstrapAsync(client);
+        var customerId = await CreateCustomerAsync(setup.Admin.User.Id, true, "CHANGE-WHOLESALE");
+        await ConfigureChangeNumberingAsync(client, setup.Admin.AccessToken);
+        await OpenSharedShiftAsync(client, setup.Admin.AccessToken);
+        var state = await ReadAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "change-wholesale-origin",
+            new ConfirmSaleRequest(customerId, [new(setup.Products.ResidueA, 1, "MINORISTA")], null, null, [],
+                "CREDITO", state.CurrentShift!.OperatingDate.AddDays(10),
+                new(SupervisorUser, SupervisorPassword))), HttpStatusCode.Created);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
+        ConfirmSaleChangeRequest Deliver(int quantity) => new(sale.Version, 1,
+            [new(Assert.Single(sale.Lines).Id, 1, true)],
+            [new(setup.Products.Standard, quantity, "MAYORISTA")], "AGREGAR_CREDITO", [],
+            new(SupervisorUser, SupervisorPassword));
+
+        // Con el mínimo inicial (12), entregar 2 unidades a precio mayorista se rechaza.
+        var belowMinimum = await PostChangeAsync(client, sale.Id, "change-wholesale-two", Deliver(2));
+        await AssertProblemAsync(belowMinimum, HttpStatusCode.BadRequest);
+        Assert.Contains("12", await belowMinimum.Content.ReadAsStringAsync());
+
+        // Con mínimo 2, un autorizador sin permiso para autorizar descuentos no basta.
+        await SetWholesaleMinimumAsync(2);
+        SetBearer(client, setup.Admin.AccessToken);
+        var discountPermissionId = await GetPermissionIdAsync(client, PermissionCodes.SalesDiscountAuthorize);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{setup.Users.Supervisor.Id}/permissions/{discountPermissionId}",
+            new SetUserPermissionRequest(false))).StatusCode);
+        SetBearer(client, setup.Cashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await PostChangeAsync(client, sale.Id, "change-wholesale-no-permission", Deliver(2))).StatusCode);
+
+        SetBearer(client, setup.Admin.AccessToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{setup.Users.Supervisor.Id}/permissions/{discountPermissionId}",
+            new SetUserPermissionRequest(true))).StatusCode);
+        SetBearer(client, setup.Cashier.AccessToken);
+        var change = await ReadAsync<SaleChangeDto>(
+            await PostChangeAsync(client, sale.Id, "change-wholesale-authorized", Deliver(2)), HttpStatusCode.Created);
+        Assert.Equal(1_800m, change.TotalDelivered);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(1, await db.AutorizacionOperacion.CountAsync(x => x.TipoOperacion == "PRECIO_MAYORISTA" &&
+            x.UsuarioAutorizadorId == setup.Users.Supervisor.Id && x.UsuarioSolicitanteId == setup.Users.Cashier.Id));
+    }
+
+    private async Task SetWholesaleMinimumAsync(int minimum)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        (await db.Establecimiento.SingleAsync()).MinimoUnidadesMayorista = minimum;
+        await db.SaveChangesAsync();
     }
 
     [Fact, Trait("Category", "Integration")]

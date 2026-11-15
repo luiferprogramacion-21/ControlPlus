@@ -647,6 +647,77 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
         return client;
     }
 
+    [Fact, Trait("Category", "Integration")]
+    public async Task CashierWholesale_NeedsTheConfiguredMinimum_AndAnAuthorizerWhoCanAuthorizeDiscounts()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client, stock: 20);
+        await SetWholesaleAsync(scenario.ProductId, 800m, minimum: 3);
+        _ = await StartSessionAsync(client, scenario);
+        CreateLayawayRequest Wholesale(int quantity, decimal payment) => new(scenario.CustomerId,
+            [new(scenario.ProductId, quantity, "MAYORISTA")], [new("EFECTIVO", payment, payment, null)],
+            null, new(SupervisorName, SupervisorPassword));
+
+        // Por debajo del mínimo configurado (3) se rechaza sin consumir la sesión.
+        var below = await PostAsync(client, "layaway-wholesale-two", Wholesale(2, 320m));
+        Assert.Equal(HttpStatusCode.BadRequest, below.StatusCode);
+        Assert.Contains("3", await below.Content.ReadAsStringAsync());
+
+        // Un autorizador sin permiso para autorizar descuentos no basta para el precio mayorista de un Cajero.
+        SetBearer(client, scenario.Admin.AccessToken);
+        var discountPermissionId = await GetPermissionIdAsync(client, PermissionCodes.SalesDiscountAuthorize);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{scenario.Supervisor.User.Id}/permissions/{discountPermissionId}",
+            new SetUserPermissionRequest(false))).StatusCode);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await PostAsync(client, "layaway-wholesale-no-discount-permission", Wholesale(3, 480m))).StatusCode);
+
+        SetBearer(client, scenario.Admin.AccessToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{scenario.Supervisor.User.Id}/permissions/{discountPermissionId}",
+            new SetUserPermissionRequest(true))).StatusCode);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var created = await ReadAsync<CreatedLayawayDto>(
+            await PostAsync(client, "layaway-wholesale-authorized", Wholesale(3, 480m)), HttpStatusCode.Created);
+        Assert.Equal(2_400m, created.Total);
+        Assert.Equal("MAYORISTA", Assert.Single(created.Lines).PriceType);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var authorizations = await db.AutorizacionOperacion.AsNoTracking().ToArrayAsync();
+        var layawayAuthorization = Assert.Single(authorizations, x => x.TipoOperacion == "CREAR_APARTADO");
+        var wholesaleAuthorization = Assert.Single(authorizations, x => x.TipoOperacion == "PRECIO_MAYORISTA");
+        Assert.Equal(scenario.Supervisor.User.Id, wholesaleAuthorization.UsuarioAutorizadorId);
+        Assert.Equal(scenario.Cashier.User.Id, wholesaleAuthorization.UsuarioSolicitanteId);
+        Assert.Equal(layawayAuthorization.CorrelacionId, wholesaleAuthorization.CorrelacionId);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task SupervisorWholesale_NeedsOnlyTheMinimum_AndRecordsNoWholesaleAuthorization()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client, stock: 20);
+        await SetWholesaleAsync(scenario.ProductId, 800m, minimum: 3);
+        _ = await StartSessionAsync(client, scenario, scenario.Supervisor);
+        var created = await ReadAsync<CreatedLayawayDto>(await PostAsync(client, "layaway-supervisor-wholesale",
+            new CreateLayawayRequest(scenario.CustomerId, [new(scenario.ProductId, 3, "MAYORISTA")],
+                [new("EFECTIVO", 480m, 480m, null)], null, null)), HttpStatusCode.Created);
+        Assert.Equal(2_400m, created.Total);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(0, await db.AutorizacionOperacion.CountAsync(x => x.TipoOperacion == "PRECIO_MAYORISTA"));
+    }
+
+    private async Task SetWholesaleAsync(Guid productId, decimal wholesalePrice, int minimum)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        (await db.Producto.SingleAsync(x => x.Id == productId)).PrecioMayorista = wholesalePrice;
+        (await db.Establecimiento.SingleAsync()).MinimoUnidadesMayorista = minimum;
+        await db.SaveChangesAsync();
+    }
+
     private async Task<Scenario> BootstrapAsync(HttpClient client, bool sharedShift = true,
         int stock = 5)
     {

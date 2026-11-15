@@ -161,6 +161,10 @@ public sealed partial class SalesService
             var product = products[delivered.ProductId];
             var price = NormalizeCode(delivered.PriceType) == "MAYORISTA"
                 ? product.PrecioMayorista : product.PrecioMinorista;
+            // Decisión del 15 de noviembre de 2026: cuentan solo las unidades de ese producto que se entregan en el cambio.
+            if (NormalizeCode(delivered.PriceType) == "MAYORISTA" && delivered.Quantity < establishment.MinimoUnidadesMayorista)
+                return Result.Failure<SaleChangeDto>(ApplicationError.Validation(
+                    $"El precio mayorista exige entregar al menos {establishment.MinimoUnidadesMayorista} unidades de {product.CodigoInterno}."));
             if (!product.Activo || price is null || product.CostoPromedio is null ||
                 price.Value < product.CostoPromedio || price.Value <= 0 ||
                 (long)product.StockActual + returnedByProduct.GetValueOrDefault(product.Id) -
@@ -225,6 +229,17 @@ public sealed partial class SalesService
                 return Result.Failure<SaleChangeDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
             }
         }
+        // Un Cajero solo entrega a precio mayorista si su autorizador también puede autorizar descuentos.
+        var wholesaleNeedsAuthorization = snapshot.HighestRoleLevel == RoleLevel.Cajero &&
+            request.Delivered.Any(x => NormalizeCode(x.PriceType) == "MAYORISTA");
+        if (wholesaleNeedsAuthorization)
+        {
+            var wholesaleAuthorizer = await userRepository.GetAuthorizationSnapshotAsync(authorizer.Id, ct);
+            if (wholesaleAuthorizer is null || !wholesaleAuthorizer.PermissionCodes.Contains(
+                    PermissionCodes.SalesDiscountAuthorize, StringComparer.OrdinalIgnoreCase))
+                return Result.Failure<SaleChangeDto>(ApplicationError.Forbidden(
+                    "El precio mayorista de un Cajero requiere un autorizador con permiso para autorizar descuentos."));
+        }
         var permission = await permissionRepository.GetByCodeAsync(PermissionCodes.SalesChangeAuthorize, ct);
         if (permission is null || !permission.Activo)
             return Result.Failure<SaleChangeDto>(ApplicationError.Conflict("El permiso de autorización no está disponible."));
@@ -249,6 +264,23 @@ public sealed partial class SalesService
             FechaExpiracion = now.UtcDateTime.AddMinutes(5), FechaUtilizacion = now.UtcDateTime
         };
         await repository.AddAuthorizationAsync(authorization, ct);
+        if (wholesaleNeedsAuthorization)
+        {
+            var wholesalePermission = await permissionRepository.GetByCodeAsync(PermissionCodes.SalesDiscountAuthorize, ct);
+            if (wholesalePermission is null || !wholesalePermission.Activo)
+                return Result.Failure<SaleChangeDto>(ApplicationError.Conflict("El permiso de autorización de descuentos no está activo."));
+            await repository.AddAuthorizationAsync(new AutorizacionOperacion
+            {
+                Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId,
+                UsuarioAutorizadorId = authorizer.Id, PermisoId = wholesalePermission.Id,
+                TipoOperacion = "PRECIO_MAYORISTA", CorrelacionId = correlation,
+                DescripcionOperacion = "Autorización de precio mayorista de un Cajero en un cambio de venta.",
+                MetodoAutenticacion = request.Authorization.AuthenticationMethod(),
+                CredencialAutorizadorId = request.Authorization?.ResolvedCredentialId, Resultado = "EXITOSA",
+                Estado = "UTILIZADA", FechaSolicitud = now.UtcDateTime,
+                FechaExpiracion = now.UtcDateTime.AddMinutes(5), FechaUtilizacion = now.UtcDateTime
+            }, ct);
+        }
         sequence.UltimoNumero++;
         var change = new CambioVenta
         {

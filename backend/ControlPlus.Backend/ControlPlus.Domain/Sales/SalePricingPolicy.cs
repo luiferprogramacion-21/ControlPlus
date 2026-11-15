@@ -7,7 +7,10 @@ public sealed record DiscountShare(Guid StableKey, decimal ExactAmount);
 
 public static class SalePricingPolicy
 {
-    /// <summary>The wholesale price only applies from this many units of the same product in one sale.</summary>
+    /// <summary>
+    /// Initial minimum of units of the same product for the wholesale price. Since 15 November 2026 the effective value is
+    /// configured per establishment (configuracion.establecimiento.minimo_unidades_mayorista) and this is only its default.
+    /// </summary>
     public const int WholesaleMinimumQuantity = 12;
 
     public static decimal MaximumDiscountPercentage(RoleLevel role) => role switch

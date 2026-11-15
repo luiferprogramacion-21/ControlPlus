@@ -151,6 +151,7 @@ builder.Services.AddScoped<ICustomerHistoryService, CustomerHistoryService>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<ICreditsService, CreditsService>();
 builder.Services.AddScoped<ICreditSettingsService, CreditSettingsService>();
+builder.Services.AddScoped<ISalesSettingsService, SalesSettingsService>();
 builder.Services.AddScoped<ILayawayCreateService, LayawayCreateService>();
 builder.Services.AddScoped<ILayawayQueryService, LayawayQueryService>();
 builder.Services.AddScoped<ILayawaySettingsService, LayawaySettingsService>();

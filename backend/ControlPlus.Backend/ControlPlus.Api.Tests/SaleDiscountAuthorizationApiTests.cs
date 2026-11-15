@@ -263,6 +263,27 @@ public sealed class SaleDiscountAuthorizationApiTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
+    public async Task Wholesale_UsesTheMinimumConfiguredByTheAdministrator()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var settings = await ReadAsync<SalesSettingsDto>(await client.GetAsync("/api/sales/settings"), HttpStatusCode.OK);
+        _ = await ReadAsync<SalesSettingsDto>(await client.PutAsJsonAsync("/api/sales/settings",
+            new UpdateSalesSettingsRequest(3, settings.Version)), HttpStatusCode.OK);
+
+        _ = await StartSessionAsync(client, scenario, scenario.Admin);
+        var belowMinimum = await PostSaleAsync(client, "wholesale-two", Wholesale(scenario, 2));
+        await AssertProblemAsync(belowMinimum, HttpStatusCode.BadRequest);
+        Assert.Contains("3", await belowMinimum.Content.ReadAsStringAsync());
+
+        var atMinimum = await ReadAsync<SaleDto>(await PostSaleAsync(client, "wholesale-three", Wholesale(scenario, 3)), HttpStatusCode.Created);
+        Assert.Equal(2_400m, atMinimum.Total);
+        Assert.Equal("MAYORISTA", Assert.Single(atMinimum.Lines).PriceType);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
     public async Task Cashier_DiscountAndWholesaleTogether_RecordBothAuthorizationsWithOneAuthorizer()
     {
         using var client = CreateClient();

@@ -42,6 +42,11 @@ public partial class Establecimiento
     /// </summary>
     public int? DiasCreditoPredeterminado { get; set; }
 
+    /// <summary>
+    /// Unidades mínimas de un mismo producto para vender a precio mayorista (1 a 999; 12 por defecto).
+    /// </summary>
+    public int MinimoUnidadesMayorista { get; set; } = 12;
+
     public int DiasLimiteCambio { get; set; }
 
     /// <summary>

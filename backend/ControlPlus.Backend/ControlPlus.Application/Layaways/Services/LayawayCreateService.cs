@@ -154,6 +154,15 @@ public sealed class LayawayCreateService(
                 return Fail(ApplicationError.Forbidden());
         }
 
+        // Decisión del 15 de noviembre de 2026: un Cajero solo aparta a precio mayorista si su autorizador, de rol
+        // superior, también puede autorizar descuentos; la misma persona deja registrada la autorización PRECIO_MAYORISTA.
+        var wholesaleNeedsAuthorization = snapshot.HighestRoleLevel == RoleLevel.Cajero &&
+            input.Lines!.Any(x => x.PriceType == "MAYORISTA");
+        if (wholesaleNeedsAuthorization && (authorizer is null ||
+            !await permissions.HasPermissionAsync(authorizer.Id, PermissionCodes.SalesDiscountAuthorize, cancellationToken)))
+            return Fail(ApplicationError.Forbidden(
+                "El precio mayorista de un Cajero requiere un autorizador con permiso para autorizar descuentos."));
+
         // Installation and shift are already locked. Sequence locks are acquired in a fixed order.
         var layawaySequence = await layaways.GetSequenceForUpdateAsync(
             installation.Id, installation.Serie, "APARTADO", cancellationToken);
@@ -191,6 +200,9 @@ public sealed class LayawayCreateService(
                 var unitPrice = line.PriceType == "MAYORISTA" ? product.PrecioMayorista : product.PrecioMinorista;
                 if (unitPrice is null)
                     return Fail(ApplicationError.Validation("El producto no tiene precio mayorista configurado."));
+                if (line.PriceType == "MAYORISTA" && line.Quantity < establishment.MinimoUnidadesMayorista)
+                    return Fail(ApplicationError.Validation(
+                        $"El precio mayorista exige al menos {establishment.MinimoUnidadesMayorista} unidades de {product.CodigoInterno}."));
                 CashMoney.Require(unitPrice.Value, allowNegative: false);
                 var lineTotal = CashMoney.Require(checked(unitPrice.Value * line.Quantity), allowNegative: false);
                 SalePricingPolicy.EnsureNotBelowCost(lineTotal, product.CostoPromedio.Value, line.Quantity);
@@ -365,6 +377,23 @@ public sealed class LayawayCreateService(
             await users.UpdateAsync(authorizer, cancellationToken);
         }
         await sales.AddAuthorizationAsync(authorization, cancellationToken);
+        if (wholesaleNeedsAuthorization)
+        {
+            var wholesalePermission = await permissionRepository.GetByCodeAsync(PermissionCodes.SalesDiscountAuthorize, cancellationToken);
+            if (wholesalePermission is null || !wholesalePermission.Activo)
+                return Fail(ApplicationError.Conflict("El permiso de autorización de descuentos no está activo."));
+            await sales.AddAuthorizationAsync(new AutorizacionOperacion
+            {
+                Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId,
+                UsuarioAutorizadorId = authorizer!.Id, PermisoId = wholesalePermission.Id,
+                TipoOperacion = "PRECIO_MAYORISTA", CorrelacionId = correlationId,
+                DescripcionOperacion = "Autorización de precio mayorista de un Cajero en un apartado.",
+                MetodoAutenticacion = input.CredentialId is null ? "PASSWORD" : "CODIGO_BARRAS_PIN",
+                CredencialAutorizadorId = input.CredentialId, Resultado = "EXITOSA", Estado = "UTILIZADA",
+                FechaSolicitud = now.UtcDateTime, FechaExpiracion = now.AddMinutes(5).UtcDateTime,
+                FechaUtilizacion = now.UtcDateTime
+            }, cancellationToken);
+        }
         await layaways.AddAsync(layaway, details, paymentRows, inventoryMovements, cancellationToken);
         await sales.AddCashMovementAsync(movement, cancellationToken);
         await sales.AddIdempotencyAsync(new OperacionIdempotente

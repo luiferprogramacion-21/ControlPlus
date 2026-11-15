@@ -214,7 +214,7 @@ public sealed partial class SalesService(
         try
         {
             prepared = PrepareSale(normalizedLines, input.GeneralDiscount, productsById, maximumDiscount,
-                establishment.VatEnabled ? establishment.VatPercentage : 0m);
+                establishment.VatEnabled ? establishment.VatPercentage : 0m, establishment.MinimoUnidadesMayorista);
         }
         catch (DomainRuleViolationException exception)
         {
@@ -691,7 +691,7 @@ public sealed partial class SalesService(
         IReadOnlyCollection<NormalizedLine> requestedLines,
         NormalizedDiscount? generalDiscount,
         IReadOnlyDictionary<Guid, Producto> products,
-        decimal maximumDiscount, decimal? vatPercentage)
+        decimal maximumDiscount, decimal? vatPercentage, int wholesaleMinimumQuantity)
     {
         var lines = new List<PreparedLine>(requestedLines.Count);
         foreach (var requested in requestedLines.OrderBy(x => x.ProductId))
@@ -705,9 +705,9 @@ public sealed partial class SalesService(
                 ? product.PrecioMayorista ?? throw new DomainRuleViolationException($"El producto {product.CodigoInterno} no tiene precio mayorista.")
                 : product.PrecioMinorista;
             CashMoney.Require(unitPrice, allowNegative: false);
-            if (requested.PriceType == "MAYORISTA" && requested.Quantity < SalePricingPolicy.WholesaleMinimumQuantity)
+            if (requested.PriceType == "MAYORISTA" && requested.Quantity < wholesaleMinimumQuantity)
                 throw new DomainRuleViolationException(
-                    $"El precio mayorista exige al menos {SalePricingPolicy.WholesaleMinimumQuantity} unidades de {product.CodigoInterno}.");
+                    $"El precio mayorista exige al menos {wholesaleMinimumQuantity} unidades de {product.CodigoInterno}.");
             var gross = CashMoney.Require(checked(unitPrice * requested.Quantity), allowNegative: false);
             var line = new PreparedLine(product, requested.Quantity, requested.PriceType, unitPrice, gross);
             if (requested.Discount is not null)
