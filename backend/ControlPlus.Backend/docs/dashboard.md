@@ -31,3 +31,36 @@ El usuario aprobó mantener la estructura de la maqueta `03-dashboard.png` con b
 El compilador Angular `ngc -p tsconfig.app.json --noEmit` terminó con salida 0, sin diagnósticos, en el entorno Linux. Allí `npm test` no arrancó porque Node 22.22.1 es anterior al mínimo 22.22.3 de Angular CLI.
 
 El operador ejecutó después en Windows `npm test -- --watch=false --include=src/app/features/dashboard/dashboard.spec.ts`: **4/4 pruebas aprobadas**, un archivo de pruebas aprobado, sin fallidas, el 10 de noviembre de 2026. `npm run build` terminó correctamente y generó `frontend/dist/controlplus-frontend`. Emitió tres advertencias de presupuesto: bundle inicial 692,07 kB frente al máximo de 520 kB; `cash.scss` 6,61 kB frente a 4 kB; `sales.scss` 4,68 kB frente a 4 kB. Ninguna impidió la compilación. No se ha acreditado todavía una revisión visual ni la consulta del Dashboard contra la API ejecutándose.
+
+## Dashboard C2: comparación, Caja actual, alertas, ventas por hora y actividad (15 de noviembre de 2026)
+
+Completa los bloques que la maqueta `03-dashboard.png` mostraba como «Pendiente de definir». No hay rutas, permisos, migraciones ni cambios de esquema nuevos: `GET /api/dashboard/summary` conserva su permiso (`REPORTS.FINANCIAL_READ`) y los ocho campos del corte C1, y añade cinco campos al final de la respuesta. Todas las cifras salen de la misma instalación activa y de la fecha operativa del servidor.
+
+| Campo | Contenido |
+|---|---|
+| `comparison` | `previousDate`, `previousTotal` y `percentChange`. |
+| `currentCash` | `openedAt` y `expectedCash`, o `null` si no hay turno abierto. |
+| `alerts` | `lowStockProducts`, `overdueCreditCustomers`, `upcomingLayaways` y `upcomingLayawayDays`. |
+| `hourlySales` | Lista de `hour` (0–23 local), `transactions` y `total`. |
+| `recentActivity` | Hasta 10 ventas: `saleId`, `number`, `occurredAt`, `customerName`, `total`, `saleType` y `state`. |
+
+### Decisiones aprobadas por el usuario el 15 de noviembre de 2026
+
+- **Frente a ayer:** se compara lo vendido hoy hasta ahora contra lo vendido ayer hasta la misma hora (ahora menos 24 horas), no contra el día completo. `percentChange` es `(hoy − ayer) / ayer × 100`, redondeado a entero, y es `null` si ayer no hubo ventas: no se divide por cero y la pantalla escribe «Sin ventas ayer a esta hora». La selección de ventas es la misma de «Ventas de hoy» (confirmadas de contado o crédito, por fecha operativa).
+- **Productos con alerta y Stock bajo:** productos activos agotados o con stock disponible (existencias menos reservado) por debajo del mínimo. Se aplica el criterio de la vista oficial `compras.vw_necesidad_reposicion` de Fase 4 —`disponible = 0` o `disponible < mínimo`, estricto—, de modo que el Dashboard cuente lo mismo que Compras. Se consulta `catalogo.producto` y no la vista, para no depender de permisos adicionales del rol de la aplicación. La pregunta de aprobación describía el criterio como «≤ mínimo»; el único caso que cambia es un producto con disponible exactamente igual a un mínimo mayor que cero, que la vista oficial no considera aún en necesidad de reposición.
+- **Apartados próximos:** apartados `ACTIVO` cuya fecha límite está entre hoy y los 3 días siguientes, ambos incluidos (`DashboardRules.UpcomingLayawayDays`). Los ya vencidos no se cuentan aquí. La maqueta decía «entregas»; la pantalla escribe «N apartados» porque la cifra no son entregas.
+- **Quién lo implementa:** backend y pantalla en el mismo corte.
+
+### Reglas propuestas por el agente, pendientes de revisión del usuario
+
+- **Caja actual:** efectivo esperado del turno abierto, con el mismo cálculo del arqueo (apertura, cobros y abonos en efectivo, movimientos manuales de efectivo); no suma transferencias ni Nequi. Sin turno abierto la pantalla escribe «Sin turno abierto». El «Flujo neto hoy» del corte C1 se conserva bajo la cifra. Un turno abierto de un día anterior muestra su fecha.
+- **Créditos vencidos:** clientes distintos con al menos un crédito no anulado con saldo positivo y vencimiento anterior a la fecha operativa, el mismo criterio que proyecta `VENCIDO` en Créditos.
+- **Ventas por hora:** ventas confirmadas de la fecha operativa agrupadas por hora local del establecimiento, desde la hora de la primera venta hasta la hora actual, con las horas sin ventas en cero; sin ventas no hay barras. La pantalla resalta la hora con más ventas.
+- **Actividad reciente:** las 10 últimas ventas de contado o crédito de la fecha operativa, confirmadas o anuladas, de la más reciente a la más antigua. El número visible es `prefijo-serie-consecutivo` como en el resto de la API; sin cliente se muestra «Consumidor final». El estado se muestra como Confirmada, Crédito o Anulada.
+- **Respaldo externo:** sigue «Pendiente de definir». Existen las tablas oficiales `ejecucion_respaldo` y `copia_respaldo`, pero ningún proceso de la aplicación las llena todavía, así que no hay una fuente real que mostrar.
+
+### Verificación
+
+Backend sin base de datos: compilación serial con `-warnaserror` sin errores ni advertencias; `DashboardSummaryTests` y `OpenApiDashboardContractTests` 12/12; suites sin base de datos Domain 80/80, API 215/215 e Infrastructure 6/6. Frontend: `dashboard.spec.ts` 12/12 y `ngc -p tsconfig.app.json --noEmit` con salida 0.
+
+Las consultas contra PostgreSQL se ejercitan en `SalesApiFlowTests.DashboardSummary_UsesActiveInstallationOperatingDateAndPersistedSourcesWithoutDoubleCounting`, ampliada con la comparación, la Caja actual, las barras por hora, la actividad y las alertas. Esa prueba, y por tanto las consultas reales de créditos vencidos y apartados próximos —que en ese escenario devuelven cero—, solo se verifican en el trabajo `database-tests` del CI. Todavía no hay revisión visual de la pantalla contra la maqueta ni consulta contra la API ejecutándose.
