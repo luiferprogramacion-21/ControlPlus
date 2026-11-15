@@ -1,5 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { errorText } from '../../core/api';
+import { SessionService } from '../../core/session.service';
 import { DashboardActivity, DashboardApi, DashboardSummary } from './dashboard-api';
 
 export interface HourBar {
@@ -17,11 +19,16 @@ export interface ComparisonText {
 
 @Component({
   selector: 'cp-dashboard',
+  imports: [RouterLink],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
 export class Dashboard implements OnInit {
   private readonly api = inject(DashboardApi);
+  /** Inventario solo abre con INVENTORY.READ; sin él no se ofrece el enlace. */
+  readonly canOpenInventory = inject(SessionService).has('INVENTORY.READ');
+  /** Inventario filtrado por el mismo criterio de stock bajo que cuenta el Dashboard. */
+  readonly lowStockQuery = { filtro: 'stock-bajo' };
   readonly summary = signal<DashboardSummary | null>(null);
   readonly loading = signal(false);
   readonly error = signal('');

@@ -37,6 +37,7 @@ public sealed class EfInventoryRepository(OfficialControlPlusDbContext dbContext
     {
         var source = dbContext.Producto.AsNoTracking().AsQueryable();
         if (!query.IncludeInactive) source = source.Where(x => x.Activo);
+        if (query.LowStock) source = source.Where(LowStockSelection.Predicate);
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var pattern = $"%{query.Search}%";

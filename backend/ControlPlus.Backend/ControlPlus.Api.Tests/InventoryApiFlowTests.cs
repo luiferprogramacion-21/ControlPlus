@@ -171,6 +171,22 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
             HttpStatusCode.OK);
         Assert.Equal(40m, Assert.Single(administratorStock.Items).AverageCost);
 
+        // Filtro de stock bajo: solo productos activos con disponible igual o menor al mínimo, y exactamente
+        // los mismos que se cuentan aparte en memoria.
+        var lowStock = await ReadAsync<PagedResult<InventoryStockDto>>(
+            await GetWithBearerAsync(client, "/api/inventory/stock?lowStock=true&pageSize=100", scenario.Admin.AccessToken),
+            HttpStatusCode.OK);
+        Assert.All(lowStock.Items, x => Assert.True(x.IsActive && x.AvailableStock <= x.MinimumStock));
+        await using (var lowStockScope = _factory!.Services.CreateAsyncScope())
+        {
+            var products = await lowStockScope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>()
+                .Producto.AsNoTracking().ToArrayAsync();
+            var expected = products.Where(p => p.Activo && p.StockActual - p.StockReservado <= p.StockMinimo)
+                .Select(p => p.Id).OrderBy(id => id).ToArray();
+            Assert.Equal(expected, lowStock.Items.Select(x => x.ProductId).OrderBy(id => id).ToArray());
+            Assert.Equal(expected.Length, lowStock.TotalCount);
+        }
+
         SetBearer(client, scenario.Admin.AccessToken);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
             $"/api/users/{scenario.SupervisorUser.Id}/permissions/{permissionId}",

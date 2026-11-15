@@ -281,9 +281,9 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         Assert.Equal(persistedSale.Total, activity.Total);
         Assert.Equal(("CONTADO", "CONFIRMADA"), (activity.SaleType, activity.State));
 
-        // Alertas: el stock bajo se cuenta aparte, en memoria, con el criterio de la vista oficial de reposición.
-        var expectedLowStock = (await context.Producto.AsNoTracking().ToArrayAsync()).Count(p => p.Activo &&
-            (p.StockActual - p.StockReservado == 0 || p.StockActual - p.StockReservado < p.StockMinimo));
+        // Alertas: el stock bajo (disponible igual o menor al mínimo) se cuenta aparte, en memoria.
+        var expectedLowStock = (await context.Producto.AsNoTracking().ToArrayAsync())
+            .Count(p => p.Activo && p.StockActual - p.StockReservado <= p.StockMinimo);
         Assert.Equal(new DashboardAlerts(expectedLowStock, 0, 0, DashboardRules.UpcomingLayawayDays), response.Alerts);
 
         var permissionId = await GetPermissionIdAsync(client, PermissionCodes.FinancialReportsRead);
@@ -662,7 +662,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task ElectronicPayments_RequireReferences_AndCannotDeclareReceivedAmountOrChange()
+    public async Task ElectronicPaymentReferences_AreOptional_ButReceivedAmountAndChangeRemainInvalid()
     {
         using var client = CreateClient();
         var scenario = await BootstrapAsync(client);
@@ -673,12 +673,15 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         await AssertProblemAsync(await PostSaleAsync(client, "transfer-change", new ConfirmSaleRequest(
             null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
             [new("TRANSFERENCIA", 1_000m, 1_050m, "TRANSFER-CHANGE-REJECTED")])), HttpStatusCode.BadRequest);
-        await AssertProblemAsync(await PostSaleAsync(client, "transfer-no-reference", new ConfirmSaleRequest(
+        var transfer = await ReadAsync<SaleDto>(await PostSaleAsync(client, "transfer-no-reference", new ConfirmSaleRequest(
             null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
-            [new("TRANSFERENCIA", 1_000m, null, null)])), HttpStatusCode.BadRequest);
-        await AssertProblemAsync(await PostSaleAsync(client, "nequi-no-reference", new ConfirmSaleRequest(
+            [new("TRANSFERENCIA", 1_000m, null, null)])), HttpStatusCode.Created);
+        Assert.Null(Assert.Single(transfer.Payments).Reference);
+
+        var nequiWithoutReference = await ReadAsync<SaleDto>(await PostSaleAsync(client, "nequi-no-reference", new ConfirmSaleRequest(
             null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
-            [new("NEQUI", 1_000m, null, " ")])), HttpStatusCode.BadRequest);
+            [new("NEQUI", 1_000m, null, " ")])), HttpStatusCode.Created);
+        Assert.Null(Assert.Single(nequiWithoutReference.Payments).Reference);
         await AssertProblemAsync(await PostSaleAsync(client, "cash-no-received", new ConfirmSaleRequest(
             null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
             [new("EFECTIVO", 1_000m, null, null)])), HttpStatusCode.BadRequest);

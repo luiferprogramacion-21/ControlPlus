@@ -60,3 +60,8 @@
 .dashboard-activity td { padding: 11px 14px; border-top: 1px solid var(--cp-border); font-size: 14px; }
 .badge--error { background: var(--cp-error-soft); color: var(--cp-error); }
 @media (max-width: 700px) { .dashboard-chart { gap: 6px; } .dashboard-alerts li { flex-wrap: wrap; } }
+
+/* Enlace a Inventario filtrado por stock bajo. */
+.dashboard-link { color: var(--cp-primary); font-size: 13px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.dashboard-metric a.dashboard-link.dashboard-metric__attention { color: var(--cp-warning); font-size: 12px; }
+.dashboard-link:focus-visible { outline: 2px solid var(--cp-focus); outline-offset: 2px; border-radius: 4px; }

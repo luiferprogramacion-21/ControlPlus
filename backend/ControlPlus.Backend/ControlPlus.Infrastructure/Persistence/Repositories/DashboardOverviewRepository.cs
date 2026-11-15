@@ -50,12 +50,8 @@ public sealed class EfDashboardOverviewRepository(OfficialControlPlusDbContext d
                 x.Cliente == null ? null : x.Cliente.NombreCompleto, x.Total, x.TipoVenta, x.Estado))
             .ToListAsync(cancellationToken);
 
-    // Mismo criterio que la vista oficial compras.vw_necesidad_reposicion (agotado, o disponible por debajo del
-    // mínimo, solo productos activos). Se consulta la tabla y no la vista para no depender de permisos extra.
     public Task<int> CountLowStockProductsAsync(CancellationToken cancellationToken) =>
-        dbContext.Producto.AsNoTracking().CountAsync(x => x.Activo &&
-            (x.StockActual - x.StockReservado == 0 || x.StockActual - x.StockReservado < x.StockMinimo),
-            cancellationToken);
+        dbContext.Producto.AsNoTracking().CountAsync(LowStockSelection.Predicate, cancellationToken);
 
     public Task<int> CountOverdueCreditCustomersAsync(Guid installationId, DateOnly operatingDate,
         CancellationToken cancellationToken) =>

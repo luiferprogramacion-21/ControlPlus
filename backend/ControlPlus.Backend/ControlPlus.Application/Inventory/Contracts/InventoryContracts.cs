@@ -8,7 +8,9 @@ public sealed record InventoryStockQuery(
     string? Search = null,
     bool IncludeInactive = false,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50,
+    // Solo productos activos con disponible igual o menor al mínimo (el mismo criterio del Dashboard).
+    bool LowStock = false);
 
 public sealed record InventoryStockDto(
     Guid ProductId,

@@ -38,7 +38,9 @@
         <div>
           <span>Productos con alerta</span>
           <strong>{{ data.alerts.lowStockProducts }}</strong>
-          @if (data.alerts.lowStockProducts > 0) { <small class="dashboard-metric__attention">Requieren revisión</small> }
+          @if (data.alerts.lowStockProducts > 0 && canOpenInventory) {
+            <a class="dashboard-link dashboard-metric__attention" routerLink="/operacion/inventario" [queryParams]="lowStockQuery">Requieren revisión · Ver productos</a>
+          } @else if (data.alerts.lowStockProducts > 0) { <small class="dashboard-metric__attention">Requieren revisión</small> }
           @else { <small>Ninguno por reponer</small> }
         </div>
         <span class="dashboard-metric__badge dashboard-metric__badge--warning" aria-hidden="true">!</span>
@@ -68,7 +70,9 @@
         <ul class="dashboard-alerts">
           <li>
             <span class="dashboard-pill dashboard-pill--warning" [class.dashboard-pill--clear]="data.alerts.lowStockProducts === 0">Stock bajo</span>
-            <strong>{{ alertValue(data.alerts.lowStockProducts, 'producto', 'productos') }}</strong>
+            @if (data.alerts.lowStockProducts > 0 && canOpenInventory) {
+              <a class="dashboard-link" routerLink="/operacion/inventario" [queryParams]="lowStockQuery">{{ alertValue(data.alerts.lowStockProducts, 'producto', 'productos') }}</a>
+            } @else { <strong>{{ alertValue(data.alerts.lowStockProducts, 'producto', 'productos') }}</strong> }
           </li>
           <li>
             <span class="dashboard-pill dashboard-pill--danger" [class.dashboard-pill--clear]="data.alerts.overdueCreditCustomers === 0">Créditos vencidos</span>

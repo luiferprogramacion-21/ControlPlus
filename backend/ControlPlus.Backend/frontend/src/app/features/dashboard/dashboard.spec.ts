@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { SessionService } from '../../core/session.service';
 import { dashboardGuard } from '../../core/guards';
 import { Dashboard } from './dashboard';
@@ -39,6 +40,7 @@ describe('Dashboard', () => {
     permissions = ['REPORTS.FINANCIAL_READ'];
     api.summary.mockResolvedValue(summary);
     TestBed.configureTestingModule({ providers: [
+      provideRouter([]),
       { provide: DashboardApi, useValue: api },
       { provide: SessionService, useValue: session },
     ] });
@@ -129,6 +131,21 @@ describe('Dashboard', () => {
     const layaways = Array.from(fixture.nativeElement.querySelectorAll('.dashboard-pill') as NodeListOf<HTMLElement>)
       .find((pill) => pill.textContent?.includes('Apartados próximos'));
     expect(layaways?.title).toContain('3 días');
+  });
+
+  it('enlaza el stock bajo a Inventario filtrado cuando se puede abrir Inventario', async () => {
+    permissions = ['REPORTS.FINANCIAL_READ', 'INVENTORY.READ'];
+    const fixture = await create();
+    const links = Array.from(fixture.nativeElement.querySelectorAll('a.dashboard-link') as NodeListOf<HTMLAnchorElement>);
+    expect(links.map((link) => link.textContent?.trim())).toEqual(['Requieren revisión · Ver productos', '7 productos']);
+    for (const link of links) expect(link.getAttribute('href')).toBe('/operacion/inventario?filtro=stock-bajo');
+  });
+
+  it('sin permiso de Inventario muestra el contador sin enlace', async () => {
+    const fixture = await create();
+    expect(fixture.nativeElement.querySelectorAll('a.dashboard-link').length).toBe(0);
+    expect(textOf(fixture)).toContain('7 productos');
+    expect(textOf(fixture)).toContain('Requieren revisión');
   });
 
   it('muestra "Ninguno" y no alarma cuando no hay alertas', async () => {
