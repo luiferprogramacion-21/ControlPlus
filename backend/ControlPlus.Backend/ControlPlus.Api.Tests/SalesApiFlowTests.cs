@@ -679,10 +679,18 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
             [new("TRANSFERENCIA", 1_000m, null, null)])), HttpStatusCode.Created);
         Assert.Null(Assert.Single(transfer.Payments).Reference);
 
+        // En modalidad compartida cada venta confirmada consume la sesión del operador.
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
+
         var nequiWithoutReference = await ReadAsync<SaleDto>(await PostSaleAsync(client, "nequi-no-reference", new ConfirmSaleRequest(
             null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
             [new("NEQUI", 1_000m, null, " ")])), HttpStatusCode.Created);
         Assert.Null(Assert.Single(nequiWithoutReference.Payments).Reference);
+
+        // En modalidad compartida cada venta confirmada consume la sesión del operador.
+        _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
+        SetBearer(client, scenario.Cashier.AccessToken);
         await AssertProblemAsync(await PostSaleAsync(client, "cash-no-received", new ConfirmSaleRequest(
             null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
             [new("EFECTIVO", 1_000m, null, null)])), HttpStatusCode.BadRequest);
