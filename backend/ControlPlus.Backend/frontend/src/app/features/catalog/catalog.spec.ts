@@ -387,7 +387,7 @@ describe('Catalog: existencias iniciales', () => {
     component.productForm.patchValue({ initialQuantity: 0 });
     await component.saveProduct();
     await vi.waitFor(() => expect(component.reconciliationCandidates()).toEqual([match]));
-    expect(api.products).toHaveBeenCalledWith(expect.objectContaining({ search: 'Producto', categoryId: 'category', includeOutOfStock: false, pageSize: 200 }));
+    expect(api.products).toHaveBeenCalledWith(expect.objectContaining({ search: 'Producto', categoryId: 'category', pageSize: 200 }));
     expect(component.createOutcomeUncertain()).toBe(true);
     expect(component.createErrorKind()).toBe('uncertain');
     expect(component.error()).toContain('No se puede conectar con la API local.');
@@ -438,7 +438,6 @@ describe('Catalog: existencias iniciales', () => {
     component.filters.controls.productSearch.setValue('búsqueda anterior');
     await component.saveProduct();
     expect(component.filters.controls.productSearch.value).toBe('PRD-1');
-    expect(component.filters.controls.includeOutOfStock.value).toBe(false);
     expect(component.notice()).toContain('PRD-1');
   });
 

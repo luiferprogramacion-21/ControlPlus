@@ -20,7 +20,6 @@
         <button mat-flat-button type="submit">Buscar</button>
         @if (session.has('PRODUCTS.CREATE')) { <button mat-stroked-button type="button" [disabled]="saving() || checkingCreate()" (click)="newProduct()">{{ createOutcomeUncertain() ? 'Retomar alta pendiente' : 'Nuevo producto' }}</button> }
         @if (session.has('PRODUCTS.SENSITIVE_UPDATE')) { <mat-checkbox formControlName="includeInactiveProducts" (change)="search()">Inactivos</mat-checkbox> }
-        @if (session.has('INVENTORY.READ')) { <mat-checkbox formControlName="includeOutOfStock" (change)="search()">Agotados</mat-checkbox> }
       </form>
       @if (loading()) { <div class="loading"><mat-spinner diameter="36"></mat-spinner><span>Cargando productos…</span></div> }
       @else {

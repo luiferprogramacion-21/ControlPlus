@@ -64,7 +64,7 @@ export class Catalog implements OnInit {
 
   readonly filters = this.fb.nonNullable.group({
     productSearch: [''], categorySearch: [''], categoryId: [''],
-    includeInactiveProducts: [false], includeOutOfStock: [false], includeInactiveCategories: [false],
+    includeInactiveProducts: [false], includeInactiveCategories: [false],
   });
   readonly categoryForm = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(100)]],
@@ -130,7 +130,6 @@ export class Catalog implements OnInit {
         const result = await this.api.products({
           search: f.productSearch.trim(), categoryId: f.categoryId || undefined,
           includeInactive: this.session.has('PRODUCTS.SENSITIVE_UPDATE') && f.includeInactiveProducts,
-          includeOutOfStock: this.session.has('INVENTORY.READ') && f.includeOutOfStock,
           page: this.productPage(), pageSize: this.productPageSize(),
         });
         if (id === this.requestId) this.products.set(result);
@@ -346,7 +345,7 @@ export class Catalog implements OnInit {
       this.cancel();
       if (!selected.id) {
         this.tab.set('products'); this.productPage.set(1);
-        this.filters.patchValue({ productSearch: saved.internalCode, categoryId: '', includeOutOfStock: false });
+        this.filters.patchValue({ productSearch: saved.internalCode, categoryId: '' });
       }
       this.notice.set(`Producto guardado. N.º de producto: ${saved.internalCode}.`); await this.reload();
     } catch (e) {
@@ -392,7 +391,7 @@ export class Catalog implements OnInit {
       let totalPages = 1;
       do {
         const result = await this.api.products({ search, categoryId: attempted.categoryId || undefined,
-          includeInactive: false, includeOutOfStock: false, page, pageSize: 200 });
+          includeInactive: false, page, pageSize: 200 });
         matches.push(...result.items);
         totalPages = result.totalPages;
         page++;
