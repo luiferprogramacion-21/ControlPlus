@@ -662,7 +662,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task ElectronicPaymentReferences_AreOptional_ButReceivedAmountAndChangeRemainInvalid()
+    public async Task ElectronicPayments_RequireReferences_AndCannotDeclareReceivedAmountOrChange()
     {
         using var client = CreateClient();
         var scenario = await BootstrapAsync(client);
@@ -673,15 +673,12 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         await AssertProblemAsync(await PostSaleAsync(client, "transfer-change", new ConfirmSaleRequest(
             null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
             [new("TRANSFERENCIA", 1_000m, 1_050m, "TRANSFER-CHANGE-REJECTED")])), HttpStatusCode.BadRequest);
-        var transfer = await ReadAsync<SaleDto>(await PostSaleAsync(client, "transfer-no-reference", new ConfirmSaleRequest(
+        await AssertProblemAsync(await PostSaleAsync(client, "transfer-no-reference", new ConfirmSaleRequest(
             null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
-            [new("TRANSFERENCIA", 1_000m, null, null)])), HttpStatusCode.Created);
-        Assert.Null(Assert.Single(transfer.Payments).Reference);
-
-        var nequiWithoutReference = await ReadAsync<SaleDto>(await PostSaleAsync(client, "nequi-no-reference", new ConfirmSaleRequest(
+            [new("TRANSFERENCIA", 1_000m, null, null)])), HttpStatusCode.BadRequest);
+        await AssertProblemAsync(await PostSaleAsync(client, "nequi-no-reference", new ConfirmSaleRequest(
             null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
-            [new("NEQUI", 1_000m, null, " ")])), HttpStatusCode.Created);
-        Assert.Null(Assert.Single(nequiWithoutReference.Payments).Reference);
+            [new("NEQUI", 1_000m, null, " ")])), HttpStatusCode.BadRequest);
         await AssertProblemAsync(await PostSaleAsync(client, "cash-no-received", new ConfirmSaleRequest(
             null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
             [new("EFECTIVO", 1_000m, null, null)])), HttpStatusCode.BadRequest);
