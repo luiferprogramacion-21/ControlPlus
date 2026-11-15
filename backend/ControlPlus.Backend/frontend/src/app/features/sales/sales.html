@@ -14,26 +14,47 @@
       </dl>
       <p class="badge print-status" [class.badge--info]="!printed() || (lastJobStatus() && lastJobStatus() !== 'IMPRESO')" [class.badge--success]="printed() && (!lastJobStatus() || lastJobStatus() === 'IMPRESO')" role="status">{{ lastJobStatus() ? 'Ticket: ' + lastJobStatus() : (printed() ? 'Ticket enviado al navegador' : 'Ticket sin imprimir') }}</p>
       @if (reprintMessage()) { <p class="field-hint" role="status">{{ reprintMessage() }}</p> }
-      @if (showDetail()) {
-        @if (result.lines?.length) {
-          <div class="table-wrap receipt-lines">
-            <table aria-label="Detalle de productos vendidos"><thead><tr><th>Producto</th><th class="align-right">Cantidad</th><th class="align-right">Subtotal</th></tr></thead>
-              <tbody>@for (line of result.lines; track line.id) { <tr><td>{{ line.productName }}</td><td class="align-right">{{ line.quantity }}</td><td class="align-right">{{ line.netAmount | currency:'COP':'symbol':'1.0-0' }}</td></tr> }</tbody>
-            </table>
-          </div>
-        }
-        <dl class="sale-detail">
-          @if (receipt(); as meta) { <div><dt>Cliente</dt><dd>{{ meta.customer }}</dd></div><div><dt>Operador</dt><dd>{{ meta.operator }}</dd></div><div><dt>Productos</dt><dd>{{ meta.items }}</dd></div><div><dt>Unidades</dt><dd>{{ meta.units }}</dd></div> }
-          @if (result.discountTotal) { <div><dt>Descuento</dt><dd>{{ result.discountTotal | currency:'COP':'symbol':'1.0-0' }}</dd></div> }
-          @for (payment of result.payments; track payment.methodCode) { <div><dt>{{ payment.methodName || payment.methodCode }}</dt><dd>{{ payment.appliedAmount | currency:'COP':'symbol':'1.0-0' }}</dd></div> }
-        </dl>
-      }
       <div class="success-actions">
         <button class="button button--secondary" type="button" (click)="printSaleTicket()" [disabled]="busy() || (printed() && !session.has('SALES.REPRINT'))">{{ lastJobStatus() === 'ERROR' ? 'Reintentar ticket' : (printed() ? 'Reimprimir' : 'Imprimir ticket') }}</button>
-        <button class="button button--secondary" type="button" (click)="showDetail.set(!showDetail())">{{ showDetail() ? 'Ocultar detalle' : 'Ver detalle' }}</button>
+        <button class="button button--secondary" type="button" (click)="showDetail.set(true)">Ver detalle</button>
         <button id="new-sale" class="button button--primary" type="button" (click)="newSale()">Nueva venta · Enter</button>
       </div>
     </section>
+    @if (showDetail()) {
+      <div class="module-form-sheet pos-sale-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="pos-sale-detail-title" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown.escape)="$event.stopPropagation(); showDetail.set(false)">
+        <div class="module-form-sheet__backdrop" (click)="showDetail.set(false)"></div>
+        <section class="panel panel--padded module-form pos-sale-detail">
+          <div class="pos-sale-detail__heading"><h2 id="pos-sale-detail-title">Venta {{ result.visibleNumber }}</h2><p>{{ formatDate(result.occurredAtUtc) }} · {{ result.creditId ? 'A crédito' : 'Confirmada' }}</p></div>
+          <div class="pos-sale-detail__summary">
+            <div><span>Total</span><strong>{{ result.total | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+            <div><span>Cambio</span><strong>{{ result.change | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+            @if (result.discountTotal) { <div><span>Descuento</span><strong>{{ result.discountTotal | currency:'COP':'symbol':'1.0-0' }}</strong></div> }
+            @if (receipt(); as meta) { <div><span>Cliente</span><strong>{{ meta.customer }}</strong></div><div><span>Operador</span><strong>{{ meta.operator }}</strong></div><div><span>Productos</span><strong>{{ meta.items }} · {{ meta.units }} unidades</strong></div> }
+          </div>
+
+          <h3>Productos</h3>
+          <div class="pos-sale-detail__list">
+            @for (line of result.lines; track line.id) {
+              <div class="pos-sale-detail__row">
+                <div class="pos-sale-detail__description"><strong>{{ line.productName }}</strong><span>{{ line.productCode }}</span></div>
+                <div class="pos-sale-detail__values"><span>{{ line.quantity }} × {{ line.unitPrice | currency:'COP':'symbol':'1.0-0' }}</span><strong>{{ line.netAmount | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+              </div>
+            } @empty { <p class="pos-sale-detail__empty">No hay productos para mostrar.</p> }
+          </div>
+
+          <h3>Pagos</h3>
+          <div class="pos-sale-detail__list">
+            @for (payment of result.payments; track payment.methodCode) {
+              <div class="pos-sale-detail__row">
+                <div class="pos-sale-detail__description"><strong>{{ payment.methodName || payment.methodCode }}</strong>@if (payment.reference) { <span>Referencia: {{ payment.reference }}</span> }</div>
+                <strong>{{ payment.appliedAmount | currency:'COP':'symbol':'1.0-0' }}</strong>
+              </div>
+            } @empty { <p class="pos-sale-detail__empty">Venta a crédito sin pagos iniciales.</p> }
+          </div>
+          <div class="pos-sale-detail__actions"><button class="button button--primary" type="button" autofocus (click)="showDetail.set(false)">Cerrar</button></div>
+        </section>
+      </div>
+    }
   } @else if (!checkoutMode()) {
     <div class="pos-grid">
       <section class="panel pos-main">
@@ -128,8 +149,8 @@
             <fieldset class="payment-card" [disabled]="busy() || locked"><legend>Medio {{ $index + 1 }}</legend><div class="payment-card__grid">
               <div><label class="field-label" [for]="'method-' + payment.code">Medio</label><select class="text-field" [id]="'method-' + payment.code" [value]="payment.code" (change)="setPaymentMethod(payment.code, $any($event.target).value)"><option value="EFECTIVO" [disabled]="paymentUsed('EFECTIVO') && payment.code !== 'EFECTIVO'">Efectivo</option><option value="TRANSFERENCIA" [disabled]="paymentUsed('TRANSFERENCIA') && payment.code !== 'TRANSFERENCIA'">Transferencia</option><option value="NEQUI" [disabled]="paymentUsed('NEQUI') && payment.code !== 'NEQUI'">Nequi</option></select></div>
               @if (payment.code === 'EFECTIVO') { <div><label class="field-label" for="cash-received">Efectivo entregado</label><div class="money-field"><span>$</span><input id="cash-received" type="number" min="0" step="1" [ngModel]="cashReceived" (ngModelChange)="onCashReceived($event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('EFECTIVO')">Efectivo exacto</button><div class="payment-result"><span>Aporta a la venta</span><strong>{{ cashApplied | currency:'COP':'symbol':'1.0-0' }}</strong><small>Cambio: {{ change | currency:'COP':'symbol':'1.0-0' }}</small></div></div> }
-              @if (payment.code === 'TRANSFERENCIA') { <div><label class="field-label" for="transfer-applied">Monto con este medio</label><div class="money-field"><span>$</span><input id="transfer-applied" type="number" min="0" step="1" [ngModel]="transferApplied" (ngModelChange)="onElectronicAmount('TRANSFERENCIA', $event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('TRANSFERENCIA')">Usar saldo pendiente</button></div><div class="payment-card__wide"><label class="field-label" for="transfer-reference">Referencia de transferencia</label><input id="transfer-reference" class="text-field" [(ngModel)]="transferReference" maxlength="100"></div> }
-              @if (payment.code === 'NEQUI') { <div><label class="field-label" for="nequi-applied">Monto con este medio</label><div class="money-field"><span>$</span><input id="nequi-applied" type="number" min="0" step="1" [ngModel]="nequiApplied" (ngModelChange)="onElectronicAmount('NEQUI', $event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('NEQUI')">Usar saldo pendiente</button></div><div class="payment-card__wide"><label class="field-label" for="nequi-reference">Referencia de Nequi</label><input id="nequi-reference" class="text-field" [(ngModel)]="nequiReference" maxlength="100"></div> }
+              @if (payment.code === 'TRANSFERENCIA') { <div><label class="field-label" for="transfer-applied">Monto con este medio</label><div class="money-field"><span>$</span><input id="transfer-applied" type="number" min="0" step="1" [ngModel]="transferApplied" (ngModelChange)="onElectronicAmount('TRANSFERENCIA', $event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('TRANSFERENCIA')">Usar saldo pendiente</button></div><div class="payment-card__wide"><label class="field-label" for="transfer-reference">Referencia de transferencia <span>(opcional)</span></label><input id="transfer-reference" class="text-field" [(ngModel)]="transferReference" maxlength="100" placeholder="Número del comprobante, si está disponible"></div> }
+              @if (payment.code === 'NEQUI') { <div><label class="field-label" for="nequi-applied">Monto con este medio</label><div class="money-field"><span>$</span><input id="nequi-applied" type="number" min="0" step="1" [ngModel]="nequiApplied" (ngModelChange)="onElectronicAmount('NEQUI', $event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('NEQUI')">Usar saldo pendiente</button></div><div class="payment-card__wide"><label class="field-label" for="nequi-reference">Referencia de Nequi <span>(opcional)</span></label><input id="nequi-reference" class="text-field" [(ngModel)]="nequiReference" maxlength="100" placeholder="Número del comprobante, si está disponible"></div> }
             </div>@if (activePayments().length > 1) { <button class="payment-card__remove" type="button" (click)="removePayment(payment.code)">Quitar medio</button> }</fieldset>
           }
         </div>

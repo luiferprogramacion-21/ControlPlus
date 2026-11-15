@@ -134,11 +134,13 @@ describe('Sales: punto de venta de contado', () => {
       expect(component.activePayments()).toEqual(['EFECTIVO']); expect(component.cashApplied).toBe(20000);
       component.onCashReceived(50000); expect(component.remaining).toBe(0);
     });
-    it('la transferencia exige referencia y el mensaje lo dice al confirmar', async () => {
+    it('permite confirmar una transferencia sin referencia y la envía como opcional', async () => {
+      confirm.mockResolvedValue({ id: 's-transfer', visibleNumber: 'VTA-001-000011', total: 50000, change: 0, state: 'CONFIRMADA', payments: [], creditId: null, lines: [] });
       component.startCheckout(); component.setPaymentMethod('EFECTIVO', 'TRANSFERENCIA');
       expect(component.transferApplied).toBe(50000);
       await component.confirm();
-      expect(confirm).not.toHaveBeenCalled(); expect(component.error()).toContain('referencia de la transferencia');
+      expect(confirm.mock.calls[0][0]).toEqual(expect.objectContaining({ payments: [{ methodCode: 'TRANSFERENCIA', appliedAmount: 50000, receivedAmount: null, reference: null }] }));
+      expect(component.error()).toBe('');
     });
     it('el efectivo insuficiente sugiere el pago mixto', async () => {
       component.startCheckout(); component.onCashReceived(10000);
@@ -161,6 +163,13 @@ describe('Sales: punto de venta de contado', () => {
       await component.confirm();
       component.handleShortcut({ key: 'Enter', target: null, preventDefault() { /* sin efecto */ } } as unknown as KeyboardEvent);
       expect(component.sale()).toBeNull(); expect(component.receipt()).toBeNull(); expect(component.saleType()).toBe('CONTADO');
+    });
+    it('el modal de detalle protege la venta confirmada y se cierra con Escape', async () => {
+      await component.confirm(); component.showDetail.set(true);
+      component.handleShortcut({ key: 'Enter', target: null, preventDefault() { /* sin efecto */ } } as unknown as KeyboardEvent);
+      expect(component.sale()?.id).toBe('s1'); expect(component.showDetail()).toBe(true);
+      component.handleShortcut({ key: 'Escape', target: null, preventDefault() { /* sin efecto */ } } as unknown as KeyboardEvent);
+      expect(component.showDetail()).toBe(false); expect(component.sale()?.id).toBe('s1');
     });
     it('Nueva venta limpia al cliente y el descuento de la venta anterior', async () => {
       component.customerId = 'c1'; component.discountReason = 'x';

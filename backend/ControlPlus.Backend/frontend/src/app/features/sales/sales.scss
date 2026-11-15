@@ -61,3 +61,34 @@
 .cart-table tr.is-wholesale td { background:var(--cp-warning-soft); }
 
 .pos-select { max-width:140px; min-height:36px; padding:4px 6px; border:1px solid var(--cp-control-border); border-radius:7px; background:var(--cp-surface); font-size:12px; }
+
+.module-form.pos-sale-detail { display:block; width:min(100%,680px); margin:0; text-align:left; }
+.pos-sale-detail__heading { margin-bottom:16px; }
+.pos-sale-detail__heading h2 { margin:0 0 4px; font-size:20px; }
+.pos-sale-detail__heading p { margin:0; color:var(--cp-text-secondary); }
+.pos-sale-detail__summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.pos-sale-detail__summary > div { display:flex; min-width:0; flex-direction:column; gap:4px; padding:11px 13px; border-radius:9px; background:var(--cp-table-head); }
+.pos-sale-detail__summary span { color:var(--cp-text-muted); font-size:12px; }
+.pos-sale-detail__summary strong { min-width:0; overflow-wrap:anywhere; font-size:16px; }
+.pos-sale-detail h3 { margin:18px 0 8px; font-size:16px; }
+.pos-sale-detail__list { width:100%; overflow:hidden; border:1px solid var(--cp-border); border-radius:10px; }
+.pos-sale-detail__row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:20px; width:100%; min-width:0; padding:11px 13px; border-bottom:1px solid var(--cp-border); }
+.pos-sale-detail__row:last-child { border-bottom:0; }
+.pos-sale-detail__description,.pos-sale-detail__values { display:flex; min-width:0; flex-direction:column; gap:3px; }
+.pos-sale-detail__description strong { min-width:0; overflow-wrap:anywhere; }
+.pos-sale-detail__description span,.pos-sale-detail__values span { color:var(--cp-text-muted); font-size:12px; }
+.pos-sale-detail__values { flex:0 0 auto; align-items:flex-end; text-align:right; }
+.pos-sale-detail__empty { margin:0; padding:13px; color:var(--cp-text-muted); text-align:center; }
+.pos-sale-detail__actions { display:flex; justify-content:flex-end; margin-top:20px; padding-top:16px; border-top:1px solid var(--cp-border); }
+.pos-sale-detail__actions .button { min-width:120px; }
+
+@media(max-width:700px) {
+  .pos-sale-detail-sheet { padding:10px; }
+  .module-form.pos-sale-detail { max-height:calc(100dvh - 20px); padding:16px; }
+}
+@media(max-width:460px) {
+  .pos-sale-detail__summary,.pos-sale-detail__row { grid-template-columns:minmax(0,1fr); }
+  .pos-sale-detail__row { align-items:flex-start; gap:8px; }
+  .pos-sale-detail__values { align-items:flex-start; text-align:left; }
+  .pos-sale-detail__actions .button { width:100%; }
+}

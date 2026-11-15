@@ -19,30 +19,43 @@
   </section>
 
   @if (detail(); as d) {
-    <section class="panel module-panel sale-detail" aria-label="Detalle de la venta">
-      <div class="module-toolbar"><div><h3>Venta {{ d.visibleNumber }}</h3><p>{{ d.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }} · {{ label(d.state) }}{{ d.creditId ? ' · a crédito' : '' }}</p></div><button class="table-action" type="button" (click)="closeDetail()">Cerrar</button></div>
-      <div class="sale-summary">
-        <div><span>Subtotal</span><strong>{{ d.grossSubtotal | currency:'COP':'symbol':'1.0-0' }}</strong></div>
-        <div><span>Descuento</span><strong>{{ d.discountTotal | currency:'COP':'symbol':'1.0-0' }}</strong></div>
-        <div><span>Total</span><strong>{{ d.total | currency:'COP':'symbol':'1.0-0' }}</strong></div>
-        <div><span>Cambio entregado</span><strong>{{ d.change | currency:'COP':'symbol':'1.0-0' }}</strong></div>
-      </div>
-      @if (canChange(d) || canCancel(d) || canReprint(d)) { <div class="sale-detail-actions">
-        @if (canReprint(d)) { <button class="button button--secondary" type="button" [disabled]="reprinting() || saving()" (click)="reprint()">{{ printStatus() === 'ERROR' ? 'Reintentar ticket' : 'Reimprimir ticket' }}</button> }
-        @if (canChange(d)) { <button class="button button--secondary" type="button" [disabled]="saving()" (click)="changing.set(true)">Cambio de productos</button> }
-        @if (canCancel(d)) { <button class="button button--secondary sale-cancel-action" type="button" [disabled]="saving()" (click)="startCancel()">Anular venta</button> }
-      </div> }
-      @if (printMessage() || printStatus()) { <p class="muted" role="status">{{ printMessage() || ('Último ticket: ' + printStatus()) }}</p> }
-      <h3>Productos</h3>
-      <div class="table-wrap module-table-wrap"><table><thead><tr><th>Código</th><th>Producto</th><th class="align-right">Cantidad</th><th class="align-right">Precio</th><th class="align-right">Subtotal</th></tr></thead><tbody>
-        @for (line of d.lines; track line.id) { <tr><td class="numeric">{{ line.productCode }}</td><td>{{ line.productName }}</td><td class="align-right numeric">{{ line.quantity }}</td><td class="align-right numeric">{{ line.unitPrice | currency:'COP':'symbol':'1.0-0' }}</td><td class="align-right numeric">{{ line.netAmount | currency:'COP':'symbol':'1.0-0' }}</td></tr> }
-      </tbody></table></div>
-      <h3>Pagos</h3>
-      <div class="table-wrap module-table-wrap"><table><thead><tr><th>Medio</th><th>Referencia</th><th class="align-right">Aplicado</th></tr></thead><tbody>
-        @for (payment of d.payments; track payment.id) { <tr><td>{{ payment.methodName }}</td><td>{{ payment.reference || '—' }}</td><td class="align-right numeric">{{ payment.appliedAmount | currency:'COP':'symbol':'1.0-0' }}</td></tr> }
-        @empty { <tr class="empty-row"><td colspan="3">{{ d.creditId ? 'Venta a crédito: sin pagos iniciales.' : 'Sin pagos registrados.' }}</td></tr> }
-      </tbody></table></div>
-    </section>
+    <div class="module-form-sheet sale-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="sale-detail-title" [cdkTrapFocus]="!changing() && !cancelling()" [cdkTrapFocusAutoCapture]="true" (keydown.escape)="$event.stopPropagation(); closeDetail()">
+      <div class="module-form-sheet__backdrop" (click)="closeDetail()"></div>
+      <section class="panel panel--padded module-form sales-history-detail">
+        <div class="sale-detail__heading"><h2 id="sale-detail-title">Venta {{ d.visibleNumber }}</h2><p>{{ d.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }} · {{ label(d.state) }}{{ d.creditId ? ' · a crédito' : '' }}</p></div>
+        <div class="sale-summary">
+          <div><span>Subtotal</span><strong>{{ d.grossSubtotal | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+          <div><span>Descuento</span><strong>{{ d.discountTotal | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+          <div><span>Total</span><strong>{{ d.total | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+          <div><span>Cambio entregado</span><strong>{{ d.change | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+        </div>
+        @if (printMessage() || printStatus()) { <p class="muted" role="status">{{ printMessage() || ('Último ticket: ' + printStatus()) }}</p> }
+        <h3>Productos</h3>
+        <div class="sale-detail-list">
+          @for (line of d.lines; track line.id) {
+            <div class="sale-detail-row">
+              <div class="sale-detail-row__description"><strong>{{ line.productName }}</strong><span>{{ line.productCode }}</span></div>
+              <div class="sale-detail-row__values"><span>{{ line.quantity }} × {{ line.unitPrice | currency:'COP':'symbol':'1.0-0' }}</span><strong>{{ line.netAmount | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+            </div>
+          }
+        </div>
+        <h3>Pagos</h3>
+        <div class="sale-detail-list">
+          @for (payment of d.payments; track payment.id) {
+            <div class="sale-detail-row">
+              <div class="sale-detail-row__description"><strong>{{ payment.methodName }}</strong>@if (payment.reference) { <span>Referencia: {{ payment.reference }}</span> }</div>
+              <strong class="sale-detail-row__amount">{{ payment.appliedAmount | currency:'COP':'symbol':'1.0-0' }}</strong>
+            </div>
+          } @empty { <p class="sale-detail-empty">{{ d.creditId ? 'Venta a crédito sin pagos iniciales.' : 'Sin pagos registrados.' }}</p> }
+        </div>
+        <div class="sale-detail-actions">
+          @if (canReprint(d)) { <button class="button button--secondary" type="button" [disabled]="reprinting() || saving()" (click)="reprint()">{{ printStatus() === 'ERROR' ? 'Reintentar ticket' : 'Reimprimir ticket' }}</button> }
+          @if (canChange(d)) { <button class="button button--secondary" type="button" [disabled]="saving()" (click)="changing.set(true)">Cambio de productos</button> }
+          @if (canCancel(d)) { <button class="button button--secondary sale-cancel-action" type="button" [disabled]="saving()" (click)="startCancel()">Anular venta</button> }
+          <button class="button button--primary sale-detail-close" type="button" autofocus (click)="closeDetail()">Cerrar</button>
+        </div>
+      </section>
+    </div>
   }
 
   @if (changing() && detail(); as d) { <cp-sale-change [sale]="d" (changed)="changeDone($event)" (closed)="changing.set(false)" /> }

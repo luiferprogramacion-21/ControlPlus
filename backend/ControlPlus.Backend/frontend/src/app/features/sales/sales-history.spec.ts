@@ -39,6 +39,20 @@ describe('SalesHistory: historial y anulación', () => {
     permissions.push('SALES.ALL_READ'); await create(); expect(api.list).toHaveBeenLastCalledWith(true, 1, 20);
   });
 
+  it('muestra el detalle en una ventana modal y permite cerrarla', async () => {
+    const fixture = TestBed.createComponent(SalesHistory);
+    fixture.detectChanges(); await fixture.whenStable();
+    fixture.componentInstance.detail.set(sale()); fixture.detectChanges();
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"][aria-labelledby="sale-detail-title"]');
+    expect(dialog).toBeTruthy();
+    expect(dialog.querySelector('.sales-history-detail')).toBeTruthy();
+    expect(dialog.querySelector('#sale-detail-title')?.textContent).toContain('VTA-1');
+    expect(dialog.querySelector('table')).toBeNull();
+    expect(dialog.querySelector('.sale-detail-actions .sale-detail-close')?.textContent).toContain('Cerrar');
+    dialog.querySelector('.module-form-sheet__backdrop').click(); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('#sale-detail-title')).toBeNull();
+  });
+
   it.each([['ADMINISTRADOR', true], ['SUPERVISOR', true], ['CAJERO', false]])('%s: botón de anular = %s', async (role, visible) => {
     roles = [role]; const component = await create();
     expect(component.canCancel(sale())).toBe(visible);

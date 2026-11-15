@@ -1,3 +1,4 @@
+import { A11yModule } from '@angular/cdk/a11y';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, OnInit, signal } from '@angular/core';
@@ -17,7 +18,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
 
 @Component({
   selector: 'cp-sales-history',
-  imports: [CurrencyPipe, DatePipe, FormsModule, MatPaginatorModule, RouterLink, Icon, SaleChange],
+  imports: [A11yModule, CurrencyPipe, DatePipe, FormsModule, MatPaginatorModule, RouterLink, Icon, SaleChange],
   templateUrl: './sales-history.html',
   styleUrls: ['../directory.scss', './sales-history.scss'],
 })

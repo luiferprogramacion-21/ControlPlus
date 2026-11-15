@@ -1,3 +1,4 @@
+import { A11yModule } from '@angular/cdk/a11y';
 import { Component, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, ViewChild } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -21,7 +22,7 @@ interface ReceiptMeta { customer: string; operator: string; items: number; units
 type PaymentCode = 'EFECTIVO' | 'TRANSFERENCIA' | 'NEQUI';
 const SUGGEST_DELAY_MS = 250;
 
-@Component({ selector: 'cp-sales', imports: [FormsModule, CurrencyPipe, DatePipe, MatButtonModule, RouterLink, CustomerPicker, DiscountDialog], templateUrl: './sales.html', styleUrl: './sales.scss' })
+@Component({ selector: 'cp-sales', imports: [A11yModule, FormsModule, CurrencyPipe, DatePipe, MatButtonModule, RouterLink, CustomerPicker, DiscountDialog], templateUrl: './sales.html', styleUrl: './sales.scss' })
 export class Sales implements OnInit, OnDestroy {
   private readonly catalog = inject(CatalogApi);
   private readonly cash = inject(CashApi);
@@ -478,6 +479,10 @@ export class Sales implements OnInit, OnDestroy {
     if (typeof document !== 'undefined' && document.querySelector('.cdk-overlay-container .mat-mdc-dialog-container')) return;
     if (this.showCustomer()) return;
     if (this.sale()) {
+      if (this.showDetail()) {
+        if (event.key === 'Escape') { event.preventDefault(); this.showDetail.set(false); }
+        return;
+      }
       const onControl = event.target instanceof HTMLElement && !!event.target.closest('button, input, select, textarea, a');
       if (event.key === 'Enter' && !onControl) { event.preventDefault(); this.newSale(); }
       return;
@@ -532,8 +537,6 @@ export class Sales implements OnInit, OnDestroy {
       if (this.applied !== this.estimate) return this.activePayments().length === 1 && this.paymentUsed('EFECTIVO') && this.applied < this.estimate
         ? 'El efectivo no cubre toda la venta. Pulsa «+ Pago mixto» para agregar otro medio.' : 'Los importes de pago deben cubrir el total exacto.';
       if (this.paymentUsed('EFECTIVO') && this.cashApplied > 0 && this.cashReceived < this.cashApplied) return 'El efectivo recibido debe cubrir el valor aplicado.';
-      if (this.paymentUsed('TRANSFERENCIA') && this.transferApplied > 0 && !this.transferReference.trim()) return 'Ingresa la referencia de la transferencia.';
-      if (this.paymentUsed('NEQUI') && this.nequiApplied > 0 && !this.nequiReference.trim()) return 'Ingresa la referencia de Nequi.';
     }
     if (this.customerId.trim() && !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(this.customerId.trim())) return 'El identificador del cliente no es válido.';
     return null;
@@ -547,8 +550,6 @@ export class Sales implements OnInit, OnDestroy {
   /** Moves the cursor to the field that blocks the confirmation. */
   private focusInvalid(): void {
     if (this.saleType() === 'CREDITO') { this.focusField('credit-due-date'); return; }
-    if (this.paymentUsed('TRANSFERENCIA') && this.transferApplied > 0 && !this.transferReference.trim()) { this.focusField('transfer-reference'); return; }
-    if (this.paymentUsed('NEQUI') && this.nequiApplied > 0 && !this.nequiReference.trim()) { this.focusField('nequi-reference'); return; }
     this.focusField('cash-received', 'transfer-applied', 'nequi-applied');
   }
   async confirm(): Promise<void> {
