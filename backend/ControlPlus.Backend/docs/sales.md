@@ -36,7 +36,7 @@ Solo puede usarse descuento por línea o descuento general. Los límites efectiv
 Para `CONTADO`, la suma de `appliedAmount` debe coincidir exactamente con el total. Un método no puede repetirse en la misma venta. Para `CREDITO` no se admite ningún pago inicial.
 
 - Efectivo exige `receivedAmount` entero, al menos igual al aplicado, no usa referencia y es el único método que genera cambio.
-- Transferencia y Nequi exigen referencia no vacía, no usan `receivedAmount` y nunca generan cambio.
+- Transferencia y Nequi admiten referencia opcional desde el 15 de noviembre de 2026 (una referencia en blanco se guarda como nula), no usan `receivedAmount` y nunca generan cambio. Véase `docs/optional-sale-payment-reference-activation.md`.
 
 Todos los importes se validan como COP enteros dentro de `numeric(18,0)`.
 

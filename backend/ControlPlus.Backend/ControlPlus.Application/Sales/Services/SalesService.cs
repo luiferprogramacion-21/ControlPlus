@@ -798,8 +798,6 @@ public sealed partial class SalesService(
             }
             else
             {
-                if (string.IsNullOrWhiteSpace(payment.Reference))
-                    return Validation("Transferencia y Nequi requieren una referencia no vacía.");
                 if (payment.ReceivedAmount is not null)
                     return Validation("Transferencia y Nequi no usan valor recibido ni generan cambio.");
             }
