@@ -14,7 +14,7 @@ const prep = (overrides: Partial<ChangePreparation> = {}): ChangePreparation => 
 const pants = { id: 'p2', name: 'Pantalón', internalCode: 'P-2', retailPrice: 25000, wholesalePrice: null, availableStock: 5, isActive: true } as unknown as Product;
 
 describe('SaleChange: cambio de productos', () => {
-  const api = { changePreparation: vi.fn(), confirmChange: vi.fn() };
+  const api = { changePreparation: vi.fn(), confirmChange: vi.fn(), pricingRules: vi.fn() };
   const catalog = { products: vi.fn() };
   const roles = { current: ['ADMINISTRADOR'] };
   const session = { user: () => ({ userName: 'admin' }), hasRole: (...c: string[]) => c.some(x => roles.current.includes(x)) };
@@ -34,7 +34,16 @@ describe('SaleChange: cambio de productos', () => {
   beforeEach(() => {
     vi.clearAllMocks(); prompt = null; dialogError = undefined; roles.current = ['ADMINISTRADOR'];
     api.confirmChange.mockResolvedValue({ visibleNumber: 'CAM-1', difference: 5000 });
+    api.pricingRules.mockResolvedValue({ wholesaleMinimumQuantity: 2 });
     TestBed.configureTestingModule({ providers: [{ provide: SalesApi, useValue: api }, { provide: CatalogApi, useValue: catalog }, { provide: AuthorizationDialog, useValue: dialog }, { provide: SessionService, useValue: session }] });
+  });
+
+  it('exige el mínimo mayorista configurado sobre las unidades entregadas', async () => {
+    const c = await open(); expect(c.wholesaleMin()).toBe(2);
+    c.returning()[0].quantity = 1; c.addDelivered({ ...pants, wholesalePrice: 20000 } as Product);
+    c.delivering()[0].priceType = 'MAYORISTA';
+    expect(c.validation()).toContain('exige entregar 2 o más unidades de Pantalón');
+    c.delivering()[0].quantity = 2; expect(c.validation()).not.toContain('mayorista');
   });
 
   it('exige devolver y entregar al menos un producto', async () => {

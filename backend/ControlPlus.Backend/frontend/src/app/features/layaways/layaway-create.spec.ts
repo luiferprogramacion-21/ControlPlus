@@ -12,7 +12,7 @@ const product = (extra: Partial<Product> = {}): Product => ({ id: 'p1', internal
 const customer = { id: 'c1', fullName: 'Ana', documentNumber: '123', phone: null, address: 'Calle 1', isActive: true } as Customer;
 
 describe('LayawayCreate: nuevo apartado', () => {
-  const api = { create: vi.fn(), creationRules: vi.fn() };
+  const api = { create: vi.fn(), creationRules: vi.fn(), pricingRules: vi.fn() };
   const customers = { list: vi.fn() };
   const catalog = { products: vi.fn() };
   const state = { roles: ['CAJERO'] };
@@ -35,6 +35,7 @@ describe('LayawayCreate: nuevo apartado', () => {
     vi.clearAllMocks(); prompt = null; dialogError = undefined; credentials = { userName: 'supervisor', password: 'secreto' };
     api.create.mockResolvedValue({ id: 'a1', visibleNumber: 'APT-1', total: 10000, balance: 0 });
     api.creationRules.mockResolvedValue({ requireMinimumInitial: true, minimumPercentage: 20, defaultDays: 15 });
+    api.pricingRules.mockResolvedValue({ wholesaleMinimumQuantity: 3 });
     customers.list.mockResolvedValue({ items: [customer], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 });
     catalog.products.mockResolvedValue({ items: [product()], page: 1, pageSize: 30, totalCount: 1, totalPages: 1 });
     TestBed.configureTestingModule({ providers: [
@@ -43,6 +44,17 @@ describe('LayawayCreate: nuevo apartado', () => {
     ] });
     component = TestBed.runInInjectionContext(() => new LayawayCreate());
     created = []; component.created.subscribe(x => created.push(x));
+  });
+
+  it('avisa el mínimo mayorista configurado antes de confirmar', async () => {
+    await Promise.resolve(); await Promise.resolve();
+    expect(component.wholesaleMin()).toBe(3);
+    component.selectCustomer(customer); component.add(product(), 'MAYORISTA');
+    component.drafts = [{ methodCode: 'EFECTIVO', appliedAmount: 8000, receivedAmount: 8000, reference: '' }];
+    component.lines()[0].quantity = 2;
+    expect(component.validation()).toContain('exige 3 o más unidades de Cuaderno');
+    component.lines()[0].quantity = 3; component.drafts[0].appliedAmount = 24000; component.drafts[0].receivedAmount = 24000;
+    expect(component.validation()).not.toContain('mayorista');
   });
 
   it('busca clientes activos y productos', async () => {

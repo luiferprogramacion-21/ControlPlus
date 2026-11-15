@@ -69,6 +69,8 @@ export class LayawaysApi {
       { expectedVersion: layaway.version, payments }, { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
   }
   creationRules(): Promise<LayawayCreationRules> { return firstValueFrom(this.http.get<LayawayCreationRules>('/api/layaways/creation-rules')); }
+  /** Units of the same product required for the wholesale price (configured by the Administrator). */
+  pricingRules(): Promise<{ wholesaleMinimumQuantity: number }> { return firstValueFrom(this.http.get<{ wholesaleMinimumQuantity: number }>('/api/sales/pricing-rules')); }
   create(input: CreateLayawayInput, key: string): Promise<CreatedLayaway> {
     return firstValueFrom(this.http.post<CreatedLayaway>('/api/layaways', input, { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
   }

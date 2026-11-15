@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
-import { ChangePolicy, ConfigApi, CreditSettings, LayawaySettings } from './config-api';
+import { ChangePolicy, ConfigApi, CreditSettings, LayawaySettings, SalesSettings } from './config-api';
 
 /** Time limit for product changes and the parameters of layaways. Both only affect documents created afterwards. */
 @Component({
@@ -54,6 +54,20 @@ import { ChangePolicy, ConfigApi, CreditSettings, LayawaySettings } from './conf
         </form>
       } @else if (creditLoadError()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ creditLoadError() }} <button class="link-button" type="button" (click)="loadCredit()">Reintentar</button></div>
       } @else { <p class="muted" role="status">Cargando…</p> }
+    </section>
+
+    <section class="panel module-panel">
+      <div class="module-toolbar"><div><h3>Precio mayorista</h3><p class="muted">Unidades de un mismo producto desde las que se puede vender, apartar o entregar en un cambio a precio mayorista. Los documentos ya registrados no cambian.</p></div></div>
+      @if (sales(); as current) {
+        <form class="settings-form" (submit)="$event.preventDefault(); saveSales()">
+          <label class="field-label" for="wholesale-minimum">Mínimo de unidades</label>
+          <div class="money-field"><span>#</span><input id="wholesale-minimum" name="wholesaleMinimum" type="number" min="1" max="999" step="1" [(ngModel)]="wholesaleMinimum"><b>unidades</b></div>
+          @if (salesError()) { <p class="field-error" role="alert">{{ salesError() }}</p> }
+          @if (salesNotice()) { <p class="field-hint" role="status">{{ salesNotice() }}</p> }
+          <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="savingSales() || Number(wholesaleMinimum) === current.wholesaleMinimumQuantity">{{ savingSales() ? 'Guardando…' : 'Guardar mínimo' }}</button></div>
+        </form>
+      } @else if (salesLoadError()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ salesLoadError() }} <button class="link-button" type="button" (click)="loadSales()">Reintentar</button></div>
+      } @else { <p class="muted" role="status">Cargando…</p> }
     </section>`,
   styles: ['.settings-form { max-width: 460px; } .settings-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; }'],
 })
@@ -79,7 +93,31 @@ export class SettingsPanel implements OnInit {
   layawayDays: number | null = 15;
   chooseEachDate = false;
 
-  ngOnInit(): void { void this.load(); void this.loadCredit(); }
+  readonly sales = signal<SalesSettings | null>(null);
+  readonly salesLoadError = signal('');
+  readonly savingSales = signal(false);
+  readonly salesError = signal(''); readonly salesNotice = signal('');
+  wholesaleMinimum: number | null = 12;
+  ngOnInit(): void { void this.load(); void this.loadCredit(); void this.loadSales(); }
+  async loadSales(): Promise<void> {
+    this.salesLoadError.set('');
+    try { this.applySales(await this.api.salesSettings()); } catch (e) { this.salesLoadError.set(errorText(e)); }
+  }
+  private applySales(settings: SalesSettings): void { this.sales.set(settings); this.wholesaleMinimum = settings.wholesaleMinimumQuantity; }
+  validateSales(): string {
+    const value = Number(this.wholesaleMinimum);
+    return Number.isInteger(value) && value >= 1 && value <= 999 ? '' : 'El mínimo debe ser un número entero entre 1 y 999.';
+  }
+  async saveSales(): Promise<void> {
+    const current = this.sales(); if (!current || this.savingSales()) return;
+    const issue = this.validateSales(); if (issue) { this.salesError.set(issue); return; }
+    this.savingSales.set(true); this.salesError.set(''); this.salesNotice.set('');
+    try {
+      this.applySales(await this.api.updateSalesSettings(Number(this.wholesaleMinimum), current.version));
+      this.salesNotice.set('Mínimo guardado. Aplica a las ventas, apartados y cambios nuevos.');
+    } catch (e) { this.salesError.set(errorText(e)); try { this.sales.set(await this.api.salesSettings()); } catch { /* el error ya se muestra */ } }
+    finally { this.savingSales.set(false); }
+  }
 
   async load(): Promise<void> {
     this.loadError.set('');

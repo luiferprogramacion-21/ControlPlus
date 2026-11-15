@@ -9,6 +9,7 @@ import { CatalogApi, Product } from '../catalog/catalog-api';
 import { appliedTotal, emptyDraft, money, PaymentDraft, PaymentMethods, validateDrafts } from '../layaways/payment-methods';
 import { ChangePaymentInput, ChangePreparation, ConfirmChangeInput, ConfirmedChange, SaleDetail, SalesApi } from './sales-api';
 import { ChangeTreatment, returnValue, settle } from './sale-change-math';
+import { WHOLESALE_MIN_QUANTITY } from './sale-discount';
 
 interface Returning { saleLineId: string; productId: string; code: string; name: string; sold: number; remaining: number; net: number; quantity: number; resellable: boolean; }
 interface Delivering { product: Product; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; }
@@ -42,7 +43,13 @@ export class SaleChange implements OnInit {
   drafts: PaymentDraft[] = [emptyDraft()];
   private pending: Pending | null = null;
 
-  ngOnInit(): void { void this.load(); }
+  /** Units of a delivered product required for the wholesale price; 12 is only the fallback. */
+  readonly wholesaleMin = signal(WHOLESALE_MIN_QUANTITY);
+  ngOnInit(): void { void this.load(); void this.loadPricingRules(); }
+  private async loadPricingRules(): Promise<void> {
+    try { this.wholesaleMin.set((await this.api.pricingRules()).wholesaleMinimumQuantity); }
+    catch { /* The server still enforces the minimum. */ }
+  }
 
   async load(): Promise<void> {
     this.loading.set(true); this.error.set('');
@@ -102,6 +109,7 @@ export class SaleChange implements OnInit {
     for (const line of this.delivering()) {
       if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) < 1) return `La cantidad de ${line.product.name} debe ser un entero mayor que cero.`;
       if (Number(line.quantity) > this.reachable(line.product)) return `No hay existencias suficientes de ${line.product.name}.`;
+      if (line.priceType === 'MAYORISTA' && Number(line.quantity) < this.wholesaleMin()) return `El precio mayorista exige entregar ${this.wholesaleMin()} o más unidades de ${line.product.name}.`;
     }
     const s = this.settlement; if (s.error) return s.error;
     if (s.mode === 'none') return '';

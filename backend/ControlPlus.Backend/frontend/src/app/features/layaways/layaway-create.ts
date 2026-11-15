@@ -8,6 +8,7 @@ import { CatalogApi, Product } from '../catalog/catalog-api';
 import { Customer, CustomersApi } from '../customers/customers-api';
 import { CreateLayawayInput, CreatedLayaway, LayawayCreationRules, LayawayPriceType, LayawaysApi } from './layaways-api';
 import { appliedTotal, cashChange, emptyDraft, money, PaymentDraft, PaymentMethods, toPayments, validateDrafts } from './payment-methods';
+import { WHOLESALE_MIN_QUANTITY } from '../sales/sale-discount';
 
 export interface CreateLine { product: Product; quantity: number; priceType: LayawayPriceType; }
 
@@ -58,7 +59,13 @@ export class LayawayCreate {
   /** Default due date term and the date it would give; null when there is no default or the rules are unknown. */
   readonly defaultDue = computed(() => { const days = this.rules()?.defaultDays; return days == null ? null : { days, date: dateInDays(days) }; });
 
-  constructor() { void this.loadRules(); }
+  /** Units required for the wholesale price; 12 is only the fallback if the rule cannot be read. */
+  readonly wholesaleMin = signal(WHOLESALE_MIN_QUANTITY);
+  constructor() { void this.loadRules(); void this.loadPricingRules(); }
+  private async loadPricingRules(): Promise<void> {
+    try { this.wholesaleMin.set((await this.api.pricingRules()).wholesaleMinimumQuantity); }
+    catch { /* The server still enforces the minimum. */ }
+  }
 
   private async loadRules(): Promise<void> {
     try { this.rules.set(await this.api.creationRules()); }
@@ -115,6 +122,8 @@ export class LayawayCreate {
     if (!this.lines().length) return 'Agrega al menos un producto.';
     if (this.lines().some(l => !Number.isSafeInteger(Number(l.quantity)) || l.quantity < 1 || l.quantity > l.product.availableStock)) return 'Revisa las cantidades: deben ser enteras y no superar la existencia disponible.';
     if (this.lines().some(l => l.priceType === 'MAYORISTA' && !l.product.wholesalePrice)) return 'Hay un producto sin precio mayorista.';
+    const shortWholesale = this.lines().find(l => l.priceType === 'MAYORISTA' && Number(l.quantity) < this.wholesaleMin());
+    if (shortWholesale) return `El precio mayorista exige ${this.wholesaleMin()} o más unidades de ${shortWholesale.product.name}.`;
     if (this.total() <= 0) return 'El total del apartado debe ser mayor que cero.';
     const paymentIssue = validateDrafts(this.drafts, { mode: 'payment', max: this.total(), overMessage: 'El pago inicial supera el total del apartado.' });
     if (paymentIssue) return paymentIssue;

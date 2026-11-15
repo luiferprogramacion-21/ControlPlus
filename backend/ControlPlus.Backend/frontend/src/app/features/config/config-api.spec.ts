@@ -54,6 +54,15 @@ describe('ConfigApi', () => {
     expect((await created).nextNumber).toBe(1);
   });
 
+  it('lee y guarda el mínimo mayorista con la versión esperada', async () => {
+    const read = api.salesSettings(); http.expectOne('/api/sales/settings').flush({ wholesaleMinimumQuantity: 12, version: 1 });
+    expect((await read).wholesaleMinimumQuantity).toBe(12);
+    const task = api.updateSalesSettings(6, 1);
+    const put = http.expectOne('/api/sales/settings');
+    expect([put.request.method, put.request.body]).toEqual(['PUT', { wholesaleMinimumQuantity: 6, expectedVersion: 1 }]);
+    put.flush({ wholesaleMinimumQuantity: 6, version: 2 }); expect((await task).version).toBe(2);
+  });
+
   it('los créditos leen y guardan el plazo predeterminado (o nulo) con la versión esperada', async () => {
     const read = api.creditSettings(); http.expectOne('/api/credits/settings').flush({ defaultDays: 30, version: 1 }); expect((await read).defaultDays).toBe(30);
     const task = api.updateCreditSettings(45, 1);

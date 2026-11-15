@@ -13,7 +13,7 @@ const numbering = (over: Partial<Numbering> = {}): Numbering => ({ documentType:
 describe('Configuración', () => {
   const api = {
     numbering: vi.fn(), createNumbering: vi.fn(), updateNumbering: vi.fn(), changePolicy: vi.fn(), updateChangePolicy: vi.fn(),
-    layawaySettings: vi.fn(), updateLayawaySettings: vi.fn(), creditSettings: vi.fn(), updateCreditSettings: vi.fn(), reasons: vi.fn(), initializeReasons: vi.fn(),
+    layawaySettings: vi.fn(), updateLayawaySettings: vi.fn(), creditSettings: vi.fn(), updateCreditSettings: vi.fn(), salesSettings: vi.fn(), updateSalesSettings: vi.fn(), reasons: vi.fn(), initializeReasons: vi.fn(),
   };
   let permissions: string[];
   beforeEach(() => {
@@ -22,6 +22,7 @@ describe('Configuración', () => {
     api.changePolicy.mockResolvedValue({ days: 15, version: 3 });
     api.layawaySettings.mockResolvedValue({ minimumPercentage: 20, defaultDays: 15, requireMinimumInitial: true, version: 2 });
     api.creditSettings.mockResolvedValue({ defaultDays: 30, version: 1 });
+    api.salesSettings.mockResolvedValue({ wholesaleMinimumQuantity: 12, version: 1 });
     api.reasons.mockResolvedValue([]);
     TestBed.configureTestingModule({ providers: [{ provide: ConfigApi, useValue: api }, { provide: SessionService, useValue: { has: (p: string) => permissions.includes(p) } }] });
   });
@@ -147,6 +148,25 @@ describe('Configuración', () => {
       const c = await open(); api.updateCreditSettings.mockRejectedValue(new HttpErrorResponse({ status: 409, error: { code: 'concurrency.conflict' } }));
       api.creditSettings.mockResolvedValue({ defaultDays: 20, version: 5 }); c.creditDays = 45; await c.saveCredit();
       expect(c.creditError()).not.toBe(''); expect(c.credit()).toEqual({ defaultDays: 20, version: 5 });
+    });
+
+    it('guarda el mínimo de unidades para precio mayorista con la versión esperada', async () => {
+      const c = await open(); expect(c.wholesaleMinimum).toBe(12);
+      api.updateSalesSettings.mockResolvedValue({ wholesaleMinimumQuantity: 6, version: 2 });
+      c.wholesaleMinimum = 6; await c.saveSales();
+      expect(api.updateSalesSettings).toHaveBeenCalledWith(6, 1); expect(c.sales()).toEqual({ wholesaleMinimumQuantity: 6, version: 2 });
+      expect(c.salesNotice()).toContain('Mínimo guardado');
+    });
+
+    it.each([[0], [1000], [2.5], ['']])('rechaza el mínimo mayorista %s sin llamar a la API', async value => {
+      const c = await open(); c.wholesaleMinimum = value as number;
+      expect(c.validateSales()).toContain('entre 1 y 999'); await c.saveSales(); expect(api.updateSalesSettings).not.toHaveBeenCalled();
+    });
+
+    it('si no se puede leer el mínimo mayorista, el resto del panel sigue funcionando', async () => {
+      api.salesSettings.mockRejectedValue(new HttpErrorResponse({ status: 500 }));
+      const c = await open();
+      expect(c.sales()).toBeNull(); expect(c.salesLoadError()).not.toBe(''); expect(c.credit()).not.toBeNull();
     });
 
     it('si no se puede leer el plazo del crédito, el resto del panel sigue funcionando', async () => {

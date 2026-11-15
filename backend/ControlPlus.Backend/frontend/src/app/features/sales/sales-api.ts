@@ -85,6 +85,8 @@ export class SalesApi {
     return firstValueFrom(this.http.post<ConfirmedChange>(`/api/sales/${saleId}/changes`, input, { headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined }));
   }
   creditRules(): Promise<CreditRules> { return firstValueFrom(this.http.get<CreditRules>('/api/sales/credit-rules')); }
+  /** Units of the same product required for the wholesale price (configured by the Administrator). */
+  pricingRules(): Promise<{ wholesaleMinimumQuantity: number }> { return firstValueFrom(this.http.get<{ wholesaleMinimumQuantity: number }>('/api/sales/pricing-rules')); }
   customers(search: string): Promise<Page<Customer>> { return this.customersApi.list({ search, status: 'active', page: 1, pageSize: 20 }); }
   printJobs(saleId: string, page = 1, pageSize = 20): Promise<Page<PrintJob>> { return firstValueFrom(this.http.get<Page<PrintJob>>(`/api/sales/${saleId}/print-jobs`, { params: { page, pageSize } })); }
   printingStatus(): Promise<PrintStatus> { return firstValueFrom(this.http.get<PrintStatus>('/api/printing/status')); }

@@ -70,7 +70,9 @@ export class Sales implements OnInit, OnDestroy {
   /** Manual discount over the whole sale; it replaces any per-product discount. */
   generalDiscount: Discount | null = null;
   /** Minimum units of one product for the wholesale price. */
-  readonly WHOLESALE_MIN = WHOLESALE_MIN_QUANTITY;
+  /** Configured by the Administrator; 12 is only the fallback while the rule loads or if it cannot be read. */
+  readonly wholesaleMin = signal(WHOLESALE_MIN_QUANTITY);
+  get WHOLESALE_MIN(): number { return this.wholesaleMin(); }
   /**
    * Credentials of the Supervisor/Administrador who authorized a Cajero's discount or wholesale price. They were verified
    * when the concession was applied and are kept only in memory until the sale is confirmed, cancelled or loses its
@@ -91,7 +93,11 @@ export class Sales implements OnInit, OnDestroy {
   private static loadAutoPrint(): boolean { try { return localStorage.getItem(Sales.AUTO_PRINT_KEY) !== '0'; } catch { return true; } }
   setAutoPrint(value: boolean): void { this.autoPrint.set(value); try { localStorage.setItem(Sales.AUTO_PRINT_KEY, value ? '1' : '0'); } catch { /* sin almacenamiento: queda solo en esta sesión */ } }
 
-  ngOnInit(): void { if (this.route.snapshot.queryParamMap.get('modalidad') === 'credito' && this.canRequestCredit) this.saleType.set('CREDITO'); void this.refreshCash(); if (this.canRequestCredit) void this.loadCreditRules(); }
+  ngOnInit(): void { if (this.route.snapshot.queryParamMap.get('modalidad') === 'credito' && this.canRequestCredit) this.saleType.set('CREDITO'); void this.refreshCash(); if (this.canRequestCredit) void this.loadCreditRules(); void this.loadPricingRules(); }
+  private async loadPricingRules(): Promise<void> {
+    try { this.wholesaleMin.set((await this.api.pricingRules()).wholesaleMinimumQuantity); }
+    catch { /* The server still enforces the minimum; the screen keeps the default. */ }
+  }
   private async loadCreditRules(): Promise<void> {
     try { this.creditDefaultDays.set((await this.api.creditRules()).defaultDays); this.creditRulesKnown.set(true); }
     catch { /* The server still validates the due date; the screen keeps asking for it. */ }
