@@ -46,6 +46,12 @@ export class SaleChange implements OnInit {
   /** Units of a delivered product required for the wholesale price; 12 is only the fallback. */
   readonly wholesaleMin = signal(WHOLESALE_MIN_QUANTITY);
   ngOnInit(): void { void this.load(); void this.loadPricingRules(); }
+  /** Igual que el punto de venta: por debajo del mínimo, la línea vuelve a precio minorista. */
+  keepWholesaleMinimum(line: Delivering): void {
+    if (line.priceType !== 'MAYORISTA' || Number(line.quantity) >= this.wholesaleMin()) return;
+    line.priceType = 'MINORISTA';
+    this.error.set(`${line.product.name}: volvió a precio minorista, el mayorista exige entregar ${this.wholesaleMin()} o más unidades.`);
+  }
   private async loadPricingRules(): Promise<void> {
     try { this.wholesaleMin.set((await this.api.pricingRules()).wholesaleMinimumQuantity); }
     catch { /* The server still enforces the minimum. */ }

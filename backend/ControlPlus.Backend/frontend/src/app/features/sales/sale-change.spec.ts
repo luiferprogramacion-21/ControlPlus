@@ -46,6 +46,14 @@ describe('SaleChange: cambio de productos', () => {
     c.delivering()[0].quantity = 2; expect(c.validation()).not.toContain('mayorista');
   });
 
+  it('una entrega mayorista vuelve a minorista si baja del mínimo', async () => {
+    const c = await open(); c.addDelivered({ ...pants, wholesalePrice: 20000 } as Product);
+    const line = c.delivering()[0]; line.quantity = 2; line.priceType = 'MAYORISTA';
+    c.keepWholesaleMinimum(line); expect(line.priceType).toBe('MAYORISTA');
+    line.quantity = 1; c.keepWholesaleMinimum(line);
+    expect(line.priceType).toBe('MINORISTA'); expect(c.error()).toContain('volvió a precio minorista');
+  });
+
   it('exige devolver y entregar al menos un producto', async () => {
     const c = await open();
     expect(c.validation()).toContain('devuelto');

@@ -111,9 +111,16 @@ export class LayawayCreate {
     this.results.set([]); this.productSearch = '';
   }
   remove(line: CreateLine): void { this.lines.set(this.lines().filter(x => x !== line)); }
-  update(): void { this.lines.set([...this.lines()]); }
+  update(): void {
+    // Igual que el punto de venta: por debajo del mínimo, una línea mayorista vuelve a precio minorista.
+    const reverted = this.lines().filter(l => l.priceType === 'MAYORISTA' && Number(l.quantity) < this.wholesaleMin());
+    for (const line of reverted) line.priceType = 'MINORISTA';
+    if (reverted.length) this.error.set(`${reverted[0].product.name}: volvió a precio minorista, el mayorista exige ${this.wholesaleMin()} o más unidades.`);
+    this.lines.set([...this.lines()]);
+  }
   setPriceType(line: CreateLine, priceType: LayawayPriceType): void {
     if (priceType === 'MAYORISTA' && !line.product.wholesalePrice) { this.error.set('Este producto no tiene precio mayorista.'); this.update(); return; }
+    if (priceType === 'MAYORISTA' && Number(line.quantity) < this.wholesaleMin()) { this.error.set(`El precio mayorista exige ${this.wholesaleMin()} o más unidades de ${line.product.name}.`); this.update(); return; }
     line.priceType = priceType; this.error.set(''); this.update();
   }
 

@@ -57,6 +57,17 @@ describe('LayawayCreate: nuevo apartado', () => {
     expect(component.validation()).not.toContain('mayorista');
   });
 
+  it('no deja elegir mayorista por debajo del mínimo y vuelve a minorista si baja la cantidad', async () => {
+    await Promise.resolve(); await Promise.resolve();
+    component.add(product());
+    component.setPriceType(component.lines()[0], 'MAYORISTA');
+    expect(component.lines()[0].priceType).toBe('MINORISTA'); expect(component.error()).toContain('exige 3 o más unidades');
+    component.lines()[0].quantity = 3; component.setPriceType(component.lines()[0], 'MAYORISTA');
+    expect(component.lines()[0].priceType).toBe('MAYORISTA');
+    component.lines()[0].quantity = 1; component.update();
+    expect(component.lines()[0].priceType).toBe('MINORISTA'); expect(component.error()).toContain('volvió a precio minorista');
+  });
+
   it('busca clientes activos y productos', async () => {
     component.customerSearch = 'Ana'; await component.findCustomer();
     expect(customers.list).toHaveBeenCalledWith({ search: 'Ana', status: 'active', page: 1, pageSize: 20 });

@@ -23,7 +23,7 @@
         <tr>
           <td><strong>{{ line.product.name }}</strong><small>{{ line.product.internalCode }} · disp. {{ line.product.availableStock }}</small></td>
           <td class="align-right"><input class="text-field layaway-qty" type="number" min="1" step="1" [max]="line.product.availableStock" [name]="'qty-' + line.product.id" [attr.aria-label]="'Cantidad de ' + line.product.name" [(ngModel)]="line.quantity" (ngModelChange)="update()"></td>
-          <td><select class="text-field" [name]="'price-' + line.product.id" [attr.aria-label]="'Tipo de precio de ' + line.product.name" [ngModel]="line.priceType" (ngModelChange)="setPriceType(line, $event)"><option value="MINORISTA">Minorista</option><option value="MAYORISTA" [disabled]="!line.product.wholesalePrice">Mayorista</option></select></td>
+          <td><select class="text-field" [name]="'price-' + line.product.id" [attr.aria-label]="'Tipo de precio de ' + line.product.name" [ngModel]="line.priceType" (ngModelChange)="setPriceType(line, $event)"><option value="MINORISTA">Minorista</option><option value="MAYORISTA" [disabled]="!line.product.wholesalePrice || line.quantity < wholesaleMin()" [title]="line.product.wholesalePrice && line.quantity < wholesaleMin() ? 'El mayorista exige ' + wholesaleMin() + ' o más unidades' : ''">Mayorista</option></select></td>
           <td class="align-right numeric">{{ money(unitPrice(line)) }}</td><td class="align-right numeric">{{ money(unitPrice(line) * line.quantity) }}</td>
           <td class="align-right"><button class="table-action" type="button" (click)="remove(line)">Quitar</button></td>
         </tr>
