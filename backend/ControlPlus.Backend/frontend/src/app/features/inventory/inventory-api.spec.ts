@@ -8,9 +8,16 @@ describe('InventoryApi', () => {
   beforeEach(() => { TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] }); api = TestBed.inject(InventoryApi); http = TestBed.inject(HttpTestingController); });
   afterEach(() => http.verify());
   it('consulta existencias paginadas', async () => {
-    const task = api.stock({ search: 'ABC', includeInactive: false, page: 3, pageSize: 20 });
+    const task = api.stock({ search: 'ABC', status: '', page: 3, pageSize: 20 });
     const req = http.expectOne(r => r.url === '/api/inventory/stock' && r.params.get('search') === 'ABC' && r.params.get('page') === '3');
+    expect(req.request.params.has('status')).toBe(false);
     req.flush({ items: [], page: 3, pageSize: 20, totalCount: 0, totalPages: 0 }); expect((await task).items).toEqual([]);
+  });
+  it('envía el estado elegido y omite la búsqueda vacía', async () => {
+    const task = api.stock({ search: '', status: 'STOCK_BAJO', page: 1, pageSize: 20 });
+    const req = http.expectOne(r => r.url === '/api/inventory/stock' && r.params.get('status') === 'STOCK_BAJO');
+    expect(req.request.params.has('search')).toBe(false);
+    req.flush({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 }); expect((await task).items).toEqual([]);
   });
   it('omite los filtros vacíos al consultar movimientos', async () => {
     const task = api.movements({ productId: 'p1', page: 1, pageSize: 20 });

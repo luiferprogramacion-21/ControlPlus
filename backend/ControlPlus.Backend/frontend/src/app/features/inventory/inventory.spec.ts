@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 import { Inventory } from './inventory';
 import { InventoryApi, Stock } from './inventory-api';
@@ -35,5 +36,32 @@ describe('Inventory', () => {
     api.adjust.mockRejectedValueOnce(new HttpErrorResponse({ status: 409 }));
     await component.adjust(); expect(component.conflict()).toBe(true); expect(component.hasPending).toBe(false);
     await component.adjust(); expect(api.adjust).toHaveBeenCalledTimes(1);
+  });
+  it('muestra Disponible, Stock bajo, Agotado e Inactivo con el criterio del Dashboard', () => {
+    const base = { isActive: true, minimumStock: 10 } as Stock;
+    expect(component.stockStatus({ ...base, availableStock: 11 })).toEqual({ label: 'Disponible', tone: 'success' });
+    expect(component.stockStatus({ ...base, availableStock: 10 })).toEqual({ label: 'Stock bajo', tone: 'warning' });
+    expect(component.stockStatus({ ...base, availableStock: 0 })).toEqual({ label: 'Agotado', tone: 'error' });
+    expect(component.stockStatus({ ...base, availableStock: 0, minimumStock: 0 })).toEqual({ label: 'Agotado', tone: 'error' });
+    expect(component.stockStatus({ ...base, isActive: false, availableStock: 50 })).toEqual({ label: 'Inactivo', tone: 'neutral' });
+  });
+  it('ofrece el filtro de estado y solo muestra Inactivos con permiso', async () => {
+    api.stock.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    const fixture = TestBed.createComponent(Inventory); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    const options = Array.from(fixture.nativeElement.querySelectorAll('#stock-status option') as NodeListOf<HTMLOptionElement>).map(o => o.textContent?.trim());
+    expect(options).toEqual(['Todos los activos', 'Disponibles', 'Stock bajo', 'Agotados']);
+    expect(fixture.nativeElement.textContent).not.toContain('Incluir inactivos');
+    expect(api.stock).toHaveBeenCalledWith(expect.objectContaining({ status: '' }));
+  });
+  it('abre filtrado por stock bajo cuando llega desde el Dashboard', async () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: InventoryApi, useValue: api }, { provide: SessionService, useValue: session }, { provide: AuthorizationDialog, useValue: dialog },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ filtro: 'stock-bajo' }) } } },
+    ] });
+    api.stock.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    const fixture = TestBed.createComponent(Inventory); fixture.detectChanges(); await fixture.whenStable();
+    expect(fixture.componentInstance.status).toBe('STOCK_BAJO');
+    expect(api.stock).toHaveBeenCalledWith(expect.objectContaining({ status: 'STOCK_BAJO' }));
   });
 });

@@ -9,8 +9,22 @@ public sealed record InventoryStockQuery(
     bool IncludeInactive = false,
     int Page = 1,
     int PageSize = 50,
-    // Solo productos activos con disponible igual o menor al mínimo (el mismo criterio del Dashboard).
-    bool LowStock = false);
+    // Filtro de estado: null (activos), DISPONIBLE, STOCK_BAJO, AGOTADO o INACTIVO; véase InventoryStockStatus.
+    string? Status = null);
+
+/// <summary>
+/// Estados del filtro de existencias (decisión del 15 de noviembre de 2026). STOCK_BAJO usa el mismo criterio del
+/// Dashboard (activo y disponible igual o menor al mínimo) e incluye los agotados; DISPONIBLE es su complemento entre
+/// los activos; AGOTADO es activo con disponible igual o menor a cero; INACTIVO exige PRODUCTS.SENSITIVE_UPDATE.
+/// </summary>
+public static class InventoryStockStatus
+{
+    public const string Available = "DISPONIBLE";
+    public const string LowStock = "STOCK_BAJO";
+    public const string OutOfStock = "AGOTADO";
+    public const string Inactive = "INACTIVO";
+    public static readonly IReadOnlyList<string> All = [Available, LowStock, OutOfStock, Inactive];
+}
 
 public sealed record InventoryStockDto(
     Guid ProductId,

@@ -171,21 +171,37 @@ public sealed class InventoryApiFlowTests : IAsyncLifetime
             HttpStatusCode.OK);
         Assert.Equal(40m, Assert.Single(administratorStock.Items).AverageCost);
 
-        // Filtro de stock bajo: solo productos activos con disponible igual o menor al mínimo, y exactamente
-        // los mismos que se cuentan aparte en memoria.
-        var lowStock = await ReadAsync<PagedResult<InventoryStockDto>>(
-            await GetWithBearerAsync(client, "/api/inventory/stock?lowStock=true&pageSize=100", scenario.Admin.AccessToken),
-            HttpStatusCode.OK);
-        Assert.All(lowStock.Items, x => Assert.True(x.IsActive && x.AvailableStock <= x.MinimumStock));
-        await using (var lowStockScope = _factory!.Services.CreateAsyncScope())
+        // Filtro de estado: cada estado devuelve exactamente los productos que se calculan aparte, en memoria.
+        await using (var statusScope = _factory!.Services.CreateAsyncScope())
         {
-            var products = await lowStockScope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>()
+            var products = await statusScope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>()
                 .Producto.AsNoTracking().ToArrayAsync();
-            var expected = products.Where(p => p.Activo && p.StockActual - p.StockReservado <= p.StockMinimo)
-                .Select(p => p.Id).OrderBy(id => id).ToArray();
-            Assert.Equal(expected, lowStock.Items.Select(x => x.ProductId).OrderBy(id => id).ToArray());
-            Assert.Equal(expected.Length, lowStock.TotalCount);
+            var expectedByStatus = new Dictionary<string, Guid[]>
+            {
+                ["STOCK_BAJO"] = Ids(products.Where(p => p.Activo && p.StockActual - p.StockReservado <= p.StockMinimo).Select(p => p.Id)),
+                ["AGOTADO"] = Ids(products.Where(p => p.Activo && p.StockActual - p.StockReservado <= 0).Select(p => p.Id)),
+                ["DISPONIBLE"] = Ids(products.Where(p => p.Activo && p.StockActual - p.StockReservado > p.StockMinimo).Select(p => p.Id)),
+                ["INACTIVO"] = Ids(products.Where(p => !p.Activo).Select(p => p.Id))
+            };
+            foreach (var (status, expected) in expectedByStatus)
+            {
+                var filtered = await ReadAsync<PagedResult<InventoryStockDto>>(
+                    await GetWithBearerAsync(client, $"/api/inventory/stock?status={status}&pageSize=100", scenario.Admin.AccessToken),
+                    HttpStatusCode.OK);
+                Assert.Equal(expected, Ids(filtered.Items.Select(x => x.ProductId)));
+                Assert.Equal(expected.Length, filtered.TotalCount);
+            }
+            // Disponibles y stock bajo reparten a todos los activos sin solaparse.
+            Assert.Equal(Ids(products.Where(p => p.Activo).Select(p => p.Id)),
+                Ids(expectedByStatus["DISPONIBLE"].Concat(expectedByStatus["STOCK_BAJO"])));
         }
+        Assert.Equal(HttpStatusCode.BadRequest, (await GetWithBearerAsync(
+            client, "/api/inventory/stock?status=OTRO", scenario.Admin.AccessToken)).StatusCode);
+        // Los inactivos siguen exigiendo PRODUCTS.SENSITIVE_UPDATE, que el Supervisor no tiene por plantilla.
+        Assert.Equal(HttpStatusCode.Forbidden, (await GetWithBearerAsync(
+            client, "/api/inventory/stock?status=INACTIVO", grantedSupervisor.AccessToken)).StatusCode);
+
+        static Guid[] Ids(IEnumerable<Guid> ids) => ids.OrderBy(id => id).ToArray();
 
         SetBearer(client, scenario.Admin.AccessToken);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(

@@ -36,8 +36,14 @@ public sealed class EfInventoryRepository(OfficialControlPlusDbContext dbContext
         CancellationToken cancellationToken = default)
     {
         var source = dbContext.Producto.AsNoTracking().AsQueryable();
-        if (!query.IncludeInactive) source = source.Where(x => x.Activo);
-        if (query.LowStock) source = source.Where(LowStockSelection.Predicate);
+        source = query.Status switch
+        {
+            InventoryStockStatus.Inactive => source.Where(x => !x.Activo),
+            InventoryStockStatus.LowStock => source.Where(LowStockSelection.Predicate),
+            InventoryStockStatus.OutOfStock => source.Where(x => x.Activo && x.StockActual - x.StockReservado <= 0),
+            InventoryStockStatus.Available => source.Where(x => x.Activo && x.StockActual - x.StockReservado > x.StockMinimo),
+            _ => query.IncludeInactive ? source : source.Where(x => x.Activo)
+        };
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var pattern = $"%{query.Search}%";

@@ -43,7 +43,13 @@ public sealed class InventoryService(
     {
         var snapshot = await RequireAsync(actor, PermissionCodes.InventoryRead, cancellationToken);
         if (snapshot.Error is not null) return Result.Failure<PagedResult<InventoryStockDto>>(snapshot.Error);
-        if (query.IncludeInactive && !Has(snapshot.Snapshot!, PermissionCodes.ProductsSensitiveUpdate))
+        var status = string.IsNullOrWhiteSpace(query.Status) ? null : query.Status.Trim().ToUpperInvariant();
+        if (status is not null && !InventoryStockStatus.All.Contains(status))
+            return Result.Failure<PagedResult<InventoryStockDto>>(Validation(
+                "El estado debe ser DISPONIBLE, STOCK_BAJO, AGOTADO o INACTIVO."));
+        query = query with { Status = status };
+        if ((query.IncludeInactive || status == InventoryStockStatus.Inactive) &&
+            !Has(snapshot.Snapshot!, PermissionCodes.ProductsSensitiveUpdate))
             return Result.Failure<PagedResult<InventoryStockDto>>(ApplicationError.Forbidden(
                 "Consultar existencias de productos inactivos requiere PRODUCTS.SENSITIVE_UPDATE."));
         var validation = ValidatePage(query.Page, query.PageSize);

@@ -3,10 +3,11 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
-import { Adjustment, InventoryApi, Movement, Reason, Stock } from './inventory-api';
+import { Adjustment, InventoryApi, Movement, Reason, Stock, StockStatusFilter } from './inventory-api';
 import { Icon } from '../../layout/icon';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 @Component({ selector: 'cp-inventory', imports: [A11yModule, FormsModule, MatPaginatorModule, DatePipe, Icon], templateUrl: './inventory.html', styleUrls: ['../directory.scss', './inventory.scss'] })
@@ -24,13 +25,26 @@ export class Inventory implements OnInit {
   readonly loading = signal(false); readonly historyLoading = signal(false); readonly saving = signal(false);
   readonly error = signal(''); readonly notice = signal(''); readonly conflict = signal(false);
   readonly movementTypes = ['COMPRA', 'ANULACION_COMPRA', 'VENTA', 'ANULACION_VENTA', 'RESERVA_APARTADO', 'LIBERACION_APARTADO', 'ENTREGA_APARTADO', 'CAMBIO_DEVOLUCION', 'CAMBIO_ENTREGA', 'AJUSTE_ENTRADA', 'AJUSTE_SALIDA', 'REVERSO'];
-  search = ''; includeInactive = false; page = 1; pageSize = 20; movementPage = 1; movementType = ''; from = ''; to = '';
+  search = ''; status: StockStatusFilter = ''; page = 1; pageSize = 20; movementPage = 1; movementType = ''; from = ''; to = '';
   quantityDelta = 0; reasonId = ''; observation = '';
   private requestId = 0;
   private pending: { key: string; input: Omit<Adjustment, 'authorization'>; authorizerUserName: string | null } | null = null;
   get canAdjust(): boolean { return this.session.has('INVENTORY.ADJUST'); }
-  ngOnInit(): void { void this.reload(); if (this.canAdjust) void this.loadReasons(); }
-  async reload(): Promise<void> { const id = ++this.requestId; this.loading.set(true); this.error.set(''); try { const result = await this.api.stock({ search: this.search.trim(), includeInactive: this.session.has('PRODUCTS.SENSITIVE_UPDATE') && this.includeInactive, page: this.page, pageSize: this.pageSize }); if (id === this.requestId) this.stocks.set(result); } catch (e) { if (id === this.requestId) this.error.set(errorText(e)); } finally { if (id === this.requestId) this.loading.set(false); } }
+  get canSeeInactive(): boolean { return this.session.has('PRODUCTS.SENSITIVE_UPDATE'); }
+  /** El Dashboard enlaza con ?filtro=stock-bajo para abrir directamente los productos que cuenta como alerta. */
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  ngOnInit(): void {
+    if (this.route?.snapshot.queryParamMap.get('filtro') === 'stock-bajo') this.status = 'STOCK_BAJO';
+    void this.reload(); if (this.canAdjust) void this.loadReasons();
+  }
+  /** Mismo orden que el filtro: inactivo, agotado, stock bajo (disponible igual o menor al mínimo) y disponible. */
+  stockStatus(stock: Stock): { label: string; tone: 'success' | 'warning' | 'error' | 'neutral' } {
+    if (!stock.isActive) return { label: 'Inactivo', tone: 'neutral' };
+    if (stock.availableStock <= 0) return { label: 'Agotado', tone: 'error' };
+    if (stock.availableStock <= stock.minimumStock) return { label: 'Stock bajo', tone: 'warning' };
+    return { label: 'Disponible', tone: 'success' };
+  }
+  async reload(): Promise<void> { const id = ++this.requestId; this.loading.set(true); this.error.set(''); try { const result = await this.api.stock({ search: this.search.trim(), status: this.status === 'INACTIVO' && !this.canSeeInactive ? '' : this.status, page: this.page, pageSize: this.pageSize }); if (id === this.requestId) this.stocks.set(result); } catch (e) { if (id === this.requestId) this.error.set(errorText(e)); } finally { if (id === this.requestId) this.loading.set(false); } }
   find(): void { this.page = 1; void this.reload(); }
   stockPage(e: PageEvent): void { this.page = e.pageIndex + 1; this.pageSize = e.pageSize; void this.reload(); }
   async loadReasons(): Promise<void> { try { this.reasons.set(await this.api.reasons()); } catch (e) { this.error.set(errorText(e)); } }

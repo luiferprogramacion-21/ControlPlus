@@ -113,3 +113,16 @@ Pedidos de compra y recepción parcial pertenecen al corte 3. La anulación de
 compras pertenece al corte 2. Consulte [purchases.md](purchases.md).
 
 **Jerarquía de autorización (5 de noviembre de 2026):** con credenciales, el autorizador debe tener rol base estrictamente superior al ejecutor: Cajero → Supervisor o Administrador; Supervisor → Administrador. Las autoautorizaciones aprobadas conservan sus condiciones. El permiso efectivo sigue siendo obligatorio.
+
+## Filtro de estado de existencias (15 de noviembre de 2026)
+
+`GET /api/inventory/stock` acepta `status` además de `search`, `page` y `pageSize`. Sin `status` lista los productos activos, como antes. Valores:
+
+| `status` | Productos |
+|---|---|
+| `DISPONIBLE` | Activos con disponible (existencias menos reservado) mayor que el mínimo. |
+| `STOCK_BAJO` | Activos con disponible igual o menor al mínimo, incluidos los agotados; el mismo criterio (`LowStockSelection`) que cuenta el Dashboard. |
+| `AGOTADO` | Activos con disponible igual o menor a cero. |
+| `INACTIVO` | Inactivos; exige `PRODUCTS.SENSITIVE_UPDATE` efectivo, igual que `includeInactive=true`. |
+
+Cualquier otro valor devuelve `400`. `DISPONIBLE` y `STOCK_BAJO` reparten a todos los activos sin solaparse. La pantalla reemplaza la casilla «Incluir inactivos» por la lista de Estado y etiqueta cada fila como Disponible, Stock bajo, Agotado o Inactivo. El enlace del Dashboard `?filtro=stock-bajo` abre la pantalla con «Stock bajo» elegido. Sin migración ni permisos nuevos. `includeInactive` se conserva por compatibilidad.
