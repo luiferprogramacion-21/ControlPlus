@@ -17,7 +17,7 @@
 
 ## Verificación previa
 
-Sin base de datos: compilación serial con `-warnaserror` sin errores ni advertencias; Domain 80/80, API 215/215 e Infrastructure 6/6; frontend 550/550 y `ngc` con salida 0. Con base de datos (trabajo `database-tests` del CI): `ConfigurableWholesaleMinimumMigrationTests`, `SalesSettingsApiTests`, la prueba de mínimo configurado en `SaleDiscountAuthorizationApiTests`, las dos de mayorista en `LayawayCreateApiFlowTests` y las de `SaleChangeConfirmationApiTests` (la existente de aumento de crédito se adaptó con mínimo 1 y ahora comprueba la autorización `PRECIO_MAYORISTA`).
+Sin base de datos: compilación serial con `-warnaserror` sin errores ni advertencias; Domain 80/80, API 215/215 e Infrastructure 6/6; frontend 550/550 y `ngc` con salida 0. Con base de datos (trabajo `database-tests` del CI): `ConfigurableWholesaleMinimumMigrationTests`, `SalesSettingsApiTests`, la prueba de mínimo configurado en `SaleDiscountAuthorizationApiTests`, las dos de mayorista en `LayawayCreateApiFlowTests` y las de `SaleChangeConfirmationApiTests` (la existente de aumento de crédito se adaptó con mínimo 1 y ahora comprueba la autorización `PRECIO_MAYORISTA`). Acreditado en la corrida `43766593949` (commit `fde54dc`): API 679/679, Domain 80/80 e Infrastructure 78/78, sin fallidas ni omitidas.
 
 ## Bloque del operador
 
