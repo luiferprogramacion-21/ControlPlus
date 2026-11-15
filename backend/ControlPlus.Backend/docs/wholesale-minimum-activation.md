@@ -34,3 +34,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\wholesale-minimum\
 Después, iniciar la API como siempre (`dotnet run` en `ControlPlus.Api`) y comprobar HTTP 200 en `/api/health` y `/api/health/database`, y 401 sin sesión en `/api/sales/settings` y `/api/sales/pricing-rules`.
 
 **No repetir la migración ni ejecutar `Down`** una vez acreditada la activación.
+
+## Activación del 15 de noviembre de 2026
+
+`WHOLESALE_MINIMUM_ACTIVATION_OK` en `C:\Users\luife\ControlPlus-Backups\WholesaleMinimum-20261115T224623Z-7ba8624f2f3a4a05b7734cb7d7db7e1f`.
+
+- Historial 24→25: el preflight acreditó 24 con `20261115010000_OptionalSalePaymentReferenceV1` y sin otras conexiones; el postflight acreditó 25 con el objetivo.
+- Respaldo previo de `controlplus` verificado: 558685 bytes, SHA-256 `91871A096DCF010D7E13C0FA0D2266CA37E44ABDF1FB3DD00FE4A93B6A1282DC`.
+- API publicada: SHA-256 `A1CED19CBBE14D050B92DDBF26015823CCA04DA5C356EE221E450A970216290B`.
+- Conservación: el único establecimiento mantuvo la huella `143b368e620f0bee4b40f9af773390af` (sin la columna nueva) antes y después.
+- El postflight confirmó columna, CHECK 1–999, valor 12 y permisos de `controlplus_app`.
+
+Un primer intento (`WholesaleMinimum-20261115T223349Z-5b6b7cdbdd394c5a8e121bc93bed186a`) se detuvo en el preflight sin respaldo ni migración: seguía corriendo en segundo plano, sin ventana, la API publicada por la activación de la referencia opcional desde su carpeta de evidencia. Se detuvo ese proceso y se repitió.
+
+**No repetir la migración ni ejecutar `Down`.** Pendiente: comprobación HTTP y revisión visual tras iniciar la API.
