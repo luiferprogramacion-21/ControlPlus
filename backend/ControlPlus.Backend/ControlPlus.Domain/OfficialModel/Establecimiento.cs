@@ -47,6 +47,12 @@ public partial class Establecimiento
     /// </summary>
     public int MinimoUnidadesMayorista { get; set; } = 12;
 
+    /// <summary>
+    /// Decisión del 16 de noviembre de 2026: con false, vender a crédito a un cliente moroso o que supera su cupo solo
+    /// muestra un aviso; con true, la venta exige la autorización de un Administrador.
+    /// </summary>
+    public bool CreditoBloquearRiesgo { get; set; }
+
     public int DiasLimiteCambio { get; set; }
 
     /// <summary>

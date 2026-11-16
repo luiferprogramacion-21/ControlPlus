@@ -48,6 +48,9 @@ import { ChangePolicy, ConfigApi, CreditSettings, LayawaySettings, SalesSettings
           <label class="field-label" for="credit-days">Plazo predeterminado</label>
           <div class="money-field"><span>#</span><input id="credit-days" name="creditDays" type="number" min="1" max="90" step="1" [(ngModel)]="creditDays" [disabled]="creditChooseEachTime"><b>días</b></div>
           <label class="settings-check"><input type="checkbox" name="creditChooseEachTime" [(ngModel)]="creditChooseEachTime"> Elegir el vencimiento en cada crédito (sin plazo predeterminado)</label>
+          <p class="field-label settings-subtitle">Clientes morosos y cupo</p>
+          <p class="muted">Al vender a crédito a un cliente con saldo vencido o que supera su cupo siempre aparece un aviso.</p>
+          <label class="settings-check"><input type="checkbox" name="creditBlock" [(ngModel)]="creditBlock"> Bloquear esas ventas: solo un Administrador puede autorizarlas</label>
           @if (creditError()) { <p class="field-error" role="alert">{{ creditError() }}</p> }
           @if (creditNotice()) { <p class="field-hint" role="status">{{ creditNotice() }}</p> }
           <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="savingCredit() || !creditChanged(current)">{{ savingCredit() ? 'Guardando…' : 'Guardar créditos' }}</button></div>
@@ -69,7 +72,7 @@ import { ChangePolicy, ConfigApi, CreditSettings, LayawaySettings, SalesSettings
       } @else if (salesLoadError()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ salesLoadError() }} <button class="link-button" type="button" (click)="loadSales()">Reintentar</button></div>
       } @else { <p class="muted" role="status">Cargando…</p> }
     </section>`,
-  styles: ['.settings-form { max-width: 460px; } .settings-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; }'],
+  styles: ['.settings-form { max-width: 460px; } .settings-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; } .settings-subtitle { margin-top: 18px; }'],
 })
 export class SettingsPanel implements OnInit {
   private readonly api = inject(ConfigApi);
@@ -83,6 +86,7 @@ export class SettingsPanel implements OnInit {
   readonly creditError = signal(''); readonly creditNotice = signal('');
   creditDays: number | null = 30;
   creditChooseEachTime = false;
+  creditBlock = false;
   readonly savingPolicy = signal(false);
   readonly savingLayaway = signal(false);
   readonly policyError = signal(''); readonly policyNotice = signal('');
@@ -133,8 +137,11 @@ export class SettingsPanel implements OnInit {
   }
   private applyCredit(settings: CreditSettings): void {
     this.credit.set(settings); this.creditChooseEachTime = settings.defaultDays === null; this.creditDays = settings.defaultDays ?? 30;
+    this.creditBlock = settings.blockRiskyCredit === true;
   }
-  creditChanged(current: CreditSettings): boolean { return (this.creditChooseEachTime ? null : Number(this.creditDays)) !== current.defaultDays; }
+  creditChanged(current: CreditSettings): boolean {
+    return (this.creditChooseEachTime ? null : Number(this.creditDays)) !== current.defaultDays || this.creditBlock !== (current.blockRiskyCredit === true);
+  }
   validateCredit(): string {
     if (this.creditChooseEachTime) return '';
     const days = Number(this.creditDays);
@@ -145,8 +152,8 @@ export class SettingsPanel implements OnInit {
     const issue = this.validateCredit(); if (issue) { this.creditError.set(issue); return; }
     this.savingCredit.set(true); this.creditError.set(''); this.creditNotice.set('');
     try {
-      this.applyCredit(await this.api.updateCreditSettings(this.creditChooseEachTime ? null : Number(this.creditDays), current.version));
-      this.creditNotice.set('Plazo guardado. Aplica a los créditos nuevos.');
+      this.applyCredit(await this.api.updateCreditSettings(this.creditChooseEachTime ? null : Number(this.creditDays), current.version, this.creditBlock));
+      this.creditNotice.set('Guardado. Aplica a los créditos nuevos.');
     } catch (e) { this.creditError.set(errorText(e)); try { this.credit.set(await this.api.creditSettings()); } catch { /* el error ya se muestra */ } }
     finally { this.savingCredit.set(false); }
   }

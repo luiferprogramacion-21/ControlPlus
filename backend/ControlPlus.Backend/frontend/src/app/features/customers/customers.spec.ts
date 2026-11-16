@@ -6,8 +6,9 @@ import { SessionService } from '../../core/session.service';
 describe('Customers', () => {
   let component: Customers;
   const api = { list: vi.fn(), create: vi.fn(), update: vi.fn(), status: vi.fn(), get: vi.fn() };
-  const session = { has: (permission: string) => permission === 'CUSTOMERS.MANAGE' };
-  beforeEach(() => { vi.clearAllMocks(); TestBed.configureTestingModule({ providers: [{ provide: CustomersApi, useValue: api }, { provide: SessionService, useValue: session }] }); component = TestBed.runInInjectionContext(() => new Customers()); });
+  let permissions = ['CUSTOMERS.MANAGE'];
+  const session = { has: (permission: string) => permissions.includes(permission) };
+  beforeEach(() => { vi.clearAllMocks(); permissions = ['CUSTOMERS.MANAGE']; TestBed.configureTestingModule({ providers: [{ provide: CustomersApi, useValue: api }, { provide: SessionService, useValue: session }] }); component = TestBed.runInInjectionContext(() => new Customers()); });
   it('valida dirección y pareja documental antes del alta', async () => {
     component.newCustomer(); component.form.fullName = 'Ana';
     await component.save(); expect(api.create).not.toHaveBeenCalled();
@@ -18,6 +19,25 @@ describe('Customers', () => {
     api.create.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
     component.newCustomer(); component.form.fullName = ' Ana '; component.form.address = ' Calle 1 '; component.form.documentType = 'CC'; component.form.documentNumber = ' 123 ';
     await component.save(); expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ fullName: 'Ana', address: 'Calle 1', documentNumber: '123' }));
+  });
+  it('guarda el cupo de crédito; vacío es sin límite y un valor no entero se rechaza', async () => {
+    api.create.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    component.newCustomer(); component.form.fullName = 'Ana'; component.form.address = 'Calle 1';
+    component.form.creditLimit = 1500.5; await component.save();
+    expect(api.create).not.toHaveBeenCalled(); expect(component.error()).toContain('cupo');
+    component.form.creditLimit = '' as never; await component.save();
+    expect(api.create).toHaveBeenLastCalledWith(expect.objectContaining({ creditLimit: null }));
+    component.newCustomer(); component.form.fullName = 'Ana'; component.form.address = 'Calle 1';
+    component.form.creditLimit = 200000; await component.save();
+    expect(api.create).toHaveBeenLastCalledWith(expect.objectContaining({ creditLimit: 200000 }));
+  });
+  it('sin CUSTOMERS.MANAGE conserva el cupo existente al editar datos básicos', async () => {
+    permissions = ['CUSTOMERS.BASIC_MANAGE'];
+    api.update.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    const customer = { id: 'c1', documentType: null, documentNumber: null, fullName: 'Ana', phone: null, address: 'Calle 1', email: null, observations: null, isActive: true, version: 3, creditLimit: 50000 };
+    component.edit(customer); component.form.creditLimit = 1; component.form.phone = '300';
+    await component.save();
+    expect(api.update).toHaveBeenCalledWith(customer, expect.objectContaining({ creditLimit: 50000, phone: '300' }));
   });
   it('pide confirmacion propia antes de inactivar un cliente', async () => {
     const customer = { id: 'c1', fullName: 'Ana', isActive: true, version: 2 } as never;

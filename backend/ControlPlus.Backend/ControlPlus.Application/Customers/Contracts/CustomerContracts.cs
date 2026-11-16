@@ -6,18 +6,21 @@ namespace ControlPlus.Application.Customers.Contracts;
 
 public sealed record CustomerDto(Guid Id, string? DocumentType, string? DocumentNumber,
     string FullName, string? Phone, string Address, string? Email, string? Observations,
-    bool IsActive, long Version);
+    bool IsActive, long Version, decimal? CreditLimit = null);
 
 public sealed record CustomerListQuery(string? Search = null, string? Status = null, int Page = 1, int PageSize = 20);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+/// <summary><c>CreditLimit</c>: cupo de crédito en pesos enteros; NULL = sin límite. Solo con CUSTOMERS.MANAGE.</summary>
 public sealed record CreateCustomerRequest(string? DocumentType, string? DocumentNumber,
-    string? FullName, string? Phone, string? Address, string? Email, string? Observations);
+    string? FullName, string? Phone, string? Address, string? Email, string? Observations,
+    decimal? CreditLimit = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record UpdateCustomerRequest(string? DocumentType, string? DocumentNumber,
     string? FullName, string? Phone, string? Address, string? Email, string? Observations,
-    [property: JsonRequired] long ExpectedVersion);
+    [property: JsonRequired] long ExpectedVersion,
+    decimal? CreditLimit = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SetCustomerStatusRequest(

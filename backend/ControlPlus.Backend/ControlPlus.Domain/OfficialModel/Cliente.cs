@@ -21,6 +21,9 @@ public partial class Cliente
 
     public string? Observaciones { get; set; }
 
+    /// <summary>Cupo de crédito: saldo máximo que puede deber el cliente, en pesos enteros. NULL = sin límite.</summary>
+    public decimal? CupoCredito { get; set; }
+
     public bool Activo { get; set; }
 
     public Guid UsuarioCreacionId { get; set; }

@@ -10,7 +10,10 @@ using ControlPlus.Application.Sales.Ports;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Application.Security.Ports;
 using ControlPlus.Application.Security.Services;
+using ControlPlus.Application.Credits.Ports;
+using ControlPlus.Application.Credits.Services;
 using ControlPlus.Domain.Common;
+using ControlPlus.Domain.Credits;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Domain.Sales;
 using ControlPlus.Domain.Security.Enums;
@@ -29,7 +32,8 @@ public sealed partial class SalesService(
     IPermissionChecker permissionChecker,
     IPermissionRepository permissionRepository,
     IAuthorizerCredentialResolver credentialResolver,
-    IClock clock) : ISalesService
+    IClock clock,
+    ICustomerCreditExposureReader creditExposure) : ISalesService
 {
     private const int MaximumPageSize = 200;
     private static readonly HashSet<string> ApprovedPaymentMethods =
@@ -231,6 +235,35 @@ public sealed partial class SalesService(
 
         if (prepared.Total <= 0)
             return Result.Failure<SaleDto>(Validation("La venta debe tener un total mayor que cero."));
+
+        // Morosos y cupo (decisión del 16 de noviembre de 2026): siempre se avisa en pantalla; con el bloqueo activo,
+        // solo un Administrador autoriza la excepción (el propio vendedor si es Administrador, o quien da sus credenciales).
+        CreditRiskAssessment? creditRisk = null;
+        string? creditRiskException = null;
+        if (input.SaleType == "CREDITO" && receiptCustomer is not null)
+        {
+            var exposure = await creditExposure.GetAsync(receiptCustomer.Id,
+                CreditSettingsService.LocalToday(establishment, clock), cancellationToken);
+            creditRisk = CreditRiskPolicy.Assess(exposure.OutstandingBalance, exposure.OverdueBalance,
+                receiptCustomer.CupoCredito, prepared.Total);
+            if (creditRisk.HasRisk && establishment.CreditoBloquearRiesgo)
+            {
+                var authorizerLevel = creditSelfMode switch
+                {
+                    "ADMINISTRATOR_SELF" => RoleLevel.Administrador,
+                    "SUPERVISOR_SELF" => RoleLevel.Supervisor,
+                    _ => (await userRepository.GetAuthorizationSnapshotAsync(creditAuthorizer!.Id, cancellationToken))?.HighestRoleLevel
+                };
+                if (authorizerLevel != RoleLevel.Administrador)
+                {
+                    var why = creditRisk.Overdue && creditRisk.ExceedsLimit ? "tiene saldo vencido y supera su cupo"
+                        : creditRisk.Overdue ? "tiene saldo vencido" : "supera su cupo de crédito";
+                    return Result.Failure<SaleDto>(ApplicationError.Forbidden(
+                        $"El cliente {why} y el bloqueo de créditos está activo: la venta requiere la autorización de un Administrador."));
+                }
+                creditRiskException = creditSelfMode ?? "ADMINISTRATOR_AUTHORIZER";
+            }
+        }
 
         var normalizedPayments = input.Payments!;
         var paymentCodes = normalizedPayments.Select(x => x.MethodCode).ToArray();
@@ -512,7 +545,14 @@ public sealed partial class SalesService(
             await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId,
                 AuditAction.CreditCreated, nameof(Credito), credit.Id,
                 new { credit.Id, credit.VentaId, credit.Estado, CorrelationId = correlationId,
-                    AuthorizationMode = creditSelfMode ?? "OTHER_USER" }, cancellationToken);
+                    AuthorizationMode = creditSelfMode ?? "OTHER_USER",
+                    Risk = creditRisk is null || !creditRisk.HasRisk ? null : new
+                    {
+                        creditRisk.Overdue,
+                        creditRisk.ExceedsLimit,
+                        Blocked = establishment.CreditoBloquearRiesgo,
+                        Exception = creditRiskException
+                    } }, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         if (operatorSession is not null)

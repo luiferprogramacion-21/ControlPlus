@@ -25,4 +25,23 @@ public sealed class CreditRulesController(
             ? MissingActor()
             : FromResult(await settings.GetSalesRulesAsync(actor, cancellationToken), Ok);
     }
+
+    /// <summary>
+    /// Situación de crédito de un cliente para una venta a crédito de <paramref name="amount"/> pesos: saldo pendiente y
+    /// vencido, cupo y si la venta quedaría bloqueada (exige autorización de un Administrador). Solo lectura.
+    /// </summary>
+    [HttpGet("credit-check")]
+    [PermissionAuthorize(PermissionCodes.CreditRequest)]
+    [ProducesResponseType<CustomerCreditRiskDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<IActionResult> Check([FromQuery] Guid customerId, [FromQuery] decimal amount, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null
+            ? MissingActor()
+            : FromResult(await settings.GetCustomerRiskAsync(actor, customerId, amount, cancellationToken), Ok);
+    }
 }

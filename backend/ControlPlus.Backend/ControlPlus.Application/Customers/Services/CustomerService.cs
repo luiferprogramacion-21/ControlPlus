@@ -38,15 +38,17 @@ public sealed class CustomerService(ICustomerRepository repository, IPermissionC
         var full = await HasAsync(actor, PermissionCodes.CustomersManage, ct);
         if (!full && (request.DocumentType is not null ||
                       request.DocumentNumber is not null ||
-                      request.Observations is not null))
+                      request.Observations is not null ||
+                      request.CreditLimit is not null))
         {
             return Denied<CustomerDto>();
         }
         var input = Validate(request.DocumentType, request.DocumentNumber, request.FullName, request.Phone, request.Address, request.Email, request.Observations);
         if (input.Error is not null) return Result.Failure<CustomerDto>(input.Error);
+        if (CreditLimitError(request.CreditLimit) is { } limitError) return Result.Failure<CustomerDto>(limitError);
         if (input.Type is not null && await repository.DocumentExistsAsync(input.Type, input.Number!, null, ct)) return Result.Failure<CustomerDto>(ApplicationError.Conflict("Ya existe un cliente con ese documento."));
         var now = clock.UtcNow.UtcDateTime;
-        var customer = new Cliente { Id = Guid.CreateVersion7(), TipoDocumento = input.Type, NumeroDocumento = input.Number, NombreCompleto = input.Name!, Telefono = input.Phone, Direccion = input.Address, Correo = input.Email, Observaciones = input.Observations, Activo = true, UsuarioCreacionId = actor.UserId, FechaCreacion = now, Version = 1 };
+        var customer = new Cliente { Id = Guid.CreateVersion7(), TipoDocumento = input.Type, NumeroDocumento = input.Number, NombreCompleto = input.Name!, Telefono = input.Phone, Direccion = input.Address, Correo = input.Email, Observaciones = input.Observations, CupoCredito = request.CreditLimit, Activo = true, UsuarioCreacionId = actor.UserId, FechaCreacion = now, Version = 1 };
         await repository.AddAsync(customer, ct);
         await WriteAudit(actor.UserId, AuditAction.CustomerCreated, customer, ["activo"], ct);
         await unitOfWork.SaveChangesAsync(ct);
@@ -59,14 +61,17 @@ public sealed class CustomerService(ICustomerRepository repository, IPermissionC
         if (request.ExpectedVersion <= 0) return Result.Failure<CustomerDto>(ApplicationError.Validation("La versión esperada debe ser mayor que cero."));
         var input = Validate(request.DocumentType, request.DocumentNumber, request.FullName, request.Phone, request.Address, request.Email, request.Observations);
         if (input.Error is not null) return Result.Failure<CustomerDto>(input.Error);
+        if (CreditLimitError(request.CreditLimit) is { } limitError) return Result.Failure<CustomerDto>(limitError);
         var customer = await repository.GetAsync(id, ct);
         if (customer is null) return Result.Failure<CustomerDto>(ApplicationError.NotFound("el cliente"));
         var full = await HasAsync(actor, PermissionCodes.CustomersManage, ct);
         if (!customer.Activo && !full) return Denied<CustomerDto>();
         if (customer.Version != request.ExpectedVersion) return Result.Failure<CustomerDto>(Conflict);
-        if (!full && (customer.TipoDocumento != input.Type || customer.NumeroDocumento != input.Number || customer.Observaciones != input.Observations)) return Denied<CustomerDto>();
+        if (!full && (customer.TipoDocumento != input.Type || customer.NumeroDocumento != input.Number || customer.Observaciones != input.Observations || customer.CupoCredito != request.CreditLimit)) return Denied<CustomerDto>();
         if (input.Type is not null && await repository.DocumentExistsAsync(input.Type, input.Number!, customer.Id, ct)) return Result.Failure<CustomerDto>(ApplicationError.Conflict("Ya existe un cliente con ese documento."));
         var changed = Changed(customer, input);
+        if (customer.CupoCredito != request.CreditLimit) changed = [.. changed, "cupoCredito"];
+        customer.CupoCredito = request.CreditLimit;
         customer.TipoDocumento = input.Type; customer.NumeroDocumento = input.Number; customer.NombreCompleto = input.Name!; customer.Telefono = input.Phone; customer.Direccion = input.Address; customer.Correo = input.Email; customer.Observaciones = input.Observations; customer.UsuarioModificacionId = actor.UserId; customer.FechaModificacion = clock.UtcNow.UtcDateTime;
         await WriteAudit(actor.UserId, AuditAction.CustomerUpdated, customer, changed, ct);
         await unitOfWork.SaveChangesAsync(ct);
@@ -107,6 +112,11 @@ public sealed class CustomerService(ICustomerRepository repository, IPermissionC
     }
     private static string? Optional(string? x) => string.IsNullOrWhiteSpace(x) ? null : x.Trim();
     private static IReadOnlyCollection<string> Changed(Cliente x, (string? Type,string? Number,string? Name,string? Phone,string? Address,string? Email,string? Observations,ApplicationError? Error) i) => new[] { (x.TipoDocumento != i.Type,"tipoDocumento"), (x.NumeroDocumento != i.Number,"numeroDocumento"), (x.NombreCompleto != i.Name,"nombreCompleto"), (x.Telefono != i.Phone,"telefono"), (x.Direccion != i.Address,"direccion"), (x.Correo != i.Email,"correo"), (x.Observaciones != i.Observations,"observaciones") }.Where(x => x.Item1).Select(x => x.Item2).ToArray();
-    private static CustomerDto Map(Cliente x) => new(x.Id, x.TipoDocumento, x.NumeroDocumento, x.NombreCompleto, x.Telefono, x.Direccion!, x.Correo, x.Observaciones, x.Activo, x.Version);
+    private static CustomerDto Map(Cliente x) => new(x.Id, x.TipoDocumento, x.NumeroDocumento, x.NombreCompleto, x.Telefono, x.Direccion!, x.Correo, x.Observaciones, x.Activo, x.Version, x.CupoCredito);
+
+    /// <summary>Cupo de crédito (16 de noviembre de 2026): vacío o pesos enteros positivos.</summary>
+    private static ApplicationError? CreditLimitError(decimal? limit) =>
+        limit is null || (limit > 0 && limit <= 999_999_999_999_999_999m && decimal.Truncate(limit.Value) == limit) ? null
+            : ApplicationError.Validation("El cupo de crédito debe ser un valor en pesos enteros mayor que cero, o vacío para no tener límite.");
     private static readonly ApplicationError Conflict = ApplicationError.ConcurrencyConflict("El registro fue modificado por otro usuario. Recargue los datos e intente nuevamente.");
 }

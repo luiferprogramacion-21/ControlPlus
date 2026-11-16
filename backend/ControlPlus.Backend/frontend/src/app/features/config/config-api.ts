@@ -33,7 +33,8 @@ export interface LayawaySettings { minimumPercentage: number; defaultDays: numbe
 export interface VatSettings { enabled: boolean; percentage: number | null; version: number; updatedAtUtc: string | null; }
 
 /** Default due-date term of a credit sale in days (1 to 90); null means the seller must choose the date each time. */
-export interface CreditSettings { defaultDays: number | null; version: number; }
+/** blockRiskyCredit: con true, vender a crédito a un moroso o sobre el cupo exige autorización de un Administrador. */
+export interface CreditSettings { defaultDays: number | null; version: number; blockRiskyCredit: boolean; }
 /** Units of the same product required for the wholesale price in sales, layaways and changes (1 to 999). */
 export interface SalesSettings { wholesaleMinimumQuantity: number; version: number; }
 
@@ -79,8 +80,8 @@ export class ConfigApi {
   updateSalesSettings(wholesaleMinimumQuantity: number, expectedVersion: number): Promise<SalesSettings> {
     return firstValueFrom(this.http.put<SalesSettings>('/api/sales/settings', { wholesaleMinimumQuantity, expectedVersion }));
   }
-  updateCreditSettings(defaultDays: number | null, expectedVersion: number): Promise<CreditSettings> {
-    return firstValueFrom(this.http.put<CreditSettings>('/api/credits/settings', { defaultDays, expectedVersion }));
+  updateCreditSettings(defaultDays: number | null, expectedVersion: number, blockRiskyCredit: boolean): Promise<CreditSettings> {
+    return firstValueFrom(this.http.put<CreditSettings>('/api/credits/settings', { defaultDays, expectedVersion, blockRiskyCredit }));
   }
 
   vatSettings(): Promise<VatSettings> { return firstValueFrom(this.http.get<VatSettings>('/api/settings/vat')); }

@@ -9,7 +9,7 @@ import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { CatalogApi, Product } from '../catalog/catalog-api';
 import { CashApi, CashState } from '../cash/cash-api';
-import { Sale, SaleInput, SalesApi, SalePaymentInput, PrintJobStatus } from './sales-api';
+import { CustomerCreditRisk, Sale, SaleInput, SalesApi, SalePaymentInput, PrintJobStatus } from './sales-api';
 import { Customer } from '../customers/customers-api';
 import { CustomerPicker } from '../customers/customer-picker';
 import { buildTicketHtml, TicketPrinter } from './ticket';
@@ -84,6 +84,8 @@ export class Sales implements OnInit, OnDestroy {
   /** Default term of the credit due date, set by the Administrator; null until read or when the seller must choose. */
   readonly creditDefaultDays = signal<number | null>(null);
   readonly creditRulesKnown = signal(false);
+  /** Moroso o sobre el cupo para la venta a crédito en curso; null si no aplica o no se pudo consultar (el servidor igual decide). */
+  readonly creditRisk = signal<CustomerCreditRisk | null>(null);
   private pending: { key: string; input: SaleInput; authorizerUserName: string | null } | null = null;
   private suggestTimer: ReturnType<typeof setTimeout> | undefined;
   private suggestSeq = 0;
@@ -240,8 +242,30 @@ export class Sales implements OnInit, OnDestroy {
     }
     // The Administrator's default term is proposed, but the seller can change it; a date already chosen is kept.
     if (this.saleType() === 'CREDITO' && !this.dueDate && this.defaultDueDate) this.dueDate = this.defaultDueDate;
+    this.creditRisk.set(null);
+    if (this.saleType() === 'CREDITO') void this.checkCreditRisk();
     this.checkoutMode.set(true);
     this.focusField('cash-received', 'credit-due-date');
+  }
+  /** Consulta si el cliente está moroso o supera su cupo con esta venta (aviso siempre; bloqueo si está activo). */
+  async checkCreditRisk(): Promise<CustomerCreditRisk | null> {
+    const customerId = this.customerId.trim();
+    if (this.saleType() !== 'CREDITO' || !customerId || this.estimate <= 0 || !this.canRequestCredit) { this.creditRisk.set(null); return null; }
+    try {
+      const risk = await this.api.creditCheck(customerId, this.estimate);
+      const current = risk.overdue || risk.exceedsLimit ? risk : null;
+      if (this.customerId.trim() === customerId) this.creditRisk.set(current);
+      return current;
+    } catch { this.creditRisk.set(null); return null; }
+  }
+  /** Texto del aviso: saldo vencido y/o cupo superado. */
+  get creditRiskText(): string {
+    const risk = this.creditRisk(); if (!risk) return '';
+    const money = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
+    const parts: string[] = [];
+    if (risk.overdue) parts.push(`tiene ${money(risk.overdueBalance)} vencidos en ${risk.overdueCredits} ${risk.overdueCredits === 1 ? 'crédito' : 'créditos'}`);
+    if (risk.exceedsLimit && risk.creditLimit !== null) parts.push(`supera su cupo de ${money(risk.creditLimit)} (disponible ${money(risk.availableCredit ?? 0)}, debe ${money(risk.outstandingBalance)})`);
+    return `El cliente ${parts.join(' y ')}.`;
   }
   returnToSale(): void { if (!this.busy()) { this.checkoutMode.set(false); this.error.set(''); this.focusSearch(); } }
   // --- retail / wholesale price ---------------------------------------------------------------
@@ -563,10 +587,16 @@ export class Sales implements OnInit, OnDestroy {
     const issue = this.pending ? null : this.validate();
     if (issue) { this.error.set(issue); this.focusInvalid(); return; }
     if (this.saleType() === 'CREDITO') {
-      await this.authorization.open({ title: 'Autorizar venta a crédito',
-        description: 'Se registrará la venta a crédito, se descontará inventario y se abrirá la deuda del cliente.' + (this.needsConcessionAuthorization ? ' También autoriza el descuento o el precio mayorista.' : ''),
+      // Con el bloqueo activo y un cliente moroso o sobre el cupo, solo un Administrador autoriza (o vende) la excepción.
+      // Consultado al entrar al cobro (el carrito y el cliente no cambian aquí); el servidor vuelve a decidir al confirmar.
+      const risk = this.creditRisk();
+      const blocked = risk?.blocked === true;
+      await this.authorization.open({ title: blocked ? 'Autorizar crédito bloqueado' : 'Autorizar venta a crédito',
+        description: (blocked ? `${this.creditRiskText} El bloqueo de créditos está activo: solo un Administrador puede autorizar esta venta. ` : '') +
+          'Se registrará la venta a crédito, se descontará inventario y se abrirá la deuda del cliente.' + (this.needsConcessionAuthorization ? ' También autoriza el descuento o el precio mayorista.' : ''),
         detail: `${this.selectedCustomerName} · ${this.estimate} COP · vence ${this.dueDate}`,
-        operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR', 'SUPERVISOR'],
+        operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
+        selfAuthorizedRoles: blocked ? ['ADMINISTRADOR'] : ['ADMINISTRADOR', 'SUPERVISOR'],
         onError: message => this.error.set(message),
         run: credentials => this.submitSale(credentials) });
     } else if (this.needsConcessionAuthorization) {
@@ -606,7 +636,7 @@ export class Sales implements OnInit, OnDestroy {
       // La venta ya está confirmada: un fallo de impresión no la afecta y se puede reintentar con el botón.
       setTimeout(() => void this.printSaleTicket(true));
       await this.refreshCash();
-    } catch (error) { if (error instanceof HttpErrorResponse && error.status === 403 && this.pending?.input.saleType === 'CREDITO') { this.pending = null; throw new Error('No se autorizó el crédito. Verifica el rol, permiso y credenciales del autorizador.'); } if (error instanceof HttpErrorResponse && error.status === 403 && credentials) { this.pending = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); throw new Error('No se autorizó el descuento o el precio mayorista. Aplica la autorización de nuevo con un Supervisor o Administrador.'); } if (credentials) throw error; this.error.set(`${errorText(error)} Si la respuesta se perdió, reintenta la misma venta con la misma clave.`); }
+    } catch (error) { if (error instanceof HttpErrorResponse && error.status === 403 && this.pending?.input.saleType === 'CREDITO') { this.pending = null; throw new Error(this.creditRisk()?.blocked ? `${this.creditRiskText} Con el bloqueo activo, solo un Administrador puede autorizar esta venta.` : 'No se autorizó el crédito. Verifica el rol, permiso y credenciales del autorizador.'); } if (error instanceof HttpErrorResponse && error.status === 403 && credentials) { this.pending = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); throw new Error('No se autorizó el descuento o el precio mayorista. Aplica la autorización de nuevo con un Supervisor o Administrador.'); } if (credentials) throw error; this.error.set(`${errorText(error)} Si la respuesta se perdió, reintenta la misma venta con la misma clave.`); }
     finally { this.busy.set(false); }
   }
 

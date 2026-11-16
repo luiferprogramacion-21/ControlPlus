@@ -1,10 +1,12 @@
 using System.Data;
 using ControlPlus.Application.Common;
 using ControlPlus.Application.Credits.Contracts;
+using ControlPlus.Application.Credits.Ports;
 using ControlPlus.Application.Sales.Ports;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Application.Security.Ports;
 using ControlPlus.Application.Security.Services;
+using ControlPlus.Domain.Credits;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Domain.Security.Enums;
 
@@ -20,7 +22,8 @@ public sealed class CreditSettingsService(
     IUserRepository users,
     IAuditRepository audits,
     IUnitOfWork unitOfWork,
-    IClock clock) : ICreditSettingsService
+    IClock clock,
+    ICustomerCreditExposureReader exposureReader) : ICreditSettingsService
 {
     private const int MaximumDays = 90;
 
@@ -51,7 +54,7 @@ public sealed class CreditSettingsService(
         var establishment = await sales.GetActiveEstablishmentAsync(cancellationToken);
         return establishment is null || establishment.Id != installation.EstablecimientoId
             ? Result.Failure<CreditRulesDto>(ApplicationError.NotFound("el establecimiento activo"))
-            : Result.Success(new CreditRulesDto(establishment.DiasCreditoPredeterminado));
+            : Result.Success(new CreditRulesDto(establishment.DiasCreditoPredeterminado, establishment.CreditoBloquearRiesgo));
     }
 
     public async Task<Result<CreditSettingsDto>> UpdateAsync(
@@ -75,20 +78,52 @@ public sealed class CreditSettingsService(
             return Result.Failure<CreditSettingsDto>(
                 ApplicationError.ConcurrencyConflict("La configuración fue modificada."));
 
-        var previous = new { DefaultDays = establishment.DiasCreditoPredeterminado };
+        var previous = new { DefaultDays = establishment.DiasCreditoPredeterminado, BlockRiskyCredit = establishment.CreditoBloquearRiesgo };
         establishment.DiasCreditoPredeterminado = request.DefaultDays;
+        if (request.BlockRiskyCredit is { } block) establishment.CreditoBloquearRiesgo = block;
         establishment.FechaModificacion = clock.UtcNow.UtcDateTime;
         await AuditWriter.WriteCashAsync(audits, clock, actor.UserId,
             AuditAction.CreditSettingsUpdated, nameof(Establecimiento), establishment.Id,
             new
             {
                 Previous = previous,
-                New = new { request.DefaultDays }
+                New = new { request.DefaultDays, BlockRiskyCredit = establishment.CreditoBloquearRiesgo }
             },
             Guid.CreateVersion7(), null, null, null, null, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Result.Success(Map(establishment));
+    }
+
+    public async Task<Result<CustomerCreditRiskDto>> GetCustomerRiskAsync(
+        ActorContext actor, Guid customerId, decimal amount, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await users.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
+        if (snapshot is null) return Result.Failure<CustomerCreditRiskDto>(ApplicationError.Unauthorized());
+        if (!snapshot.PermissionCodes.Contains(PermissionCodes.CreditRequest, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<CustomerCreditRiskDto>(ApplicationError.Forbidden());
+        if (customerId == Guid.Empty || amount < 0 || decimal.Truncate(amount) != amount)
+            return Result.Failure<CustomerCreditRiskDto>(ApplicationError.Validation(
+                "Indique el cliente y un valor en pesos enteros no negativo."));
+        var establishment = await sales.GetActiveEstablishmentAsync(cancellationToken);
+        if (establishment is null)
+            return Result.Failure<CustomerCreditRiskDto>(ApplicationError.NotFound("el establecimiento activo"));
+        var customer = await sales.GetCustomerAsync(customerId, cancellationToken);
+        if (customer is null) return Result.Failure<CustomerCreditRiskDto>(ApplicationError.NotFound("el cliente"));
+
+        var exposure = await exposureReader.GetAsync(customerId, LocalToday(establishment, clock), cancellationToken);
+        var risk = CreditRiskPolicy.Assess(exposure.OutstandingBalance, exposure.OverdueBalance, customer.CupoCredito, amount);
+        return Result.Success(new CustomerCreditRiskDto(customerId, exposure.OutstandingBalance, exposure.OverdueBalance,
+            exposure.OverdueCredits, customer.CupoCredito, risk.AvailableCredit, risk.Overdue, risk.ExceedsLimit,
+            establishment.CreditoBloquearRiesgo, risk.HasRisk && establishment.CreditoBloquearRiesgo));
+    }
+
+    /// <summary>Fecha local del establecimiento, la misma que usa Créditos para proyectar VENCIDO.</summary>
+    public static DateOnly LocalToday(Establecimiento establishment, IClock clock)
+    {
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(
+            string.IsNullOrWhiteSpace(establishment.ZonaHoraria) ? "America/Bogota" : establishment.ZonaHoraria);
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.UtcNow, zone).DateTime);
     }
 
     private async Task<ApplicationError?> RequireAdministratorAsync(
@@ -114,5 +149,5 @@ public sealed class CreditSettingsService(
     }
 
     private static CreditSettingsDto Map(Establecimiento establishment) =>
-        new(establishment.DiasCreditoPredeterminado, establishment.Version);
+        new(establishment.DiasCreditoPredeterminado, establishment.Version, establishment.CreditoBloquearRiesgo);
 }

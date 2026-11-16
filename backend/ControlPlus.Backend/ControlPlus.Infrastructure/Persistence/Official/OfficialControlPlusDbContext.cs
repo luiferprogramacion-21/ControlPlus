@@ -812,6 +812,10 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .HasMaxLength(50)
                 .HasColumnName("numero_documento");
             entity.Property(e => e.Observaciones).HasColumnName("observaciones");
+            entity.Property(e => e.CupoCredito)
+                .HasPrecision(18)
+                .HasComment("Saldo maximo que puede deber el cliente en creditos. NULL significa sin limite.")
+                .HasColumnName("cupo_credito");
             entity.Property(e => e.Telefono)
                 .HasMaxLength(30)
                 .HasColumnName("telefono");
@@ -1713,6 +1717,9 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .HasDefaultValue(12)
                 .HasComment("Unidades minimas de un mismo producto para vender a precio mayorista en ventas, apartados y cambios.")
                 .HasColumnName("minimo_unidades_mayorista");
+            entity.Property(e => e.CreditoBloquearRiesgo)
+                .HasComment("Si es true, vender a credito a un moroso o sobre el cupo exige autorizacion de un Administrador.")
+                .HasColumnName("credito_bloquear_riesgo");
             entity.Property(e => e.DiasLimiteCambio)
                 .HasDefaultValue(15)
                 .HasColumnName("dias_limite_cambio");

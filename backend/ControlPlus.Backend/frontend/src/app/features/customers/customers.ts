@@ -28,7 +28,7 @@ export class Customers implements OnInit {
   private requestId = 0;
   get full(): boolean { return this.session.has('CUSTOMERS.MANAGE'); }
   ngOnInit(): void { void this.reload(); }
-  private empty(): CustomerInput { return { documentType: null, documentNumber: null, fullName: '', phone: null, address: '', email: null, observations: null }; }
+  private empty(): CustomerInput { return { documentType: null, documentNumber: null, fullName: '', phone: null, address: '', email: null, observations: null, creditLimit: null }; }
   async reload(): Promise<void> {
     const id = ++this.requestId; this.loading.set(true); this.error.set('');
     try { const result = await this.api.list({ search: this.search.trim(), status: this.full ? this.status : 'active', page: this.page, pageSize: this.pageSize }); if (id === this.requestId) this.result.set(result); }
@@ -38,9 +38,9 @@ export class Customers implements OnInit {
   find(): void { this.page = 1; void this.reload(); }
   pageChanged(e: PageEvent): void { this.page = e.pageIndex + 1; this.pageSize = e.pageSize; void this.reload(); }
   newCustomer(): void { this.selected.set(null); this.form = this.empty(); this.editing.set(true); this.error.set(''); }
-  edit(customer: Customer): void { this.selected.set(customer); this.form = { documentType: customer.documentType, documentNumber: customer.documentNumber, fullName: customer.fullName, phone: customer.phone, address: customer.address, email: customer.email, observations: customer.observations }; this.editing.set(true); this.error.set(''); }
+  edit(customer: Customer): void { this.selected.set(customer); this.form = { documentType: customer.documentType, documentNumber: customer.documentNumber, fullName: customer.fullName, phone: customer.phone, address: customer.address, email: customer.email, observations: customer.observations, creditLimit: customer.creditLimit ?? null }; this.editing.set(true); this.error.set(''); }
   cancel(): void { this.editing.set(false); this.selected.set(null); }
-  private normalized(): CustomerInput { const f = this.form; const value = (x: string | null) => x?.trim() || null; return { documentType: this.full ? value(f.documentType)?.toUpperCase() ?? null : this.selected()?.documentType ?? null, documentNumber: this.full ? value(f.documentNumber)?.toUpperCase() ?? null : this.selected()?.documentNumber ?? null, fullName: f.fullName.trim(), phone: value(f.phone), address: f.address.trim(), email: value(f.email)?.toLowerCase() ?? null, observations: this.full ? value(f.observations) : this.selected()?.observations ?? null }; }
+  private normalized(): CustomerInput { const f = this.form; const value = (x: string | null) => x?.trim() || null; return { documentType: this.full ? value(f.documentType)?.toUpperCase() ?? null : this.selected()?.documentType ?? null, documentNumber: this.full ? value(f.documentNumber)?.toUpperCase() ?? null : this.selected()?.documentNumber ?? null, fullName: f.fullName.trim(), phone: value(f.phone), address: f.address.trim(), email: value(f.email)?.toLowerCase() ?? null, observations: this.full ? value(f.observations) : this.selected()?.observations ?? null, creditLimit: this.full ? limit(f.creditLimit) : this.selected()?.creditLimit ?? null }; }
   validation(): string {
     const f = this.normalized();
     if (!f.fullName || f.fullName.length > 200) return 'Indica un nombre de hasta 200 caracteres.';
@@ -49,6 +49,7 @@ export class Customers implements OnInit {
     if (f.documentNumber && f.documentNumber.length > 50) return 'El documento supera 50 caracteres.';
     if (f.phone && f.phone.length > 30) return 'El teléfono supera 30 caracteres.';
     if (f.email && (f.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email))) return 'Revisa el correo.';
+    if (f.creditLimit != null && (!Number.isInteger(f.creditLimit) || f.creditLimit <= 0)) return 'El cupo de crédito debe ser un valor en pesos enteros mayor que cero, o vacío para no tener límite.';
     return '';
   }
   async save(): Promise<void> {
@@ -73,4 +74,10 @@ export class Customers implements OnInit {
     catch (e) { this.error.set(e instanceof HttpErrorResponse && e.status === 409 ? 'El cliente cambió. Actualiza la lista antes de intentar otra vez.' : errorText(e)); }
     finally { this.saving.set(false); }
   }
+}
+
+/** Empty input means no limit; any other value is sent as a number for the server to validate. */
+function limit(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  return Number(value);
 }

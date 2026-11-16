@@ -18,7 +18,13 @@ export interface SaleReprintRequest { requestId: string; saleId: string; request
 
 export interface SaleSummary { id: string; visibleNumber: string; userId: string; customerId: string | null; occurredAtUtc: string; operatingDate: string; total: number; state: string; }
 /** Default due-date term of a credit sale in days; null when the seller must choose the date. The range of 1 to 90 days is enforced by the server. */
-export interface CreditRules { defaultDays: number | null; }
+export interface CreditRules { defaultDays: number | null; blockRiskyCredit?: boolean; }
+/** Situación de crédito de un cliente frente a una venta nueva (GET /api/sales/credit-check). */
+export interface CustomerCreditRisk {
+  customerId: string; outstandingBalance: number; overdueBalance: number; overdueCredits: number;
+  creditLimit: number | null; availableCredit: number | null; overdue: boolean; exceedsLimit: boolean;
+  blockRiskyCredit: boolean; blocked: boolean;
+}
 export interface SaleLine { id: string; productId: string; productCode: string; productName: string; measurementUnit: string; quantity: number; priceType: string; unitPrice: number; discountAmount: number; grossAmount: number; netAmount: number; }
 export interface SalePaymentLine { id: string; methodCode: string; methodName: string; appliedAmount: number; receivedAmount: number | null; change: number; reference: string | null; }
 export interface SaleDetail { id: string; visibleNumber: string; occurredAtUtc: string; operatingDate: string; grossSubtotal: number; discountTotal: number; total: number; change: number; state: string; version: number; creditId: string | null; lines: SaleLine[]; payments: SalePaymentLine[]; }
@@ -85,6 +91,9 @@ export class SalesApi {
     return firstValueFrom(this.http.post<ConfirmedChange>(`/api/sales/${saleId}/changes`, input, { headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined }));
   }
   creditRules(): Promise<CreditRules> { return firstValueFrom(this.http.get<CreditRules>('/api/sales/credit-rules')); }
+  creditCheck(customerId: string, amount: number): Promise<CustomerCreditRisk> {
+    return firstValueFrom(this.http.get<CustomerCreditRisk>('/api/sales/credit-check', { params: { customerId, amount } }));
+  }
   /** Units of the same product required for the wholesale price (configured by the Administrator). */
   pricingRules(): Promise<{ wholesaleMinimumQuantity: number }> { return firstValueFrom(this.http.get<{ wholesaleMinimumQuantity: number }>('/api/sales/pricing-rules')); }
   customers(search: string): Promise<Page<Customer>> { return this.customersApi.list({ search, status: 'active', page: 1, pageSize: 20 }); }

@@ -141,6 +141,12 @@
             @if (creditDefaultDays() !== null) { <p class="form-hint">Plazo predeterminado: <strong>{{ creditDefaultDays() }} {{ creditDefaultDays() === 1 ? 'día' : 'días' }}</strong>@if (defaultDueDateText) { (vence el <strong>{{ defaultDueDateText }}</strong>) }. Puedes cambiar la fecha entre mañana y 90 días.</p> }
             @else if (creditRulesKnown()) { <p class="form-hint">No hay un plazo predeterminado: elige la fecha de vencimiento, entre mañana y 90 días.</p> }
           </div>
+          @if (creditRisk(); as risk) {
+            <div class="inline-feedback" [class.inline-feedback--error]="risk.blocked" [class.inline-feedback--warning]="!risk.blocked" role="alert">
+              <strong>{{ risk.blocked ? 'Crédito bloqueado' : 'Atención' }}:</strong> {{ creditRiskText }}
+              @if (risk.blocked) { Solo un Administrador puede autorizar esta venta. }
+            </div>
+          }
         } @else {
         <div class="change-highlight" [class.change-highlight--active]="change > 0" role="status" aria-live="polite"><span>CAMBIO A DEVOLVER</span><strong>{{ change | currency:'COP':'symbol':'1.0-0' }}</strong><small>{{ change > 0 ? 'Entregar al cliente' : 'Sin cambio' }}</small></div>
         <div class="payment-toolbar"><span class="badge" [class.badge--success]="remaining === 0" [class.badge--warning]="remaining !== 0">{{ remaining >= 0 ? 'Faltante' : 'Excede' }} {{ (remaining < 0 ? -remaining : remaining) | currency:'COP':'symbol':'1.0-0' }}</span><button class="button button--secondary" type="button" (click)="addPayment()" [disabled]="activePayments().length >= 3 || busy()">+ Pago mixto</button></div>

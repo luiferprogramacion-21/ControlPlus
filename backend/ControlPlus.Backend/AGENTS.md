@@ -392,3 +392,5 @@ Aprobado por el usuario (entran en la V1, repartidos entre Claude y Codex):
 - **Dependabot:** después de la entrega.
 
 Intereses, mora, cuotas y cupo no existen en el modelo oficial de la Fase 4. Las cuotas y el cupo/modo de bloqueo requieren migraciones nuevas, que activará el operador como las anteriores.
+
+Estado (16 de noviembre de 2026): pantalla de auditoría publicada (`docs/audit-screen.md`). Morosos y cupo implementados con `GET /api/sales/credit-check`, `blockRiskyCredit` en `/api/credits/settings`, `creditLimit` en clientes y la migración `20261116010000_CreditRiskControlsV1` (historial 25→26), **pendiente de activación por el operador** con `scripts/credit-risk/Invoke-Activation.ps1` y el servicio detenido (`docs/credit-risk.md`). La regla de «vencido» para morosos es `CreditStatusPolicy`; las cuotas de Codex deben actualizarla junto con `EfCustomerCreditExposureReader`.

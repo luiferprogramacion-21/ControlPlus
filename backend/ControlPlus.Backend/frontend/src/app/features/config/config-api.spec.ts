@@ -64,13 +64,13 @@ describe('ConfigApi', () => {
   });
 
   it('los créditos leen y guardan el plazo predeterminado (o nulo) con la versión esperada', async () => {
-    const read = api.creditSettings(); http.expectOne('/api/credits/settings').flush({ defaultDays: 30, version: 1 }); expect((await read).defaultDays).toBe(30);
-    const task = api.updateCreditSettings(45, 1);
+    const read = api.creditSettings(); http.expectOne('/api/credits/settings').flush({ defaultDays: 30, version: 1, blockRiskyCredit: false }); expect((await read).defaultDays).toBe(30);
+    const task = api.updateCreditSettings(45, 1, false);
     const put = http.expectOne('/api/credits/settings');
-    expect([put.request.method, put.request.body]).toEqual(['PUT', { defaultDays: 45, expectedVersion: 1 }]); put.flush({ defaultDays: 45, version: 2 });
+    expect([put.request.method, put.request.body]).toEqual(['PUT', { defaultDays: 45, expectedVersion: 1, blockRiskyCredit: false }]); put.flush({ defaultDays: 45, version: 2, blockRiskyCredit: false });
     await task;
-    const none = api.updateCreditSettings(null, 2); const putNone = http.expectOne('/api/credits/settings');
-    expect(putNone.request.body).toEqual({ defaultDays: null, expectedVersion: 2 }); putNone.flush({ defaultDays: null, version: 3 }); await none;
+    const none = api.updateCreditSettings(null, 2, true); const putNone = http.expectOne('/api/credits/settings');
+    expect(putNone.request.body).toEqual({ defaultDays: null, expectedVersion: 2, blockRiskyCredit: true }); putNone.flush({ defaultDays: null, version: 3, blockRiskyCredit: true }); await none;
   });
 
   it('la política de cambios envía los días y la versión esperada', async () => {

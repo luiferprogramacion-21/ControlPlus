@@ -372,6 +372,87 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
+    public async Task RiskyCustomer_IsOnlyWarned_UntilTheBlockIsOn_ThenOnlyAnAdministratorAuthorizesTheException()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        var today = scenario.Shift.OperatingDate;
+        var selfRequest = CreditRequest(scenario, scenario.CustomerId, today.AddDays(1)) with { Authorization = null };
+        var checkUrl = $"/api/sales/credit-check?customerId={scenario.CustomerId}&amount=1000";
+
+        // Un cliente al día y sin cupo: nada que avisar.
+        _ = await StartSessionAsync(client, scenario, scenario.Supervisor);
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        var first = await ReadAsync<SaleDto>(await PostSaleAsync(client, "risk-first", selfRequest), HttpStatusCode.Created);
+        var clean = await ReadAsync<CustomerCreditRiskDto>(await client.GetAsync(checkUrl), HttpStatusCode.OK);
+        Assert.Equal((1_000m, 0m, false, false, false), (clean.OutstandingBalance, clean.OverdueBalance, clean.Overdue, clean.ExceedsLimit, clean.Blocked));
+        Assert.Null(clean.CreditLimit);
+
+        // El crédito anterior vence y el cliente tiene cupo de 1 500: moroso y sobre el cupo.
+        await using (var scope = _factory!.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            var credit = await db.Credito.SingleAsync(x => x.Id == first.CreditId);
+            credit.FechaOtorgamiento = today.AddDays(-10);
+            credit.FechaVencimiento = today.AddDays(-1);
+            (await db.Cliente.SingleAsync(x => x.Id == scenario.CustomerId)).CupoCredito = 1_500m;
+            await db.SaveChangesAsync();
+        }
+        var risky = await ReadAsync<CustomerCreditRiskDto>(await client.GetAsync(checkUrl), HttpStatusCode.OK);
+        Assert.Equal((1_000m, 1, true, true, 500m, false, false),
+            (risky.OverdueBalance, risky.OverdueCredits, risky.Overdue, risky.ExceedsLimit, risky.AvailableCredit, risky.BlockRiskyCredit, risky.Blocked));
+
+        // Modo aviso (predeterminado): la venta se permite y queda el aviso en la auditoría.
+        _ = await StartSessionAsync(client, scenario, scenario.Supervisor);
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        var warned = await ReadAsync<SaleDto>(await PostSaleAsync(client, "risk-warned", selfRequest), HttpStatusCode.Created);
+        Assert.Contains("\"Overdue\":true", await CreditAuditAsync(warned.CreditId!.Value));
+
+        // El Administrador activa el bloqueo.
+        SetBearer(client, scenario.Admin.AccessToken);
+        var settings = await ReadAsync<CreditSettingsDto>(await client.GetAsync("/api/credits/settings"), HttpStatusCode.OK);
+        Assert.False(settings.BlockRiskyCredit);
+        var blocked = await ReadAsync<CreditSettingsDto>(await client.PutAsJsonAsync("/api/credits/settings",
+            new UpdateCreditSettingsRequest(settings.DefaultDays, settings.Version, true)), HttpStatusCode.OK);
+        Assert.True(blocked.BlockRiskyCredit);
+        Assert.Equal(settings.DefaultDays, blocked.DefaultDays);
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        Assert.True((await ReadAsync<CreditRulesDto>(await client.GetAsync("/api/sales/credit-rules"), HttpStatusCode.OK)).BlockRiskyCredit);
+        Assert.True((await ReadAsync<CustomerCreditRiskDto>(await client.GetAsync(checkUrl), HttpStatusCode.OK)).Blocked);
+
+        // Supervisor sin segundo autorizador: rechazado. Con credenciales de un Administrador: excepción autorizada.
+        _ = await StartSessionAsync(client, scenario, scenario.Supervisor);
+        SetBearer(client, scenario.Supervisor.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(client, "risk-supervisor-self", selfRequest), HttpStatusCode.Forbidden);
+        var byAdmin = await ReadAsync<SaleDto>(await PostSaleAsync(client, "risk-supervisor-admin",
+            CreditRequest(scenario, scenario.CustomerId, today.AddDays(1), AdminName, AdminPassword)), HttpStatusCode.Created);
+        Assert.Contains("ADMINISTRATOR_AUTHORIZER", await CreditAuditAsync(byAdmin.CreditId!.Value));
+
+        // Cajero: el Supervisor ya no alcanza; el Administrador sí.
+        _ = await StartSessionAsync(client, scenario, scenario.Cashier);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(client, "risk-cashier-supervisor",
+            CreditRequest(scenario, scenario.CustomerId, today.AddDays(1))), HttpStatusCode.Forbidden);
+        _ = await ReadAsync<SaleDto>(await PostSaleAsync(client, "risk-cashier-admin",
+            CreditRequest(scenario, scenario.CustomerId, today.AddDays(1), AdminName, AdminPassword)), HttpStatusCode.Created);
+
+        // El Administrador que vende autoriza él mismo la excepción.
+        _ = await StartSessionAsync(client, scenario, scenario.Admin);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var adminSelf = await ReadAsync<SaleDto>(await PostSaleAsync(client, "risk-admin-self", selfRequest), HttpStatusCode.Created);
+        Assert.Contains("ADMINISTRATOR_SELF", await CreditAuditAsync(adminSelf.CreditId!.Value));
+    }
+
+    private async Task<string> CreditAuditAsync(Guid creditId)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        return (await db.EventoAuditoria.AsNoTracking()
+            .SingleAsync(x => x.Accion == "CREDITCREATED" && x.EntidadId == creditId)).DatosNuevos!;
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
     public async Task FailedCreditAuthorization_SharesLoginCounter_LocksOnce_AndKeepsActorUntouched()
     {
         using var client = CreateClient();
