@@ -376,3 +376,19 @@ Se aplican los respaldos de Fase 4 (confirmado por el usuario): respaldo lógico
 Aprobado por el usuario: un único servicio de Windows «ControlPlus» que corre la API y sirve la pantalla de Angular compilada en `http://localhost:5000` (las rutas de `/api` nunca devuelven la pantalla), con la cuenta del sistema (LocalSystem), inicio automático después de PostgreSQL (sin retraso desde el 16 de noviembre de 2026; la dependencia garantiza el orden), reinicio ante fallos y acceso directo en el escritorio. El servicio lee su configuración de `C:\ProgramData\ControlPlus\api-secrets.json` (solo SYSTEM y Administradores), que el instalador copia de los User Secrets; `dotnet run` sigue con User Secrets. Instalar o actualizar con `scripts/service/Install-ControlPlusService.ps1` como Administrador; desinstalar con `Uninstall-ControlPlusService.ps1`. No aplica migraciones. Instalado en el equipo de la tienda el 15 de noviembre de 2026 (`CONTROLPLUS_SERVICE_OK`); pendiente comprobar el arranque tras reiniciar. Véase `docs/windows-service.md`.
 
 - Decisión del 15 de noviembre de 2026 (identidad visual): el usuario aportó el logo de ControlPlus y pidió el inicio de sesión en dos paneles, en lugar de la maqueta 02: formulario «Punto de venta / Baratísimo» a la izquierda y, a la derecha, la versión blanca del logo sobre un panel azul marino. El inicio de sesión usa los colores del logo: azul marino `#0F2C4D` y naranja `#FD6D32`. El ícono del logo (caja con recibo) se recortó como `controlplus.ico` para el acceso directo del escritorio; los archivos están en `frontend/public` (`controlplus-logo.png`, `controlplus-logo-white.png`, `controlplus-icon.png`, `controlplus.ico`) y el instalador del servicio usa el ícono.
+
+## Decisión del 16 de noviembre de 2026: cierre de Créditos, auditoría y pruebas para la V1
+
+Aprobado por el usuario (entran en la V1, repartidos entre Claude y Codex):
+
+- **Sin intereses ni mora monetaria.** El saldo de un crédito nunca crece; «vencido» sigue siendo solo un estado.
+- **Anular un abono:** igual que anular una venta. Supervisor con autorización de un Administrador; el Administrador sin segundo autorizador; el Cajero no puede. Siempre con motivo del catálogo `ANULACION_PAGO` y auditoría. Restituye el saldo del crédito (un crédito `PAGADO` vuelve a pendiente o vencido) y revierte el dinero en Caja. Usa los campos de anulación que ya tiene `ventas.pago_credito`.
+- **Condonar el saldo de un crédito:** solo Administrador, con motivo y auditoría. El crédito pasa a `ANULADO`, la mercancía no vuelve y los abonos hechos se conservan. Anular la venta con su crédito, que devuelve el inventario, sigue existiendo aparte.
+- **Cuotas opcionales:** al vender a crédito se elige pago único (como hoy) o N cuotas con fecha cada una. Cada abono se aplica a la cuota más antigua y el vencimiento se mide por cuota.
+- **Clientes morosos (con saldo vencido):** al vender a crédito siempre aparece un aviso. El Administrador puede activar en Configuración el modo «Bloquear». Con el bloqueo activo, solo un Administrador puede autorizar una excepción puntual con sus credenciales, que queda en la auditoría.
+- **Cupo de crédito por cliente:** opcional en la ficha (vacío = sin límite). Si la venta lo supera: aviso, o bloqueo si está activo el modo «Bloquear», con la misma excepción del Administrador.
+- **Pantalla de auditoría:** consulta de solo lectura de `GET /api/audit-records` (`AUDIT.READ`) con filtros.
+- **Pruebas de extremo a extremo en navegador** del flujo principal, ejecutadas en el CI.
+- **Dependabot:** después de la entrega.
+
+Intereses, mora, cuotas y cupo no existen en el modelo oficial de la Fase 4. Las cuotas y el cupo/modo de bloqueo requieren migraciones nuevas, que activará el operador como las anteriores.
