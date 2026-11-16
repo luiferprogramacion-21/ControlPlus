@@ -6,7 +6,7 @@ Para que la tienda no dependa de abrir terminales, ControlPlus se instala como u
 
 - **Un solo servicio** («ControlPlus») que corre la API y además sirve la pantalla de Angular ya compilada en `http://localhost:5000`. Las rutas de la pantalla devuelven `index.html`; las rutas de `/api` nunca devuelven la pantalla.
 - **Cuenta del sistema (LocalSystem):** no pide contraseña de Windows y arranca aunque nadie haya iniciado sesión. Puede escribir en la carpeta de OneDrive del usuario. Una impresora instalada solo para un usuario podría no verse; se revisará con la impresora física.
-- **Arranque:** automático retrasado, después del servicio de PostgreSQL (dependencia declarada), y reinicio automático si falla (10 s, 10 s y 60 s; el contador se reinicia cada día).
+- **Arranque:** automático, después del servicio de PostgreSQL (dependencia declarada); hasta el 16 de noviembre de 2026 era «automático retrasado», que Windows aplica unos 2 minutos después del encendido, y reinicio automático si falla (10 s, 10 s y 60 s; el contador se reinicia cada día).
 - **Configuración privada:** los User Secrets solo existen para el usuario que desarrolla. El instalador copia esos valores (conexión, clave JWT, Master Key y respaldos) a `C:\ProgramData\ControlPlus\api-secrets.json`, con permisos solo para SYSTEM y Administradores. Solo el servicio lee ese archivo; `dotnet run` sigue usando User Secrets.
 - **Acceso directo** «ControlPlus» en el escritorio que abre `http://localhost:5000/`.
 - El servicio corre en entorno Production: no publica OpenAPI. No aplica migraciones al iniciar.
@@ -61,4 +61,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\service\Repair-Con
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\maintenance\Remove-TestDatabases.ps1
 ```
 
-Pendiente: confirmar con un nuevo reinicio que ControlPlus arranca solo.
+Ejecución en el equipo de la tienda (16 de noviembre de 2026): `Repair-ControlPlusStartup.ps1` terminó con `CONTROLPLUS_STARTUP_OK` (servicio de PostgreSQL en ejecución con espera de 10 minutos y ControlPlus con salud 200). `Remove-TestDatabases.ps1` encontró 368 bases temporales (4 436 MB), conservó los 4 clones de ensayo, ninguna tenía conexiones abiertas, y terminó con `TEST_DATABASES_REMOVED_OK removed=368`.
+
+Reinicio de comprobación (16 de noviembre de 2026, 12:35:28): PostgreSQL inició en 1 segundo («Servidor iniciado y aceptando conexiones» a las 12:35:45) y ControlPlus a las 12:37:48 por el inicio retrasado; salud de la API, de la base y pantalla con HTTP 200. Queda acreditado que arranca solo. A pedido del usuario se cambió el inicio a automático sin retraso (`sc.exe config ControlPlus start= auto`; el instalador lo deja así).

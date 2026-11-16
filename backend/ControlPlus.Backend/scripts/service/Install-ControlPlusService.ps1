@@ -9,7 +9,7 @@
     2. Lee la configuración privada de la API (User Secrets del usuario que ejecuta el script).
     3. Compila la pantalla (Angular, producción) y publica la API con la pantalla dentro (wwwroot).
     4. Escribe la configuración en C:\ProgramData\ControlPlus\api-secrets.json, legible solo por SYSTEM y Administradores.
-    5. Crea (o actualiza) el servicio "ControlPlus": cuenta del sistema, inicio automático retrasado, depende de
+    5. Crea (o actualiza) el servicio "ControlPlus": cuenta del sistema, inicio automático (sin retraso), depende de
        PostgreSQL y se reinicia solo si falla.
     6. Comprueba http://localhost:5000 (salud, base de datos y pantalla) y crea el acceso directo del escritorio.
     No aplica migraciones ni modifica la base de datos. Ejecutar en PowerShell como Administrador.
@@ -150,7 +150,8 @@ try {
             -Description 'ControlPlus POS de Baratísimo: API, pantalla y respaldos automáticos.' `
             -StartupType Automatic -DependsOn $postgres.Name | Out-Null
     }
-    & sc.exe config $serviceName start= delayed-auto | Out-Null
+    # Sin retraso: la dependencia de PostgreSQL ya garantiza el orden (decisión del 16 de noviembre de 2026).
+    & sc.exe config $serviceName start= auto | Out-Null
     & sc.exe failure $serviceName reset= 86400 actions= restart/10000/restart/10000/restart/60000 | Out-Null
     Start-Service -Name $serviceName
 
