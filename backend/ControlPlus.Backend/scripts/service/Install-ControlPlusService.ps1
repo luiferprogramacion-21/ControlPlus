@@ -63,6 +63,15 @@ try {
         }
         throw "El servicio $($postgres.Name) no está corriendo. Inícielo con Start-Service $($postgres.Name) y vuelva a intentar."
     }
+    # Espera de arranque de PostgreSQL de 10 minutos: con los 60 segundos predeterminados, una recuperación tras un
+    # apagado brusco lo deja marcado como fallido aunque termine de iniciar, y ControlPlus (que depende de él) no arranca.
+    $pgRegistry = "HKLM:\SYSTEM\CurrentControlSet\Services\$($postgres.Name)"
+    $pgImage = (Get-ItemProperty -LiteralPath $pgRegistry -Name ImagePath).ImagePath
+    if ($pgImage -match 'pg_ctl\.exe"?\s+runservice' -and $pgImage -notmatch '\s-t\s+600(\s|$)') {
+        if ($pgImage -match '\s-t\s+\d+') { $pgImage = $pgImage -replace '\s-t\s+\d+', ' -t 600' } else { $pgImage = $pgImage + ' -t 600' }
+        Set-ItemProperty -LiteralPath $pgRegistry -Name ImagePath -Value $pgImage
+        Write-Host 'Espera de arranque del servicio de PostgreSQL ampliada a 10 minutos.'
+    }
     $existing = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     $servicePid = 0
     if ($existing) { $servicePid = (Get-CimInstance Win32_Service -Filter "Name='$serviceName'").ProcessId }

@@ -40,4 +40,25 @@ Elimina el servicio sin tocar la base, los respaldos ni la configuración; `-Rem
 
 Compilación serial con `-warnaserror` sin errores ni advertencias; API sin base de datos 225/225, incluidas las 5 de `FrontendHostingTests` (pantalla en `/` y rutas internas, archivos estáticos, `/api` inexistente nunca devuelve la pantalla y sin pantalla compilada no se sirve nada). Prueba local de la publicación con la pantalla dentro, en el puerto 5099: salud y salud de base 200, `/`, `/operacion/dashboard` y `/operacion/soporte/restauracion` devuelven la pantalla y el JavaScript se entrega con su tipo. Instalación real en el equipo de la tienda (15 de noviembre de 2026): el primer intento se detuvo antes de cambiar nada porque PostgreSQL atendía en el puerto 5432 pero su servicio figuraba detenido (el proceso que lo vigilaba había terminado después del arranque del 11 de noviembre). El operador lo detuvo con `pg_ctl stop -m fast` y lo inició con `Start-Service postgresql-x64-18` (Running); el instalador mejoró su mensaje para ese caso. La instalación terminó con `CONTROLPLUS_SERVICE_OK`: servicio `ControlPlus` en ejecución con LocalSystem desde `C:\Program Files\ControlPlus\api`, inicio automático, dependencia de `postgresql-x64-18`, y HTTP 200 en `/api/health`, `/api/health/database`, `/` y `/operacion/soporte`; acceso directo creado. El build de la pantalla mantiene las advertencias de presupuesto ya conocidas (bundle inicial y estilos de Dashboard, Soporte, Caja y Ventas).
 
-Pendiente: comprobar que el servicio arranca solo tras reiniciar el equipo, que los respaldos automáticos escriben en OneDrive con la cuenta del sistema y la impresora térmica con esa cuenta.
+Pendiente: comprobar que los respaldos automáticos escriben en OneDrive con la cuenta del sistema y la impresora térmica con esa cuenta.
+
+## Incidente del 16 de noviembre de 2026: ControlPlus no arrancó tras reiniciar
+
+Después de dos reinicios ControlPlus quedó detenido. Causa (registros de Windows y de PostgreSQL):
+
+1. PostgreSQL no se había apagado de forma ordenada («el sistema de bases de datos fue interrumpido; última vez en funcionamiento en 2026-11-15 22:52:05»). Al arrancar, antes de recuperarse, sincroniza (`fsync`) todo el directorio de datos.
+2. El directorio tenía **377 bases y 245 788 archivos (4,5 GB)**, casi todas bases temporales de pruebas `controlplus_test_*` que quedaron sin borrar (pruebas interrumpidas). La sincronización tardó más de 7 minutos.
+3. El servicio `postgresql-x64-18` espera 60 segundos (`pg_ctl -w` sin `-t`): se marcó como fallido aunque PostgreSQL siguió iniciando, y ControlPlus, que depende de él, no arrancó. Con el servicio marcado como detenido, el siguiente reinicio tampoco lo apaga en orden y el problema se repite.
+
+Solución:
+
+- `scripts/service/Repair-ControlPlusStartup.ps1` (como Administrador): amplía a 10 minutos la espera de arranque del servicio de PostgreSQL (`-t 600` en su `ImagePath`), espera a que PostgreSQL acepte conexiones, lo detiene en orden y lo inicia por su servicio, inicia ControlPlus y comprueba la salud. Termina con `CONTROLPLUS_STARTUP_OK`. El instalador del servicio también deja la espera en 10 minutos.
+- `scripts/maintenance/Remove-TestDatabases.ps1`: borra las bases `controlplus_test_<id>` y `controlplus_restore_<id>` sin conexiones abiertas, conserva los cuatro clones de ensayo documentados (salvo `-IncludeRehearsalClones`) y nunca toca `controlplus`. Pide escribir `BORRAR` y termina con `TEST_DATABASES_REMOVED_OK`. Ejecutarlo sin pruebas corriendo.
+
+```powershell
+Set-Location 'C:\ControlPlus\backend\ControlPlus.Backend'
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\service\Repair-ControlPlusStartup.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\maintenance\Remove-TestDatabases.ps1
+```
+
+Pendiente: confirmar con un nuevo reinicio que ControlPlus arranca solo.
