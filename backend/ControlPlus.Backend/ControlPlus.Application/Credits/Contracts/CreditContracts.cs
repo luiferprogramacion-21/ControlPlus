@@ -13,6 +13,34 @@ public sealed record CreditPaymentDto(Guid Id, string Number, string MethodCode,
     decimal AppliedAmount, decimal? ReceivedAmount, decimal Change, DateTimeOffset OccurredAtUtc,
     string State, Guid CorrelationId);
 
+public sealed record CreditPaymentCancellationReasonDto(Guid Id, string Code, string Name, int DisplayOrder);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CreditLifecycleAuthorizationRequest(
+    string? UserName, string? Password, string? CredentialToken = null) : IAuthorizerCredentials
+{
+    [JsonIgnore] public Guid? ResolvedCredentialId { get; init; }
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CancelCreditPaymentRequest(
+    [property: JsonRequired] long ExpectedVersion,
+    [property: JsonRequired] Guid ReasonId,
+    string? Observation,
+    CreditLifecycleAuthorizationRequest? Authorization = null);
+
+public sealed record CancelCreditPaymentDto(Guid CreditId, decimal Balance, string State, long Version,
+    IReadOnlyCollection<Guid> CancelledPaymentIds, Guid CorrelationId, DateTimeOffset CancelledAtUtc,
+    decimal ReversedAmount);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ForgiveCreditRequest(
+    [property: JsonRequired] long ExpectedVersion,
+    [property: JsonRequired] string Reason);
+
+public sealed record ForgiveCreditDto(Guid CreditId, decimal Balance, string State, long Version,
+    Guid AuthorizationId, Guid CorrelationId, DateTimeOffset ForgivenAtUtc);
+
 public sealed record CreditPaymentOperationDto(Guid CreditId, decimal Balance, string State, long Version,
     Guid CorrelationId, IReadOnlyCollection<CreditPaymentDto> Payments);
 
@@ -38,4 +66,10 @@ public interface ICreditsService
         int page, int pageSize, CancellationToken cancellationToken = default);
     Task<Result<CreditPaymentOperationDto>> ApplyPaymentAsync(ActorContext actor, Guid creditId,
         string idempotencyKey, ApplyCreditPaymentRequest request, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyCollection<CreditPaymentCancellationReasonDto>>> ListPaymentCancellationReasonsAsync(
+        ActorContext actor, CancellationToken cancellationToken = default);
+    Task<Result<CancelCreditPaymentDto>> CancelPaymentAsync(ActorContext actor, Guid creditId, Guid paymentId,
+        string idempotencyKey, CancelCreditPaymentRequest request, CancellationToken cancellationToken = default);
+    Task<Result<ForgiveCreditDto>> ForgiveAsync(ActorContext actor, Guid creditId, string idempotencyKey,
+        ForgiveCreditRequest request, CancellationToken cancellationToken = default);
 }

@@ -121,7 +121,14 @@ try {
     if ($roles -notcontains 'controlplus_app') { throw 'No existe el rol controlplus_app en este PostgreSQL. Créelo primero (docs/backups.md, «Equipo nuevo»).' }
     $currentExists = @(Invoke-Sql 'postgres' "SELECT 1 FROM pg_database WHERE datname = 'controlplus';").Count -eq 1
     $owner = 'postgres'
-    if ($currentExists) { $owner = (Invoke-Sql 'postgres' "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'controlplus';")[0] }
+    if ($currentExists) {
+        # PowerShell 5.1 unwraps a one-row pipeline result to a scalar string. Indexing
+        # that scalar with [0] returns its first character (for example, "c" from
+        # "controlplus_app") instead of the first row.
+        $ownerRows = @(Invoke-Sql 'postgres' "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'controlplus';")
+        if ($ownerRows.Count -ne 1) { throw 'No se pudo determinar un único dueño para la base actual.' }
+        $owner = [string]$ownerRows[0]
+    }
     if ($owner -notmatch '^[a-z_][a-z0-9_]*$') { throw 'El dueño de la base actual tiene un nombre inesperado.' }
 
     # 2. Copia en claro y verificación

@@ -59,6 +59,41 @@ public sealed class EfCreditsRepository(OfficialControlPlusDbContext dbContext) 
         return rows.SingleOrDefault();
     }
 
+    public async Task<PagoCredito?> GetPaymentForUpdateAsync(Guid creditId, Guid paymentId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.PagoCredito.FromSqlInterpolated(
+                $"SELECT p.* FROM ventas.pago_credito AS p WHERE p.credito_id = {creditId} AND p.id = {paymentId} FOR UPDATE")
+            .AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
+    public async Task<IReadOnlyCollection<PagoCredito>> GetPaymentsForCashMovementForUpdateAsync(
+        Guid cashMovementId, CancellationToken cancellationToken = default) =>
+        await dbContext.PagoCredito.FromSqlInterpolated(
+                $"SELECT p.* FROM ventas.pago_credito AS p WHERE p.movimiento_caja_id = {cashMovementId} ORDER BY p.id FOR UPDATE")
+            .AsTracking().ToArrayAsync(cancellationToken);
+
+    public async Task<IReadOnlyCollection<MetodoPago>> GetPaymentMethodsByIdAsync(
+        IReadOnlyCollection<Guid> methodIds, CancellationToken cancellationToken = default)
+    {
+        var ids = methodIds.Distinct().ToArray();
+        return await dbContext.MetodoPago.AsNoTracking().Where(x => ids.Contains(x.Id))
+            .ToArrayAsync(cancellationToken);
+    }
+
+    public async Task<MovimientoCaja?> GetCashMovementForUpdateAsync(Guid movementId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.MovimientoCaja.FromSqlInterpolated(
+                $"SELECT m.* FROM caja.movimiento_caja AS m WHERE m.id = {movementId} FOR UPDATE")
+            .AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
+
+    public Task<bool> HasCashReversalAsync(Guid movementId, CancellationToken cancellationToken = default) =>
+        dbContext.MovimientoCaja.AnyAsync(x => x.MovimientoRevertidoId == movementId, cancellationToken);
+
     public async Task<PagedResult<PagoCredito>> ListPaymentsAsync(
         Guid creditId, int page, int pageSize, int offset,
         CancellationToken cancellationToken = default)

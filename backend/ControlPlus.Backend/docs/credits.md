@@ -1,4 +1,4 @@
-# Créditos y abonos — corte 1
+# Créditos y abonos
 
 ## Alcance y estado
 
@@ -29,7 +29,7 @@ Venta, detalles, movimientos y stock de inventario, autorización, crédito, ide
 | `PENDIENTE` | Saldo positivo, vencimiento vigente. |
 | `VENCIDO` | Saldo positivo y vencimiento anterior a la fecha local del negocio. Una lectura proyecta este estado sin escribir. |
 | `PAGADO` | Saldo cero tras un abono; se registra `fecha_pago`. |
-| `ANULADO` | Estado oficial que no admite nuevos abonos. La cancelación no se implementa en este corte. |
+| `ANULADO` | Saldo condonado por un Administrador o crédito cancelado junto con su venta. No admite nuevos abonos. |
 
 Un crédito vencido puede recibir abonos. Si el cliente se inactiva después del otorgamiento, su crédito sigue siendo consultable y pagable; la inactividad impide otorgarle uno nuevo.
 
@@ -39,6 +39,9 @@ Un crédito vencido puede recibir abonos. Si el cliente se inactiva después del
 | `GET` | `/api/credits/{creditId}` | `CREDIT.MANAGE` |
 | `GET` | `/api/credits/{creditId}/payments` | `CREDIT.MANAGE` y `CUSTOMERS.HISTORY_READ` |
 | `POST` | `/api/credits/{creditId}/payments` | `CREDIT.MANAGE` |
+| `GET` | `/api/credits/payment-cancellation-reasons` | Supervisor/Administrador y `CREDIT.MANAGE` |
+| `POST` | `/api/credits/{creditId}/payments/{paymentId}/cancel` | Supervisor/Administrador y `CREDIT.MANAGE` |
+| `POST` | `/api/credits/{creditId}/forgive` | Administrador y `CREDIT.MANAGE` |
 | `GET/PUT` | `/api/credits/settings` | Administrador y `CONFIGURATION.MANAGE` |
 | `GET` | `/api/sales/credit-rules` | `CREDIT.REQUEST` |
 
@@ -56,6 +59,18 @@ Cada método crea una fila `ventas.pago_credito` y consume un número `PAGO_CRED
 
 La transacción de abono sigue el orden de bloqueo instalación → turno y sesión → consecutivo → crédito → recursos restantes, compatible con el orden inicial de Ventas y Numeración. La venta a crédito usa antes el coordinador por cuenta del autorizador y luego bloquea instalación → turno y sesión → autorizador → consecutivo `VENTA` → productos. Confirma o revierte saldo, versión, pagos, movimiento, consecutivos, sesión, idempotencia y auditoría como una unidad. Dos abonos concurrentes no pueden dejar saldo negativo; la versión obsoleta devuelve `409`.
 
+## Anulación de abonos
+
+`POST /api/credits/{creditId}/payments/{paymentId}/cancel` exige `Idempotency-Key`, `expectedVersion`, un `reasonId` activo del catálogo `ANULACION_PAGO` y observación obligatoria para `OTRO`. El Cajero no puede. El Supervisor requiere credenciales vigentes de un Administrador distinto con `CREDIT.MANAGE` efectivo; la jerarquía es estricta. El Administrador ejecuta sin segundo autorizador y queda registrado como `ADMINISTRATOR_SELF`. Se reutiliza `CREDIT.MANAGE`: no se creó permiso ni migración para este alcance.
+
+La operación marca los campos oficiales de anulación de `ventas.pago_credito`, restituye el saldo, limpia `fecha_pago` y resuelve el estado abierto con `CreditStatusPolicy`: saldo positivo vencido solo cuando la fecha límite es anterior al día local. También crea un `REVERSO/REVERSO_PAGO` en el turno abierto actual, vinculado al movimiento original, incluso si el abono pertenece a un turno cerrado. Crédito, pagos, autorización, reverso, idempotencia y auditoría se confirman en una sola transacción.
+
+Una solicitud de abono con varios medios crea varias filas `pago_credito`, pero comparte un único movimiento de Caja que admite un solo reverso. Por eso seleccionar cualquiera de sus filas anula atómicamente todas las filas de esa operación y revierte la suma completa; no se permite una reversión parcial inconsistente. En turno individual el actor debe ser el responsable; en compartido necesita una sesión activa, que se consume.
+
+## Condonación de saldo
+
+`POST /api/credits/{creditId}/forgive` exige Administrador vigente con `CREDIT.MANAGE`, `Idempotency-Key`, `expectedVersion` y un motivo de 1 a 500 caracteres. El crédito debe conservar saldo. La operación crea una `autorizacion_operacion` `CONDONACION_CREDITO` autoautorizada, pone saldo cero y estado `ANULADO`, y audita la correlación y el importe condonado. No cambia `monto_ajustado`, no anula la venta, no repone inventario y no modifica ni elimina abonos existentes. No se añadieron columnas al crédito.
+
 ## Numeración de abonos
 
 | Método | Ruta | Resultado |
@@ -72,6 +87,6 @@ Los contratos raíz y anidados rechazan propiedades JSON desconocidas. Los error
 
 La auditoría registra IDs internos, resultado, estado y correlación necesarios. Omite contraseña, JWT, `Idempotency-Key`, referencia electrónica, dirección, correo, observaciones y datos personales o importes innecesarios. Los intentos fallidos de autorización se registran sin credenciales; un fallo de COMMIT revierte la auditoría de éxito junto con la operación.
 
-Permanecen pendientes la cancelación general de créditos, reversión o anulación de abonos, intereses, mora, cuotas, límites de crédito, `CREDIT.FUTURE_BLOCK`, impresión física y operaciones `PUT`, `PATCH` o `DELETE` sobre créditos y abonos. Los ajustes de un crédito pendiente o vencido por cambio posterior de productos se describen en [sales-changes.md](sales-changes.md). No se hizo eliminación física.
+No se implementan intereses ni mora monetaria. Las cuotas opcionales y sus asignaciones se incorporan en el corte posterior, después de la migración predecesora de cupo/morosos. Permanecen fuera la eliminación física de créditos o abonos y la impresión física propia del módulo. Los ajustes de un crédito pendiente o vencido por cambio posterior de productos se describen en [sales-changes.md](sales-changes.md).
 
 **Jerarquía de autorización (5 de noviembre de 2026):** con credenciales, el autorizador debe tener rol base estrictamente superior al ejecutor: Cajero → Supervisor o Administrador; Supervisor → Administrador. Las autoautorizaciones aprobadas conservan sus condiciones. El permiso efectivo sigue siendo obligatorio.

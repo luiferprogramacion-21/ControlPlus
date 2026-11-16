@@ -68,4 +68,53 @@ public sealed class CreditsController(CurrentActorContextResolver actorContextRe
         var result = await credits.ApplyPaymentAsync(actor, creditId, idempotencyKey, request, cancellationToken);
         return FromResult(result, value => StatusCode(StatusCodes.Status201Created, value));
     }
+
+    [HttpGet("payment-cancellation-reasons")]
+    [PermissionAuthorize(PermissionCodes.CreditManage)]
+    [ProducesResponseType<IReadOnlyCollection<CreditPaymentCancellationReasonDto>>(
+        StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    public async Task<IActionResult> PaymentCancellationReasons(CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(
+            await credits.ListPaymentCancellationReasonsAsync(actor, cancellationToken), Ok);
+    }
+
+    [HttpPost("{creditId:guid}/payments/{paymentId:guid}/cancel")]
+    [PermissionAuthorize(PermissionCodes.CreditManage)]
+    [Consumes("application/json")]
+    [ProducesResponseType<CancelCreditPaymentDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> CancelPayment(Guid creditId, Guid paymentId,
+        [FromHeader(Name = "Idempotency-Key"), Required] string idempotencyKey,
+        [FromBody] CancelCreditPaymentRequest request, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await credits.CancelPaymentAsync(
+            actor, creditId, paymentId, idempotencyKey, request, cancellationToken), Ok);
+    }
+
+    [HttpPost("{creditId:guid}/forgive")]
+    [PermissionAuthorize(PermissionCodes.CreditManage)]
+    [Consumes("application/json")]
+    [ProducesResponseType<ForgiveCreditDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> Forgive(Guid creditId,
+        [FromHeader(Name = "Idempotency-Key"), Required] string idempotencyKey,
+        [FromBody] ForgiveCreditRequest request, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await credits.ForgiveAsync(
+            actor, creditId, idempotencyKey, request, cancellationToken), Ok);
+    }
 }

@@ -23,7 +23,7 @@
     @if (result(); as pageResult) { <mat-paginator [length]="pageResult.totalCount" [pageIndex]="page - 1" [pageSize]="pageSize" [pageSizeOptions]="[10,20,50]" (page)="pageChanged($event)" /> }
   </section>
   @if (detailOpen() && selected(); as credit) {
-    <div class="module-form-sheet credit-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="credit-detail-title" [cdkTrapFocus]="!dialog()" [cdkTrapFocusAutoCapture]="true" (keydown.escape)="$event.stopPropagation(); close()">
+    <div class="module-form-sheet credit-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="credit-detail-title" [cdkTrapFocus]="!dialog() && !cancellingPayment() && !forgiving()" [cdkTrapFocusAutoCapture]="true" (keydown.escape)="$event.stopPropagation(); close()">
       <div class="module-form-sheet__backdrop" (click)="close()"></div>
       <section class="panel panel--padded module-form credits-detail-dialog">
         <div class="credit-detail-heading"><h2 id="credit-detail-title">Crédito {{ credit.saleNumber }}</h2><p>{{ credit.customerName }} · {{ credit.documentType && credit.documentNumber ? credit.documentType + ' ' + credit.documentNumber : credit.phone || 'Sin documento' }} · {{ label(credit.state) }}</p></div>
@@ -33,12 +33,12 @@
           <h3>Historial de abonos</h3>
           <div class="credit-history-list">
             @for (payment of history()?.items ?? []; track payment.id) {
-              <div class="credit-history-row"><div class="credit-history-row__description"><strong>{{ payment.number }}</strong><span>{{ payment.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }} · {{ payment.methodName }}</span></div><div class="credit-history-row__values"><span>Aplicado</span><strong>{{ money(payment.appliedAmount) }}</strong>@if (payment.change > 0) { <small>Cambio {{ money(payment.change) }}</small> }</div></div>
+              <div class="credit-history-row"><div class="credit-history-row__description"><strong>{{ payment.number }}</strong><span>{{ payment.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }} · {{ payment.methodName }} · {{ label(payment.state) }}</span></div><div class="credit-history-row__values"><span>Aplicado</span><strong>{{ money(payment.appliedAmount) }}</strong>@if (payment.change > 0) { <small>Cambio {{ money(payment.change) }}</small> }@if (canCancel(payment)) { <button class="table-action" type="button" [disabled]="saving()" (click)="startCancelPayment(payment)">Anular abono</button> }</div></div>
             } @empty { <p class="credit-history-empty">No hay abonos registrados.</p> }
           </div>
           @if (history(); as historyResult) { <mat-paginator [length]="historyResult.totalCount" [pageIndex]="historyPage - 1" [pageSize]="historyPageSize" [pageSizeOptions]="[10,20,50]" (page)="historyChanged($event)" /> }
         }
-        <div class="credit-detail-actions"><button class="button button--secondary" type="button" [disabled]="saving()" (click)="refreshSelected()">Actualizar</button><button class="button button--primary" type="button" [disabled]="credit.state === 'PAGADO' || credit.state === 'ANULADO' || credit.balance <= 0" (click)="openPayment(credit)">Abonar</button><button class="button button--secondary credit-detail-close" type="button" autofocus (click)="close()">Cerrar</button></div>
+        <div class="credit-detail-actions"><button class="button button--secondary" type="button" [disabled]="saving()" (click)="refreshSelected()">Actualizar</button><button class="button button--primary" type="button" [disabled]="credit.state === 'PAGADO' || credit.state === 'ANULADO' || credit.balance <= 0" (click)="openPayment(credit)">Abonar</button>@if (canForgive) { <button class="button button--secondary credit-danger-action" type="button" [disabled]="saving()" (click)="startForgive()">Condonar saldo</button> }<button class="button button--secondary credit-detail-close" type="button" autofocus (click)="close()">Cerrar</button></div>
       </section>
     </div>
   }
@@ -49,4 +49,23 @@
     @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
     <div class="form-actions"><button class="button button--secondary" type="button" (click)="close()" [disabled]="saving()">Cancelar</button><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Registrando…' : 'Registrar abono' }}</button></div>
   </form></div> } }
+  @if (cancellingPayment() && selected(); as credit) { @if (cancellationTarget(); as payment) {
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="credit-payment-cancel-title"><div class="module-form-sheet__backdrop" (click)="cancellingPayment.set(false)"></div><form class="panel panel--padded module-form" (submit)="$event.preventDefault(); confirmCancelPayment()">
+      <div class="panel-heading"><h2 id="credit-payment-cancel-title">Anular abono</h2><p>{{ payment.number }} · {{ payment.methodName }} · {{ money(payment.appliedAmount) }}</p></div>
+      <p class="muted">El saldo se restituye y Caja registra el movimiento inverso en el turno abierto actual, aunque el abono pertenezca a un turno anterior. Los medios combinados del mismo abono se anulan juntos.</p>
+      <label class="field-label" for="credit-payment-cancel-reason">Motivo</label><select id="credit-payment-cancel-reason" class="text-field" name="cancellationReason" [(ngModel)]="cancellationReasonId"><option value="">Selecciona un motivo</option>@for (reason of cancellationReasons(); track reason.id) { <option [value]="reason.id">{{ reason.name }}</option> }</select>
+      <label class="field-label field-label--spaced" for="credit-payment-cancel-observation">Observación <span>{{ selectedCancellationReason?.code === 'OTRO' ? '(obligatoria)' : '(opcional)' }}</span></label><textarea id="credit-payment-cancel-observation" class="text-field" name="cancellationObservation" maxlength="500" [(ngModel)]="cancellationObservation"></textarea>
+      @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+      <div class="form-actions"><button class="button button--secondary" type="button" [disabled]="saving()" (click)="cancellingPayment.set(false)">Volver</button><button class="button button--primary" type="submit" [disabled]="saving()">Continuar</button></div>
+    </form></div>
+  } }
+  @if (forgiving() && selected(); as credit) {
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="credit-forgive-title"><div class="module-form-sheet__backdrop" (click)="forgiving.set(false)"></div><form class="panel panel--padded module-form" (submit)="$event.preventDefault(); confirmForgive()">
+      <div class="panel-heading"><h2 id="credit-forgive-title">Condonar saldo</h2><p>{{ credit.saleNumber }} · saldo {{ money(credit.balance) }}</p></div>
+      <p class="muted">El crédito pasará a Anulado. No se repone mercancía y los abonos registrados se conservan.</p>
+      <label class="field-label" for="credit-forgive-reason">Motivo obligatorio</label><textarea id="credit-forgive-reason" class="text-field" name="forgivenessReason" maxlength="500" [(ngModel)]="forgivenessReason"></textarea>
+      @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+      <div class="form-actions"><button class="button button--secondary" type="button" [disabled]="saving()" (click)="forgiving.set(false)">Cancelar</button><button class="button button--primary" type="submit" [disabled]="saving()">Condonar saldo</button></div>
+    </form></div>
+  }
 </section>

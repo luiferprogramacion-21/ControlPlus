@@ -4,6 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { SessionService } from '../../core/session.service';
 import { Credit } from './credits-api';
 import { Credits } from './credits';
+import { AuthorizationDialog } from '../../shared/authorization-dialog';
 
 const credit = { id: 'credit-id', saleNumber: 'VTA-1', customerName: 'Ana', adjustedAmount: 10000, balance: 5000, state: 'PENDIENTE', version: 4 } as Credit;
 
@@ -12,7 +13,7 @@ describe('Credits', () => {
   let onRequest: ((url: string) => void) | null;
   beforeEach(async () => {
     onRequest = null;
-    await TestBed.configureTestingModule({ imports: [Credits], providers: [provideHttpClient(withInterceptors([(request, next) => { onRequest?.(request.url); return next(request); }])), provideHttpClientTesting(), { provide: SessionService, useValue: { has: (permission: string) => permission === 'CREDIT.MANAGE' } }] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [Credits], providers: [provideHttpClient(withInterceptors([(request, next) => { onRequest?.(request.url); return next(request); }])), provideHttpClientTesting(), { provide: SessionService, useValue: { has: (permission: string) => permission === 'CREDIT.MANAGE', hasRole: (...roles: string[]) => roles.includes('ADMINISTRADOR'), user: () => ({ userName: 'admin' }) } }, { provide: AuthorizationDialog, useValue: { open: async (prompt: { run: (credentials: null) => Promise<void> }) => prompt.run(null) } }] }).compileComponents();
     fixture = TestBed.createComponent(Credits); component = fixture.componentInstance; http = TestBed.inject(HttpTestingController);
   });
   afterEach(() => http.verify());

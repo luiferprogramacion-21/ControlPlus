@@ -737,6 +737,164 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         Assert.Equal(expected.Sum(x => x.ExpectedAmount), entries.Sum(x => x.Amount));
     }
 
+    [Fact, Trait("Category", "Integration")]
+    public async Task AdministratorCancelsCombinedPaymentFromClosedShift_InOneTransactionAndReplayIsStable()
+    {
+        using var client = CreateClient();
+        var setup = await BootstrapAsync(client);
+        var creditId = (await CreateCreditAsync(client, setup, "credit-cancel-closed-shift-sale")).CreditId!.Value;
+        var paid = await ReadAsync<CreditPaymentOperationDto>(await PayAsync(client, creditId,
+            "credit-cancel-combined-payment", new ApplyCreditPaymentRequest(1,
+                [new("EFECTIVO", 400m, 400m, null), new("TRANSFERENCIA", 300m, null, "TR-CANCEL")])),
+            HttpStatusCode.Created);
+        var selectedPayment = paid.Payments.Single(x => x.MethodCode == "EFECTIVO");
+        var reconciliation = await ReadAsync<CashReconciliationDto>(
+            await client.GetAsync("/api/cash/reconciliation"), HttpStatusCode.OK);
+        await ReadAsync<CashReconciliationDto>(await client.PostAsJsonAsync(
+            $"/api/cash/shifts/{setup.Shift.Id}/close", new CloseCashShiftRequest(
+                reconciliation.ShiftVersion,
+                reconciliation.PaymentMethods.Where(x => x.AffectsCash).Select(x =>
+                    new CountedPaymentMethodRequest(x.PaymentMethodId, x.ExpectedAmount)).ToArray(),
+                null, null, null)), HttpStatusCode.OK);
+        var currentShift = await ReadAsync<CashShiftDto>(await client.PostAsJsonAsync("/api/cash/shifts",
+            new OpenCashShiftRequest(1_000m, "Turno para reversar abono anterior")), HttpStatusCode.Created);
+        var reasons = await ReadAsync<IReadOnlyCollection<CreditPaymentCancellationReasonDto>>(
+            await client.GetAsync("/api/credits/payment-cancellation-reasons"), HttpStatusCode.OK);
+        var request = new CancelCreditPaymentRequest(paid.Version,
+            reasons.Single(x => x.Code == "ERROR_REGISTRO").Id, "Abono duplicado");
+
+        var cancelled = await ReadAsync<CancelCreditPaymentDto>(await CancelPaymentAsync(client,
+            creditId, selectedPayment.Id, "credit-cancel-closed-shift", request), HttpStatusCode.OK);
+        Assert.Equal(1_000m, cancelled.Balance);
+        Assert.Equal("PENDIENTE", cancelled.State);
+        Assert.Equal(3, cancelled.Version);
+        Assert.Equal(700m, cancelled.ReversedAmount);
+        Assert.Equal(paid.Payments.Select(x => x.Id).Order(), cancelled.CancelledPaymentIds.Order());
+        var replay = await ReadAsync<CancelCreditPaymentDto>(await CancelPaymentAsync(client,
+            creditId, selectedPayment.Id, "credit-cancel-closed-shift", request), HttpStatusCode.OK);
+        Assert.Equal(cancelled.CorrelationId, replay.CorrelationId);
+        Assert.Equal(cancelled.Version, replay.Version);
+        Assert.Equal(cancelled.CancelledPaymentIds.Order(), replay.CancelledPaymentIds.Order());
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var rows = await db.PagoCredito.AsNoTracking().Where(x => x.CreditoId == creditId).ToArrayAsync();
+        Assert.Equal(2, rows.Length);
+        Assert.All(rows, x =>
+        {
+            Assert.Equal("ANULADO", x.Estado);
+            Assert.NotNull(x.UsuarioAnulacionId);
+            Assert.NotNull(x.AutorizacionAnulacionId);
+            Assert.NotNull(x.MotivoAnulacionId);
+            Assert.NotNull(x.FechaAnulacion);
+        });
+        var originalMovementId = Assert.Single(rows.Select(x => x.MovimientoCajaId).Distinct())!.Value;
+        var reversal = Assert.Single(await db.MovimientoCaja.AsNoTracking()
+            .Where(x => x.MovimientoRevertidoId == originalMovementId).ToArrayAsync());
+        Assert.Equal(currentShift.Id, reversal.TurnoCajaId);
+        Assert.Equal(700m, reversal.Valor);
+        var authorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.Id == rows[0].AutorizacionAnulacionId);
+        Assert.Equal(setup.Admin.User.Id, authorization.UsuarioSolicitanteId);
+        Assert.Equal(setup.Admin.User.Id, authorization.UsuarioAutorizadorId);
+        Assert.Equal("ANULACION_PAGO_CREDITO", authorization.TipoOperacion);
+        Assert.Equal(1, await db.OperacionIdempotente.CountAsync(x => x.TipoOperacion == "ANULAR_ABONO_CREDITO"));
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task SupervisorNeedsStrictAdministratorAuthorization_AndCashierCannotCancelPayment()
+    {
+        using var client = CreateClient();
+        var setup = await BootstrapAsync(client);
+        var creditId = (await CreateCreditAsync(client, setup, "credit-cancel-hierarchy-sale")).CreditId!.Value;
+        var paid = await ReadAsync<CreditPaymentOperationDto>(await PayAsync(client, creditId,
+            "credit-cancel-hierarchy-payment", new ApplyCreditPaymentRequest(1,
+                [new("EFECTIVO", 200m, 200m, null)])), HttpStatusCode.Created);
+        var paymentId = Assert.Single(paid.Payments).Id;
+        var reason = (await ReadAsync<IReadOnlyCollection<CreditPaymentCancellationReasonDto>>(
+            await client.GetAsync("/api/credits/payment-cancellation-reasons"), HttpStatusCode.OK))
+            .Single(x => x.Code == "ERROR_REGISTRO");
+        var reconciliation = await ReadAsync<CashReconciliationDto>(
+            await client.GetAsync("/api/cash/reconciliation"), HttpStatusCode.OK);
+        await ReadAsync<CashReconciliationDto>(await client.PostAsJsonAsync(
+            $"/api/cash/shifts/{setup.Shift.Id}/close", new CloseCashShiftRequest(
+                reconciliation.ShiftVersion,
+                reconciliation.PaymentMethods.Where(x => x.AffectsCash).Select(x =>
+                    new CountedPaymentMethodRequest(x.PaymentMethodId, x.ExpectedAmount)).ToArray(),
+                null, null, null)), HttpStatusCode.OK);
+
+        SetBearer(client, setup.Supervisor.AccessToken);
+        await ReadAsync<CashShiftDto>(await client.PostAsJsonAsync("/api/cash/shifts",
+            new OpenCashShiftRequest(500m, "Turno del Supervisor")), HttpStatusCode.Created);
+        SetBearer(client, setup.Cashier.AccessToken);
+        await AssertProblemAsync(await CancelPaymentAsync(client, creditId, paymentId, "cashier-cancel",
+            new CancelCreditPaymentRequest(paid.Version, reason.Id, null)), HttpStatusCode.Forbidden);
+        SetBearer(client, setup.Supervisor.AccessToken);
+        await AssertProblemAsync(await CancelPaymentAsync(client, creditId, paymentId, "supervisor-no-admin",
+            new CancelCreditPaymentRequest(paid.Version, reason.Id, null)), HttpStatusCode.BadRequest);
+        await AssertProblemAsync(await CancelPaymentAsync(client, creditId, paymentId, "supervisor-self-auth",
+            new CancelCreditPaymentRequest(paid.Version, reason.Id, null,
+                new CreditLifecycleAuthorizationRequest(SupervisorName, _supervisorPassword))),
+            HttpStatusCode.Unauthorized);
+        var cancelled = await ReadAsync<CancelCreditPaymentDto>(await CancelPaymentAsync(client,
+            creditId, paymentId, "supervisor-admin-auth", new CancelCreditPaymentRequest(
+                paid.Version, reason.Id, null,
+                new CreditLifecycleAuthorizationRequest(AdminName, _adminPassword))), HttpStatusCode.OK);
+        Assert.Equal(1_000m, cancelled.Balance);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var payment = await db.PagoCredito.AsNoTracking().SingleAsync(x => x.Id == paymentId);
+        var authorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.Id == payment.AutorizacionAnulacionId);
+        Assert.Equal(setup.SupervisorUser.Id, authorization.UsuarioSolicitanteId);
+        Assert.Equal(setup.Admin.User.Id, authorization.UsuarioAutorizadorId);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task AdministratorForgivesOutstandingBalance_WithoutReturningStockOrDeletingPayments()
+    {
+        using var client = CreateClient();
+        var setup = await BootstrapAsync(client);
+        var sale = await CreateCreditAsync(client, setup, "credit-forgive-sale");
+        var creditId = sale.CreditId!.Value;
+        var paid = await ReadAsync<CreditPaymentOperationDto>(await PayAsync(client, creditId,
+            "credit-forgive-payment", new ApplyCreditPaymentRequest(1,
+                [new("EFECTIVO", 250m, 250m, null)])), HttpStatusCode.Created);
+        var before = await SnapshotAsync(creditId, setup.ProductId);
+        SetBearer(client, setup.Supervisor.AccessToken);
+        await AssertProblemAsync(await ForgiveAsync(client, creditId, "supervisor-forgive",
+            new ForgiveCreditRequest(paid.Version, "No autorizado")), HttpStatusCode.Forbidden);
+        SetBearer(client, setup.Admin.AccessToken);
+        var request = new ForgiveCreditRequest(paid.Version, "Acuerdo documentado con el cliente");
+        var forgiven = await ReadAsync<ForgiveCreditDto>(await ForgiveAsync(client, creditId,
+            "administrator-forgive", request), HttpStatusCode.OK);
+        Assert.Equal("ANULADO", forgiven.State);
+        Assert.Equal(0m, forgiven.Balance);
+        Assert.Equal(3, forgiven.Version);
+        Assert.Equal(forgiven, await ReadAsync<ForgiveCreditDto>(await ForgiveAsync(client, creditId,
+            "administrator-forgive", request), HttpStatusCode.OK));
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var credit = await db.Credito.AsNoTracking().SingleAsync(x => x.Id == creditId);
+        Assert.Equal("ANULADO", credit.Estado);
+        Assert.Equal(0m, credit.SaldoPendiente);
+        Assert.Equal(1_000m, credit.MontoAjustado);
+        Assert.Null(credit.FechaPago);
+        Assert.Equal(before.PaymentRows, await db.PagoCredito.CountAsync(x => x.CreditoId == creditId));
+        Assert.All(await db.PagoCredito.AsNoTracking().Where(x => x.CreditoId == creditId).ToArrayAsync(),
+            x => Assert.Equal("APLICADO", x.Estado));
+        Assert.Equal(before.Stock, await db.Producto.Where(x => x.Id == setup.ProductId)
+            .Select(x => x.StockActual).SingleAsync());
+        Assert.Equal("CONFIRMADA", await db.Venta.Where(x => x.Id == sale.Id).Select(x => x.Estado).SingleAsync());
+        var authorization = await db.AutorizacionOperacion.AsNoTracking()
+            .SingleAsync(x => x.Id == forgiven.AuthorizationId);
+        Assert.Equal("CONDONACION_CREDITO", authorization.TipoOperacion);
+        Assert.Equal("Acuerdo documentado con el cliente", authorization.Motivo);
+        Assert.Equal(setup.Admin.User.Id, authorization.UsuarioSolicitanteId);
+        Assert.Equal(setup.Admin.User.Id, authorization.UsuarioAutorizadorId);
+    }
+
     /// <summary>Simulates an installation created before the consecutives were automatic.</summary>
     private async Task RemoveAboNumberingAsync()
     {
@@ -870,6 +1028,14 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         message.Headers.Add("Idempotency-Key", key);
         return await client.SendAsync(message);
     }
+
+    private static Task<HttpResponseMessage> CancelPaymentAsync(HttpClient client, Guid creditId,
+        Guid paymentId, string key, CancelCreditPaymentRequest request) => RawJsonAsync(client,
+        HttpMethod.Post, $"/api/credits/{creditId}/payments/{paymentId}/cancel", request, key);
+
+    private static Task<HttpResponseMessage> ForgiveAsync(HttpClient client, Guid creditId,
+        string key, ForgiveCreditRequest request) => RawJsonAsync(client, HttpMethod.Post,
+        $"/api/credits/{creditId}/forgive", request, key);
 
     private static async Task<HttpResponseMessage> RawJsonAsync(HttpClient client, HttpMethod method,
         string path, object payload, string? key = null)

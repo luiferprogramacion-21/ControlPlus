@@ -10,6 +10,15 @@ public interface ICreditsRepository
         CancellationToken cancellationToken = default);
     Task<Credito?> GetAsync(Guid creditId, CancellationToken cancellationToken = default);
     Task<Credito?> GetForUpdateAsync(Guid creditId, CancellationToken cancellationToken = default);
+    Task<PagoCredito?> GetPaymentForUpdateAsync(Guid creditId, Guid paymentId,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<PagoCredito>> GetPaymentsForCashMovementForUpdateAsync(Guid cashMovementId,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<MetodoPago>> GetPaymentMethodsByIdAsync(IReadOnlyCollection<Guid> methodIds,
+        CancellationToken cancellationToken = default);
+    Task<MovimientoCaja?> GetCashMovementForUpdateAsync(Guid movementId,
+        CancellationToken cancellationToken = default);
+    Task<bool> HasCashReversalAsync(Guid movementId, CancellationToken cancellationToken = default);
     Task<PagedResult<PagoCredito>> ListPaymentsAsync(Guid creditId, int page, int pageSize, int offset,
         CancellationToken cancellationToken = default);
     Task AddPaymentsAsync(IReadOnlyCollection<PagoCredito> payments, CancellationToken cancellationToken = default);

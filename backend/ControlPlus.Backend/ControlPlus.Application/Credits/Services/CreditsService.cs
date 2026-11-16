@@ -12,14 +12,18 @@ using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Application.Security.Ports;
 using ControlPlus.Application.Security.Services;
 using ControlPlus.Domain.Common;
+using ControlPlus.Domain.Credits;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Domain.Security.Enums;
 
 namespace ControlPlus.Application.Credits.Services;
 
-public sealed class CreditsService(ICreditsRepository credits, ISalesRepository sales,
+public sealed partial class CreditsService(ICreditsRepository credits, ISalesRepository sales,
     IDocumentNumberingRepository numbering, ISalesTransactionManager transactions,
-    IUserRepository users, IAuditRepository audits, IUnitOfWork unitOfWork, IClock clock)
+    IUserRepository users, IAuditRepository audits, IUnitOfWork unitOfWork, IClock clock,
+    IPermissionRepository permissions, IPasswordHasher passwordHasher,
+    IAuthorizerCredentialResolver credentialResolver, ILoginAttemptCoordinator loginAttempts,
+    ControlPlus.Application.Cash.Ports.ICashRepository cashRepository)
     : ICreditsService
 {
     public async Task<Result<PagedResult<CreditDto>>> ListAsync(ActorContext actor, CreditListQuery query,
@@ -187,7 +191,8 @@ public sealed class CreditsService(ICreditsRepository credits, ISalesRepository 
             };
         }).ToArray();
         credit.SaldoPendiente -= amount;
-        credit.Estado = credit.SaldoPendiente == 0 ? "PAGADO" : credit.FechaVencimiento < today ? "VENCIDO" : "PENDIENTE";
+        credit.Estado = credit.SaldoPendiente == 0 ? "PAGADO" :
+            CreditStatusPolicy.ResolveOpenState(credit.FechaVencimiento, credit.SaldoPendiente, today);
         credit.FechaPago = credit.SaldoPendiente == 0 ? today : null;
         await sales.AddCashMovementAsync(movement, cancellationToken);
         await credits.AddPaymentsAsync(rows, cancellationToken);
@@ -251,7 +256,8 @@ public sealed class CreditsService(ICreditsRepository credits, ISalesRepository 
             customer.Id, customer.NombreCompleto, customer.TipoDocumento, customer.NumeroDocumento,
             customer.Telefono, credit.MontoOriginal, credit.MontoAjustado, credit.SaldoPendiente,
             credit.FechaOtorgamiento, credit.FechaVencimiento, credit.FechaPago,
-            credit.Estado == "PENDIENTE" && credit.SaldoPendiente > 0 && credit.FechaVencimiento < today
+            credit.Estado == "PENDIENTE" && CreditStatusPolicy.IsOverdue(
+                credit.FechaVencimiento, credit.SaldoPendiente, today)
                 ? "VENCIDO" : credit.Estado, credit.Version);
     }
 
