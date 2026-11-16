@@ -59,8 +59,12 @@ public sealed record PurchaseOrderDto(Guid Id, Guid SupplierId, string Status, s
     Guid? CloseReasonId, Guid? CancelReasonId, Guid? CloseAuthorizationId,
     Guid? CancelAuthorizationId);
 
+public sealed record PurchaseOrderLineSummaryDto(string ProductCode, string ProductName,
+    int RequestedQuantity, int ReceivedQuantity);
+
 public sealed record PurchaseOrderSummaryDto(Guid Id, Guid SupplierId, string Status,
-    string VisibleNumber, DateTime CreatedAt, long Version);
+    string VisibleNumber, DateTime CreatedAt, long Version,
+    IReadOnlyCollection<PurchaseOrderLineSummaryDto> Lines);
 
 public sealed record PurchaseOrderNumberingDto(string Prefix, string Series,
     long LastNumber, long NextNumber, long Version);

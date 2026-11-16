@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Purchases } from './purchases';
+import { currentColombiaDate, Purchases } from './purchases';
 import { PurchasesApi } from './purchases-api';
 import { OrdersApi } from './orders-api';
 import { SuppliersApi } from '../suppliers/suppliers-api';
@@ -63,5 +63,12 @@ describe('Purchases', () => {
     expect(component.selectedOrder()?.version).toBe(6);
     expect(getOrder).toHaveBeenCalledOnce();
     expect(listOrders).toHaveBeenCalledOnce();
+  });
+});
+
+describe('purchase dates', () => {
+  it('usa la fecha de Colombia aunque UTC ya haya cambiado de día', () => {
+    expect(currentColombiaDate(new Date('2026-11-16T02:30:00Z'))).toBe('2026-11-15');
+    expect(currentColombiaDate(new Date('2026-11-16T05:01:00Z'))).toBe('2026-11-16');
   });
 });

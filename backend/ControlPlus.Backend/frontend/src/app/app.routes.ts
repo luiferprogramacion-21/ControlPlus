@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { catalogGuard, cashGuard, salesGuard, salesHistoryGuard, inventoryGuard, customersGuard, creditsGuard, suppliersGuard, purchasesGuard, reportsGuard, dashboardGuard, adminGuard, supportGuard, configGuard, layawaysGuard, sessionGuard } from './core/guards';
+import { catalogGuard, cashGuard, salesGuard, salesHistoryGuard, inventoryGuard, customersGuard, creditsGuard, suppliersGuard, purchasesGuard, purchaseReceiptsGuard, reportsGuard, dashboardGuard, adminGuard, supportGuard, configGuard, layawaysGuard, sessionGuard } from './core/guards';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'operacion/catalogo' },
@@ -17,7 +17,8 @@ export const routes: Routes = [
       { path: 'clientes', canActivate: [customersGuard], loadComponent: () => import('./features/customers/customers').then(m => m.Customers), title: 'Clientes | ControlPlus' },
       { path: 'ventas', canActivate: [salesGuard], loadComponent: () => import('./features/sales/sales').then(m => m.Sales), title: 'Ventas | ControlPlus' },
       { path: 'ventas/historial', canActivate: [salesHistoryGuard], loadComponent: () => import('./features/sales/sales-history').then(m => m.SalesHistory), title: 'Historial de ventas | ControlPlus' },
-      { path: 'compras', canActivate: [purchasesGuard], loadComponent: () => import('./features/purchases/purchases').then(m => m.Purchases), title: 'Compras | ControlPlus' },
+      { path: 'compras', canActivate: [purchasesGuard], data: { purchaseView: 'orders' }, loadComponent: () => import('./features/purchases/purchases').then(m => m.Purchases), title: 'Compras | ControlPlus' },
+      { path: 'recepciones', canActivate: [purchaseReceiptsGuard], data: { purchaseView: 'receipts' }, loadComponent: () => import('./features/purchases/purchases').then(m => m.Purchases), title: 'Recepción de compras | ControlPlus' },
       { path: 'reportes', canActivate: [reportsGuard], loadComponent: () => import('./features/reports/reports').then(m => m.Reports), title: 'Reportes | ControlPlus' },
       { path: 'proveedores',canActivate: [suppliersGuard], loadComponent: () => import('./features/suppliers/suppliers').then(m => m.Suppliers), title: 'Proveedores | ControlPlus' },
       { path: 'apartados', canActivate: [layawaysGuard], loadComponent: () => import('./features/layaways/layaways').then(m => m.Layaways), title: 'Apartados | ControlPlus' },

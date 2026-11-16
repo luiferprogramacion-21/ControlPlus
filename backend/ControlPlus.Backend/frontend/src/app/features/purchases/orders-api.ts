@@ -4,7 +4,8 @@ import { firstValueFrom } from 'rxjs';
 import { AuthorizationBody, Page, authorizationContext } from '../../core/api';
 import { Purchase } from './purchases-api';
 export interface OrderLine { id: string; productId: string; productCode: string; productName: string; requestedQuantity: number; receivedQuantity: number; pendingQuantity: number; excessQuantity: number; suggestedQuantity: number; estimatedUnitCost: number | null; observation: string | null; }
-export interface OrderSummary { id: string; supplierId: string; status: string; visibleNumber: string; createdAt: string; version: number; }
+export interface OrderLineSummary { productCode: string; productName: string; requestedQuantity: number; receivedQuantity: number; }
+export interface OrderSummary { id: string; supplierId: string; status: string; visibleNumber: string; createdAt: string; version: number; lines: OrderLineSummary[]; }
 export interface Order extends OrderSummary { lines: OrderLine[]; sentAt: string | null; closedAt: string | null; canceledAt?: string | null; closeReasonId?: string | null; cancelReasonId?: string | null; }
 export interface OrderReason { id: string; code: string; name: string; displayOrder: number; }
 export interface OrderTransitionInput { reasonId: string; observation: string | null; authorization?: AuthorizationBody; }

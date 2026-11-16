@@ -29,5 +29,6 @@ export const suppliersGuard: CanActivateFn = () => inject(SessionService).has('S
 export const reportsGuard: CanActivateFn = () => inject(SessionService).has('REPORTS.FINANCIAL_READ');
 export const dashboardGuard: CanActivateFn = () => inject(SessionService).has('REPORTS.FINANCIAL_READ');
 export const purchasesGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('PURCHASES.RECEIVE') || session.has('PURCHASE_ORDERS.MANAGE'); };
+export const purchaseReceiptsGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('PURCHASES.RECEIVE') && session.has('PURCHASE_ORDERS.MANAGE'); };
 
 export const configGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('CONFIGURATION.MANAGE') || session.has('NUMBERING.MANAGE') || session.has('TAXES.MANAGE'); };

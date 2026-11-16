@@ -71,7 +71,8 @@ public sealed class EfPurchaseOrderRepository(OfficialControlPlusDbContext db) :
     public async Task<PagedResult<PedidoCompra>> ListAsync(Guid installationId,
         PurchaseOrderListQuery query, int offset, CancellationToken ct = default)
     {
-        var source = db.PedidoCompra.AsNoTracking().Where(x => x.InstalacionId == installationId);
+        var source = db.PedidoCompra.AsNoTracking().Include(x => x.DetallePedidoCompra)
+            .Where(x => x.InstalacionId == installationId);
         if (query.SupplierId is Guid supplierId) source = source.Where(x => x.ProveedorId == supplierId);
         if (query.Status is not null) source = source.Where(x => x.Estado == query.Status);
         var count = await source.CountAsync(ct);

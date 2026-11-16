@@ -35,7 +35,10 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
         if (installation is null) return Missing<PagedResult<PurchaseOrderSummaryDto>>("la instalación activa");
         var result = await repository.ListAsync(installation.Id, query with { Status = status }, (int)offset, ct);
         return Result.Success(new PagedResult<PurchaseOrderSummaryDto>(result.Items.Select(x => new PurchaseOrderSummaryDto(
-            x.Id, x.ProveedorId, x.Estado, VisibleNumber(x), x.FechaCreacion, x.Version)).ToArray(),
+            x.Id, x.ProveedorId, x.Estado, VisibleNumber(x), x.FechaCreacion, x.Version,
+            x.DetallePedidoCompra.OrderBy(line => line.ProductoId)
+                .Select(line => new PurchaseOrderLineSummaryDto(line.CodigoProducto, line.NombreProducto,
+                    line.CantidadSolicitada, line.CantidadRecibida)).ToArray())).ToArray(),
             result.Page, result.PageSize, result.TotalCount));
     }
 
