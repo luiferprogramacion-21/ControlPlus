@@ -12,12 +12,12 @@ SELECT
         AND NOT has_schema_privilege('controlplus_app', n.oid, 'USAGE'))
     + (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname IN ('auditoria', 'caja', 'catalogo', 'compras', 'configuracion', 'seguridad', 'ventas')
-        AND c.relkind IN ('r', 'p', 'v')
-        AND NOT has_table_privilege('controlplus_app', c.oid, 'SELECT'))
+        AND CASE WHEN c.relkind IN ('r', 'p', 'v') THEN NOT has_table_privilege('controlplus_app', c.oid, 'SELECT') ELSE false END)
     + (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname IN ('auditoria', 'caja', 'catalogo', 'compras', 'configuracion', 'seguridad', 'ventas')
-        AND c.relkind = 'S'
-        AND NOT has_sequence_privilege('controlplus_app', c.oid, 'USAGE'))
+        -- CASE asegura que has_sequence_privilege solo se evalúe sobre secuencias (el planificador puede
+        -- adelantar la función a otros filtros y fallar con «no es una secuencia»).
+        AND CASE WHEN c.relkind = 'S' THEN NOT has_sequence_privilege('controlplus_app', c.oid, 'USAGE') ELSE false END)
     + (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
       WHERE n.nspname IN ('auditoria', 'caja', 'catalogo', 'compras', 'configuracion', 'seguridad', 'ventas')
         AND p.prorettype <> 'trigger'::regtype
