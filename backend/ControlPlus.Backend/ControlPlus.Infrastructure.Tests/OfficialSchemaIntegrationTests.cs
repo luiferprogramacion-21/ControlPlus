@@ -42,7 +42,8 @@ public sealed class OfficialSchemaIntegrationTests
         await context.Database.MigrateAsync();
         await context.Database.OpenConnectionAsync();
 
-        Assert.Equal(62L, await ScalarAsync(context.Database.GetDbConnection(),
+        // 62 de la base aprobada más ventas.cuota_credito y ventas.aplicacion_pago_cuota (20261116020000_CreditInstallmentsV1).
+        Assert.Equal(64L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*)
             FROM information_schema.tables
@@ -50,7 +51,7 @@ public sealed class OfficialSchemaIntegrationTests
               AND table_schema IN ('seguridad','configuracion','catalogo','caja','ventas','compras','auditoria')
             """));
 
-        Assert.Equal(62L, await ScalarAsync(context.Database.GetDbConnection(),
+        Assert.Equal(64L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*)
             FROM information_schema.table_constraints

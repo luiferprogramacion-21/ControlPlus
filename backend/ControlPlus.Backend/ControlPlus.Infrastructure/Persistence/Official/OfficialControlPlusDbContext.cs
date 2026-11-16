@@ -3866,7 +3866,7 @@ public partial class OfficialControlPlusDbContext : DbContext
             entity.Property(e => e.FechaVencimiento).HasColumnName("fecha_vencimiento");
             entity.Property(e => e.FechaPago).HasColumnName("fecha_pago");
             entity.HasOne(e => e.Credito).WithMany(e => e.CuotaCredito)
-                .HasForeignKey(e => e.CreditoId).OnDelete(DeleteBehavior.Cascade)
+                .HasForeignKey(e => e.CreditoId).OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_cuota_credito_credito");
         });
 

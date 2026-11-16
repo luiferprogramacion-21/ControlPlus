@@ -21,7 +21,7 @@ public sealed class CreditInstallmentsV1 : Migration
           fecha_vencimiento date NOT NULL,
           fecha_pago date NULL,
           CONSTRAINT fk_cuota_credito_credito FOREIGN KEY (credito_id)
-            REFERENCES ventas.credito(id) ON DELETE CASCADE,
+            REFERENCES ventas.credito(id) ON DELETE RESTRICT,
           CONSTRAINT ck_cuota_credito_numero CHECK (numero > 0),
           CONSTRAINT ck_cuota_credito_montos CHECK (
             monto >= 0 AND saldo_pendiente >= 0 AND saldo_pendiente <= monto),
