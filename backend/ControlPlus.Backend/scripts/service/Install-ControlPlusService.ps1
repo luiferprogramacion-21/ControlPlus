@@ -151,7 +151,8 @@ try {
     $screen = Wait-Http '/' 30
     if ($screen.Content -notmatch '<html') { throw 'La pantalla no respondió como HTML.' }
 
-    $desktop = [Environment]::GetFolderPath('Desktop')
+    # Escritorio común de todos los usuarios: no depende de redirecciones de OneDrive del escritorio personal.
+    $desktop = [Environment]::GetFolderPath('CommonDesktopDirectory')
     $shortcut = Join-Path $desktop 'ControlPlus.url'
     [IO.File]::WriteAllText($shortcut, "[InternetShortcut]`r`nURL=$url/`r`n", (New-Object Text.UTF8Encoding($false)))
 
