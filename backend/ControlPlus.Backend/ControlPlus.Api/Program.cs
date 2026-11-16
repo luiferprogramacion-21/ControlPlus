@@ -38,6 +38,7 @@ using ControlPlus.Infrastructure.Persistence;
 using ControlPlus.Infrastructure.Security;
 using ControlPlus.Infrastructure.Printing;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -94,7 +95,23 @@ if (controlledCommand.Mode == ControlledExecutionMode.Migration)
     return;
 }
 
-var builder = WebApplication.CreateBuilder(args);
+// Como servicio de Windows el directorio actual es System32: el contenido (wwwroot, appsettings) se toma de la
+// carpeta del ejecutable. Fuera del servicio el comportamiento no cambia.
+var runningAsService = WindowsServiceHelpers.IsWindowsService();
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = runningAsService ? AppContext.BaseDirectory : null
+});
+if (runningAsService)
+{
+    builder.Services.AddWindowsService(options => options.ServiceName = "ControlPlus");
+    // Los User Secrets solo existen para el usuario que desarrolla; el servicio lee los mismos valores de un archivo
+    // protegido (solo SYSTEM y Administradores) que escribe scripts/service/Install-ControlPlusService.ps1.
+    builder.Configuration.AddJsonFile(
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "ControlPlus", "api-secrets.json"),
+        optional: false, reloadOnChange: false);
+}
 
 StartupSecurityConfiguration.EnsureRequiredSecrets(
     builder.Configuration,
@@ -213,11 +230,25 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 }
 
 app.UseHttpsRedirection();
+// Pantalla compilada (Angular) en wwwroot cuando se instala como servicio; en desarrollo no hay wwwroot y se sigue
+// usando ng serve con su proxy.
+var hasFrontend = File.Exists(Path.Combine(app.Environment.WebRootPath ?? string.Empty, "index.html"));
+if (hasFrontend)
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+if (hasFrontend)
+{
+    // Las rutas de la pantalla (/operacion/...) devuelven index.html; las de /api que no existen siguen dando 404.
+    // nonfile: los archivos (main.js, estilos) los sirve UseStaticFiles; solo las rutas de la pantalla caen aquí.
+    app.MapFallbackToFile("{**path:nonfile:regex(^(?!api(/|$)).*$)}", "index.html").AllowAnonymous();
+}
 
 app.Run();
 
