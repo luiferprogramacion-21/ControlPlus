@@ -406,7 +406,14 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         _ = await StartSessionAsync(client, scenario, scenario.Supervisor);
         SetBearer(client, scenario.Supervisor.AccessToken);
         var warned = await ReadAsync<SaleDto>(await PostSaleAsync(client, "risk-warned", selfRequest), HttpStatusCode.Created);
-        Assert.Contains("\"Overdue\":true", await CreditAuditAsync(warned.CreditId!.Value));
+        using (var warnedAudit = JsonDocument.Parse(await CreditAuditAsync(warned.CreditId!.Value)))
+        {
+            var risk = warnedAudit.RootElement.GetProperty("Risk");
+            Assert.True(risk.GetProperty("Overdue").GetBoolean());
+            Assert.True(risk.GetProperty("ExceedsLimit").GetBoolean());
+            Assert.False(risk.GetProperty("Blocked").GetBoolean());
+            Assert.Equal(JsonValueKind.Null, risk.GetProperty("Exception").ValueKind);
+        }
 
         // El Administrador activa el bloqueo.
         SetBearer(client, scenario.Admin.AccessToken);
