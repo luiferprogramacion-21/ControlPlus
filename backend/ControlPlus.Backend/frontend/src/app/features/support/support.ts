@@ -21,6 +21,8 @@ export class Support implements OnInit {
   readonly saving = signal<BackupDestinationType | null>(null);
   readonly error = signal('');
   readonly notice = signal('');
+  /** Error or confirmation shown inside the destination card, where the Administrator is looking. */
+  readonly destinationMessage = signal<{ type: BackupDestinationType; text: string; ok: boolean } | null>(null);
   drafts: Record<BackupDestinationType, DestinationDraft> = {
     LOCAL_FISICO_SEPARADO: { path: '', active: true },
     EXTERNO_CIFRADO: { path: '', active: true },
@@ -57,14 +59,14 @@ export class Support implements OnInit {
 
   async saveDestination(destination: BackupDestination): Promise<void> {
     const draft = this.drafts[destination.type];
-    if (!draft.path.trim()) { this.error.set('Indique la carpeta del destino.'); return; }
-    this.saving.set(destination.type); this.error.set(''); this.notice.set('');
+    if (!draft.path.trim()) { this.destinationMessage.set({ type: destination.type, text: 'Indique la carpeta del destino.', ok: false }); return; }
+    this.saving.set(destination.type); this.destinationMessage.set(null);
     try {
       await this.api.updateDestination(destination.type, draft.path.trim(), draft.active, destination.version);
-      this.notice.set(`${destination.name}: carpeta guardada. Se usará desde el próximo respaldo.`);
       this.saving.set(null);
       await this.refresh();
-    } catch (e) { this.error.set(errorText(e)); this.saving.set(null); }
+      this.destinationMessage.set({ type: destination.type, text: 'Carpeta guardada. Se usará desde el próximo respaldo.', ok: true });
+    } catch (e) { this.destinationMessage.set({ type: destination.type, text: errorText(e), ok: false }); this.saving.set(null); }
   }
 
   time(iso: string | null | undefined): string {

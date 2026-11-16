@@ -86,6 +86,7 @@
               [placeholder]="destination.type === 'EXTERNO_CIFRADO' ? 'Ej.: C:\\Users\\Tienda\\Google Drive\\Respaldos' : 'Ej.: E:\\Respaldos'">
             <label class="support-check"><input type="checkbox" [name]="'active-' + destination.type" [(ngModel)]="drafts[destination.type].active"> Activo</label>
             @if (destination.type === 'EXTERNO_CIFRADO' && !destination.passphraseConfigured) { <p class="field-error">Falta la contraseña de cifrado en este equipo.</p> }
+            @if (destinationMessage(); as message) { @if (message.type === destination.type) { <p [class.field-error]="!message.ok" [class.field-hint]="message.ok" [attr.role]="message.ok ? 'status' : 'alert'">{{ message.text }}</p> } }
             @if (destination.lastCopy; as copy) { <p class="field-hint">Última copia: {{ dateTime(copy.completedAt) }} · {{ resultLabel(copy.state) }}@if (copy.error) { · {{ copy.error }} }</p> }
             <div class="support-actions"><button class="button button--primary" type="submit" [disabled]="saving() === destination.type">{{ saving() === destination.type ? 'Guardando…' : 'Guardar' }}</button></div>
           </form>

@@ -90,6 +90,7 @@ describe('Soporte y continuidad', () => {
     await c.saveDestination(status.destinations[0]);
     expect(api.updateDestination).toHaveBeenCalledWith('LOCAL_FISICO_SEPARADO', 'F:\\Copias', true, 2);
     expect(api.status).toHaveBeenCalledTimes(2);
+    expect(c.destinationMessage()).toMatchObject({ type: 'LOCAL_FISICO_SEPARADO', ok: true });
   });
 
   it('una carpeta vacía no llega al servidor y un rechazo muestra su mensaje', async () => {
@@ -97,10 +98,11 @@ describe('Soporte y continuidad', () => {
     c.drafts.EXTERNO_CIFRADO.path = ' ';
     await c.saveDestination(status.destinations[1]);
     expect(api.updateDestination).not.toHaveBeenCalled();
-    expect(c.error()).toContain('Indique la carpeta');
+    expect(c.destinationMessage()).toEqual({ type: 'EXTERNO_CIFRADO', text: 'Indique la carpeta del destino.', ok: false });
     api.updateDestination.mockRejectedValue(new HttpErrorResponse({ status: 400, error: { detail: 'La copia local debe estar en un disco distinto al de la base de datos.' } }));
     c.drafts.LOCAL_FISICO_SEPARADO.path = 'C:\\Respaldos';
     await c.saveDestination(status.destinations[0]);
-    expect(c.error()).not.toBe('');
+    expect(c.destinationMessage()?.ok).toBe(false);
+    expect(c.destinationMessage()?.type).toBe('LOCAL_FISICO_SEPARADO');
   });
 });
