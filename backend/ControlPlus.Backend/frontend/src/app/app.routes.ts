@@ -22,6 +22,7 @@ export const routes: Routes = [
       { path: 'proveedores',canActivate: [suppliersGuard], loadComponent: () => import('./features/suppliers/suppliers').then(m => m.Suppliers), title: 'Proveedores | ControlPlus' },
       { path: 'apartados', canActivate: [layawaysGuard], loadComponent: () => import('./features/layaways/layaways').then(m => m.Layaways), title: 'Apartados | ControlPlus' },
       { path: 'administracion', canActivate: [adminGuard], loadComponent: () => import('./features/admin/admin').then(m => m.Admin), title: 'Administración | ControlPlus' },
+      { path: 'soporte/restauracion', canActivate: [supportGuard], loadComponent: () => import('./features/support/restore').then(m => m.Restore), title: 'Restauración | ControlPlus' },
       { path: 'soporte', canActivate: [supportGuard], loadComponent: () => import('./features/support/support').then(m => m.Support), title: 'Soporte y continuidad | ControlPlus' },
       { path: 'configuracion', canActivate: [configGuard], loadComponent: () => import('./features/config/config').then(m => m.Config), title: 'Configuración | ControlPlus' },
       { path: 'creditos', canActivate: [creditsGuard], loadComponent: () => import('./features/credits/credits').then(m => m.Credits), title: 'Créditos y abonos | ControlPlus' },

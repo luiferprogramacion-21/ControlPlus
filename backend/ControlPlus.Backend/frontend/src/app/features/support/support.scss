@@ -43,3 +43,16 @@
 
 @media (max-width: 1050px) { .support-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .support-metrics, .support-panels, .support-destinations { grid-template-columns: 1fr; } }
+
+/* Restauración (maqueta 22c). */
+.restore-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.support-metric small.restore-warning { color: var(--cp-warning); }
+.restore-badge--warning { background: var(--cp-warning-soft); color: var(--cp-warning); }
+.restore-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; }
+.restore-copies tr.is-selected td { background: var(--cp-primary-soft); }
+.restore-kind { margin: 14px 0 6px; color: var(--cp-text-secondary); font-size: 13px; }
+.restore-actions { display: flex; flex-direction: column; gap: 10px; }
+.restore-choice.is-active { border-color: var(--cp-primary); color: var(--cp-primary); background: var(--cp-primary-soft); }
+.restore-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.restore-note { flex: 1; margin: 0; padding: 14px 18px; border-radius: 8px; background: var(--cp-error-soft); color: var(--cp-error); font-weight: 600; font-size: 14px; }
+@media (max-width: 900px) { .restore-metrics, .restore-layout { grid-template-columns: 1fr; } .restore-footer { flex-direction: column; align-items: stretch; } }

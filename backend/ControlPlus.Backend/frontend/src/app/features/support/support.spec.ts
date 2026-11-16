@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { SessionService } from '../../core/session.service';
 import { supportGuard } from '../../core/guards';
 import { Support } from './support';
@@ -28,6 +29,7 @@ describe('Soporte y continuidad', () => {
     vi.clearAllMocks(); permissions = ['BACKUPS.MANAGE'];
     api.status.mockResolvedValue(status); api.healthy.mockResolvedValue(true); api.run.mockResolvedValue({});
     TestBed.configureTestingModule({ providers: [
+      provideRouter([]),
       { provide: SupportApi, useValue: api },
       { provide: SessionService, useValue: { has: (code: string) => permissions.includes(code) } },
     ] });

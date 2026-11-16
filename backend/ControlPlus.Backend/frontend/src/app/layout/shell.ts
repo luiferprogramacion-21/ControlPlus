@@ -77,6 +77,7 @@ export class Shell {
     if (url.includes('/reportes')) { this.activeSection.set('reportes'); this.pageTitle.set('Reportes'); this.pageSubtitle.set('Indicadores y análisis operativo'); return; }
     if (url.includes('/apartados')) { this.activeSection.set('apartados'); this.pageTitle.set('Apartados'); this.pageSubtitle.set('Abonos, entregas y saldos'); return; }
     if (url.includes('/configuracion')) { this.activeSection.set('configuracion'); this.pageTitle.set('Configuración'); this.pageSubtitle.set('Numeración, plazos, impresora y motivos'); return; }
+    if (url.includes('/soporte/restauracion')) { this.activeSection.set('administracion'); this.pageTitle.set('Restauración'); this.pageSubtitle.set('Administración / Soporte / Respaldos / Restaurar'); return; }
     if (url.includes('/soporte')) { this.activeSection.set('administracion'); this.pageTitle.set('Soporte y continuidad'); this.pageSubtitle.set('Salud del sistema, respaldos y diagnóstico'); return; }
     if (url.includes('/administracion')) { this.activeSection.set('administracion'); this.pageTitle.set('Administración'); this.pageSubtitle.set('Usuarios, roles y permisos'); return; }
     if (url.includes('/creditos')) { this.activeSection.set('creditos'); this.pageTitle.set('Créditos y abonos'); this.pageSubtitle.set('Cartera de clientes y pagos'); return; }

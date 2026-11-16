@@ -40,3 +40,21 @@ El operador ejecutó `Initialize-Backups.ps1` (terminó con `BACKUP_SETUP_OK`) y
 
 **Pendiente:** el equipo solo tiene el disco `C:`, así que la copia local separada queda sin configurar hasta conectar un disco USB u otro disco. OneDrive avisa de poco almacenamiento: si se llena deja de subir las copias, por lo que conviene liberar espacio. Aún no se ha probado restaurar una copia (corte 2).
 
+## Corte 2: prueba de restauración (maqueta 22c)
+
+Administración → «Soporte y continuidad» → «Restauración» (`/operacion/soporte/restauracion`). Muestra las metas de Fase 4 guardadas en el establecimiento (RPO 30 min, RTO 120 min y prueba cada 90 días), la última prueba con la fecha de la próxima, y las copias completadas (fecha, destino, tamaño, verificación y si el archivo sigue disponible).
+
+«Probar restauración» (`POST /api/backups/copies/{id}/restore-test`) descifra la copia si es externa, compara su SHA-256 con el del respaldo original, la restaura con `pg_restore --exit-on-error` en una base nueva `controlplus_restore_<id>`, comprueba el historial de migraciones, el establecimiento y que las tablas de productos y ventas se puedan consultar, y borra la base temporal. **Nunca toca la base `controlplus`.** Queda registrada en `configuracion.prueba_restauracion` con una autorización `PRUEBA_RESTAURACION` del propio Administrador, el RTO observado (minutos que tardó), el RPO observado (minutos desde el respaldo exitoso anterior), las migraciones restauradas y la auditoría `BackupRestoreTested`. Sin una prueba exitosa, la próxima fecha queda vencida.
+
+«Restaurar operación» (reemplazar la base real) **no está disponible en la pantalla**: se hace con la API detenida y un procedimiento propio, pendiente de documentar.
+
+Requiere que el rol `controlplus_backup` pueda crear bases (`CREATEDB`). En un equipo ya preparado, repetir la preparación **conservando la contraseña de cifrado**, porque las copias existentes solo se abren con ella:
+
+```powershell
+Set-Location 'C:\ControlPlusackend\ControlPlus.Backend'
+git pull --ff-only
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scriptsackups\Initialize-Backups.ps1 -KeepPassphrase
+```
+
+Verificación sin base de datos: frontend 565/565 y `ngc` con salida 0; API sin base de datos 220/220. La integración `RestoreTest_IsRecordedWithItsSelfAuthorization_AndTheOverviewShowsGoalsCopiesAndNextDate` usa un motor de prueba; la restauración real con `pg_restore` se comprueba en el equipo de la tienda.
+

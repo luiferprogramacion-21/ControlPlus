@@ -1,5 +1,6 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { errorText } from '../../core/api';
 import { BackupDestination, BackupDestinationType, BackupStatus, SupportApi } from './support-api';
 
@@ -7,7 +8,7 @@ interface DestinationDraft { path: string; active: boolean; }
 
 @Component({
   selector: 'cp-support',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './support.html',
   styleUrl: './support.scss',
 })

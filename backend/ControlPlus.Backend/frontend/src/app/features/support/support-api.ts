@@ -29,12 +29,25 @@ export interface BackupStatus {
   destinations: BackupDestination[]; recentEvents: BackupEvent[];
 }
 
+export interface RestorableCopy { copyId: string; backupAt: string; destinationType: BackupDestinationType; sizeBytes: number | null; verified: boolean; available: boolean; }
+export interface RestoreTest {
+  id: string; copyId: string; startedAt: string; finishedAt: string | null; result: string;
+  rpoObservedMinutes: number | null; rtoObservedMinutes: number | null; integrityVerified: boolean; applicationVerified: boolean; error: string | null;
+}
+/** Phase 4 goals of the establishment, last restore test and the copies that can be tested. */
+export interface RestoreOverview {
+  rpoMinutes: number; rtoMinutes: number; restoreTestDays: number; lastTest: RestoreTest | null; nextTestDue: string | null; copies: RestorableCopy[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class SupportApi {
   private readonly http = inject(HttpClient);
 
   status(): Promise<BackupStatus> { return firstValueFrom(this.http.get<BackupStatus>('/api/backups/status')); }
   run(): Promise<unknown> { return firstValueFrom(this.http.post('/api/backups/run', null)); }
+  restoreOverview(): Promise<RestoreOverview> { return firstValueFrom(this.http.get<RestoreOverview>('/api/backups/restore')); }
+  /** Restores the copy into a temporary database that is dropped afterwards; the real database is never touched. */
+  restoreTest(copyId: string): Promise<RestoreTest> { return firstValueFrom(this.http.post<RestoreTest>(`/api/backups/copies/${copyId}/restore-test`, null)); }
   updateDestination(type: BackupDestinationType, path: string, active: boolean, expectedVersion: number | null): Promise<BackupDestination> {
     return firstValueFrom(this.http.put<BackupDestination>(`/api/backups/destinations/${type}`, { path, active, expectedVersion }));
   }

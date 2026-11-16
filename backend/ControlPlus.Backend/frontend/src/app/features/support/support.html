@@ -60,7 +60,7 @@
             <div><dt>Integridad</dt><dd>@if (data.lastSuccessfulBackup?.verified) { <span class="badge badge--success">Verificada</span> } @else { — }</dd></div>
           </dl>
           @if (!data.serviceEnabled) { <p class="field-hint">El servicio está apagado en este equipo. Ejecute la preparación de respaldos (scripts\backups\Initialize-Backups.ps1) y reinicie la API.</p> }
-          <div class="support-actions"><button class="button button--secondary" type="button" (click)="runNow()" [disabled]="running() || !data.serviceEnabled">{{ running() ? 'Solicitando…' : 'Crear respaldo' }}</button></div>
+          <div class="support-actions"><button class="button button--secondary" type="button" (click)="runNow()" [disabled]="running() || !data.serviceEnabled">{{ running() ? 'Solicitando…' : 'Crear respaldo' }}</button><a class="button button--secondary" routerLink="/operacion/soporte/restauracion">Restauración</a></div>
         </section>
 
         <section class="support-panel" aria-labelledby="support-events-title">
