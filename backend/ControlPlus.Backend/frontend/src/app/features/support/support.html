@@ -1,0 +1,96 @@
+<section class="support-page" aria-labelledby="support-title">
+  <div class="support-heading">
+    <div>
+      <h2 id="support-title">Soporte y continuidad</h2>
+      <p>Salud del sistema, respaldos y diagnóstico</p>
+    </div>
+  </div>
+
+  @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
+  @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
+  @if (loading() && !status()) { <p class="support-message" role="status">Cargando diagnóstico…</p> }
+
+  @if (status(); as data) {
+    <div class="support-metrics">
+      <article class="support-metric">
+        <div><span>Servidor local</span><strong>{{ apiUp() && databaseUp() ? 'Disponible' : 'Con fallas' }}</strong>
+          <small [class.support-ok]="apiUp() && databaseUp()" [class.support-bad]="!(apiUp() && databaseUp())">{{ apiUp() && databaseUp() ? 'Servicios esenciales activos' : 'Revise el estado de componentes' }}</small></div>
+        <span class="support-metric__badge support-metric__badge--success" aria-hidden="true">✓</span>
+      </article>
+      <article class="support-metric">
+        <div><span>Último respaldo</span><strong>{{ time(data.lastSuccessfulBackup?.startedAt) }}</strong>
+          @if (data.lastBackup?.result === 'FALLIDO') { <small class="support-bad">Falló: {{ data.lastBackup?.error }}</small> }
+          @else if (data.lastSuccessfulBackup) { <small class="support-ok">Verificado correctamente</small> }
+          @else { <small>Aún no hay respaldos</small> }</div>
+        <span class="support-metric__badge support-metric__badge--success" aria-hidden="true">B</span>
+      </article>
+      <article class="support-metric">
+        <div><span>Copia externa</span><strong>{{ time(data.lastExternalCopy?.completedAt) }}</strong>
+          <small [class.support-info]="data.lastExternalCopy?.state === 'COMPLETADA'" [class.support-bad]="data.lastExternalCopy?.state === 'FALLIDA'">{{ externalHint(data) }}</small></div>
+        <span class="support-metric__badge support-metric__badge--info" aria-hidden="true">N</span>
+      </article>
+      <article class="support-metric">
+        <div><span>Espacio disponible</span><strong>{{ size(localDestination()?.freeBytes) }}</strong>
+          <small>{{ localDestination()?.freeBytes ? freePercent(localDestination()) + ' · disco de la copia local' : 'Configure la copia local' }}</small></div>
+        <span class="support-metric__badge" aria-hidden="true">D</span>
+      </article>
+    </div>
+
+    <div class="support-panels">
+      <section class="support-panel" aria-labelledby="support-components-title">
+        <h3 id="support-components-title">Estado de componentes</h3>
+        <p>Diagnóstico local de ControlPlus.</p>
+        <ul class="support-components">
+          <li><span>API ASP.NET Core</span><span class="badge" [class.badge--success]="apiUp()" [class.badge--error]="!apiUp()">{{ apiUp() ? 'Disponible' : 'No disponible' }}</span></li>
+          <li><span>PostgreSQL</span><span class="badge" [class.badge--success]="databaseUp()" [class.badge--error]="!databaseUp()">{{ databaseUp() ? 'Disponible' : 'No disponible' }}</span></li>
+          <li><span>Servicio de respaldos</span><span class="badge" [class.badge--success]="data.serviceEnabled" [class.badge--warning]="!data.serviceEnabled">{{ data.serviceEnabled ? 'Disponible' : 'Apagado' }}</span></li>
+          <li><span>Impresora térmica</span><span class="support-pending">Pendiente de definir</span></li>
+          <li><span>Cola de impresión</span><span class="support-pending">Pendiente de definir</span></li>
+        </ul>
+        <div class="support-actions"><button class="button button--secondary" type="button" (click)="refresh()" [disabled]="loading()">{{ loading() ? 'Actualizando…' : 'Actualizar diagnóstico' }}</button></div>
+      </section>
+
+      <div class="support-side">
+        <section class="support-panel" aria-labelledby="support-backups-title">
+          <h3 id="support-backups-title">Respaldos</h3>
+          <p>Cada {{ data.intervalMinutes }} minutos y después del cierre.</p>
+          <dl class="support-facts">
+            <div><dt>Último respaldo válido</dt><dd>{{ dateTime(data.lastSuccessfulBackup?.startedAt) }}</dd></div>
+            <div><dt>Tamaño</dt><dd>{{ size(data.lastSuccessfulBackup?.sizeBytes) }}</dd></div>
+            <div><dt>Integridad</dt><dd>@if (data.lastSuccessfulBackup?.verified) { <span class="badge badge--success">Verificada</span> } @else { — }</dd></div>
+          </dl>
+          @if (!data.serviceEnabled) { <p class="field-hint">El servicio está apagado en este equipo. Ejecute la preparación de respaldos (scripts\backups\Initialize-Backups.ps1) y reinicie la API.</p> }
+          <div class="support-actions"><button class="button button--secondary" type="button" (click)="runNow()" [disabled]="running() || !data.serviceEnabled">{{ running() ? 'Solicitando…' : 'Crear respaldo' }}</button></div>
+        </section>
+
+        <section class="support-panel" aria-labelledby="support-events-title">
+          <h3 id="support-events-title">Eventos recientes</h3>
+          <div class="support-table"><table><thead><tr><th>Hora</th><th>Evento</th><th>Resultado</th></tr></thead><tbody>
+            @for (event of data.recentEvents; track $index) {
+              <tr><td>{{ time(event.at) }}</td><td>{{ event.description }}</td><td><span class="badge {{ resultClass(event.result) }}">{{ resultLabel(event.result) }}</span></td></tr>
+            } @empty { <tr><td colspan="3" class="support-pending">Todavía no hay eventos.</td></tr> }
+          </tbody></table></div>
+        </section>
+      </div>
+    </div>
+
+    <section class="support-panel" aria-labelledby="support-destinations-title">
+      <h3 id="support-destinations-title">Destinos</h3>
+      <p>Copia local en un disco distinto al de la base (externo USB u otro disco interno) y copia externa cifrada en la carpeta de Google Drive u OneDrive. Se conservan las del día, {{ data.destinations[0]?.dailyRetention }} diarias, {{ data.destinations[0]?.weeklyRetention }} semanales y {{ data.destinations[0]?.monthlyRetention }} mensuales.</p>
+      <div class="support-destinations">
+        @for (destination of data.destinations; track destination.type) {
+          <form class="support-destination" (submit)="$event.preventDefault(); saveDestination(destination)">
+            <h4>{{ destination.name }}</h4>
+            <label class="field-label" [for]="'path-' + destination.type">Carpeta</label>
+            <input class="text-field" [id]="'path-' + destination.type" [name]="'path-' + destination.type" [(ngModel)]="drafts[destination.type].path"
+              [placeholder]="destination.type === 'EXTERNO_CIFRADO' ? 'Ej.: C:\\Users\\Tienda\\Google Drive\\Respaldos' : 'Ej.: E:\\Respaldos'">
+            <label class="support-check"><input type="checkbox" [name]="'active-' + destination.type" [(ngModel)]="drafts[destination.type].active"> Activo</label>
+            @if (destination.type === 'EXTERNO_CIFRADO' && !destination.passphraseConfigured) { <p class="field-error">Falta la contraseña de cifrado en este equipo.</p> }
+            @if (destination.lastCopy; as copy) { <p class="field-hint">Última copia: {{ dateTime(copy.completedAt) }} · {{ resultLabel(copy.state) }}@if (copy.error) { · {{ copy.error }} }</p> }
+            <div class="support-actions"><button class="button button--primary" type="submit" [disabled]="saving() === destination.type">{{ saving() === destination.type ? 'Guardando…' : 'Guardar' }}</button></div>
+          </form>
+        }
+      </div>
+    </section>
+  }
+</section>

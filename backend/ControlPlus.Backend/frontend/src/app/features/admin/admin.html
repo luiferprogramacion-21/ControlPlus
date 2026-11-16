@@ -4,6 +4,7 @@
     <div class="tabs">
       @if (canReadUsers) { <button mat-button type="button" [class.active]="tab() === 'users'" (click)="switchTab('users')">Usuarios</button> }
       @if (canReadRoles) { <button mat-button type="button" [class.active]="tab() === 'roles'" (click)="switchTab('roles')">Roles</button> }
+      @if (session.has('BACKUPS.MANAGE')) { <a mat-button routerLink="/operacion/soporte">Soporte y continuidad</a> }
     </div>
   </div>
   @if (error() && !mode()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }

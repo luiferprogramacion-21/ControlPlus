@@ -1,3 +1,4 @@
+import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -16,7 +17,7 @@ type Tab = 'users' | 'roles';
 
 @Component({
   selector: 'cp-admin',
-  imports: [DatePipe, FormsModule, MatButtonModule, MatPaginatorModule, Icon, RoleTemplate, UserPermissions, UserCredential],
+  imports: [DatePipe, FormsModule, MatButtonModule, MatPaginatorModule, RouterLink, Icon, RoleTemplate, UserPermissions, UserCredential],
   templateUrl: './admin.html',
   styleUrls: ['../directory.scss', './admin.scss'],
 })
