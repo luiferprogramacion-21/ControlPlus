@@ -33,3 +33,10 @@ Después: reiniciar la API, entrar en Administración → «Soporte y continuida
 ## Verificación
 
 Sin base de datos: compilación serial con `-warnaserror` sin errores ni advertencias; `BackupRetentionPolicyTests` 5/5, `BackupCryptoTests` 4/4; API sin base de datos 220/220 e Infrastructure 10/10; frontend 560/560 y `ngc` con salida 0. Con base de datos (CI, corrida `43779247153`, commit `acfb2ca`): API 687/687, Domain 80/80 e Infrastructure 82/82, incluido `BackupApiTests` (ejecución y copias en las tablas oficiales, error saneado, validaciones, concurrencia y permisos) con un motor de prueba en lugar de `pg_dump`. El volcado real con `pg_dump` se comprueba en la preparación y en el primer respaldo del equipo.
+
+## Puesta en marcha en el equipo de la tienda (15 de noviembre de 2026)
+
+El operador ejecutó `Initialize-Backups.ps1` (terminó con `BACKUP_SETUP_OK`) y reinició la API. El servicio generó respaldos automático y manuales verificados (unos 550 KB cada uno). Se configuró la copia externa cifrada en la carpeta de OneDrive del equipo; la primera copia `controlplus-20261116T011745Z-MANUAL.dump.cpbk` (563 743 bytes) quedó escrita con el encabezado `CPBK1` y verificada por el servicio. En la revisión se corrigió que el resultado de «Guardar» un destino se mostraba fuera de la vista; ahora aparece dentro de su recuadro.
+
+**Pendiente:** el equipo solo tiene el disco `C:`, así que la copia local separada queda sin configurar hasta conectar un disco USB u otro disco. OneDrive avisa de poco almacenamiento: si se llena deja de subir las copias, por lo que conviene liberar espacio. Aún no se ha probado restaurar una copia (corte 2).
+
