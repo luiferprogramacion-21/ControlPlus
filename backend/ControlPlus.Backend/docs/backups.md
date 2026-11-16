@@ -51,9 +51,9 @@ Administración → «Soporte y continuidad» → «Restauración» (`/operacion
 Requiere que el rol `controlplus_backup` pueda crear bases (`CREATEDB`). En un equipo ya preparado, repetir la preparación **conservando la contraseña de cifrado**, porque las copias existentes solo se abren con ella:
 
 ```powershell
-Set-Location 'C:\ControlPlusackend\ControlPlus.Backend'
+Set-Location 'C:\ControlPlus\backend\ControlPlus.Backend'
 git pull --ff-only
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scriptsackups\Initialize-Backups.ps1 -KeepPassphrase
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backups\Initialize-Backups.ps1 -KeepPassphrase
 ```
 
 Verificación sin base de datos: frontend 565/565 y `ngc` con salida 0; API sin base de datos 220/220. La integración `RestoreTest_IsRecordedWithItsSelfAuthorization_AndTheOverviewShowsGoalsCopiesAndNextDate` usa un motor de prueba; la restauración real con `pg_restore` se comprueba en el equipo de la tienda.
