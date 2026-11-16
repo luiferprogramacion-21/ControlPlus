@@ -112,5 +112,7 @@ public enum AuditAction
     LayawaySettingsUpdated = 103,
     CashOpenAuthorizationRejected = 104,
     CreditSettingsUpdated = 106,
-    SalesSettingsUpdated = 107
+    SalesSettingsUpdated = 107,
+    BackupDestinationUpdated = 108,
+    BackupRequested = 109
 }

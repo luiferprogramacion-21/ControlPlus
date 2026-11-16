@@ -1,3 +1,4 @@
+using ControlPlus.Application.Backups;
 using ControlPlus.Domain.Security;
 using System.Data;
 using ControlPlus.Application.Cash.Contracts;
@@ -23,7 +24,8 @@ public sealed class CashService(
     ICredentialTokenGenerator tokenGenerator,
     IAuditRepository auditRepository,
     IClock clock,
-    ILoginAttemptCoordinator loginAttemptCoordinator) : ICashService
+    ILoginAttemptCoordinator loginAttemptCoordinator,
+    IBackupRequestQueue backupRequests) : ICashService
 {
     private const int MaximumPageSize = 200;
 
@@ -352,14 +354,19 @@ public sealed class CashService(
         // The same account lock as login covers credentials and the complete financial
         // transaction. Failed credentials commit only their counter and failure audit;
         // successful credentials remain atomic with the closing, including COMMIT.
+        Result<CashReconciliationDto> result;
         if (!string.IsNullOrWhiteSpace(request!.Authorization?.UserName))
-            return await loginAttemptCoordinator.ExecuteAsync(
+            result = await loginAttemptCoordinator.ExecuteAsync(
                 request.Authorization.UserName.Trim().ToUpperInvariant(),
                 token => CloseWithinTransactionAsync(actor, shiftId, request, token), cancellationToken);
-
-        await using var transaction = await transactionManager.BeginAsync(IsolationLevel.Serializable, cancellationToken);
-        var result = await CloseWithinTransactionAsync(actor, shiftId, request, cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        else
+        {
+            await using var transaction = await transactionManager.BeginAsync(IsolationLevel.Serializable, cancellationToken);
+            result = await CloseWithinTransactionAsync(actor, shiftId, request, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        // Fase 4: un respaldo después de cada cierre, ya confirmado; si el servicio está apagado el pedido se ignora.
+        if (result.IsSuccess) backupRequests.Request(BackupCodes.CashClose);
         return result;
     }
 
