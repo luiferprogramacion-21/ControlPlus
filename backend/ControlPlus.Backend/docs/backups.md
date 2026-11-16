@@ -56,5 +56,7 @@ git pull --ff-only
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backups\Initialize-Backups.ps1 -KeepPassphrase
 ```
 
-Verificación sin base de datos: frontend 565/565 y `ngc` con salida 0; API sin base de datos 220/220. La integración `RestoreTest_IsRecordedWithItsSelfAuthorization_AndTheOverviewShowsGoalsCopiesAndNextDate` usa un motor de prueba; la restauración real con `pg_restore` se comprueba en el equipo de la tienda.
+Verificación sin base de datos: frontend 565/565 y `ngc` con salida 0; API sin base de datos 220/220. La integración `RestoreTest_IsRecordedWithItsSelfAuthorization_AndTheOverviewShowsGoalsCopiesAndNextDate` usa un motor de prueba; el CI (corrida `43788457884`, commit `31f5bf5`) acreditó API 688/688, Domain 80/80 e Infrastructure 82/82.
+
+Prueba real en el equipo de la tienda (15 de noviembre de 2026): tras repetir la preparación con `-KeepPassphrase` y reiniciar la API, el Administrador probó la copia externa cifrada de las 20:47 desde la pantalla: «Prueba correcta», RTO observado 1 minuto y próxima prueba el 14/02/2027. Queda acreditado que la copia de OneDrive se descifra con la contraseña guardada y se restaura completa. Una copia de las 20:17 figura «No disponible» porque su archivo ya no está en la carpeta; la pantalla lo informa y no permite probarla.
 
