@@ -148,6 +148,93 @@ public sealed partial class PgDumpBackupEngine(IOptions<BackupOptions> options, 
         }
     }
 
+    public bool CopyExists(string path) => File.Exists(path);
+
+    public async Task<RestoreTestResult> TestRestoreAsync(string copyPath, bool encrypted, string? expectedSha256,
+        CancellationToken cancellationToken)
+    {
+        var watch = Stopwatch.StartNew();
+        var connection = configuration.GetConnectionString(BackupOptions.ConnectionStringName);
+        if (string.IsNullOrWhiteSpace(connection))
+            return new RestoreTestResult(false, false, watch.Elapsed, null, "Falta la conexión de respaldos (ConnectionStrings:ControlPlusBackup).");
+        var builder = new NpgsqlConnectionStringBuilder(connection);
+        Directory.CreateDirectory(Options.ResolvedStagingDirectory);
+        var plainPath = Path.Combine(Options.ResolvedStagingDirectory, $"prueba-restauracion-{Guid.NewGuid():N}.dump");
+        // Base temporal con nombre propio; la base real nunca se usa como destino de la restauración.
+        var database = $"controlplus_restore_{Guid.NewGuid():N}";
+        var created = false;
+        try
+        {
+            var bytes = await File.ReadAllBytesAsync(copyPath, cancellationToken);
+            if (encrypted) bytes = BackupCrypto.Decrypt(bytes, Options.EncryptionPassphrase ?? string.Empty);
+            var hash = Convert.ToHexString(SHA256.HashData(bytes));
+            if (expectedSha256 is not null && !string.Equals(hash, expectedSha256, StringComparison.OrdinalIgnoreCase))
+                return new RestoreTestResult(false, false, watch.Elapsed, null, "La copia no coincide con la huella del respaldo original.");
+            await File.WriteAllBytesAsync(plainPath, bytes, cancellationToken);
+
+            await ExecuteOnMaintenanceAsync(builder, $"CREATE DATABASE \"{database}\"", cancellationToken);
+            created = true;
+            var exit = await RunAsync("pg_restore.exe",
+                ["-w", "-h", builder.Host ?? "127.0.0.1", "-p", builder.Port.ToString(CultureInfo.InvariantCulture),
+                 "-U", builder.Username ?? string.Empty, "-d", database, "--no-owner", "--no-acl", "--exit-on-error", plainPath],
+                builder.Password, cancellationToken);
+            if (exit != 0)
+                return new RestoreTestResult(true, false, watch.Elapsed, null, $"pg_restore terminó con error (código {exit}).");
+
+            var target = new NpgsqlConnectionStringBuilder(builder.ConnectionString) { Database = database, Pooling = false };
+            await using var restored = new NpgsqlConnection(target.ConnectionString);
+            await restored.OpenAsync(cancellationToken);
+            var migrations = Convert.ToInt32(await ScalarAsync(restored, "SELECT count(*) FROM public.\"__EFMigrationsHistory\"", cancellationToken), CultureInfo.InvariantCulture);
+            var establishments = Convert.ToInt64(await ScalarAsync(restored, "SELECT count(*) FROM configuracion.establecimiento", cancellationToken), CultureInfo.InvariantCulture);
+            // Las tablas operativas deben poder consultarse aunque estén vacías.
+            _ = await ScalarAsync(restored, "SELECT count(*) FROM catalogo.producto", cancellationToken);
+            _ = await ScalarAsync(restored, "SELECT count(*) FROM ventas.venta", cancellationToken);
+            var applicationOk = migrations > 0 && establishments > 0;
+            return new RestoreTestResult(true, applicationOk, watch.Elapsed, migrations,
+                applicationOk ? null : "La base restaurada no tiene historial de migraciones o establecimiento.");
+        }
+        catch (CryptographicException)
+        {
+            return new RestoreTestResult(false, false, watch.Elapsed, null,
+                "No se pudo descifrar la copia: la contraseña de cifrado es distinta o el archivo está alterado.");
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.InsufficientPrivilege)
+        {
+            return new RestoreTestResult(true, false, watch.Elapsed, null,
+                "El usuario de respaldo no puede crear bases temporales: ejecute de nuevo la preparación de respaldos.");
+        }
+        catch (Exception exception) when (exception is NpgsqlException or IOException or UnauthorizedAccessException)
+        {
+            var code = exception is PostgresException postgres ? $" (código {postgres.SqlState})" : string.Empty;
+            return new RestoreTestResult(false, false, watch.Elapsed, null, "No se pudo completar la prueba de restauración" + code + ".");
+        }
+        finally
+        {
+            if (created)
+            {
+                try { await ExecuteOnMaintenanceAsync(builder, $"DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE)", CancellationToken.None); }
+                catch (NpgsqlException) { /* Queda con nombre controlplus_restore_* y se puede borrar a mano. */ }
+            }
+            try { if (File.Exists(plainPath)) File.Delete(plainPath); }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+        }
+    }
+
+    private static async Task ExecuteOnMaintenanceAsync(NpgsqlConnectionStringBuilder builder, string sql, CancellationToken cancellationToken)
+    {
+        var maintenance = new NpgsqlConnectionStringBuilder(builder.ConnectionString) { Database = "postgres", Pooling = false };
+        await using var connection = new NpgsqlConnection(maintenance.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<object?> ScalarAsync(NpgsqlConnection connection, string sql, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(sql, connection);
+        return await command.ExecuteScalarAsync(cancellationToken);
+    }
+
     private async Task<int> RunAsync(string program, IReadOnlyList<string> arguments, string? password, CancellationToken cancellationToken)
     {
         var start = new ProcessStartInfo(Path.Combine(Options.PgBinDirectory, program))

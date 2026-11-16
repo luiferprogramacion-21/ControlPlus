@@ -14,7 +14,10 @@
     No modifica datos ni esquema de la base. Se puede repetir: renueva la contraseña del rol y la configuración.
 #>
 [CmdletBinding()]
-param()
+param(
+    # Conserva la contraseña de cifrado ya guardada: las copias cifradas existentes solo se abren con ella.
+    [switch]$KeepPassphrase
+)
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -75,9 +78,9 @@ try {
 DO `$`$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'controlplus_backup') THEN
-        CREATE ROLE controlplus_backup LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '$backupPassword';
+        CREATE ROLE controlplus_backup LOGIN NOSUPERUSER CREATEDB NOCREATEROLE PASSWORD '$backupPassword';
     ELSE
-        ALTER ROLE controlplus_backup LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '$backupPassword';
+        ALTER ROLE controlplus_backup LOGIN NOSUPERUSER CREATEDB NOCREATEROLE PASSWORD '$backupPassword';
     END IF;
 END
 `$`$;
@@ -108,16 +111,23 @@ SELECT 'BACKUP_ROLE_OK';
     if ($LASTEXITCODE -ne 0) { throw 'El respaldo de prueba no pasó la verificación de pg_restore.' }
     Write-Host ('BACKUP_DUMP_TEST_OK bytes=' + (Get-Item -LiteralPath $testDump).Length)
 
-    $passphrase = Read-Secret 'Contraseña de cifrado de la copia externa (mínimo 12 caracteres, oculta)'
-    $confirmation = Read-Secret 'Repita la contraseña de cifrado'
-    if ($passphrase -cne $confirmation) { throw 'Las contraseñas de cifrado no coinciden.' }
-    $confirmation = $null
-    if ($passphrase.Length -lt 12) { throw 'La contraseña de cifrado debe tener al menos 12 caracteres.' }
+    $backupSettings = @{ Enabled = 'true'; DatabaseDriveRoot = $databaseDrive }
+    if ($KeepPassphrase) {
+        Write-Host 'Se conserva la contraseña de cifrado ya guardada.'
+    }
+    else {
+        $passphrase = Read-Secret 'Contraseña de cifrado de la copia externa (mínimo 12 caracteres, oculta)'
+        $confirmation = Read-Secret 'Repita la contraseña de cifrado'
+        if ($passphrase -cne $confirmation) { throw 'Las contraseñas de cifrado no coinciden.' }
+        $confirmation = $null
+        if ($passphrase.Length -lt 12) { throw 'La contraseña de cifrado debe tener al menos 12 caracteres.' }
+        $backupSettings['EncryptionPassphrase'] = $passphrase
+    }
 
     # Los valores se pasan por la entrada estándar, no como argumentos visibles del proceso.
     $secrets = @{
         ConnectionStrings = @{ ControlPlusBackup = "Host=127.0.0.1;Port=5432;Database=controlplus;Username=controlplus_backup;Password=$backupPassword" }
-        Backup = @{ Enabled = 'true'; EncryptionPassphrase = $passphrase; DatabaseDriveRoot = $databaseDrive }
+        Backup = $backupSettings
     } | ConvertTo-Json -Compress
     $previousEncoding = $OutputEncoding
     $OutputEncoding = New-Object Text.UTF8Encoding($false)

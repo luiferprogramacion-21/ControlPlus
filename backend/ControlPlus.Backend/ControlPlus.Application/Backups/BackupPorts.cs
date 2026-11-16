@@ -6,6 +6,10 @@ public sealed record DumpResult(string StagingPath, long SizeBytes, string Sha25
 
 public sealed record CopyResult(string FinalPath, bool Verified);
 
+/// <summary>Resultado de restaurar una copia en una base temporal que se borra al terminar.</summary>
+public sealed record RestoreTestResult(bool IntegrityVerified, bool ApplicationVerified, TimeSpan Duration,
+    int? AppliedMigrations, string? Error);
+
 /// <summary>Volcado con pg_dump, copia a los destinos (cifrada si corresponde) y manejo de archivos.</summary>
 public interface IBackupEngine
 {
@@ -27,6 +31,15 @@ public interface IBackupEngine
 
     /// <summary>Conserva solo los últimos archivos de la carpeta de trabajo.</summary>
     void PruneStaging(int keep);
+
+    bool CopyExists(string path);
+
+    /// <summary>
+    /// Descifra si hace falta, compara el SHA-256 con el del respaldo original, restaura en una base temporal nueva,
+    /// comprueba el historial de migraciones y las tablas principales, y borra la base temporal. Nunca toca la base real.
+    /// </summary>
+    Task<RestoreTestResult> TestRestoreAsync(string copyPath, bool encrypted, string? expectedSha256,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>Configuración técnica del equipo: si el servicio está activo, cada cuánto y si hay contraseña de cifrado.</summary>
@@ -49,4 +62,16 @@ public interface IBackupRepository
     Task<IReadOnlyList<(CopiaRespaldo Copy, string DestinationType)>> GetRecentCopiesAsync(Guid installationId, int limit,
         CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
+
+    Task<Establecimiento?> GetEstablishmentAsync(Guid installationId, CancellationToken cancellationToken);
+    /// <summary>Copias completadas, de la más reciente a la más antigua, con su ejecución y el tipo de destino.</summary>
+    Task<IReadOnlyList<(CopiaRespaldo Copy, EjecucionRespaldo Execution, string DestinationType)>> GetCompletedCopiesAsync(
+        Guid installationId, int limit, CancellationToken cancellationToken);
+    Task<(CopiaRespaldo Copy, EjecucionRespaldo Execution, string DestinationType)?> GetCopyAsync(Guid installationId,
+        Guid copyId, CancellationToken cancellationToken);
+    Task<EjecucionRespaldo?> GetPreviousSuccessfulAsync(Guid installationId, DateTime before, CancellationToken cancellationToken);
+    Task<PruebaRestauracion?> GetLastRestoreTestAsync(Guid installationId, CancellationToken cancellationToken);
+    Task AddRestoreTestAsync(PruebaRestauracion test, CancellationToken cancellationToken);
+    Task AddAuthorizationAsync(AutorizacionOperacion authorization, CancellationToken cancellationToken);
+    Task<Guid?> GetPermissionIdAsync(string code, CancellationToken cancellationToken);
 }

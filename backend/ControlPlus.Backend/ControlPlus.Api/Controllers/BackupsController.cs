@@ -39,6 +39,33 @@ public sealed class BackupsController(CurrentActorContextResolver actorContextRe
             : FromResult(await backups.RequestManualAsync(actor, cancellationToken), value => Accepted(value));
     }
 
+    /// <summary>Metas de RPO/RTO, última prueba de restauración y copias disponibles (maqueta 22c).</summary>
+    [HttpGet("restore")]
+    [PermissionAuthorize(PermissionCodes.BackupsManage)]
+    [ProducesResponseType<RestoreOverviewDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<IActionResult> GetRestore(CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await backups.GetRestoreOverviewAsync(actor, cancellationToken), Ok);
+    }
+
+    /// <summary>Prueba restaurar la copia en una base temporal que se borra al terminar; nunca toca la base real.</summary>
+    [HttpPost("copies/{copyId:guid}/restore-test")]
+    [PermissionAuthorize(PermissionCodes.BackupsManage)]
+    [ProducesResponseType<RestoreTestDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> TestRestore(Guid copyId, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await backups.TestRestoreAsync(actor, copyId, cancellationToken), Ok);
+    }
+
     /// <summary>Configura la carpeta de un destino (LOCAL_FISICO_SEPARADO o EXTERNO_CIFRADO) y si está activo.</summary>
     [HttpPut("destinations/{type}")]
     [PermissionAuthorize(PermissionCodes.BackupsManage)]

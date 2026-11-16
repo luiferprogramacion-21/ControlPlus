@@ -54,4 +54,49 @@ public sealed class EfBackupRepository(OfficialControlPlusDbContext dbContext) :
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => dbContext.SaveChangesAsync(cancellationToken);
+
+    public Task<Establecimiento?> GetEstablishmentAsync(Guid installationId, CancellationToken cancellationToken) =>
+        dbContext.Instalacion.AsNoTracking().Where(x => x.Id == installationId)
+            .Select(x => x.Establecimiento).FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<(CopiaRespaldo Copy, EjecucionRespaldo Execution, string DestinationType)>> GetCompletedCopiesAsync(
+        Guid installationId, int limit, CancellationToken cancellationToken)
+    {
+        var rows = await dbContext.CopiaRespaldo.AsNoTracking()
+            .Where(x => x.Estado == BackupCodes.CopyCompleted && x.DestinoRespaldo.InstalacionId == installationId)
+            .OrderByDescending(x => x.EjecucionRespaldo.FechaInicio).ThenByDescending(x => x.Id).Take(limit)
+            .Select(x => new { Copy = x, Execution = x.EjecucionRespaldo, x.DestinoRespaldo.TipoDestino })
+            .ToListAsync(cancellationToken);
+        return rows.Select(x => (x.Copy, x.Execution, x.TipoDestino)).ToArray();
+    }
+
+    public async Task<(CopiaRespaldo Copy, EjecucionRespaldo Execution, string DestinationType)?> GetCopyAsync(Guid installationId,
+        Guid copyId, CancellationToken cancellationToken)
+    {
+        var row = await dbContext.CopiaRespaldo.AsNoTracking()
+            .Where(x => x.Id == copyId && x.DestinoRespaldo.InstalacionId == installationId)
+            .Select(x => new { Copy = x, Execution = x.EjecucionRespaldo, x.DestinoRespaldo.TipoDestino })
+            .FirstOrDefaultAsync(cancellationToken);
+        return row is null ? null : (row.Copy, row.Execution, row.TipoDestino);
+    }
+
+    public Task<EjecucionRespaldo?> GetPreviousSuccessfulAsync(Guid installationId, DateTime before, CancellationToken cancellationToken) =>
+        dbContext.EjecucionRespaldo.AsNoTracking()
+            .Where(x => x.InstalacionId == installationId && x.Resultado == BackupCodes.Succeeded && x.FechaInicio < before)
+            .OrderByDescending(x => x.FechaInicio).ThenByDescending(x => x.Id).FirstOrDefaultAsync(cancellationToken);
+
+    public Task<PruebaRestauracion?> GetLastRestoreTestAsync(Guid installationId, CancellationToken cancellationToken) =>
+        dbContext.PruebaRestauracion.AsNoTracking()
+            .Where(x => x.CopiaRespaldo.DestinoRespaldo.InstalacionId == installationId)
+            .OrderByDescending(x => x.FechaInicio).ThenByDescending(x => x.Id).FirstOrDefaultAsync(cancellationToken);
+
+    public async Task AddRestoreTestAsync(PruebaRestauracion test, CancellationToken cancellationToken) =>
+        await dbContext.PruebaRestauracion.AddAsync(test, cancellationToken);
+
+    public async Task AddAuthorizationAsync(AutorizacionOperacion authorization, CancellationToken cancellationToken) =>
+        await dbContext.AutorizacionOperacion.AddAsync(authorization, cancellationToken);
+
+    public Task<Guid?> GetPermissionIdAsync(string code, CancellationToken cancellationToken) =>
+        dbContext.Permiso.AsNoTracking().Where(x => x.Codigo == code && x.Activo)
+            .Select(x => (Guid?)x.Id).FirstOrDefaultAsync(cancellationToken);
 }

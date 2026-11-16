@@ -114,5 +114,6 @@ public enum AuditAction
     CreditSettingsUpdated = 106,
     SalesSettingsUpdated = 107,
     BackupDestinationUpdated = 108,
-    BackupRequested = 109
+    BackupRequested = 109,
+    BackupRestoreTested = 110
 }

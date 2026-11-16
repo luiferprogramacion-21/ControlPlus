@@ -163,6 +163,66 @@ public sealed class BackupApiTests : IAsyncLifetime
         }
     }
 
+    [Fact, Trait("Category", "Integration")]
+    public async Task RestoreTest_IsRecordedWithItsSelfAuthorization_AndTheOverviewShowsGoalsCopiesAndNextDate()
+    {
+        using var client = CreateClient();
+        var (admin, supervisor, _) = await BootstrapAsync(client);
+        SetBearer(client, admin);
+        _ = await ReadAsync<BackupDestinationDto>(await client.PutAsJsonAsync("/api/backups/destinations/EXTERNO_CIFRADO",
+            new UpdateBackupDestinationRequest(_engine.Folder("nube"), true, null)), HttpStatusCode.OK);
+        _ = await RunAsync(BackupCodes.Scheduled);
+        _ = await RunAsync(BackupCodes.Manual);
+
+        var overview = await ReadAsync<RestoreOverviewDto>(await client.GetAsync("/api/backups/restore"), HttpStatusCode.OK);
+        Assert.Equal((30, 120, 90), (overview.RpoMinutes, overview.RtoMinutes, overview.RestoreTestDays));
+        Assert.Null(overview.LastTest);
+        Assert.Equal(2, overview.Copies.Count);
+        Assert.All(overview.Copies, x => Assert.True(x.Available && x.Verified && x.DestinationType == "EXTERNO_CIFRADO"));
+        var newest = overview.Copies[0];
+
+        var test = await ReadAsync<RestoreTestDto>(
+            await client.PostAsync($"/api/backups/copies/{newest.CopyId}/restore-test", null), HttpStatusCode.OK);
+        Assert.Equal("EXITOSA", test.Result);
+        Assert.True(test.IntegrityVerified && test.ApplicationVerified);
+        Assert.Equal(1, test.RtoObservedMinutes);
+        Assert.NotNull(test.RpoObservedMinutes);
+        Assert.True(_engine.LastRestore!.Value.Encrypted);
+        Assert.Equal(new string('A', 64), _engine.LastRestore.Value.Hash);
+
+        await using (var scope = _factory!.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            var stored = await db.PruebaRestauracion.AsNoTracking().Include(x => x.AutorizacionOperacion).SingleAsync();
+            Assert.Equal(("EXITOSA", "PRUEBA_RESTAURACION"), (stored.Resultado, stored.AutorizacionOperacion.TipoOperacion));
+            Assert.Equal(stored.EjecutadaPorId, stored.AutorizacionOperacion.UsuarioAutorizadorId);
+            Assert.Equal("Migraciones restauradas: 26.", stored.Observaciones);
+        }
+        var after = await ReadAsync<RestoreOverviewDto>(await client.GetAsync("/api/backups/restore"), HttpStatusCode.OK);
+        Assert.Equal(test.Id, after.LastTest!.Id);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90), after.NextTestDue);
+
+        // Una prueba fallida queda registrada con su mensaje y no adelanta la próxima fecha.
+        _engine.RestoreResult = new RestoreTestResult(false, false, TimeSpan.FromSeconds(5), null, "La copia no coincide con la huella del respaldo original.");
+        var failed = await ReadAsync<RestoreTestDto>(
+            await client.PostAsync($"/api/backups/copies/{overview.Copies[1].CopyId}/restore-test", null), HttpStatusCode.OK);
+        Assert.Equal("FALLIDA", failed.Result);
+        Assert.Equal("La copia no coincide con la huella del respaldo original.", failed.Error);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow),
+            (await ReadAsync<RestoreOverviewDto>(await client.GetAsync("/api/backups/restore"), HttpStatusCode.OK)).NextTestDue);
+
+        // Un archivo que ya no existe no se puede probar; una copia desconocida no existe; otros roles no entran.
+        File.Delete(_engine.LastRestore.Value.Path);
+        await AssertProblemAsync(await client.PostAsync($"/api/backups/copies/{overview.Copies[1].CopyId}/restore-test", null),
+            HttpStatusCode.Conflict, "resource.conflict");
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.PostAsync($"/api/backups/copies/{Guid.NewGuid()}/restore-test", null)).StatusCode);
+        SetBearer(client, supervisor);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/backups/restore")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await client.PostAsync($"/api/backups/copies/{newest.CopyId}/restore-test", null)).StatusCode);
+    }
+
     private async Task<BackupExecutionDto?> RunAsync(string trigger)
     {
         await using var scope = _factory!.Services.CreateAsyncScope();
@@ -205,6 +265,16 @@ public sealed class BackupApiTests : IAsyncLifetime
         public (long? FreeBytes, long? TotalBytes) GetSpace(string path) => (1_000_000, 2_000_000);
         public string? ValidateDestination(string type, string path) => RejectWith;
         public void PruneStaging(int keep) { }
+        public bool CopyExists(string path) => File.Exists(path);
+        public RestoreTestResult RestoreResult { get; set; } = new(true, true, TimeSpan.FromSeconds(40), 26, null);
+        public (string Path, bool Encrypted, string? Hash)? LastRestore { get; private set; }
+
+        public Task<RestoreTestResult> TestRestoreAsync(string copyPath, bool encrypted, string? expectedSha256,
+            CancellationToken cancellationToken)
+        {
+            LastRestore = (copyPath, encrypted, expectedSha256);
+            return Task.FromResult(RestoreResult);
+        }
 
         public void Dispose()
         {

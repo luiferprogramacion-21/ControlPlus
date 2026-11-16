@@ -206,6 +206,100 @@ public sealed class BackupService(
             destination.RetencionSemanal, destination.RetencionMensual, free, total, null, destination.Version));
     }
 
+    public async Task<Result<RestoreOverviewDto>> GetRestoreOverviewAsync(ActorContext actor, CancellationToken cancellationToken = default)
+    {
+        var error = await RequireAdministratorAsync(actor, cancellationToken);
+        if (error is not null) return Result.Failure<RestoreOverviewDto>(error);
+        var installationId = await repository.GetActiveInstallationIdAsync(cancellationToken);
+        if (installationId is null) return Result.Failure<RestoreOverviewDto>(ApplicationError.NotFound("la instalación activa"));
+        var establishment = await repository.GetEstablishmentAsync(installationId.Value, cancellationToken);
+        if (establishment is null) return Result.Failure<RestoreOverviewDto>(ApplicationError.NotFound("el establecimiento activo"));
+
+        var copies = (await repository.GetCompletedCopiesAsync(installationId.Value, 30, cancellationToken))
+            .Select(x => new RestorableCopyDto(x.Copy.Id, Utc(x.Execution.FechaInicio), x.DestinationType, x.Execution.TamanoBytes,
+                x.Copy.HashVerificado, x.Copy.UbicacionFinal is not null && engine.CopyExists(x.Copy.UbicacionFinal)))
+            .ToArray();
+        var last = await repository.GetLastRestoreTestAsync(installationId.Value, cancellationToken);
+        // Fase 4: probar al menos cada dias_prueba_restauracion días; sin una prueba exitosa, ya está vencida.
+        var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+        var nextDue = last is { Resultado: BackupCodes.TestSucceeded }
+            ? DateOnly.FromDateTime(last.FechaInicio).AddDays(establishment.DiasPruebaRestauracion)
+            : today;
+        return Result.Success(new RestoreOverviewDto(establishment.RpoMinutos, establishment.RtoMinutos,
+            establishment.DiasPruebaRestauracion, last is null ? null : MapTest(last), nextDue, copies));
+    }
+
+    public async Task<Result<RestoreTestDto>> TestRestoreAsync(ActorContext actor, Guid copyId, CancellationToken cancellationToken = default)
+    {
+        var error = await RequireAdministratorAsync(actor, cancellationToken);
+        if (error is not null) return Result.Failure<RestoreTestDto>(error);
+        var settings = runtime.Settings;
+        if (!settings.Enabled)
+            return Result.Failure<RestoreTestDto>(ApplicationError.Conflict("El servicio de respaldos no está activado en este equipo."));
+        var installationId = await repository.GetActiveInstallationIdAsync(cancellationToken);
+        if (installationId is null) return Result.Failure<RestoreTestDto>(ApplicationError.NotFound("la instalación activa"));
+        var found = await repository.GetCopyAsync(installationId.Value, copyId, cancellationToken);
+        if (found is null) return Result.Failure<RestoreTestDto>(ApplicationError.NotFound("la copia de respaldo"));
+        var (copy, execution, _) = found.Value;
+        if (copy.Estado != BackupCodes.CopyCompleted || copy.UbicacionFinal is null)
+            return Result.Failure<RestoreTestDto>(ApplicationError.Conflict("Solo se puede probar una copia completada."));
+        if (!engine.CopyExists(copy.UbicacionFinal))
+            return Result.Failure<RestoreTestDto>(ApplicationError.Conflict(
+                "El archivo de la copia ya no está disponible (depurado por retención o disco desconectado)."));
+        if (copy.Cifrado && !settings.PassphraseConfigured)
+            return Result.Failure<RestoreTestDto>(ApplicationError.Conflict("Falta la contraseña de cifrado en este equipo."));
+        var permissionId = await repository.GetPermissionIdAsync(PermissionCodes.BackupsManage, cancellationToken);
+        if (permissionId is null)
+            return Result.Failure<RestoreTestDto>(ApplicationError.Conflict("El permiso de respaldos no está activo."));
+
+        var now = clock.UtcNow.UtcDateTime;
+        var correlationId = Guid.CreateVersion7();
+        // El Administrador autoriza su propia prueba: no cambia datos de la operación y queda registrada.
+        var authorization = new AutorizacionOperacion
+        {
+            Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId, UsuarioAutorizadorId = actor.UserId,
+            PermisoId = permissionId.Value, TipoOperacion = BackupCodes.RestoreTestType, CorrelacionId = correlationId,
+            DescripcionOperacion = "Prueba de restauración de un respaldo en una base temporal, por el Administrador.",
+            MetodoAutenticacion = "PASSWORD", CredencialAutorizadorId = null, Resultado = "EXITOSA", Estado = "UTILIZADA",
+            FechaSolicitud = now, FechaExpiracion = now.AddMinutes(5), FechaUtilizacion = now
+        };
+        var test = new PruebaRestauracion
+        {
+            Id = Guid.CreateVersion7(), CopiaRespaldoId = copy.Id, EjecutadaPorId = actor.UserId,
+            AutorizacionOperacionId = authorization.Id, FechaInicio = now, Resultado = BackupCodes.TestRunning
+        };
+        await repository.AddAuthorizationAsync(authorization, cancellationToken);
+        await repository.AddRestoreTestAsync(test, cancellationToken);
+        await repository.SaveChangesAsync(cancellationToken);
+
+        RestoreTestResult result;
+        try { result = await engine.TestRestoreAsync(copy.UbicacionFinal, copy.Cifrado, execution.HashIntegridad, cancellationToken); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            result = new RestoreTestResult(false, false, TimeSpan.Zero, null, Sanitize(exception, "No se pudo completar la prueba de restauración."));
+        }
+
+        var previous = await repository.GetPreviousSuccessfulAsync(installationId.Value, execution.FechaInicio, cancellationToken);
+        test.FechaFin = clock.UtcNow.UtcDateTime;
+        test.IntegridadVerificada = result.IntegrityVerified;
+        test.AplicacionVerificada = result.ApplicationVerified;
+        test.Resultado = result.IntegrityVerified && result.ApplicationVerified ? BackupCodes.TestSucceeded : BackupCodes.TestFailed;
+        // RTO observado: minutos que tomó recuperar. RPO observado: separación con el respaldo exitoso anterior.
+        test.RtoObservadoMinutos = (int)Math.Ceiling(result.Duration.TotalMinutes);
+        test.RpoObservadoMinutos = previous is null ? null : (int)Math.Ceiling((execution.FechaInicio - previous.FechaInicio).TotalMinutes);
+        test.Observaciones = result.AppliedMigrations is int migrations ? $"Migraciones restauradas: {migrations}." : null;
+        test.ErrorSanitizado = result.Error;
+        await AuditWriter.WriteCashAsync(audits, clock, actor.UserId, AuditAction.BackupRestoreTested, nameof(PruebaRestauracion),
+            test.Id, new { CopyId = copy.Id, test.Resultado, test.IntegridadVerificada, test.AplicacionVerificada },
+            correlationId, actor.UserId, null, null, null, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return Result.Success(MapTest(test));
+    }
+
+    private static RestoreTestDto MapTest(PruebaRestauracion x) => new(x.Id, x.CopiaRespaldoId, Utc(x.FechaInicio),
+        x.FechaFin is null ? null : Utc(x.FechaFin.Value), x.Resultado, x.RpoObservadoMinutos, x.RtoObservadoMinutos,
+        x.IntegridadVerificada, x.AplicacionVerificada, x.ErrorSanitizado);
+
     private async Task CopyAsync(EjecucionRespaldo execution, DestinoRespaldo destination, DumpResult dump,
         BackupRuntimeSettings settings, CancellationToken cancellationToken)
     {

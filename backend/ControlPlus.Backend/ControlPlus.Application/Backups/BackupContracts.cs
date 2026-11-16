@@ -20,6 +20,10 @@ public static class BackupCodes
     public const string CopyCompleted = "COMPLETADA";
     public const string CopyFailed = "FALLIDA";
     public const string CopySending = "ENVIANDO";
+    public const string RestoreTestType = "PRUEBA_RESTAURACION";
+    public const string TestRunning = "EN_PROCESO";
+    public const string TestSucceeded = "EXITOSA";
+    public const string TestFailed = "FALLIDA";
     /// <summary>Nombre de la configuración que guarda la contraseña de cifrado; nunca se guarda la contraseña.</summary>
     public const string PassphraseReference = "Backup:EncryptionPassphrase";
     public static readonly IReadOnlyList<string> DestinationTypes = [LocalDestination, ExternalDestination];
@@ -50,6 +54,17 @@ public sealed record UpdateBackupDestinationRequest(
 
 public sealed record BackupRunRequested(Guid RequestId, string Trigger);
 
+/// <summary>Copia disponible para probar restauración (maqueta 22c).</summary>
+public sealed record RestorableCopyDto(Guid CopyId, DateTimeOffset BackupAt, string DestinationType, long? SizeBytes,
+    bool Verified, bool Available);
+
+public sealed record RestoreTestDto(Guid Id, Guid CopyId, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, string Result,
+    int? RpoObservedMinutes, int? RtoObservedMinutes, bool IntegrityVerified, bool ApplicationVerified, string? Error);
+
+/// <summary>Metas de Fase 4 del establecimiento (RPO, RTO y frecuencia de prueba), última prueba y copias disponibles.</summary>
+public sealed record RestoreOverviewDto(int RpoMinutes, int RtoMinutes, int RestoreTestDays, RestoreTestDto? LastTest,
+    DateOnly? NextTestDue, IReadOnlyList<RestorableCopyDto> Copies);
+
 /// <summary>Configuración técnica del servicio, leída de la configuración local (no de la base).</summary>
 public sealed record BackupRuntimeSettings(bool Enabled, int IntervalMinutes, bool PassphraseConfigured, string? DatabaseDriveRoot);
 
@@ -68,4 +83,7 @@ public interface IBackupService
     Task<Result<BackupRunRequested>> RequestManualAsync(ActorContext actor, CancellationToken cancellationToken = default);
     Task<Result<BackupDestinationDto>> UpdateDestinationAsync(ActorContext actor, string type,
         UpdateBackupDestinationRequest request, CancellationToken cancellationToken = default);
+    Task<Result<RestoreOverviewDto>> GetRestoreOverviewAsync(ActorContext actor, CancellationToken cancellationToken = default);
+    /// <summary>Restaura la copia en una base temporal que se borra al terminar; nunca toca la base real.</summary>
+    Task<Result<RestoreTestDto>> TestRestoreAsync(ActorContext actor, Guid copyId, CancellationToken cancellationToken = default);
 }

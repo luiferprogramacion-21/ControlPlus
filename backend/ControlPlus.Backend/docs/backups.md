@@ -24,7 +24,7 @@ git pull --ff-only
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backups\Initialize-Backups.ps1
 ```
 
-El script pide la contraseña de `postgres` y dos veces la contraseña de cifrado. Crea o renueva el rol `controlplus_backup` (solo lectura con `pg_read_all_data`, contraseña aleatoria que no se muestra), concede a `controlplus_app` `SELECT`, `INSERT` y `UPDATE` sobre las cuatro tablas de respaldo, prueba un `pg_dump` real con ese rol (y lo borra) y guarda en los User Secrets de la API la conexión `ControlPlusBackup`, la contraseña de cifrado, el disco de la base y `Backup:Enabled = true`. No modifica datos ni esquema; termina con `BACKUP_SETUP_OK`. Se puede repetir.
+El script pide la contraseña de `postgres` y dos veces la contraseña de cifrado. Crea o renueva el rol `controlplus_backup` (solo lectura con `pg_read_all_data` y `CREATEDB` para las bases temporales de las pruebas de restauración, contraseña aleatoria que no se muestra), concede a `controlplus_app` `SELECT`, `INSERT` y `UPDATE` sobre las cuatro tablas de respaldo, prueba un `pg_dump` real con ese rol (y lo borra) y guarda en los User Secrets de la API la conexión `ControlPlusBackup`, la contraseña de cifrado, el disco de la base y `Backup:Enabled = true`. No modifica datos ni esquema; termina con `BACKUP_SETUP_OK`. Se puede repetir.
 
 Después: reiniciar la API, entrar en Administración → «Soporte y continuidad», guardar la carpeta de cada destino y pulsar «Crear respaldo».
 
