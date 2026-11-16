@@ -15,7 +15,7 @@ import { Icon } from './icon';
       @if (menuOpen()) {
         <div class="drawer-backdrop" (click)="menuOpen.set(false)" aria-hidden="true"></div>
         <aside id="main-navigation" class="sidebar" role="dialog" aria-modal="true" aria-label="Navegación principal" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown)="onMenuKeydown($event)">
-          <div class="brand brand--sidebar"><span class="brand__mark" aria-hidden="true">+</span><span><strong>ControlPlus</strong><small>Baratísimo</small></span>
+          <div class="brand brand--sidebar"><img class="brand__mark brand__mark--logo" src="controlplus-icon.png" alt="" width="36" height="36"><span><strong>ControlPlus</strong><small>Baratísimo</small></span>
             <button class="icon-button icon-button--dark drawer-close" type="button" aria-label="Cerrar menú" (click)="menuOpen.set(false)" cdkFocusInitial><cp-icon name="close" /></button>
           </div>
           <p class="sidebar__label">NAVEGACIÓN</p>

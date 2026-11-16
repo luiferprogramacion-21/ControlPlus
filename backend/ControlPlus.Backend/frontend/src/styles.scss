@@ -122,6 +122,8 @@ h3 { font-size: 20px; }
 .brand small { display: block; color: var(--cp-sidebar-text); font-size: 12px; font-weight: 400; }
 .brand--sidebar { gap: 12px; padding: 18px 20px 10px; font-size: 20px; }
 .brand--sidebar .brand__mark { width: 36px; height: 36px; border-radius: 8px; font-size: 28px; }
+/* Ícono del logo de ControlPlus (placa blanca redondeada) en lugar del «+». */
+.brand__mark--logo { display: block; padding: 0; background: none; object-fit: contain; }
 
 .button {
   min-height: 44px;
