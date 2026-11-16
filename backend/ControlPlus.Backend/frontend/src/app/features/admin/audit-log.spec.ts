@@ -1,0 +1,118 @@
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { SessionService } from '../../core/session.service';
+import { AdminApi } from './admin-api';
+import { AUDIT_ACTION_GROUPS, auditActionLabel, auditActionModule } from './audit-actions';
+import { AuditApi, AuditLog, AuditRecord, localDay } from './audit-log';
+
+const record = (extra: Partial<AuditRecord> = {}): AuditRecord => ({
+  id: 'e1', occurredAtUtc: '2026-11-16T15:30:00Z', actorUserId: 'u1', actorUserName: 'admin',
+  actionCode: 'SaleCancelled', entityType: 'VENTA', entityId: 'v1', details: '{"total":5000,"motivo":"ERROR_COBRO"}',
+  correlationId: null, authorizerUserId: 'u2', authorizerUserName: 'supervisor', reason: 'Error en el cobro', result: 'EXITOSO', ...extra,
+});
+
+describe('Auditoría', () => {
+  const api = { records: vi.fn() };
+  const admin = { users: vi.fn() };
+  let permissions: string[];
+  const session = { has: (code: string) => permissions.includes(code) };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    permissions = ['AUDIT.READ', 'USERS.READ'];
+    api.records.mockResolvedValue({ items: [record(), record({ id: 'e2', actorUserId: null, actorUserName: null, actionCode: 'LoginFailed', result: 'RECHAZADO', details: null, authorizerUserName: null, reason: null })], page: 1, pageSize: 50, totalCount: 2, totalPages: 1 });
+    admin.users.mockResolvedValue({ items: [{ id: 'u1', userName: 'admin', displayName: 'Administrador' }], page: 1, pageSize: 100, totalCount: 1, totalPages: 1 });
+    TestBed.configureTestingModule({ imports: [AuditLog], providers: [
+      { provide: AuditApi, useValue: api }, { provide: AdminApi, useValue: admin }, { provide: SessionService, useValue: session }] });
+  });
+
+  async function create() {
+    const fixture = TestBed.createComponent(AuditLog);
+    fixture.detectChanges(); await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0)); fixture.detectChanges();
+    return fixture;
+  }
+  const text = (fixture: { nativeElement: HTMLElement }) => fixture.nativeElement.textContent as string;
+
+  it('muestra los eventos de hoy con usuario, acción en español, autorizador, motivo y resultado', async () => {
+    const fixture = await create();
+    const filter = api.records.mock.calls[0][0];
+    expect(filter.from).toBe(filter.to);
+    expect(filter).toMatchObject({ userId: '', action: '', page: 1, pageSize: 50 });
+    const content = text(fixture);
+    expect(content).toContain('Venta anulada');
+    expect(content).toContain('Ventas');
+    expect(content).toContain('supervisor');
+    expect(content).toContain('Error en el cobro');
+    expect(content).toContain('Inicio de sesión fallido');
+    expect(content).toContain('Sistema');
+    const pills = Array.from(fixture.nativeElement.querySelectorAll('.status-pill') as NodeListOf<HTMLElement>);
+    expect(pills.map((pill) => pill.classList.contains('status-pill--warning'))).toEqual([false, true]);
+  });
+
+  it('filtra por usuario y acción, y vuelve a la primera página', async () => {
+    const fixture = await create();
+    const component = fixture.componentInstance;
+    component.filter.page = 3; component.filter.userId = 'u1'; component.filter.action = 'SaleCancelled';
+    component.find();
+    await fixture.whenStable();
+    expect(api.records).toHaveBeenLastCalledWith(expect.objectContaining({ userId: 'u1', action: 'SaleCancelled', page: 1 }));
+  });
+
+  it('rechaza un rango de fechas invertido sin consultar', async () => {
+    const fixture = await create();
+    const component = fixture.componentInstance;
+    api.records.mockClear();
+    component.filter.from = '2026-11-16'; component.filter.to = '2026-11-01';
+    await component.reload();
+    expect(api.records).not.toHaveBeenCalled();
+    expect(component.error()).toContain('fecha inicial');
+  });
+
+  it('despliega el detalle como campo y valor', async () => {
+    const fixture = await create();
+    const button = fixture.nativeElement.querySelector('.table-action') as HTMLButtonElement;
+    button.click(); fixture.detectChanges();
+    const detail = text(fixture);
+    expect(detail).toContain('total');
+    expect(detail).toContain('5000');
+    expect(fixture.componentInstance.detailRows(record({ details: 'texto libre' }))).toEqual([{ field: 'Detalle', value: 'texto libre' }]);
+  });
+
+  it('sin USERS.READ no ofrece el filtro de usuario ni consulta la lista de usuarios', async () => {
+    permissions = ['AUDIT.READ'];
+    const fixture = await create();
+    expect(admin.users).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('select[name="userId"]')).toBeNull();
+  });
+
+  it('nombra cada acción y su módulo; una acción sin traducir se lee separada en palabras', () => {
+    expect(auditActionLabel('CashShiftClosed')).toBe('Turno cerrado');
+    expect(auditActionModule('CashShiftClosed')).toBe('Caja');
+    expect(auditActionLabel('SomethingNew')).toBe('Something New');
+    expect(auditActionModule('SomethingNew')).toBe('Otros');
+    const codes = AUDIT_ACTION_GROUPS.flatMap((group) => Object.keys(group.actions));
+    expect(new Set(codes).size).toBe(codes.length);
+  });
+});
+
+describe('AuditApi', () => {
+  it('envía cada día local como instantes UTC de inicio y fin', async () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(AuditApi);
+    const http = TestBed.inject(HttpTestingController);
+    const pending = api.records({ from: '2026-11-16', to: '2026-11-16', userId: 'u1', action: 'SaleConfirmed', page: 2, pageSize: 50 });
+    const request = http.expectOne((r) => r.url === '/api/audit-records');
+    expect(request.request.params.get('fromUtc')).toBe(localDay('2026-11-16', false));
+    expect(request.request.params.get('toUtc')).toBe(localDay('2026-11-16', true));
+    expect(request.request.params.get('actorUserId')).toBe('u1');
+    expect(request.request.params.get('action')).toBe('SaleConfirmed');
+    expect(request.request.params.get('page')).toBe('2');
+    request.flush({ items: [], page: 2, pageSize: 50, totalCount: 0, totalPages: 0 });
+    await pending;
+    http.verify();
+    expect(new Date(localDay('2026-11-16', false)).getHours()).toBe(0);
+    expect(new Date(localDay('2026-11-16', true)).getHours()).toBe(23);
+  });
+});

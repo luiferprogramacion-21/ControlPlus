@@ -26,7 +26,10 @@ public sealed record AuditRecordDto(
     Guid? OperatorSessionId,
     Guid? TerminalId,
     string? Reason,
-    string Result);
+    string Result,
+    string ActionCode,
+    string? ActorUserName = null,
+    string? AuthorizerUserName = null);
 
 public interface IAuditQueryService
 {

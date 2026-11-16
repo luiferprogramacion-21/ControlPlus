@@ -120,8 +120,15 @@ describe('Admin: usuarios, roles y permisos', () => {
     expect(component.viewedRole()).toBeNull();
   });
 
-  it('la ruta exige USERS.READ o ROLES.READ', () => {
-    for (const [permissions, allowed] of [[['USERS.READ'], true], [['ROLES.READ'], true], [['USERS.MANAGE'], false]] as const) {
+  it('solo con AUDIT.READ abre directamente la pestaña de Auditoría', async () => {
+    state.permissions = ['AUDIT.READ'];
+    await component.ngOnInit();
+    expect(component.tab()).toBe('audit');
+    expect(api.users).not.toHaveBeenCalled();
+  });
+
+  it('la ruta exige USERS.READ, ROLES.READ o AUDIT.READ', () => {
+    for (const [permissions, allowed] of [[['USERS.READ'], true], [['ROLES.READ'], true], [['AUDIT.READ'], true], [['USERS.MANAGE'], false]] as const) {
       state.permissions = [...permissions];
       expect(TestBed.runInInjectionContext(() => adminGuard({} as never, {} as never))).toBe(allowed);
     }

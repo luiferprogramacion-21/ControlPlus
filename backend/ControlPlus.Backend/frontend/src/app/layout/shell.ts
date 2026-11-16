@@ -37,7 +37,7 @@ import { paginatorIntlProvider } from './paginator-intl';
             @if (session.has('REPORTS.FINANCIAL_READ')) { <a routerLink="/operacion/reportes" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'reportes'"><span><cp-icon name="reports" /></span><b>Reportes</b></a> }
             @if (session.has('LAYAWAY.MANAGE')) { <a routerLink="/operacion/apartados" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'apartados'"><span><cp-icon name="catalog" /></span><b>Apartados</b></a> }
             @if (session.has('CONFIGURATION.MANAGE') || session.has('NUMBERING.MANAGE') || session.has('TAXES.MANAGE')) { <a routerLink="/operacion/configuracion" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'configuracion'"><span><cp-icon name="settings" /></span><b>Configuración</b></a> }
-            @if (session.has('USERS.READ') || session.has('ROLES.READ')) { <a routerLink="/operacion/administracion" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'administracion'"><span><cp-icon name="settings" /></span><b>Administración</b></a> }
+            @if (session.has('USERS.READ') || session.has('ROLES.READ') || session.has('AUDIT.READ')) { <a routerLink="/operacion/administracion" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'administracion'"><span><cp-icon name="settings" /></span><b>Administración</b></a> }
             @if (session.has('PRODUCTS.READ') || session.has('CATEGORIES.READ')) { <a routerLink="/operacion/catalogo" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'catalogo'" aria-label="Catálogo"><span><cp-icon name="catalog" /></span><b>Catálogo</b></a> }
           </nav>
           <div class="sidebar__user"><span class="avatar">{{ session.user()?.displayName?.charAt(0) }}</span><span class="sidebar__user-copy"><strong>{{ session.user()?.displayName }}</strong><small>{{ session.user()?.roles?.join(', ') }}</small></span></div>
@@ -85,7 +85,7 @@ export class Shell {
     if (url.includes('/configuracion')) { this.activeSection.set('configuracion'); this.pageTitle.set('Configuración'); this.pageSubtitle.set('Numeración, plazos, impresora y motivos'); return; }
     if (url.includes('/soporte/restauracion')) { this.activeSection.set('administracion'); this.pageTitle.set('Restauración'); this.pageSubtitle.set('Administración / Soporte / Respaldos / Restaurar'); return; }
     if (url.includes('/soporte')) { this.activeSection.set('administracion'); this.pageTitle.set('Soporte y continuidad'); this.pageSubtitle.set('Salud del sistema, respaldos y diagnóstico'); return; }
-    if (url.includes('/administracion')) { this.activeSection.set('administracion'); this.pageTitle.set('Administración'); this.pageSubtitle.set('Usuarios, roles y permisos'); return; }
+    if (url.includes('/administracion')) { this.activeSection.set('administracion'); this.pageTitle.set('Administración'); this.pageSubtitle.set('Usuarios, roles, permisos y auditoría'); return; }
     if (url.includes('/creditos')) { this.activeSection.set('creditos'); this.pageTitle.set('Créditos y abonos'); this.pageSubtitle.set('Cartera de clientes y pagos'); return; }
     this.activeSection.set('catalogo'); this.pageTitle.set('Catálogo'); this.pageSubtitle.set('Productos, categorías y precios');
   }

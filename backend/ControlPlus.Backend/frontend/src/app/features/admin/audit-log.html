@@ -1,0 +1,58 @@
+<section class="panel module-panel">
+  <div class="module-toolbar"><h3>Auditoría</h3>
+    <form class="directory-filters" (submit)="$event.preventDefault(); find()">
+      <label class="field-label" for="audit-from">Desde</label>
+      <input id="audit-from" class="text-field audit-date" type="date" name="from" [(ngModel)]="filter.from">
+      <label class="field-label" for="audit-to">Hasta</label>
+      <input id="audit-to" class="text-field audit-date" type="date" name="to" [(ngModel)]="filter.to">
+      @if (canFilterUsers) {
+        <select class="text-field" name="userId" [(ngModel)]="filter.userId" aria-label="Usuario">
+          <option value="">Todos los usuarios</option>
+          @for (user of users(); track user.id) { <option [value]="user.id">{{ user.userName }} · {{ user.displayName }}</option> }
+        </select>
+      }
+      <select class="text-field" name="action" [(ngModel)]="filter.action" aria-label="Acción">
+        <option value="">Todas las acciones</option>
+        @for (group of groups; track group.module) {
+          <optgroup [label]="group.module">
+            @for (action of group.actions; track action.code) { <option [value]="action.code">{{ action.label }}</option> }
+          </optgroup>
+        }
+      </select>
+      <button class="button button--primary" type="submit" [disabled]="loading()">Buscar</button>
+    </form>
+  </div>
+  @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
+  @if (loading()) { <p class="muted" role="status">Cargando auditoría…</p> }
+  <div class="table-wrap module-table-wrap"><table>
+    <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Sobre</th><th>Autorizó</th><th>Motivo</th><th>Resultado</th><th class="align-right">Detalle</th></tr></thead>
+    <tbody>
+      @for (record of records()?.items ?? []; track record.id) {
+        <tr>
+          <td>{{ record.occurredAtUtc | date: 'dd/MM/yyyy HH:mm:ss' }}</td>
+          <td>{{ record.actorUserName ?? 'Sistema' }}</td>
+          <td><strong>{{ actionLabel(record) }}</strong><small>{{ moduleLabel(record) }}</small></td>
+          <td>{{ entityLabel(record) }}</td>
+          <td>{{ record.authorizerUserName ?? '—' }}</td>
+          <td>{{ record.reason || '—' }}</td>
+          <td><span class="status-pill" [class.status-pill--warning]="isProblem(record)">{{ resultLabel(record) }}</span></td>
+          <td class="align-right">
+            @if (record.details) { <button class="table-action" type="button" [attr.aria-expanded]="expanded() === record.id" (click)="toggle(record)">{{ expanded() === record.id ? 'Ocultar' : 'Ver' }}</button> }
+          </td>
+        </tr>
+        @if (expanded() === record.id) {
+          <tr class="audit-detail"><td colspan="8">
+            <dl>
+              @for (row of detailRows(record); track row.field) { <div><dt>{{ row.field }}</dt><dd>{{ row.value }}</dd></div> }
+            </dl>
+          </td></tr>
+        }
+      } @empty {
+        @if (!loading()) { <tr><td colspan="8" class="muted">No hay eventos con estos filtros.</td></tr> }
+      }
+    </tbody>
+  </table></div>
+  @if (records(); as page) {
+    <mat-paginator [length]="page.totalCount" [pageIndex]="page.page - 1" [pageSize]="page.pageSize" [pageSizeOptions]="[50, 100, 200]" (page)="pageChanged($event)" aria-label="Páginas de auditoría"></mat-paginator>
+  }
+</section>

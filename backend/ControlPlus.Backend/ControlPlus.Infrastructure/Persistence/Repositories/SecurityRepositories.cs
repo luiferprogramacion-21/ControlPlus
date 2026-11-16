@@ -422,6 +422,14 @@ public sealed class EfAuditRepository(OfficialControlPlusDbContext dbContext) : 
     }
 }
 
+public sealed class EfAuditUserDirectory(OfficialControlPlusDbContext dbContext) : IAuditUserDirectory
+{
+    public async Task<IReadOnlyDictionary<Guid, string>> GetUserNamesAsync(IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.Usuario.AsNoTracking().Where(user => userIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, user => user.NombreUsuario, cancellationToken);
+}
+
 public sealed class EfUnitOfWork(OfficialControlPlusDbContext dbContext) : IUnitOfWork
 {
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>

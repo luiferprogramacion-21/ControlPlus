@@ -8,16 +8,17 @@ import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
 import { AdminApi, AdminPermission, AdminRole, AdminUser, ROLE_LEVEL_NAMES } from './admin-api';
+import { AuditLog } from './audit-log';
 import { RoleTemplate } from './role-template';
 import { UserCredential } from './user-credential';
 import { UserPermissions } from './user-permissions';
 
 type Mode = 'create' | 'edit' | 'role' | 'password';
-type Tab = 'users' | 'roles';
+type Tab = 'users' | 'roles' | 'audit';
 
 @Component({
   selector: 'cp-admin',
-  imports: [DatePipe, FormsModule, MatButtonModule, MatPaginatorModule, RouterLink, Icon, RoleTemplate, UserPermissions, UserCredential],
+  imports: [DatePipe, FormsModule, MatButtonModule, MatPaginatorModule, RouterLink, Icon, RoleTemplate, UserPermissions, UserCredential, AuditLog],
   templateUrl: './admin.html',
   styleUrls: ['../directory.scss', './admin.scss'],
 })
@@ -43,6 +44,7 @@ export class Admin implements OnInit {
 
   get canReadUsers(): boolean { return this.session.has('USERS.READ'); }
   get canReadRoles(): boolean { return this.session.has('ROLES.READ'); }
+  get canReadAudit(): boolean { return this.session.has('AUDIT.READ'); }
   get canManageUsers(): boolean { return this.session.has('USERS.MANAGE'); }
   /** Creating or reassigning needs the role catalogue to choose from. */
   get canChooseRole(): boolean { return this.canManageUsers && this.canReadRoles; }
@@ -51,7 +53,7 @@ export class Admin implements OnInit {
   get canEditTemplates(): boolean { return this.session.has('ROLES.MANAGE') && this.session.has('PERMISSIONS.READ'); }
 
   async ngOnInit(): Promise<void> {
-    if (!this.canReadUsers && this.canReadRoles) this.tab.set('roles');
+    if (!this.canReadUsers) this.tab.set(this.canReadRoles ? 'roles' : 'audit');
     await Promise.all([this.reload(), this.canReadRoles ? this.loadRoles() : Promise.resolve()]);
   }
 

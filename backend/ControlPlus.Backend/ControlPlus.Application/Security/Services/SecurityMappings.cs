@@ -57,7 +57,8 @@ internal static class SecurityMappings
             auditRecord.OperatorSessionId,
             auditRecord.TerminalId,
             auditRecord.Reason,
-            auditRecord.Result);
+            auditRecord.Result,
+            auditRecord.Action.ToString());
 
     public static PagedResult<TDestination> Map<TSource, TDestination>(
         PagedResult<TSource> source,

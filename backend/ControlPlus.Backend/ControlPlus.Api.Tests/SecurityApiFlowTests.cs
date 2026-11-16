@@ -178,6 +178,14 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authentication.AccessToken);
         var audit = await client.GetAsync("/api/audit-records?page=1&pageSize=100");
         Assert.Equal(HttpStatusCode.OK, audit.StatusCode);
+        // La consulta trae el código de la acción y el nombre de usuario de quien actuó, para la pantalla de auditoría.
+        var auditPage = await audit.Content.ReadFromJsonAsync<PagedResult<AuditRecordDto>>();
+        Assert.NotNull(auditPage);
+        Assert.Contains(auditPage.Items, record => record.ActionCode == "RoleAssigned" && record.ActorUserName == "admin.test");
+        var assignedOnly = await client.GetFromJsonAsync<PagedResult<AuditRecordDto>>("/api/audit-records?action=RoleAssigned&page=1&pageSize=100");
+        Assert.NotNull(assignedOnly);
+        Assert.NotEmpty(assignedOnly.Items);
+        Assert.All(assignedOnly.Items, record => Assert.Equal("RoleAssigned", record.ActionCode));
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var officialContext = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();

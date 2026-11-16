@@ -20,7 +20,7 @@ export const inventoryGuard: CanActivateFn = () => inject(SessionService).has('I
 export const customersGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('CUSTOMERS.BASIC_MANAGE') || session.has('CUSTOMERS.MANAGE'); };
 export const creditsGuard: CanActivateFn = () => inject(SessionService).has('CREDIT.MANAGE');
 
-export const adminGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('USERS.READ') || session.has('ROLES.READ'); };
+export const adminGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('USERS.READ') || session.has('ROLES.READ') || session.has('AUDIT.READ'); };
 /** Soporte y continuidad (respaldos): the server also requires the Administrator role. */
 export const supportGuard: CanActivateFn = () => inject(SessionService).has('BACKUPS.MANAGE');
 export const layawaysGuard: CanActivateFn = () => inject(SessionService).has('LAYAWAY.MANAGE');

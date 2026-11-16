@@ -34,6 +34,7 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<IRoleRepository, EfRoleRepository>();
         services.AddScoped<IPermissionRepository, EfPermissionRepository>();
         services.AddScoped<IAuditRepository, EfAuditRepository>();
+        services.AddScoped<IAuditUserDirectory, EfAuditUserDirectory>();
         services.AddScoped<ICatalogRepository, EfCatalogRepository>();
         services.AddScoped<ICashRepository, EfCashRepository>();
         services.AddScoped<ICashTransactionManager, EfCashTransactionManager>();
