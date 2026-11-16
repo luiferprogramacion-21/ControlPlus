@@ -52,7 +52,17 @@ try {
     # 1. PostgreSQL y puerto 5000
     $postgres = Get-Service -Name 'postgresql*' -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -eq $postgres) { throw 'No se encontró el servicio de PostgreSQL.' }
-    if ($postgres.Status -ne 'Running') { throw "El servicio $($postgres.Name) no está corriendo. Inícielo y vuelva a intentar." }
+    if ($postgres.Status -ne 'Running') {
+        $portOpen = @(Get-NetTCPConnection -LocalPort 5432 -State Listen -ErrorAction SilentlyContinue).Count -gt 0
+        if ($portOpen) {
+            # PostgreSQL atiende, pero Windows no lo reconoce como servicio en marcha: ControlPlus depende de ese servicio
+            # y al arrancar intentaría iniciar otro PostgreSQL, que fallaría.
+            throw ("PostgreSQL atiende en el puerto 5432, pero el servicio $($postgres.Name) figura detenido. Reinícielo a través del servicio y vuelva a ejecutar:`n" +
+                "  & 'C:\Program Files\PostgreSQL\18\bin\pg_ctl.exe' stop -D 'C:\Program Files\PostgreSQL\18\data' -m fast`n" +
+                "  Start-Service $($postgres.Name)")
+        }
+        throw "El servicio $($postgres.Name) no está corriendo. Inícielo con Start-Service $($postgres.Name) y vuelva a intentar."
+    }
     $existing = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     $servicePid = 0
     if ($existing) { $servicePid = (Get-CimInstance Win32_Service -Filter "Name='$serviceName'").ProcessId }
