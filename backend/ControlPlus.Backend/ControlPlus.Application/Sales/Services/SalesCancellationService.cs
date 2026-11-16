@@ -311,6 +311,12 @@ public sealed partial class SalesService
         sale.Estado = "ANULADA";
         if (sale.Credito is not null)
         {
+            foreach (var installment in sale.Credito.CuotaCredito)
+            {
+                installment.Monto = 0;
+                installment.SaldoPendiente = 0;
+                installment.FechaPago = null;
+            }
             sale.Credito.Estado = "ANULADO";
             sale.Credito.MontoAjustado = 0;
             sale.Credito.SaldoPendiente = 0;

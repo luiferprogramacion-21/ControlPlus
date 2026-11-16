@@ -3,7 +3,8 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { AuthorizationBody, Page } from '../../core/api';
 
-export interface Credit { id: string; saleId: string; saleNumber: string; customerId: string; customerName: string; documentType: string | null; documentNumber: string | null; phone: string | null; originalAmount: number; adjustedAmount: number; balance: number; grantedOn: string; dueOn: string; paidOn: string | null; state: string; version: number; }
+export interface CreditInstallment { id: string; number: number; amount: number; balance: number; dueOn: string; paidOn: string | null; state: string; }
+export interface Credit { id: string; saleId: string; saleNumber: string; customerId: string; customerName: string; documentType: string | null; documentNumber: string | null; phone: string | null; originalAmount: number; adjustedAmount: number; balance: number; grantedOn: string; dueOn: string; paidOn: string | null; state: string; version: number; installments?: CreditInstallment[]; }
 export interface CreditPayment { id: string; number: string; methodCode: string; methodName: string; appliedAmount: number; receivedAmount: number | null; change: number; occurredAtUtc: string; state: string; correlationId: string; }
 export interface CreditPaymentCancellationReason { id: string; code: string; name: string; displayOrder: number; }
 export interface PaymentMethodInput { methodCode: 'EFECTIVO' | 'TRANSFERENCIA' | 'NEQUI'; appliedAmount: number; receivedAmount: number | null; reference: string | null; }

@@ -20,10 +20,11 @@ public sealed class EfCreditsRepository(OfficialControlPlusDbContext dbContext) 
         {
             if (query.State == "VENCIDO")
                 source = source.Where(x => x.Estado == "VENCIDO" ||
-                    (x.Estado == "PENDIENTE" && x.SaldoPendiente > 0 && x.FechaVencimiento < today));
+                    (x.Estado == "PENDIENTE" && x.CuotaCredito.Any(q =>
+                        q.SaldoPendiente > 0 && q.FechaVencimiento < today)));
             else if (query.State == "PENDIENTE")
                 source = source.Where(x => x.Estado == "PENDIENTE" &&
-                    (x.SaldoPendiente <= 0 || x.FechaVencimiento >= today));
+                    !x.CuotaCredito.Any(q => q.SaldoPendiente > 0 && q.FechaVencimiento < today));
             else source = source.Where(x => x.Estado == query.State);
         }
         if (!string.IsNullOrWhiteSpace(query.SaleNumber))
@@ -42,6 +43,7 @@ public sealed class EfCreditsRepository(OfficialControlPlusDbContext dbContext) 
         }
         var count = await source.CountAsync(cancellationToken);
         var items = await source.Include(x => x.Venta).ThenInclude(x => x.Cliente)
+            .Include(x => x.CuotaCredito)
             .OrderByDescending(x => x.FechaOtorgamiento).ThenByDescending(x => x.Id)
             .Skip(offset).Take(query.PageSize).ToArrayAsync(cancellationToken);
         return new PagedResult<Credito>(items, query.Page, query.PageSize, count);
@@ -49,6 +51,7 @@ public sealed class EfCreditsRepository(OfficialControlPlusDbContext dbContext) 
 
     public Task<Credito?> GetAsync(Guid creditId, CancellationToken cancellationToken = default) =>
         dbContext.Credito.AsNoTracking().Include(x => x.Venta).ThenInclude(x => x.Cliente)
+            .Include(x => x.CuotaCredito)
             .SingleOrDefaultAsync(x => x.Id == creditId, cancellationToken);
 
     public async Task<Credito?> GetForUpdateAsync(Guid creditId, CancellationToken cancellationToken = default)
@@ -108,4 +111,24 @@ public sealed class EfCreditsRepository(OfficialControlPlusDbContext dbContext) 
 
     public Task AddPaymentsAsync(IReadOnlyCollection<PagoCredito> payments, CancellationToken cancellationToken = default) =>
         dbContext.PagoCredito.AddRangeAsync(payments, cancellationToken);
+
+    public async Task<IReadOnlyCollection<CuotaCredito>> GetInstallmentsForUpdateAsync(Guid creditId,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.CuotaCredito.FromSqlInterpolated($"""
+            SELECT q.* FROM ventas.cuota_credito AS q WHERE q.credito_id = {creditId}
+            ORDER BY q.fecha_vencimiento, q.numero FOR UPDATE
+            """).AsTracking().ToArrayAsync(cancellationToken);
+
+    public async Task<IReadOnlyCollection<AplicacionPagoCuota>> GetPaymentApplicationsForUpdateAsync(
+        IReadOnlyCollection<Guid> paymentIds, CancellationToken cancellationToken = default)
+    {
+        var ids = paymentIds.Distinct().ToArray();
+        return await dbContext.AplicacionPagoCuota.Where(x => ids.Contains(x.PagoCreditoId))
+            .OrderBy(x => x.PagoCreditoId).ThenBy(x => x.CuotaCreditoId)
+            .ToArrayAsync(cancellationToken);
+    }
+
+    public Task AddPaymentApplicationsAsync(IReadOnlyCollection<AplicacionPagoCuota> applications,
+        CancellationToken cancellationToken = default) =>
+        dbContext.AplicacionPagoCuota.AddRangeAsync(applications, cancellationToken);
 }

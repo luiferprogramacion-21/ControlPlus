@@ -27,7 +27,7 @@ public sealed partial class CreditsService
         var installation = await sales.GetActiveInstallationAsync(cancellationToken);
         if (installation is null)
             return Result.Failure<IReadOnlyCollection<CreditPaymentCancellationReasonDto>>(
-                ApplicationError.NotFound("la instalaciÃ³n activa"));
+                ApplicationError.NotFound("la instalación activa"));
         var reasons = await sales.GetCancellationReasonsAsync(installation.EstablecimientoId,
             ApprovedReasonCatalogs.SalePaymentCancellationType, cancellationToken);
         return Result.Success<IReadOnlyCollection<CreditPaymentCancellationReasonDto>>(reasons
@@ -67,13 +67,13 @@ public sealed partial class CreditsService
     {
         var installation = await sales.GetActiveInstallationForUpdateAsync(cancellationToken);
         if (installation is null)
-            return Result.Failure<CancelCreditPaymentDto>(ApplicationError.NotFound("la instalaciÃ³n activa"));
+            return Result.Failure<CancelCreditPaymentDto>(ApplicationError.NotFound("la instalación activa"));
         var actorSnapshot = await GetLifecycleActorAsync(actor, RoleLevel.Supervisor, cancellationToken);
         if (actorSnapshot is null) return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Forbidden());
         var previous = await sales.GetIdempotencyAsync(installation.Id, key, cancellationToken);
         if (previous is not null)
             return Replay<CancelCreditPaymentDto>(previous, actor.UserId, "ANULAR_ABONO_CREDITO",
-                creditId, fingerprint, "La anulaciÃ³n original no es recuperable.");
+                creditId, fingerprint, "La anulación original no es recuperable.");
 
         var terminal = await sales.GetActiveTerminalAsync(installation.Id, cancellationToken);
         if (terminal is null)
@@ -85,16 +85,16 @@ public sealed partial class CreditsService
                 "El Administrador anula el abono sin un segundo autorizador."));
         if (!administratorSelf && (request.Authorization is null || !request.Authorization.IsComplete()))
             return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Validation(
-                "La autorizaciÃ³n de un Administrador es obligatoria."));
+                "La autorización de un Administrador es obligatoria."));
 
         var credit = await credits.GetForUpdateAsync(creditId, cancellationToken);
-        if (credit is null) return Result.Failure<CancelCreditPaymentDto>(ApplicationError.NotFound("el crÃ©dito"));
+        if (credit is null) return Result.Failure<CancelCreditPaymentDto>(ApplicationError.NotFound("el crédito"));
         if (credit.Version != request.ExpectedVersion)
             return Result.Failure<CancelCreditPaymentDto>(ApplicationError.ConcurrencyConflict(
-                "El crÃ©dito fue modificado. RecÃ¡rguelo e intente nuevamente."));
+                "El crédito fue modificado. Recárguelo e intente nuevamente."));
         if (credit.Estado == "ANULADO")
             return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
-                "Un crÃ©dito anulado no admite anulaciones de abonos."));
+                "Un crédito anulado no admite anulaciones de abonos."));
         var selectedPayment = await credits.GetPaymentForUpdateAsync(creditId, paymentId, cancellationToken);
         if (selectedPayment is null)
             return Result.Failure<CancelCreditPaymentDto>(ApplicationError.NotFound("el abono"));
@@ -110,7 +110,7 @@ public sealed partial class CreditsService
         catch (Exception exception) when (exception is CashMoneyException or OverflowException)
         {
             return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
-                "Los importes del abono no permiten una reversiÃ³n segura."));
+                "Los importes del abono no permiten una reversión segura."));
         }
         if (originalMovement is null || originalMovement.Tipo != CashConstants.IncomeMovement ||
             originalMovement.CategoriaMovimiento != "ABONO_CREDITO" ||
@@ -118,10 +118,17 @@ public sealed partial class CreditsService
             paymentRows.Any(x => x.CreditoId != creditId || x.Estado != "APLICADO") ||
             await credits.HasCashReversalAsync(originalMovement.Id, cancellationToken))
             return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
-                "El abono combinado o su movimiento de Caja no admiten reversiÃ³n."));
+                "El abono combinado o su movimiento de Caja no admiten reversión."));
+        var installments = (await credits.GetInstallmentsForUpdateAsync(credit.Id, cancellationToken)).ToArray();
+        var applications = (await credits.GetPaymentApplicationsForUpdateAsync(
+            paymentRows.Select(x => x.Id).ToArray(), cancellationToken)).ToArray();
+        if (installments.Length == 0 || applications.Sum(x => x.ValorAplicado) != reversedAmount)
+            return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
+                "Las aplicaciones del abono a cuotas no permiten una reversión segura."));
+
         if (credit.SaldoPendiente > credit.MontoAjustado - reversedAmount)
             return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
-                "El saldo del crÃ©dito es inconsistente con el abono."));
+                "El saldo del crédito es inconsistente con el abono."));
 
         var reasons = await sales.GetCancellationReasonsAsync(installation.EstablecimientoId,
             ApprovedReasonCatalogs.SalePaymentCancellationType, cancellationToken);
@@ -129,10 +136,10 @@ public sealed partial class CreditsService
             IsApprovedPaymentCancellationReason(x));
         if (reason is null)
             return Result.Failure<CancelCreditPaymentDto>(ApplicationError.NotFound(
-                "el motivo activo de anulaciÃ³n de pago"));
+                "el motivo activo de anulación de pago"));
         if (reason.Codigo == "OTRO" && observation is null)
             return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Validation(
-                "La observaciÃ³n es obligatoria para OTRO."));
+                "La observación es obligatoria para OTRO."));
 
         var shift = await sales.GetOpenShiftForUpdateAsync(cancellationToken);
         if (shift is null || shift.TerminalId != terminal.Id)
@@ -151,10 +158,10 @@ public sealed partial class CreditsService
                 shift.Id, terminal.Id, actor.UserId, cancellationToken);
             if (operatorSession is null)
                 return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
-                    "Se requiere una sesiÃ³n activa del operador."));
+                    "Se requiere una sesión activa del operador."));
         }
         else return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
-            "La modalidad del turno no es vÃ¡lida."));
+            "La modalidad del turno no es válida."));
 
         var methods = await credits.GetPaymentMethodsByIdAsync(
             paymentRows.Select(x => x.MetodoPagoId).ToArray(), cancellationToken);
@@ -167,7 +174,7 @@ public sealed partial class CreditsService
         var cashAvailable = CashMoney.Sum(expected.Where(x => x.AffectsCash).Select(x => x.ExpectedAmount));
         if (cashRefund > cashAvailable)
             return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
-                "El efectivo esperado del turno actual no cubre la reversiÃ³n."));
+                "El efectivo esperado del turno actual no cubre la reversión."));
 
         var authorizer = await ResolveCancellationAuthorizerAsync(actor, actorSnapshot, request.Authorization,
             administratorSelf, terminal.Id, creditId, cancellationToken);
@@ -175,7 +182,7 @@ public sealed partial class CreditsService
         var permission = await permissions.GetByCodeAsync(PermissionCodes.CreditManage, cancellationToken);
         if (permission is null || !permission.Activo)
             return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
-                "El permiso de gestiÃ³n de crÃ©ditos no estÃ¡ disponible."));
+                "El permiso de gestión de créditos no está disponible."));
         var now = clock.UtcNow;
         var today = await TodayAsync(cancellationToken);
         var correlation = Guid.CreateVersion7();
@@ -187,8 +194,8 @@ public sealed partial class CreditsService
             PermisoId = permission.Id, TipoOperacion = "ANULACION_PAGO_CREDITO",
             CorrelacionId = correlation,
             DescripcionOperacion = administratorSelf
-                ? "AutorizaciÃ³n de anulaciÃ³n de abono por Administrador sin segundo autorizador."
-                : "AutorizaciÃ³n de anulaciÃ³n de abono de crÃ©dito por Administrador.",
+                ? "Autorización de anulación de abono por Administrador sin segundo autorizador."
+                : "Autorización de anulación de abono de crédito por Administrador.",
             Motivo = reason.Codigo, MetodoAutenticacion = request.Authorization.AuthenticationMethod(),
             Resultado = "EXITOSA", Estado = "UTILIZADA", FechaSolicitud = now.UtcDateTime,
             FechaExpiracion = now.UtcDateTime.AddMinutes(5), FechaUtilizacion = now.UtcDateTime
@@ -203,16 +210,26 @@ public sealed partial class CreditsService
             payment.FechaAnulacion = now.UtcDateTime;
             payment.ObservacionAnulacion = observation;
         }
+        var installmentsById = installments.ToDictionary(x => x.Id);
+        foreach (var application in applications)
+        {
+            if (!installmentsById.TryGetValue(application.CuotaCreditoId, out var installment) ||
+                installment.SaldoPendiente + application.ValorAplicado > installment.Monto)
+                return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
+                    "Una cuota no admite restituir el importe del abono."));
+            installment.SaldoPendiente += application.ValorAplicado;
+            installment.FechaPago = null;
+        }
         credit.SaldoPendiente += reversedAmount;
         credit.Estado = CreditStatusPolicy.ResolveOpenState(
-            credit.FechaVencimiento, credit.SaldoPendiente, today);
+            installments.Select(x => (x.FechaVencimiento, x.SaldoPendiente)), today);
         credit.FechaPago = null;
         await sales.AddCashMovementAsync(new MovimientoCaja
         {
             Id = Guid.CreateVersion7(), TurnoCajaId = shift.Id, UsuarioId = actor.UserId,
             SesionOperadorId = operatorSession?.Id, MovimientoRevertidoId = originalMovement.Id,
             Tipo = "REVERSO", CategoriaMovimiento = "REVERSO_PAGO", Valor = reversedAmount,
-            Concepto = "AnulaciÃ³n de abono de crÃ©dito", FechaHora = now.UtcDateTime,
+            Concepto = "Anulación de abono de crédito", FechaHora = now.UtcDateTime,
             CorrelacionId = correlation
         }, cancellationToken);
         var response = new CancelCreditPaymentDto(credit.Id, credit.SaldoPendiente, credit.Estado,
@@ -254,7 +271,7 @@ public sealed partial class CreditsService
         if (creditId == Guid.Empty || request is null || request.ExpectedVersion <= 0 ||
             request.ExpectedVersion == long.MaxValue || reason.Length is < 1 or > 500 || !ValidKey(key))
             return Result.Failure<ForgiveCreditDto>(ApplicationError.Validation(
-                "Idempotency-Key, versiÃ³n y motivo son obligatorios."));
+                "Idempotency-Key, versión y motivo son obligatorios."));
         var fingerprint = Hash(JsonSerializer.Serialize(new
         {
             CreditId = creditId, request.ExpectedVersion, Reason = reason, Actor = actor.UserId
@@ -262,31 +279,31 @@ public sealed partial class CreditsService
         await using var transaction = await transactions.BeginAsync(IsolationLevel.ReadCommitted, cancellationToken);
         var installation = await sales.GetActiveInstallationForUpdateAsync(cancellationToken);
         if (installation is null)
-            return Result.Failure<ForgiveCreditDto>(ApplicationError.NotFound("la instalaciÃ³n activa"));
+            return Result.Failure<ForgiveCreditDto>(ApplicationError.NotFound("la instalación activa"));
         actorSnapshot = await GetLifecycleActorAsync(actor, RoleLevel.Administrador, cancellationToken);
         if (actorSnapshot is null) return Result.Failure<ForgiveCreditDto>(ApplicationError.Forbidden());
         var previous = await sales.GetIdempotencyAsync(installation.Id, key, cancellationToken);
         if (previous is not null)
             return Replay<ForgiveCreditDto>(previous, actor.UserId, "CONDONAR_CREDITO", creditId,
-                fingerprint, "La condonaciÃ³n original no es recuperable.");
+                fingerprint, "La condonación original no es recuperable.");
         var terminal = await sales.GetActiveTerminalAsync(installation.Id, cancellationToken);
         if (terminal is null)
             return Result.Failure<ForgiveCreditDto>(ApplicationError.NotFound("la terminal activa"));
         var credit = await credits.GetForUpdateAsync(creditId, cancellationToken);
-        if (credit is null) return Result.Failure<ForgiveCreditDto>(ApplicationError.NotFound("el crÃ©dito"));
+        if (credit is null) return Result.Failure<ForgiveCreditDto>(ApplicationError.NotFound("el crédito"));
         if (credit.Version != request.ExpectedVersion)
             return Result.Failure<ForgiveCreditDto>(ApplicationError.ConcurrencyConflict(
-                "El crÃ©dito fue modificado. RecÃ¡rguelo e intente nuevamente."));
+                "El crédito fue modificado. Recárguelo e intente nuevamente."));
         if (credit.Estado == "ANULADO" || credit.SaldoPendiente <= 0)
             return Result.Failure<ForgiveCreditDto>(ApplicationError.Conflict(
-                "Solo puede condonarse un crÃ©dito con saldo pendiente."));
+                "Solo puede condonarse un crédito con saldo pendiente."));
         var administrator = await sales.GetUserForUpdateAsync(actor.UserId, cancellationToken);
         if (administrator is null || !administrator.IsActive)
             return Result.Failure<ForgiveCreditDto>(ApplicationError.Forbidden());
         var permission = await permissions.GetByCodeAsync(PermissionCodes.CreditManage, cancellationToken);
         if (permission is null || !permission.Activo)
             return Result.Failure<ForgiveCreditDto>(ApplicationError.Conflict(
-                "El permiso de gestiÃ³n de crÃ©ditos no estÃ¡ disponible."));
+                "El permiso de gestión de créditos no está disponible."));
         var now = clock.UtcNow;
         var correlation = Guid.CreateVersion7();
         var authorization = new AutorizacionOperacion
@@ -294,7 +311,7 @@ public sealed partial class CreditsService
             Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId,
             UsuarioAutorizadorId = actor.UserId, PermisoId = permission.Id,
             TipoOperacion = "CONDONACION_CREDITO", CorrelacionId = correlation,
-            DescripcionOperacion = "CondonaciÃ³n del saldo de crÃ©dito por Administrador.",
+            DescripcionOperacion = "Condonación del saldo de crédito por Administrador.",
             Motivo = reason, MetodoAutenticacion = "PASSWORD", Resultado = "EXITOSA",
             Estado = "UTILIZADA", FechaSolicitud = now.UtcDateTime,
             FechaExpiracion = now.UtcDateTime.AddMinutes(5), FechaUtilizacion = now.UtcDateTime
@@ -302,6 +319,12 @@ public sealed partial class CreditsService
         await sales.AddAuthorizationAsync(authorization, cancellationToken);
         var forgivenAmount = credit.SaldoPendiente;
         var previousState = credit.Estado;
+        var installments = await credits.GetInstallmentsForUpdateAsync(credit.Id, cancellationToken);
+        foreach (var installment in installments)
+        {
+            installment.SaldoPendiente = 0;
+            installment.FechaPago = null;
+        }
         credit.SaldoPendiente = 0;
         credit.Estado = "ANULADO";
         credit.FechaPago = null;
@@ -345,7 +368,7 @@ public sealed partial class CreditsService
             authorizer.Id == actor.UserId || actorSnapshot.HighestRoleLevel != RoleLevel.Supervisor ||
             snapshot.HighestRoleLevel != RoleLevel.Administrador ||
             !snapshot.PermissionCodes.Contains(PermissionCodes.CreditManage, StringComparer.OrdinalIgnoreCase))
-            return (null, ApplicationError.Unauthorized("Credenciales de autorizaciÃ³n invÃ¡lidas."));
+            return (null, ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
         if (!request.UsesCredential() && !passwordHasher.Verify(request.Password!, authorizer.PasswordHash))
         {
             var locked = authorizer.RegisterFailedLogin(clock.UtcNow);
@@ -359,7 +382,7 @@ public sealed partial class CreditsService
                 new { CreditId = creditId, Result = "INVALID_AUTHORIZATION" }, Guid.CreateVersion7(),
                 terminalId, null, cancellationToken);
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            return (null, ApplicationError.Unauthorized("Credenciales de autorizaciÃ³n invÃ¡lidas."));
+            return (null, ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
         }
         authorizer.RegisterSuccessfulLogin(clock.UtcNow);
         await users.UpdateAsync(authorizer, cancellationToken);
@@ -382,7 +405,7 @@ public sealed partial class CreditsService
         if (authorization is null || !authorization.UsesCredential()) return (authorization, null);
         if (authorization.MixesCredentialWithPassword())
             return (null, ApplicationError.Validation(
-                "La credencial escaneada reemplaza el usuario y la contraseÃ±a."));
+                "La credencial escaneada reemplaza el usuario y la contraseña."));
         var match = await credentialResolver.ResolveAsync(authorization.CredentialToken!, cancellationToken);
         return (authorization with
         {
@@ -400,7 +423,7 @@ public sealed partial class CreditsService
             !ValidKey(idempotencyKey?.Trim() ?? string.Empty) ||
             (request.Authorization is not null && !request.Authorization.IsComplete()))
             return ApplicationError.Validation(
-                "La solicitud de anulaciÃ³n o Idempotency-Key es invÃ¡lida.");
+                "La solicitud de anulación o Idempotency-Key es inválida.");
         return null;
     }
 

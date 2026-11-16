@@ -31,9 +31,10 @@ Decisión del 16 de noviembre de 2026 (sección «cierre de Créditos, auditorí
 # PowerShell como Administrador, desde C:\ControlPlus\backend\ControlPlus.Backend
 git pull --ff-only
 Stop-Service ControlPlus
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\credit-risk\Invoke-Activation.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\service\Install-ControlPlusService.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\credit-risk\Invoke-Activation.ps1 -UsePostgresCredential
 ```
+
+`-UsePostgresCredential` pide la contraseña de `postgres` de forma oculta: el rol de la aplicación no puede hacer el respaldo completo. Las cuotas (`docs/credit-installments.md`) van justo después, y el servicio se reinstala una sola vez al final.
 
 El script exige el servicio detenido, hace preflight de solo lectura (historial 25 terminando en `20261115020000_ConfigurableWholesaleMinimumV1`, sin las columnas nuevas y sin otras conexiones), respaldo verificado, `--migrate-to` y postflight (historial 26, tipos, valor inicial, CHECK, permisos de `controlplus_app` y huellas idénticas de establecimientos y clientes sin las columnas nuevas). Termina con `CREDIT_RISK_ACTIVATION_OK`. El instalador del servicio publica la versión nueva y lo vuelve a iniciar. **No repetir la migración ni ejecutar Down.**
 

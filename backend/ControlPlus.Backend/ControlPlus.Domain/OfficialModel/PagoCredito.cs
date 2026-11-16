@@ -5,6 +5,8 @@ namespace ControlPlus.Domain.OfficialModel;
 
 public partial class PagoCredito
 {
+    public virtual ICollection<AplicacionPagoCuota> AplicacionPagoCuota { get; set; } = new List<AplicacionPagoCuota>();
+
     public Guid Id { get; set; }
 
     public Guid CreditoId { get; set; }

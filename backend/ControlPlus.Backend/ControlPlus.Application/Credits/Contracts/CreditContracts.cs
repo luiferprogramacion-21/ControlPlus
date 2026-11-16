@@ -4,10 +4,14 @@ using ControlPlus.Application.Security.Contracts;
 
 namespace ControlPlus.Application.Credits.Contracts;
 
+public sealed record CreditInstallmentDto(Guid Id, int Number, decimal Amount, decimal Balance,
+    DateOnly DueOn, DateOnly? PaidOn, string State);
+
 public sealed record CreditDto(Guid Id, Guid SaleId, string SaleNumber, Guid CustomerId,
     string CustomerName, string? DocumentType, string? DocumentNumber, string? Phone,
     decimal OriginalAmount, decimal AdjustedAmount, decimal Balance, DateOnly GrantedOn,
-    DateOnly DueOn, DateOnly? PaidOn, string State, long Version);
+    DateOnly DueOn, DateOnly? PaidOn, string State, long Version,
+    IReadOnlyCollection<CreditInstallmentDto> Installments);
 
 public sealed record CreditPaymentDto(Guid Id, string Number, string MethodCode, string MethodName,
     decimal AppliedAmount, decimal? ReceivedAmount, decimal Change, DateTimeOffset OccurredAtUtc,

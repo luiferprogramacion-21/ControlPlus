@@ -53,7 +53,7 @@ export class Credits implements OnInit {
   ngOnInit(): void { void this.reload(); }
   money(value: number): string { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value); }
   paid(credit: Credit): number { return credit.adjustedAmount - credit.balance; }
-  label(state: string): string { return ({ PENDIENTE: 'Pendiente', VENCIDO: 'Vencido', PAGADO: 'Pagado', ANULADO: 'Anulado', APLICADO: 'Aplicado' } as Record<string, string>)[state] ?? state; }
+  label(state: string): string { return ({ PENDIENTE: 'Pendiente', VENCIDO: 'Vencido', VENCIDA: 'Vencida', PAGADO: 'Pagado', PAGADA: 'Pagada', ANULADO: 'Anulado', ANULADA: 'Anulada', APLICADO: 'Aplicado' } as Record<string, string>)[state] ?? state; }
   private emptyDraft(): Draft { return { methodCode: 'EFECTIVO', appliedAmount: 0, receivedAmount: null, reference: '' }; }
   async reload(): Promise<void> {
     const id = ++this.requestId; this.loading.set(true); this.error.set('');
@@ -132,14 +132,14 @@ export class Credits implements OnInit {
     this.error.set(''); this.cancellationTarget.set(payment); this.cancellationReasonId = ''; this.cancellationObservation = ''; this.pendingCancellation = null;
     try {
       this.cancellationReasons.set(await this.api.paymentCancellationReasons());
-      if (!this.cancellationReasons().length) { this.error.set('No hay motivos activos del catÃ¡logo ANULACION_PAGO.'); this.cancellationTarget.set(null); return; }
+      if (!this.cancellationReasons().length) { this.error.set('No hay motivos activos del catálogo ANULACION_PAGO.'); this.cancellationTarget.set(null); return; }
       this.cancellingPayment.set(true);
     } catch (e) { this.cancellationTarget.set(null); this.error.set(errorText(e)); }
   }
   cancelPaymentValidation(): string {
-    if (!this.cancellationReasonId) return 'Selecciona el motivo de la anulaciÃ³n.';
-    if (this.selectedCancellationReason?.code === 'OTRO' && !this.cancellationObservation.trim()) return 'La observaciÃ³n es obligatoria cuando el motivo es Â«OtroÂ».';
-    if (this.cancellationObservation.trim().length > 500) return 'La observaciÃ³n admite hasta 500 caracteres.';
+    if (!this.cancellationReasonId) return 'Selecciona el motivo de la anulación.';
+    if (this.selectedCancellationReason?.code === 'OTRO' && !this.cancellationObservation.trim()) return 'La observación es obligatoria cuando el motivo es «Otro».';
+    if (this.cancellationObservation.trim().length > 500) return 'La observación admite hasta 500 caracteres.';
     return '';
   }
   async confirmCancelPayment(): Promise<void> {
@@ -147,9 +147,9 @@ export class Credits implements OnInit {
     if (!credit || !payment || this.saving()) return;
     const issue = this.cancelPaymentValidation(); if (issue) { this.error.set(issue); return; }
     await this.authorization.open({
-      title: 'Autorizar anulaciÃ³n de abono',
-      description: 'Se restituirÃ¡ el saldo y se registrarÃ¡ el reverso en el turno de Caja abierto. Si el abono usÃ³ varios medios, se anularÃ¡n juntos.',
-      detail: `${payment.number} Â· ${this.money(payment.appliedAmount)}`,
+      title: 'Autorizar anulación de abono',
+      description: 'Se restituirá el saldo y se registrará el reverso en el turno de Caja abierto. Si el abono usó varios medios, se anularán juntos.',
+      detail: `${payment.number} · ${this.money(payment.appliedAmount)}`,
       operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true,
       allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
       onError: message => this.error.set(message),
@@ -190,7 +190,7 @@ export class Credits implements OnInit {
     try {
       await this.api.forgive(credit, reason, this.pendingForgiveness.key);
       this.pendingForgiveness = null; this.forgiving.set(false);
-      this.notice.set('Saldo condonado. El crÃ©dito quedÃ³ anulado; la venta y sus abonos se conservaron.');
+      this.notice.set('Saldo condonado. El crédito quedó anulado; la venta y sus abonos se conservaron.');
       await this.refreshSelected(); await this.reload();
     } catch (e) { this.error.set(errorText(e)); }
     finally { this.saving.set(false); }

@@ -395,6 +395,8 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
             var credit = await db.Credito.SingleAsync(x => x.Id == first.CreditId);
             credit.FechaOtorgamiento = today.AddDays(-10);
             credit.FechaVencimiento = today.AddDays(-1);
+            await db.CuotaCredito.Where(x => x.CreditoId == credit.Id)
+                .ForEachAsync(x => x.FechaVencimiento = today.AddDays(-1));
             (await db.Cliente.SingleAsync(x => x.Id == scenario.CustomerId)).CupoCredito = 1_500m;
             await db.SaveChangesAsync();
         }

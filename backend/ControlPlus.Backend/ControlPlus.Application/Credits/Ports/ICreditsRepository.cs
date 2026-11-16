@@ -21,5 +21,11 @@ public interface ICreditsRepository
     Task<bool> HasCashReversalAsync(Guid movementId, CancellationToken cancellationToken = default);
     Task<PagedResult<PagoCredito>> ListPaymentsAsync(Guid creditId, int page, int pageSize, int offset,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<CuotaCredito>> GetInstallmentsForUpdateAsync(Guid creditId,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<AplicacionPagoCuota>> GetPaymentApplicationsForUpdateAsync(
+        IReadOnlyCollection<Guid> paymentIds, CancellationToken cancellationToken = default);
     Task AddPaymentsAsync(IReadOnlyCollection<PagoCredito> payments, CancellationToken cancellationToken = default);
+    Task AddPaymentApplicationsAsync(IReadOnlyCollection<AplicacionPagoCuota> applications,
+        CancellationToken cancellationToken = default);
 }

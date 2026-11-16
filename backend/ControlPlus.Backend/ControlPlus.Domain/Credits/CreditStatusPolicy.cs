@@ -11,4 +11,10 @@ public static class CreditStatusPolicy
 
     public static string ResolveOpenState(DateOnly dueOn, decimal outstandingAmount, DateOnly today) =>
         IsOverdue(dueOn, outstandingAmount, today) ? "VENCIDO" : "PENDIENTE";
+
+    public static bool HasOverdueInstallment(IEnumerable<(DateOnly DueOn, decimal Balance)> installments,
+        DateOnly today) => installments.Any(x => IsOverdue(x.DueOn, x.Balance, today));
+
+    public static string ResolveOpenState(IEnumerable<(DateOnly DueOn, decimal Balance)> installments,
+        DateOnly today) => HasOverdueInstallment(installments, today) ? "VENCIDO" : "PENDIENTE";
 }

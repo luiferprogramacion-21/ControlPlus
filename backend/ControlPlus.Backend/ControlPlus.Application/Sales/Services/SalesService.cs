@@ -139,10 +139,7 @@ public sealed partial class SalesService(
             return Result.Failure<SaleDto>(ApplicationError.Conflict("El turno abierto tiene una modalidad no admitida."));
         }
 
-        if (input.SaleType == "CREDITO" &&
-            (request.DueDate is null || request.DueDate.Value.DayNumber <= shift.FechaOperativa.DayNumber ||
-             request.DueDate.Value.DayNumber > shift.FechaOperativa.DayNumber + 90))
-            return Result.Failure<SaleDto>(Validation("El vencimiento debe estar entre mañana y 90 días desde la fecha operativa."));
+        IReadOnlyCollection<PlannedCreditInstallment> plannedInstallments = [];
 
         Cliente? receiptCustomer = null;
         if (request.CustomerId is Guid customerId)
@@ -235,6 +232,19 @@ public sealed partial class SalesService(
 
         if (prepared.Total <= 0)
             return Result.Failure<SaleDto>(Validation("La venta debe tener un total mayor que cero."));
+
+        if (input.SaleType == "CREDITO")
+        {
+            try
+            {
+                plannedInstallments = CreditInstallmentPolicy.Build(prepared.Total, shift.FechaOperativa,
+                    request.DueDate, request.InstallmentDueDates);
+            }
+            catch (ArgumentException exception)
+            {
+                return Result.Failure<SaleDto>(Validation(exception.Message));
+            }
+        }
 
         // Morosos y cupo (decisión del 16 de noviembre de 2026): siempre se avisa en pantalla; con el bloqueo activo,
         // solo un Administrador autoriza la excepción (el propio vendedor si es Administrador, o quien da sus credenciales).
@@ -429,7 +439,7 @@ public sealed partial class SalesService(
             {
                 Id = Guid.CreateVersion7(), VentaId = sale.Id, AutorizacionOperacionId = operationAuthorization.Id,
                 MontoOriginal = sale.Total, MontoAjustado = sale.Total, SaldoPendiente = sale.Total,
-                FechaOtorgamiento = shift.FechaOperativa, FechaVencimiento = request.DueDate!.Value,
+                FechaOtorgamiento = shift.FechaOperativa, FechaVencimiento = plannedInstallments.Max(x => x.DueOn),
                 Estado = "PENDIENTE", Version = 1
             };
             if (creditSelfMode is null)
@@ -439,6 +449,11 @@ public sealed partial class SalesService(
             }
             await repository.AddAuthorizationAsync(operationAuthorization, cancellationToken);
             await repository.AddCreditAsync(credit, cancellationToken);
+            await repository.AddCreditInstallmentsAsync(plannedInstallments.Select(x => new CuotaCredito
+            {
+                Id = Guid.CreateVersion7(), CreditoId = credit.Id, Numero = x.Number,
+                Monto = x.Amount, SaldoPendiente = x.Amount, FechaVencimiento = x.DueOn
+            }).ToArray(), cancellationToken);
         }
 
         // Record who authorized a Cajero's discount and/or wholesale price (same user as the credit authorizer on a credit).
@@ -858,10 +873,12 @@ public sealed partial class SalesService(
             return NormalizedInput.Fail("El tipo de venta debe ser CONTADO o CREDITO.");
         if (request.Payments is null || (saleType == "CONTADO" && request.Payments.Count == 0))
             return NormalizedInput.Fail("La venta de contado debe contener al menos un pago.");
-        if (saleType == "CREDITO" && (request.Payments.Count != 0 || request.DueDate is null ||
+        var hasInstallments = request.InstallmentDueDates is { Count: > 0 };
+        if (saleType == "CREDITO" && (request.Payments.Count != 0 || (!hasInstallments && request.DueDate is null) ||
+            (hasInstallments && request.DueDate is not null) ||
             (request.Authorization is not null && !request.Authorization.IsComplete())))
             return NormalizedInput.Fail("El crédito requiere vencimiento, sin pago inicial; si envía authorization, incluya usuario y contraseña o la credencial escaneada.");
-        if (saleType == "CONTADO" && request.DueDate is not null)
+        if (saleType == "CONTADO" && (request.DueDate is not null || hasInstallments))
             return NormalizedInput.Fail("Una venta de contado no admite vencimiento.");
         if (saleType == "CONTADO" && request.Authorization is not null && !request.Authorization.IsComplete())
             return NormalizedInput.Fail("Si envía authorization, incluya usuario y contraseña o la credencial escaneada.");
@@ -936,7 +953,7 @@ public sealed partial class SalesService(
                     Lines = lines.OrderBy(x => x.ProductId), GeneralDiscount = general.Value,
                     DiscountReason = NormalizeOptional(request.DiscountReason),
                     Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal),
-                    request.DueDate, AuthorizationMode = "SELF"
+                    request.DueDate, request.InstallmentDueDates, AuthorizationMode = "SELF"
                 })
                 : JsonSerializer.Serialize(new
                 {
@@ -946,7 +963,7 @@ public sealed partial class SalesService(
                     GeneralDiscount = general.Value,
                     DiscountReason = NormalizeOptional(request.DiscountReason),
                     Payments = payments.OrderBy(x => x.MethodCode, StringComparer.Ordinal),
-                    request.DueDate,
+                    request.DueDate, request.InstallmentDueDates,
                     Authorizer = request.Authorization.IdentityKey
                 });
         return new NormalizedInput(key.Trim(), lines, general.Value, payments, saleType, canonical, null);

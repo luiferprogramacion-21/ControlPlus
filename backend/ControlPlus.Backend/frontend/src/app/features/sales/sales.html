@@ -137,7 +137,23 @@
       <section class="panel panel--padded checkout-main" (keydown.enter)="checkoutEnter($event)">
         <div class="checkout-heading"><div class="panel-heading"><h2>{{ saleType() === 'CREDITO' ? 'Venta a crédito' : 'Cobro de la venta' }}</h2></div><div class="amount-due"><span>{{ saleType() === 'CREDITO' ? 'Total del crédito' : 'Total a cobrar' }}</span><strong>{{ estimate | currency:'COP':'symbol':'1.0-0' }}</strong></div></div>
         @if (saleType() === 'CREDITO') {
-          <div class="credit-checkout-fields"><label class="field-label" for="credit-due-date">Fecha de vencimiento</label><input id="credit-due-date" class="text-field" type="date" [min]="minimumDueDate" [max]="maximumDueDate" [(ngModel)]="dueDate" [disabled]="locked || busy()">
+          <div class="credit-checkout-fields">
+            <label class="field-label" for="credit-plan">Forma de pago</label>
+            <select id="credit-plan" class="text-field" [ngModel]="creditPlan" (ngModelChange)="setCreditPlan($event)" [disabled]="locked || busy()">
+              <option value="SINGLE">Pago único</option><option value="INSTALLMENTS">Cuotas</option>
+            </select>
+            @if (creditPlan === 'SINGLE') {
+              <label class="field-label" for="credit-due-date">Fecha de vencimiento</label><input id="credit-due-date" class="text-field" type="date" [min]="minimumDueDate" [max]="maximumDueDate" [(ngModel)]="dueDate" [disabled]="locked || busy()">
+            } @else {
+              <label class="field-label" for="credit-installment-count">Número de cuotas</label>
+              <input id="credit-installment-count" class="text-field" type="number" min="2" max="90" [ngModel]="installmentDates.length" (ngModelChange)="setInstallmentCount($event)" [disabled]="locked || busy()">
+              <div class="credit-installments">
+                @for (date of installmentDates; track $index) {
+                  <label class="field-label" [for]="'credit-installment-' + $index">Cuota {{ $index + 1 }} · {{ installmentAmount($index) | currency:'COP':'symbol':'1.0-0' }}</label>
+                  <input class="text-field" [id]="'credit-installment-' + $index" type="date" [min]="minimumDueDate" [max]="maximumDueDate" [(ngModel)]="installmentDates[$index]" [disabled]="locked || busy()">
+                }
+              </div>
+            }
             @if (creditDefaultDays() !== null) { <p class="form-hint">Plazo predeterminado: <strong>{{ creditDefaultDays() }} {{ creditDefaultDays() === 1 ? 'día' : 'días' }}</strong>@if (defaultDueDateText) { (vence el <strong>{{ defaultDueDateText }}</strong>) }. Puedes cambiar la fecha entre mañana y 90 días.</p> }
             @else if (creditRulesKnown()) { <p class="form-hint">No hay un plazo predeterminado: elige la fecha de vencimiento, entre mañana y 90 días.</p> }
           </div>

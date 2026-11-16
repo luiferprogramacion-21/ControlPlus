@@ -33,6 +33,8 @@ public partial class Credito
 
     public virtual ICollection<CambioVenta> CambioVenta { get; set; } = new List<CambioVenta>();
 
+    public virtual ICollection<CuotaCredito> CuotaCredito { get; set; } = new List<CuotaCredito>();
+
     public virtual ICollection<PagoCredito> PagoCredito { get; set; } = new List<PagoCredito>();
 
     public virtual Venta Venta { get; set; } = null!;

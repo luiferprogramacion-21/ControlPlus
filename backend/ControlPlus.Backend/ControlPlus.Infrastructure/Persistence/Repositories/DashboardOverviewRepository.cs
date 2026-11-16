@@ -58,7 +58,8 @@ public sealed class EfDashboardOverviewRepository(OfficialControlPlusDbContext d
         CancellationToken cancellationToken) =>
         dbContext.Credito.AsNoTracking()
             .Where(x => x.Venta.InstalacionId == installationId && x.Estado != "ANULADO" &&
-                        x.SaldoPendiente > 0 && x.FechaVencimiento < operatingDate && x.Venta.ClienteId != null)
+                        x.SaldoPendiente > 0 && x.Venta.ClienteId != null && x.CuotaCredito.Any(q =>
+                            q.SaldoPendiente > 0 && q.FechaVencimiento < operatingDate))
             .Select(x => x.Venta.ClienteId)
             .Distinct()
             .CountAsync(cancellationToken);

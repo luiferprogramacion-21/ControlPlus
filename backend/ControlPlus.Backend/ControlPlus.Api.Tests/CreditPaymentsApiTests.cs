@@ -534,6 +534,8 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
             var credit = await db.Credito.SingleAsync(x => x.Id == first.CreditId);
             credit.FechaOtorgamiento = old.AddDays(-1);
             credit.FechaVencimiento = old;
+            await db.CuotaCredito.Where(x => x.CreditoId == credit.Id)
+                .ForEachAsync(x => x.FechaVencimiento = old);
             await db.SaveChangesAsync();
         }
         var before = await SnapshotAsync(first.CreditId!.Value, setup.ProductId);
@@ -618,6 +620,8 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
             var overdue = await db.Credito.SingleAsync(x => x.Id == overdueSale.CreditId);
             overdue.FechaOtorgamiento = setup.Shift.OperatingDate.AddDays(-3);
             overdue.FechaVencimiento = setup.Shift.OperatingDate.AddDays(-2);
+            await db.CuotaCredito.Where(x => x.CreditoId == overdue.Id)
+                .ForEachAsync(x => x.FechaVencimiento = setup.Shift.OperatingDate.AddDays(-2));
             var annulled = await db.Credito.SingleAsync(x => x.Id == annulledSale.CreditId);
             annulled.Estado = "ANULADO";
             var customer = await db.Cliente.SingleAsync(x => x.Id == setup.CustomerId);
@@ -893,6 +897,105 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         Assert.Equal("Acuerdo documentado con el cliente", authorization.Motivo);
         Assert.Equal(setup.Admin.User.Id, authorization.UsuarioSolicitanteId);
         Assert.Equal(setup.Admin.User.Id, authorization.UsuarioAutorizadorId);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task InstallmentPlan_SplitsWholePesos_AppliesPaymentsByDueDate_AndCancellationRestoresTheSameInstallments()
+    {
+        using var client = CreateClient();
+        var setup = await BootstrapAsync(client);
+        var day = setup.Shift.OperatingDate;
+        DateOnly[] dates = [day.AddDays(10), day.AddDays(20), day.AddDays(30)];
+        var line = new SaleLineRequest(setup.ProductId, 1, "MINORISTA");
+
+        // Plan ambiguo, desordenado o fuera de plazo: 400 sin venta.
+        foreach (var (key, request) in new[]
+        {
+            ("installments-mixed", new ConfirmSaleRequest(setup.CustomerId, [line], null, null, [], "CREDITO",
+                day.AddDays(10), null, dates)),
+            ("installments-unordered", new ConfirmSaleRequest(setup.CustomerId, [line], null, null, [], "CREDITO",
+                null, null, [day.AddDays(20), day.AddDays(10)])),
+            ("installments-too-late", new ConfirmSaleRequest(setup.CustomerId, [line], null, null, [], "CREDITO",
+                null, null, [day.AddDays(10), day.AddDays(91)])),
+            ("installments-cash", new ConfirmSaleRequest(setup.CustomerId, [line], null, null,
+                [new SalePaymentRequest("EFECTIVO", 1_000m, 1_000m, null)], "CONTADO", null, null, dates)),
+        })
+        {
+            using var invalid = new HttpRequestMessage(HttpMethod.Post, "/api/sales") { Content = JsonContent.Create(request) };
+            invalid.Headers.Add("Idempotency-Key", key);
+            await AssertProblemAsync(await client.SendAsync(invalid), HttpStatusCode.BadRequest);
+        }
+        await using (var scope = _factory!.Services.CreateAsyncScope())
+            Assert.Equal(0, await scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>().Venta.CountAsync());
+
+        using var message = new HttpRequestMessage(HttpMethod.Post, "/api/sales")
+        {
+            Content = JsonContent.Create(new ConfirmSaleRequest(setup.CustomerId, [line], null, null, [],
+                "CREDITO", null, null, dates))
+        };
+        message.Headers.Add("Idempotency-Key", "installments-sale");
+        var sale = await ReadAsync<SaleDto>(await client.SendAsync(message), HttpStatusCode.Created);
+        var creditId = sale.CreditId!.Value;
+        var credit = await ReadAsync<CreditDto>(await client.GetAsync($"/api/credits/{creditId}"), HttpStatusCode.OK);
+        Assert.Equal(dates[^1], credit.DueOn);
+        Assert.Equal("PENDIENTE", credit.State);
+        Assert.Equal([1, 2, 3], credit.Installments.Select(x => x.Number));
+        Assert.Equal([334m, 333m, 333m], credit.Installments.Select(x => x.Amount));
+        Assert.Equal(dates, credit.Installments.Select(x => x.DueOn));
+        Assert.All(credit.Installments, x => Assert.Equal("PENDIENTE", x.State));
+
+        // El abono recorre las cuotas por fecha: paga la primera y deja la segunda parcial.
+        var paid = await ReadAsync<CreditPaymentOperationDto>(await PayAsync(client, creditId,
+            "installments-payment", new ApplyCreditPaymentRequest(credit.Version,
+                [new("EFECTIVO", 500m, 500m, null)])), HttpStatusCode.Created);
+        Assert.Equal(500m, paid.Balance);
+        credit = await ReadAsync<CreditDto>(await client.GetAsync($"/api/credits/{creditId}"), HttpStatusCode.OK);
+        Assert.Equal([0m, 167m, 333m], credit.Installments.Select(x => x.Balance));
+        Assert.Equal(["PAGADA", "PENDIENTE", "PENDIENTE"], credit.Installments.Select(x => x.State));
+        Assert.Equal(day, credit.Installments.First().PaidOn);
+        var paymentId = Assert.Single(paid.Payments).Id;
+        await using (var scope = _factory!.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            var applied = await db.AplicacionPagoCuota.AsNoTracking().Where(x => x.PagoCreditoId == paymentId)
+                .Join(db.CuotaCredito, a => a.CuotaCreditoId, q => q.Id, (a, q) => new { q.Numero, a.ValorAplicado })
+                .OrderBy(x => x.Numero).ToArrayAsync();
+            Assert.Equal([(1, 334m), (2, 166m)], applied.Select(x => (x.Numero, x.ValorAplicado)));
+
+            // Solo la segunda cuota vence: el crédito y el cliente quedan en mora por su saldo, no por el total.
+            var second = await db.CuotaCredito.SingleAsync(x => x.CreditoId == creditId && x.Numero == 2);
+            second.FechaVencimiento = day.AddDays(-1);
+            await db.SaveChangesAsync();
+        }
+        credit = await ReadAsync<CreditDto>(await client.GetAsync($"/api/credits/{creditId}"), HttpStatusCode.OK);
+        Assert.Equal("VENCIDO", credit.State);
+        Assert.Equal(["PAGADA", "VENCIDA", "PENDIENTE"], credit.Installments.Select(x => x.State));
+        Assert.Contains((await ReadAsync<PagedResult<CreditDto>>(await client.GetAsync("/api/credits?state=VENCIDO"),
+            HttpStatusCode.OK)).Items, x => x.Id == creditId);
+        Assert.DoesNotContain((await ReadAsync<PagedResult<CreditDto>>(await client.GetAsync("/api/credits?state=PENDIENTE"),
+            HttpStatusCode.OK)).Items, x => x.Id == creditId);
+        var risk = await ReadAsync<CustomerCreditRiskDto>(await client.GetAsync(
+            $"/api/sales/credit-check?customerId={setup.CustomerId}&amount=1"), HttpStatusCode.OK);
+        Assert.Equal((500m, 167m, 1, true), (risk.OutstandingBalance, risk.OverdueBalance, risk.OverdueCredits, risk.Overdue));
+
+        // Anular el abono restituye exactamente las mismas cuotas.
+        var reason = (await ReadAsync<IReadOnlyCollection<CreditPaymentCancellationReasonDto>>(
+            await client.GetAsync("/api/credits/payment-cancellation-reasons"), HttpStatusCode.OK))
+            .Single(x => x.Code == "ERROR_REGISTRO");
+        var cancelled = await ReadAsync<CancelCreditPaymentDto>(await CancelPaymentAsync(client, creditId, paymentId,
+            "installments-cancel", new CancelCreditPaymentRequest(paid.Version, reason.Id, null)), HttpStatusCode.OK);
+        Assert.Equal((1_000m, "VENCIDO"), (cancelled.Balance, cancelled.State));
+        credit = await ReadAsync<CreditDto>(await client.GetAsync($"/api/credits/{creditId}"), HttpStatusCode.OK);
+        Assert.Equal([334m, 333m, 333m], credit.Installments.Select(x => x.Balance));
+        Assert.All(credit.Installments, x => Assert.Null(x.PaidOn));
+
+        // Condonar pone en cero todas las cuotas y conserva el plan.
+        var forgiven = await ReadAsync<ForgiveCreditDto>(await ForgiveAsync(client, creditId, "installments-forgive",
+            new ForgiveCreditRequest(cancelled.Version, "Acuerdo documentado")), HttpStatusCode.OK);
+        Assert.Equal("ANULADO", forgiven.State);
+        credit = await ReadAsync<CreditDto>(await client.GetAsync($"/api/credits/{creditId}"), HttpStatusCode.OK);
+        Assert.Equal([334m, 333m, 333m], credit.Installments.Select(x => x.Amount));
+        Assert.All(credit.Installments, x => Assert.Equal((0m, "ANULADA"), (x.Balance, x.State)));
     }
 
     /// <summary>Simulates an installation created before the consecutives were automatic.</summary>

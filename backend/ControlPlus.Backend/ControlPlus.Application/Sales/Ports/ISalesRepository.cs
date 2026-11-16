@@ -37,6 +37,8 @@ public interface ISalesRepository
     Task<Cliente?> GetCustomerAsync(Guid customerId, CancellationToken cancellationToken = default);
     Task<Usuario?> GetUserForUpdateAsync(Guid userId, CancellationToken cancellationToken = default);
     Task AddCreditAsync(Credito credit, CancellationToken cancellationToken = default);
+    Task AddCreditInstallmentsAsync(IReadOnlyCollection<CuotaCredito> installments,
+        CancellationToken cancellationToken = default);
     Task AddAuthorizationAsync(AutorizacionOperacion authorization, CancellationToken cancellationToken = default);
 
     Task AddSaleAsync(Venta sale, CancellationToken cancellationToken = default);
@@ -65,6 +67,8 @@ public interface ISalesRepository
     Task<ConsecutivoDocumento?> GetChangeSequenceForUpdateAsync(Guid installationId,
         string series, CancellationToken cancellationToken = default);
     Task<Credito?> GetSaleCreditForUpdateAsync(Guid saleId,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<CuotaCredito>> GetCreditInstallmentsForUpdateAsync(Guid creditId,
         CancellationToken cancellationToken = default);
     Task AddChangeAsync(CambioVenta change, CancellationToken cancellationToken = default);
     Task AddChangeDetailsAsync(IReadOnlyCollection<DetalleCambioVenta> details,

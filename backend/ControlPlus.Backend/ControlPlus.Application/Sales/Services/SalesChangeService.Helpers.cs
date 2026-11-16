@@ -189,12 +189,38 @@ public sealed partial class SalesService
         var beforeAdjusted = credit.MontoAjustado;
         var beforeBalance = credit.SaldoPendiente;
         var increasing = difference > 0;
+        var installments = (await repository.GetCreditInstallmentsForUpdateAsync(credit.Id, ct)).ToArray();
+        if (installments.Length == 0 || installments.Sum(x => x.SaldoPendiente) != beforeBalance)
+            throw new InvalidOperationException("El plan de cuotas no coincide con el saldo del crédito.");
+        if (increasing)
+        {
+            var last = installments.OrderByDescending(x => x.FechaVencimiento).ThenByDescending(x => x.Numero).First();
+            last.Monto = CashMoney.Add(last.Monto, amount);
+            last.SaldoPendiente = CashMoney.Add(last.SaldoPendiente, amount);
+            last.FechaPago = null;
+        }
+        else
+        {
+            var remaining = amount;
+            foreach (var installment in installments.Where(x => x.SaldoPendiente > 0)
+                         .OrderByDescending(x => x.FechaVencimiento).ThenByDescending(x => x.Numero))
+            {
+                var reduction = Math.Min(remaining, installment.SaldoPendiente);
+                installment.Monto = CashMoney.Subtract(installment.Monto, reduction);
+                installment.SaldoPendiente = CashMoney.Subtract(installment.SaldoPendiente, reduction);
+                if (installment.SaldoPendiente == 0) installment.FechaPago = today;
+                remaining -= reduction;
+                if (remaining == 0) break;
+            }
+            if (remaining != 0) throw new InvalidOperationException("Las cuotas no admiten la reducción solicitada.");
+        }
         credit.MontoAjustado = increasing ? CashMoney.Add(beforeAdjusted, amount)
             : CashMoney.Subtract(beforeAdjusted, amount);
         credit.SaldoPendiente = increasing ? CashMoney.Add(beforeBalance, amount)
             : CashMoney.Subtract(beforeBalance, amount);
         credit.Estado = credit.SaldoPendiente == 0 ? "PAGADO"
-            : credit.FechaVencimiento < today ? "VENCIDO" : "PENDIENTE";
+            : ControlPlus.Domain.Credits.CreditStatusPolicy.ResolveOpenState(
+                installments.Select(x => (x.FechaVencimiento, x.SaldoPendiente)), today);
         credit.FechaPago = credit.SaldoPendiente == 0 ? today : null;
         await repository.AddCreditChangeAdjustmentAsync(new AjusteCreditoCambio
         {

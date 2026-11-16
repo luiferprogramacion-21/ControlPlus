@@ -40,6 +40,10 @@ public partial class OfficialControlPlusDbContext : DbContext
 
     public virtual DbSet<Credito> Credito { get; set; }
 
+    public virtual DbSet<CuotaCredito> CuotaCredito { get; set; }
+
+    public virtual DbSet<AplicacionPagoCuota> AplicacionPagoCuota { get; set; }
+
     public virtual DbSet<DestinoRespaldo> DestinoRespaldo { get; set; }
 
     public virtual DbSet<DetalleApartado> DetalleApartado { get; set; }
@@ -3846,6 +3850,42 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .HasForeignKey(d => d.UsuarioId)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("fk_venta_usuario");
+        });
+
+        modelBuilder.Entity<CuotaCredito>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("pk_cuota_credito");
+            entity.ToTable("cuota_credito", "ventas");
+            entity.HasIndex(e => new { e.CreditoId, e.Numero }, "uq_cuota_credito_numero").IsUnique();
+            entity.HasIndex(e => new { e.FechaVencimiento, e.SaldoPendiente }, "ix_cuota_credito_vencimiento_saldo");
+            entity.Property(e => e.Id).ValueGeneratedNever().HasColumnName("id");
+            entity.Property(e => e.CreditoId).HasColumnName("credito_id");
+            entity.Property(e => e.Numero).HasColumnName("numero");
+            entity.Property(e => e.Monto).HasPrecision(18).HasColumnName("monto");
+            entity.Property(e => e.SaldoPendiente).HasPrecision(18).HasColumnName("saldo_pendiente");
+            entity.Property(e => e.FechaVencimiento).HasColumnName("fecha_vencimiento");
+            entity.Property(e => e.FechaPago).HasColumnName("fecha_pago");
+            entity.HasOne(e => e.Credito).WithMany(e => e.CuotaCredito)
+                .HasForeignKey(e => e.CreditoId).OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_cuota_credito_credito");
+        });
+
+        modelBuilder.Entity<AplicacionPagoCuota>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("pk_aplicacion_pago_cuota");
+            entity.ToTable("aplicacion_pago_cuota", "ventas");
+            entity.HasIndex(e => new { e.PagoCreditoId, e.CuotaCreditoId }, "uq_aplicacion_pago_cuota").IsUnique();
+            entity.HasIndex(e => e.CuotaCreditoId, "ix_aplicacion_pago_cuota_cuota");
+            entity.Property(e => e.Id).ValueGeneratedNever().HasColumnName("id");
+            entity.Property(e => e.PagoCreditoId).HasColumnName("pago_credito_id");
+            entity.Property(e => e.CuotaCreditoId).HasColumnName("cuota_credito_id");
+            entity.Property(e => e.ValorAplicado).HasPrecision(18).HasColumnName("valor_aplicado");
+            entity.HasOne(e => e.PagoCredito).WithMany(e => e.AplicacionPagoCuota)
+                .HasForeignKey(e => e.PagoCreditoId).OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_aplicacion_pago_cuota_pago");
+            entity.HasOne(e => e.CuotaCredito).WithMany(e => e.AplicacionPagoCuota)
+                .HasForeignKey(e => e.CuotaCreditoId).OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_aplicacion_pago_cuota_cuota");
         });
 
         modelBuilder.Entity<VwNecesidadReposicion>(entity =>

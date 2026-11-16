@@ -30,7 +30,8 @@ public sealed record ConfirmSaleRequest(
     IReadOnlyCollection<SalePaymentRequest> Payments,
     string? SaleType = null,
     DateOnly? DueDate = null,
-    SaleCreditAuthorizationRequest? Authorization = null);
+    SaleCreditAuthorizationRequest? Authorization = null,
+    IReadOnlyCollection<DateOnly>? InstallmentDueDates = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 /// <summary>

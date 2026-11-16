@@ -163,6 +163,10 @@ public sealed partial class CreditsService(ICreditsRepository credits, ISalesRep
             return Result.Failure<CreditPaymentOperationDto>(ApplicationError.Conflict("El crédito no admite más abonos."));
         if (amount > credit.SaldoPendiente)
             return Result.Failure<CreditPaymentOperationDto>(ApplicationError.Validation("El abono no puede superar el saldo pendiente."));
+        var installments = (await credits.GetInstallmentsForUpdateAsync(credit.Id, cancellationToken)).ToArray();
+        if (installments.Length == 0 || installments.Sum(x => x.SaldoPendiente) != credit.SaldoPendiente)
+            return Result.Failure<CreditPaymentOperationDto>(ApplicationError.Conflict(
+                "El plan de cuotas del crédito no coincide con su saldo."));
         var methods = await sales.GetPaymentMethodsAsync(payments.Select(x => x.MethodCode).ToArray(), cancellationToken);
         if (methods.Count != payments.Length || methods.Any(x => !x.Activo) ||
             methods.Any(x => x.Codigo == "EFECTIVO" ? !x.AfectaEfectivo : x.AfectaEfectivo))
@@ -190,12 +194,35 @@ public sealed partial class CreditsService(ICreditsRepository credits, ISalesRep
                 Referencia = x.Reference, FechaHora = now.UtcDateTime, Estado = "APLICADO"
             };
         }).ToArray();
+        var applications = new List<AplicacionPagoCuota>();
+        foreach (var row in rows)
+        {
+            var remaining = row.ValorAplicado;
+            foreach (var installment in installments.Where(x => x.SaldoPendiente > 0)
+                         .OrderBy(x => x.FechaVencimiento).ThenBy(x => x.Numero))
+            {
+                if (remaining == 0) break;
+                var applied = Math.Min(remaining, installment.SaldoPendiente);
+                installment.SaldoPendiente -= applied;
+                if (installment.SaldoPendiente == 0) installment.FechaPago = today;
+                applications.Add(new AplicacionPagoCuota
+                {
+                    Id = Guid.CreateVersion7(), PagoCreditoId = row.Id,
+                    CuotaCreditoId = installment.Id, ValorAplicado = applied
+                });
+                remaining -= applied;
+            }
+            if (remaining != 0)
+                return Result.Failure<CreditPaymentOperationDto>(ApplicationError.Conflict(
+                    "El plan de cuotas no pudo absorber el abono completo."));
+        }
         credit.SaldoPendiente -= amount;
         credit.Estado = credit.SaldoPendiente == 0 ? "PAGADO" :
-            CreditStatusPolicy.ResolveOpenState(credit.FechaVencimiento, credit.SaldoPendiente, today);
+            CreditStatusPolicy.ResolveOpenState(installments.Select(x => (x.FechaVencimiento, x.SaldoPendiente)), today);
         credit.FechaPago = credit.SaldoPendiente == 0 ? today : null;
         await sales.AddCashMovementAsync(movement, cancellationToken);
         await credits.AddPaymentsAsync(rows, cancellationToken);
+        await credits.AddPaymentApplicationsAsync(applications, cancellationToken);
         var response = new CreditPaymentOperationDto(credit.Id, credit.SaldoPendiente, credit.Estado,
             credit.Version + 1, correlationId,
             rows.Select(x => Map(x, byCode[payments.Single(p => p.AppliedAmount == x.ValorAplicado &&
@@ -252,13 +279,18 @@ public sealed partial class CreditsService(ICreditsRepository credits, ISalesRep
     {
         var sale = credit.Venta;
         var customer = sale.Cliente!;
+        var installments = credit.CuotaCredito.OrderBy(x => x.Numero).Select(x => new CreditInstallmentDto(
+            x.Id, x.Numero, x.Monto, x.SaldoPendiente, x.FechaVencimiento, x.FechaPago,
+            credit.Estado == "ANULADO" ? "ANULADA" : x.SaldoPendiente == 0 ? "PAGADA" :
+            CreditStatusPolicy.IsOverdue(x.FechaVencimiento, x.SaldoPendiente, today) ? "VENCIDA" : "PENDIENTE"))
+            .ToArray();
+        var effectiveState = credit.Estado is "ANULADO" or "PAGADO" ? credit.Estado :
+            CreditStatusPolicy.ResolveOpenState(installments.Select(x => (x.DueOn, x.Balance)), today);
         return new CreditDto(credit.Id, sale.Id, $"{sale.Prefijo}-{sale.Serie}-{sale.Consecutivo}",
             customer.Id, customer.NombreCompleto, customer.TipoDocumento, customer.NumeroDocumento,
             customer.Telefono, credit.MontoOriginal, credit.MontoAjustado, credit.SaldoPendiente,
             credit.FechaOtorgamiento, credit.FechaVencimiento, credit.FechaPago,
-            credit.Estado == "PENDIENTE" && CreditStatusPolicy.IsOverdue(
-                credit.FechaVencimiento, credit.SaldoPendiente, today)
-                ? "VENCIDO" : credit.Estado, credit.Version);
+            effectiveState, credit.Version, installments);
     }
 
     private static CreditPaymentDto Map(PagoCredito payment) => Map(payment, payment.MetodoPago,

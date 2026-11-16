@@ -9,7 +9,7 @@ import type { SaleReceipt } from './ticket';
 export interface SaleDiscount { type: 'PORCENTAJE' | 'VALOR_FIJO'; value: number; }
 export interface SaleLineInput { productId: string; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; discount: SaleDiscount | null; }
 export interface SalePaymentInput { methodCode: 'EFECTIVO' | 'TRANSFERENCIA' | 'NEQUI'; appliedAmount: number; receivedAmount: number | null; reference: string | null; }
-export interface SaleInput { customerId: string | null; lines: SaleLineInput[]; generalDiscount: SaleDiscount | null; discountReason: string | null; payments: SalePaymentInput[]; saleType: 'CONTADO' | 'CREDITO'; dueDate: string | null; authorization: AuthorizationBody | null; }
+export interface SaleInput { customerId: string | null; lines: SaleLineInput[]; generalDiscount: SaleDiscount | null; discountReason: string | null; payments: SalePaymentInput[]; saleType: 'CONTADO' | 'CREDITO'; dueDate: string | null; installmentDueDates?: string[] | null; authorization: AuthorizationBody | null; }
 export interface Sale {
   id: string; visibleNumber: string; total: number; change: number; state: string; payments: (SalePaymentInput & { methodName?: string })[]; creditId: string | null;
   occurredAtUtc?: string; grossSubtotal?: number; discountTotal?: number; lines?: SaleLine[];

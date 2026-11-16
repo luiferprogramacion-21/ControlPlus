@@ -174,6 +174,10 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
     public Task AddCreditAsync(Credito credit, CancellationToken cancellationToken = default) =>
         dbContext.Credito.AddAsync(credit, cancellationToken).AsTask();
 
+    public Task AddCreditInstallmentsAsync(IReadOnlyCollection<CuotaCredito> installments,
+        CancellationToken cancellationToken = default) =>
+        dbContext.CuotaCredito.AddRangeAsync(installments, cancellationToken);
+
     public Task AddAuthorizationAsync(AutorizacionOperacion authorization, CancellationToken cancellationToken = default) =>
         dbContext.AutorizacionOperacion.AddAsync(authorization, cancellationToken).AsTask();
 
@@ -310,6 +314,14 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
         return rows.SingleOrDefault();
     }
 
+    public async Task<IReadOnlyCollection<CuotaCredito>> GetCreditInstallmentsForUpdateAsync(Guid creditId,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.CuotaCredito.FromSqlInterpolated($"""
+            SELECT q.* FROM ventas.cuota_credito AS q
+            WHERE q.credito_id = {creditId}
+            ORDER BY q.fecha_vencimiento, q.numero FOR UPDATE
+            """).AsTracking().ToArrayAsync(cancellationToken);
+
     public Task AddChangeAsync(CambioVenta change, CancellationToken cancellationToken = default) =>
         dbContext.CambioVenta.AddAsync(change, cancellationToken).AsTask();
 
@@ -339,6 +351,8 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
         foreach (var payment in sale.PagoVenta)
             await dbContext.Entry(payment).Reference(x => x.MetodoPago).LoadAsync(cancellationToken);
         await dbContext.Entry(sale).Reference(x => x.Credito).LoadAsync(cancellationToken);
+        if (sale.Credito is not null)
+            await dbContext.Entry(sale.Credito).Collection(x => x.CuotaCredito).LoadAsync(cancellationToken);
         return sale;
     }
 
