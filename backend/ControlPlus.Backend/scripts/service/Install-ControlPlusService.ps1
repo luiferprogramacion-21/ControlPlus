@@ -152,9 +152,12 @@ try {
     if ($screen.Content -notmatch '<html') { throw 'La pantalla no respondió como HTML.' }
 
     # Escritorio común de todos los usuarios: no depende de redirecciones de OneDrive del escritorio personal.
+    # El ícono se copia a ProgramData para que el acceso no dependa de la carpeta que se reemplaza al actualizar.
+    $iconFile = Join-Path $dataDir 'controlplus.ico'
+    Copy-Item -LiteralPath (Join-Path $installDir 'wwwroot\controlplus.ico') -Destination $iconFile -Force
     $desktop = [Environment]::GetFolderPath('CommonDesktopDirectory')
     $shortcut = Join-Path $desktop 'ControlPlus.url'
-    [IO.File]::WriteAllText($shortcut, "[InternetShortcut]`r`nURL=$url/`r`n", (New-Object Text.UTF8Encoding($false)))
+    [IO.File]::WriteAllText($shortcut, "[InternetShortcut]`r`nURL=$url/`r`nIconFile=$iconFile`r`nIconIndex=0`r`n", (New-Object Text.UTF8Encoding($false)))
 
     Write-Host 'CONTROLPLUS_SERVICE_OK'
     Write-Host "ControlPlus corre como servicio y abre en $url (acceso directo en el escritorio)."
