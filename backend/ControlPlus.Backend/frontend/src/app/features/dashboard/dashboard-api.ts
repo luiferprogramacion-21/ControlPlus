@@ -27,6 +27,13 @@ export interface DashboardAlerts {
   upcomingLayawayDays: number;
 }
 
+/** Last delivery to the encrypted external backup copy (no paths or errors). */
+export interface DashboardExternalBackup {
+  state: 'SIN_CONFIGURAR' | 'SIN_COPIAS' | 'CORRECTO' | 'FALLIDO' | 'ENVIANDO';
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+}
+
 /** Confirmed sales of one local hour of the establishment. */
 export interface DashboardHour {
   hour: number;
@@ -60,6 +67,7 @@ export interface DashboardSummary {
   alerts: DashboardAlerts;
   hourlySales: DashboardHour[];
   recentActivity: DashboardActivity[];
+  externalBackup: DashboardExternalBackup;
 }
 
 @Injectable({ providedIn: 'root' })

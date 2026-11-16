@@ -11,9 +11,9 @@ Sigue el diseño de Fase 4 (`configuracion.destino_respaldo`, `ejecucion_respald
 - **Retención (Fase 4):** se conservan todas las copias de las últimas 24 horas, la más reciente de cada uno de los últimos 7 días, 4 semanas y 12 meses, y las previas a una actualización. Nunca se borra la copia más reciente. Solo se borran archivos con el nombre exacto que genera ControlPlus, dentro de la subcarpeta `ControlPlus` del destino.
 - **Registro:** cada ejecución y cada copia quedan en las tablas oficiales con errores saneados (sin rutas internas ni secretos).
 - **Acceso:** solo el Administrador vigente con `BACKUPS.MANAGE` efectivo. `GET /api/backups/status`, `POST /api/backups/run` (202, se ejecuta en segundo plano) y `PUT /api/backups/destinations/{LOCAL_FISICO_SEPARADO|EXTERNO_CIFRADO}` (carpeta, activo y `expectedVersion`). Se auditan el pedido manual y los cambios de destino (sin la ruta).
-- **Pantalla:** Administración → «Soporte y continuidad» (`/operacion/soporte`), según la maqueta 22. Cambios respecto a la maqueta, pendientes de aprobación: se agrega el panel «Destinos» para elegir las carpetas, y «Impresora térmica» y «Cola de impresión» aparecen como «Pendiente de definir». «Ver historial» y «Generar paquete de soporte» no se incluyen en este corte.
+- **Pantalla:** Administración → «Soporte y continuidad» (`/operacion/soporte`), según la maqueta 22. Cambios respecto a la maqueta, aprobados por el usuario el 16 de noviembre de 2026: se agrega el panel «Destinos» para elegir las carpetas, y «Impresora térmica» y «Cola de impresión» aparecen como «Pendiente de definir». «Ver historial» y «Generar paquete de soporte» no se incluyen en este corte.
 
-Pendientes: corte 2 de restauración (maqueta 22c, «Probar restauración» en una base temporal cada 90 días como máximo), «Respaldo externo» real en el Dashboard y arranque automático de la API como servicio de Windows.
+Hechos después: corte 2 de restauración (prueba en base temporal), «Respaldo externo» real en el Dashboard (`docs/dashboard.md`), ControlPlus como servicio de Windows (`docs/windows-service.md`) y la restauración de emergencia (al final de este documento).
 
 ## Preparación del equipo (una sola vez)
 
@@ -46,7 +46,7 @@ Administración → «Soporte y continuidad» → «Restauración» (`/operacion
 
 «Probar restauración» (`POST /api/backups/copies/{id}/restore-test`) descifra la copia si es externa, compara su SHA-256 con el del respaldo original, la restaura con `pg_restore --exit-on-error` en una base nueva `controlplus_restore_<id>`, comprueba el historial de migraciones, el establecimiento y que las tablas de productos y ventas se puedan consultar, y borra la base temporal. **Nunca toca la base `controlplus`.** Queda registrada en `configuracion.prueba_restauracion` con una autorización `PRUEBA_RESTAURACION` del propio Administrador, el RTO observado (minutos que tardó), el RPO observado (minutos desde el respaldo exitoso anterior), las migraciones restauradas y la auditoría `BackupRestoreTested`. Sin una prueba exitosa, la próxima fecha queda vencida.
 
-«Restaurar operación» (reemplazar la base real) **no está disponible en la pantalla**: se hace con la API detenida y un procedimiento propio, pendiente de documentar.
+«Restaurar operación» (reemplazar la base real) **no está disponible en la pantalla** (aprobado el 16 de noviembre de 2026): se hace con el procedimiento de emergencia descrito al final.
 
 Requiere que el rol `controlplus_backup` pueda crear bases (`CREATEDB`). En un equipo ya preparado, repetir la preparación **conservando la contraseña de cifrado**, porque las copias existentes solo se abren con ella:
 
@@ -60,3 +60,43 @@ Verificación sin base de datos: frontend 565/565 y `ngc` con salida 0; API sin 
 
 Prueba real en el equipo de la tienda (15 de noviembre de 2026): tras repetir la preparación con `-KeepPassphrase` y reiniciar la API, el Administrador probó la copia externa cifrada de las 20:47 desde la pantalla: «Prueba correcta», RTO observado 1 minuto y próxima prueba el 14/02/2027. Queda acreditado que la copia de OneDrive se descifra con la contraseña guardada y se restaura completa. Una copia de las 20:17 figura «No disponible» porque su archivo ya no está en la carpeta; la pantalla lo informa y no permite probarla.
 
+## Restauración de emergencia (base real)
+
+Solo cuando la base `controlplus` se dañó o se perdieron datos y el responsable decidió volver a una copia. **Todo lo registrado después de esa copia se pierde** (con respaldos cada 30 minutos, a lo sumo lo ocurrido desde el último). Antes de empezar, pruebe la copia elegida con «Probar restauración».
+
+### Dueños y permisos de las copias
+
+Las copias guardan los dueños de los objetos (casi todos son de `controlplus_app`). Hasta el 15 de noviembre de 2026 se generaban con `--no-acl`, así que **no** guardaban los permisos concedidos sobre los 15 objetos cuyo dueño es `postgres` (tabla y secuencia de códigos de producto y sus funciones). Desde el 16 de noviembre los respaldos automáticos guardan también los permisos (`pg_dump -Fc` sin `--no-acl`); la prueba de restauración los sigue omitiendo porque restaura con el rol de respaldo. Para una copia antigua, el procedimiento vuelve a conceder los permisos que dieron las migraciones (`scripts/backups/emergency/Restore-AppPrivileges.sql`, cada uno solo si su migración está en el historial de la copia) y los de las tablas de respaldo, y después comprueba que `controlplus_app` pueda usar todos los objetos de los siete esquemas.
+
+### Procedimiento
+
+En PowerShell **como Administrador**, desde `C:\ControlPlus\backend\ControlPlus.Backend`, con la ruta de la copia (de OneDrive, del disco local o un `controlplus-antes-de-restaurar.dump` anterior):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backups\emergency\Restore-ControlPlusDatabase.ps1 -BackupFile 'C:\Users\<usuario>\OneDrive\<carpeta>\ControlPlus\controlplus-AAAAMMDDTHHMMSSZ-PROGRAMADO.dump.cpbk'
+```
+
+El script:
+
+1. Comprueba la copia, PostgreSQL, el rol `controlplus_app` y que el puerto 5000 no lo use una API iniciada con `dotnet run`. Pide la contraseña de `postgres`.
+2. Si la copia está cifrada (`.cpbk`), la descifra con `scripts/backups/decrypt/Decrypt-ControlPlusBackup.cs`, que se ejecuta con `dotnet run` y requiere el SDK de .NET 10 (PowerShell 5.1 no tiene AES-GCM). Toma la contraseña de cifrado de la configuración del servicio y, si no existe, la pide; se pasa por la entrada estándar. La copia en claro se escribe en la carpeta de evidencia y se borra al terminar. Verifica con `pg_restore --list`.
+3. Restaura en una base **nueva** `controlplus_restaurando_<fecha>` con el mismo dueño que la actual, con dueños y permisos (`--exit-on-error --single-transaction`), vuelve a conceder los permisos si la copia no los traía y comprueba historial de migraciones, establecimiento y acceso de `controlplus_app` (`Check-RestoredDatabase.sql`). **Hasta aquí la base real no se toca**; si algo falla, borra la base temporal.
+4. Muestra la base actual frente a la restaurada (migraciones, última migración, productos, ventas y última venta) y pide escribir `RESTAURAR`. Si la copia tiene menos migraciones que la base actual se detiene, porque la API instalada no funcionaría con ella; `-AllowMissingMigrations` permite seguir, pero deja el servicio detenido hasta aplicar las migraciones faltantes con el migrador controlado.
+5. Detiene el servicio ControlPlus, guarda un respaldo de seguridad de la base actual (`controlplus-antes-de-restaurar.dump`, con su SHA-256 en el registro), copia los permisos de nivel de base y, en una transacción, renombra la base actual a `controlplus_anterior_<fecha>` (**no se borra**) y la restaurada a `controlplus`.
+6. Inicia el servicio, comprueba `/api/health` y `/api/health/database`, y termina con `EMERGENCY_RESTORE_OK`. El registro queda en `%USERPROFILE%\ControlPlus-Backups\EmergencyRestore-<fecha>-<id>\registro.txt`.
+
+No aplica migraciones ni toca las copias de respaldo. Si falla antes del cambio de nombres, la base real queda como estaba y el servicio se vuelve a iniciar.
+
+### Después de restaurar
+
+- Revise en ControlPlus las últimas ventas, la caja y el inventario. Lo registrado después de la copia hay que volver a cargarlo a mano (por ejemplo, con los tiquetes impresos).
+- Cree un respaldo manual en «Soporte y continuidad».
+- Cuando todo esté confirmado, borre la base anterior desde psql como `postgres`: `DROP DATABASE controlplus_anterior_<fecha>;`. Para volver atrás antes de borrarla: detenga el servicio y cambie los nombres al revés con `ALTER DATABASE ... RENAME TO ...`.
+
+### Equipo nuevo
+
+En un PostgreSQL recién instalado faltan los roles, que no viajan en las copias. Antes de restaurar, cree `controlplus_app` como `postgres` con la contraseña que tiene la conexión de la API (`CREATE ROLE controlplus_app LOGIN PASSWORD '...';`). Después de restaurar, repita la preparación de respaldos (`Initialize-Backups.ps1 -KeepPassphrase` si conserva la contraseña de cifrado) y la instalación del servicio.
+
+### Verificación
+
+`EmergencyRestoreScriptsTests` (Infrastructure, base temporal con todas las migraciones; en el CI con un rol `controlplus_app` sin inicio de sesión, como en la tienda): la comprobación detecta objetos sin acceso, el archivo de permisos los devuelve (incluido `DELETE` sobre los códigos de producto, sin conceder de más), deja 0 objetos sin acceso y es repetible. El descifrado se probó con un archivo cifrado por el mismo código de `BackupCrypto`, incluida una contraseña con «ñ», y rechaza una contraseña incorrecta. El script pasa el analizador de PowerShell 5.1 sin errores. **No se ha ejecutado sobre la base real**; el primer uso real debe quedar registrado aquí.

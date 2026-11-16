@@ -28,6 +28,7 @@ const summary: DashboardSummary = {
     { saleId: 'b', number: 'VTA-001-2', occurredAt: '2026-11-10T19:18:00Z', customerName: 'María López', total: 154000, saleType: 'CREDITO', state: 'CONFIRMADA' },
     { saleId: 'c', number: 'VTA-001-1', occurredAt: '2026-11-10T19:02:00Z', customerName: 'Pedro Gómez', total: 12000, saleType: 'CONTADO', state: 'ANULADA' },
   ],
+  externalBackup: { state: 'CORRECTO', lastAttemptAt: '2026-11-10T19:30:00Z', lastSuccessAt: '2026-11-10T19:30:00Z' },
 };
 
 describe('Dashboard', () => {
@@ -120,18 +121,44 @@ describe('Dashboard', () => {
     expect(bars[1].heightPercent).toBe(100);
   });
 
-  it('muestra los contadores de las alertas operativas y deja el respaldo pendiente', async () => {
+  it('muestra los contadores de las alertas operativas y la última copia externa', async () => {
     const fixture = await create();
     const text = textOf(fixture);
     expect(text).toContain('7 productos');
     expect(text).toContain('3 clientes');
     expect(text).toContain('1 apartado');
     expect(text).toContain('Respaldo externo');
-    expect(text).toContain('Pendiente de definir');
+    expect(text).toContain('Confirmado');
+    expect(text).not.toContain('Pendiente de definir');
     expect(text).toContain('Requieren revisión');
     const layaways = Array.from(fixture.nativeElement.querySelectorAll('.dashboard-pill') as NodeListOf<HTMLElement>)
       .find((pill) => pill.textContent?.includes('Apartados próximos'));
     expect(layaways?.title).toContain('3 días');
+  });
+
+  it('marca en rojo un envío externo fallido e indica la última copia correcta', async () => {
+    api.summary.mockResolvedValue({ ...summary, externalBackup: { state: 'FALLIDO', lastAttemptAt: '2026-11-10T20:00:00Z', lastSuccessAt: '2026-11-08T19:30:00Z' } });
+    const fixture = await create();
+    const pill = backupPill(fixture.nativeElement);
+    expect(pill.classList).toContain('dashboard-pill--danger');
+    expect(pill.title).toContain('Última copia correcta:');
+    expect(textOf(fixture)).toContain('Falló');
+  });
+
+  it('indica cuando la copia externa no está configurada o aún no tiene copias', async () => {
+    api.summary.mockResolvedValue({ ...summary, externalBackup: { state: 'SIN_CONFIGURAR', lastAttemptAt: null, lastSuccessAt: null } });
+    let fixture = await create();
+    expect(backupPill(fixture.nativeElement).classList).toContain('dashboard-pill--clear');
+    expect(textOf(fixture)).toContain('Sin configurar');
+    api.summary.mockResolvedValue({ ...summary, externalBackup: { state: 'SIN_COPIAS', lastAttemptAt: null, lastSuccessAt: null } });
+    fixture = await create();
+    expect(textOf(fixture)).toContain('Sin copias todavía');
+  });
+
+  it('una copia correcta de otro día muestra también su fecha', async () => {
+    const component = (await create()).componentInstance;
+    const text = component.externalBackup({ ...summary, externalBackup: { state: 'CORRECTO', lastAttemptAt: '2026-11-08T15:00:00Z', lastSuccessAt: '2026-11-08T15:00:00Z' } }).text;
+    expect(text).toMatch(/^Confirmado 0?8\/11 \d{2}:\d{2}$/);
   });
 
   it('enlaza el stock bajo a Inventario filtrado cuando se puede abrir Inventario', async () => {
@@ -198,3 +225,8 @@ describe('Dashboard', () => {
     expect(text).not.toContain('100.000');
   });
 });
+
+function backupPill(root: HTMLElement): HTMLElement {
+  return Array.from(root.querySelectorAll('.dashboard-pill') as NodeListOf<HTMLElement>)
+    .find((pill) => pill.textContent?.includes('Respaldo externo'))!;
+}

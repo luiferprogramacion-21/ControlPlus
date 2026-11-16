@@ -135,6 +135,9 @@ jobs:
           test_password="$(openssl rand -hex 24)"
           echo "::add-mask::$test_password"
           psql -X -v ON_ERROR_STOP=1 -c "CREATE ROLE controlplus_test_admin LOGIN CREATEDB NOSUPERUSER PASSWORD '${test_password}'"
+          # Rol de la aplicación como en la tienda (sin inicio de sesión): las migraciones le conceden permisos y
+          # las pruebas de permisos y de restauración de emergencia los comprueban.
+          psql -X -v ON_ERROR_STOP=1 -c "CREATE ROLE controlplus_app NOLOGIN"
           echo "CONTROLPLUS_TEST_ADMIN_CONNECTION=Host=127.0.0.1;Port=5432;Database=postgres;Username=controlplus_test_admin;Password=${test_password}" >> "$GITHUB_ENV"
 
       - name: Restaurar paquetes

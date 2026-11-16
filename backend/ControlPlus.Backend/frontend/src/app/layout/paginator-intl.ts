@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, Provider } from '@angular/core';
 import { MatPaginatorIntl } from '@angular/material/paginator';
 
 @Injectable()
@@ -18,3 +18,6 @@ export class SpanishPaginatorIntl extends MatPaginatorIntl {
     return `${start + 1}–${end} de ${total}`;
   };
 }
+
+/** Paginador en español para las pantallas dentro del menú (las que muestran listas paginadas). */
+export const paginatorIntlProvider: Provider = { provide: MatPaginatorIntl, useClass: SpanishPaginatorIntl };

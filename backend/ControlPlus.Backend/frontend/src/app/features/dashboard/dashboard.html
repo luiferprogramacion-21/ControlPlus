@@ -83,8 +83,9 @@
             <strong>{{ alertValue(data.alerts.upcomingLayaways, 'apartado', 'apartados') }}</strong>
           </li>
           <li>
-            <span class="dashboard-pill dashboard-pill--success">Respaldo externo</span>
-            <strong class="dashboard-alerts__pending">Pendiente de definir</strong>
+            @let backup = externalBackup(data);
+            <span class="dashboard-pill" [class]="'dashboard-pill--' + backup.tone" [title]="backup.title">Respaldo externo</span>
+            <strong [title]="backup.title">{{ backup.text }}</strong>
           </li>
         </ul>
       </section>

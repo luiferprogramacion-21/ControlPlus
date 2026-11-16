@@ -12,6 +12,12 @@ export interface HourBar {
   description: string;
 }
 
+export interface AlertText {
+  text: string;
+  tone: 'success' | 'danger' | 'info' | 'clear';
+  title: string;
+}
+
 export interface ComparisonText {
   text: string;
   tone: 'up' | 'down' | 'flat' | 'none';
@@ -102,6 +108,27 @@ export class Dashboard implements OnInit {
     const sameDay = new Intl.DateTimeFormat('en-CA').format(opened) === data.operatingDate;
     const day = new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: '2-digit' }).format(opened);
     return `Abierta desde ${sameDay ? '' : `${day} `}${this.time(cash.openedAt)}`;
+  }
+
+  /** Last external copy: a time from another day also shows its date. */
+  externalBackup(data: DashboardSummary): AlertText {
+    const backup = data.externalBackup;
+    const at = (iso: string | null) => iso ? this.moment(iso, data.operatingDate) : '';
+    const lastGood = backup.lastSuccessAt ? `Última copia correcta: ${at(backup.lastSuccessAt)}` : 'Aún no hay una copia correcta';
+    switch (backup.state) {
+      case 'CORRECTO': return { text: `Confirmado ${at(backup.lastSuccessAt)}`, tone: 'success', title: 'Copia externa cifrada enviada y verificada' };
+      case 'FALLIDO': return { text: `Falló ${at(backup.lastAttemptAt)}`, tone: 'danger', title: lastGood };
+      case 'ENVIANDO': return { text: 'Enviando…', tone: 'info', title: lastGood };
+      case 'SIN_COPIAS': return { text: 'Sin copias todavía', tone: 'clear', title: 'El destino externo está configurado y aún no recibe copias' };
+      default: return { text: 'Sin configurar', tone: 'clear', title: 'Configure la copia externa en Soporte y continuidad' };
+    }
+  }
+
+  private moment(iso: string, operatingDate: string): string {
+    const value = new Date(iso);
+    const sameDay = new Intl.DateTimeFormat('en-CA').format(value) === operatingDate;
+    const day = new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: '2-digit' }).format(value);
+    return `${sameDay ? '' : `${day} `}${this.time(iso)}`;
   }
 
   statusLabel(activity: DashboardActivity): string {

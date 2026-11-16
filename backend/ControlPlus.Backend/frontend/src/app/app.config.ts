@@ -5,12 +5,10 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { authInterceptor } from './core/api';
 import { routes } from './app.routes';
-import { MatPaginatorIntl } from '@angular/material/paginator';
-import { SpanishPaginatorIntl } from './layout/paginator-intl';
 
 // Importes y fechas en formato colombiano ($ 10.000), como en el prototipo.
 registerLocaleData(localeEsCo);
 
 export const appConfig: ApplicationConfig = {
-  providers: [provideBrowserGlobalErrorListeners(), provideHttpClient(withInterceptors([authInterceptor])), provideRouter(routes), { provide: LOCALE_ID, useValue: 'es-CO' }, { provide: MatPaginatorIntl, useClass: SpanishPaginatorIntl }],
+  providers: [provideBrowserGlobalErrorListeners(), provideHttpClient(withInterceptors([authInterceptor])), provideRouter(routes), { provide: LOCALE_ID, useValue: 'es-CO' }],
 };

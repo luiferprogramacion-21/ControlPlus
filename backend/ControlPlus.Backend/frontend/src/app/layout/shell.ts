@@ -5,10 +5,14 @@ import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router
 import { filter } from 'rxjs';
 import { SessionService } from '../core/session.service';
 import { Icon } from './icon';
+import { paginatorIntlProvider } from './paginator-intl';
 
 @Component({
   selector: 'cp-shell',
   imports: [RouterOutlet, RouterLink, Icon, A11yModule],
+  // La traducción del paginador vive aquí y no en app.config: así el paginador (con sus menús, tooltips y
+  // formularios) no entra en el paquete inicial que descarga la pantalla de ingreso.
+  providers: [paginatorIntlProvider],
   template: `
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
     <div class="app-shell app-shell--drawer">

@@ -1,3 +1,4 @@
+using ControlPlus.Application.Backups;
 using ControlPlus.Application.Cash.Ports;
 using ControlPlus.Application.Reports;
 using ControlPlus.Infrastructure.Persistence.Official;
@@ -66,4 +67,30 @@ public sealed class EfDashboardOverviewRepository(OfficialControlPlusDbContext d
         CancellationToken cancellationToken) =>
         dbContext.Apartado.AsNoTracking().CountAsync(x => x.InstalacionId == installationId &&
             x.Estado == "ACTIVO" && x.FechaLimite >= from && x.FechaLimite <= to, cancellationToken);
+
+    public async Task<DashboardExternalBackup> GetExternalBackupAsync(Guid installationId, CancellationToken cancellationToken)
+    {
+        var destination = await dbContext.DestinoRespaldo.AsNoTracking()
+            .Where(x => x.InstalacionId == installationId && x.TipoDestino == BackupCodes.ExternalDestination && x.Activo)
+            .Select(x => new { x.Id }).FirstOrDefaultAsync(cancellationToken);
+        if (destination is null) return new DashboardExternalBackup(DashboardExternalBackupStates.NotConfigured, null, null);
+
+        var last = await dbContext.CopiaRespaldo.AsNoTracking().Where(x => x.DestinoRespaldoId == destination.Id)
+            .OrderByDescending(x => x.FechaUltimoIntento).ThenByDescending(x => x.Id)
+            .Select(x => new { x.Estado, x.FechaUltimoIntento, x.FechaCompletada }).FirstOrDefaultAsync(cancellationToken);
+        if (last is null) return new DashboardExternalBackup(DashboardExternalBackupStates.NoCopies, null, null);
+        var lastSuccess = await dbContext.CopiaRespaldo.AsNoTracking()
+            .Where(x => x.DestinoRespaldoId == destination.Id && x.Estado == BackupCodes.CopyCompleted && x.FechaCompletada != null)
+            .MaxAsync(x => x.FechaCompletada, cancellationToken);
+        var state = last.Estado switch
+        {
+            BackupCodes.CopyCompleted => DashboardExternalBackupStates.Succeeded,
+            BackupCodes.CopyFailed => DashboardExternalBackupStates.Failed,
+            _ => DashboardExternalBackupStates.Sending
+        };
+        return new DashboardExternalBackup(state, Utc(last.FechaUltimoIntento ?? last.FechaCompletada), Utc(lastSuccess));
+    }
+
+    private static DateTimeOffset? Utc(DateTime? value) =>
+        value is null ? null : new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc));
 }

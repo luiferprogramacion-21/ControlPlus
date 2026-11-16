@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using ControlPlus.Application.Common;
 using ControlPlus.Application.Backups;
+using ControlPlus.Application.Reports;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Infrastructure.Persistence;
 using ControlPlus.Infrastructure.Persistence.Official;
@@ -82,6 +83,8 @@ public sealed class BackupApiTests : IAsyncLifetime
         Assert.Equal(30, initial.IntervalMinutes);
         Assert.Null(initial.LastBackup);
         Assert.All(initial.Destinations, x => Assert.Null(x.Path));
+        var dashboardBefore = await ReadAsync<DashboardSummary>(await client.GetAsync("/api/dashboard/summary"), HttpStatusCode.OK);
+        Assert.Equal(new DashboardExternalBackup("SIN_CONFIGURAR", null, null), dashboardBefore.ExternalBackup);
 
         var local = await ReadAsync<BackupDestinationDto>(await client.PutAsJsonAsync("/api/backups/destinations/LOCAL_FISICO_SEPARADO",
             new UpdateBackupDestinationRequest(_engine.Folder("local"), true, null)), HttpStatusCode.OK);
@@ -114,6 +117,12 @@ public sealed class BackupApiTests : IAsyncLifetime
         Assert.Equal("COMPLETADA", status.LastExternalCopy!.State);
         Assert.Contains(status.RecentEvents, x => x.Description == "Envío de copia externa" && x.Result == "COMPLETADA");
         Assert.Contains(status.RecentEvents, x => x.Description == "Respaldo manual" && x.Result == "EXITOSO");
+
+        // El Dashboard muestra el último envío externo (sin ruta ni error).
+        var dashboard = await ReadAsync<DashboardSummary>(await client.GetAsync("/api/dashboard/summary"), HttpStatusCode.OK);
+        Assert.Equal("CORRECTO", dashboard.ExternalBackup.State);
+        Assert.NotNull(dashboard.ExternalBackup.LastAttemptAt);
+        Assert.NotNull(dashboard.ExternalBackup.LastSuccessAt);
     }
 
     [Fact, Trait("Category", "Integration")]

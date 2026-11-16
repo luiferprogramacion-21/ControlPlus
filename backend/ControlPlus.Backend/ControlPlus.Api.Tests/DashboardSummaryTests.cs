@@ -30,6 +30,18 @@ public sealed class DashboardSummaryTests
     }
 
     [Fact]
+    public async Task Summary_ReportsTheLastExternalBackupOfTheActiveInstallation()
+    {
+        var installation = Guid.NewGuid();
+        var at = new DateTimeOffset(2026, 11, 15, 20, 30, 0, TimeSpan.Zero);
+        var backup = new DashboardExternalBackup(DashboardExternalBackupStates.Failed, at, at.AddMinutes(-30));
+        var source = new Source(installation) { ExternalBackup = backup };
+        var result = await Create(source, at.AddMinutes(5)).GetAsync(Actor, default);
+        Assert.Equal(backup, result.Value!.ExternalBackup);
+        Assert.Equal(installation, source.LastBackupInstallation);
+    }
+
+    [Fact]
     public async Task Summary_DeniesRevokedPermissionBeforeReadingInstallation()
     {
         var source = new Source(Guid.NewGuid());
@@ -222,6 +234,16 @@ public sealed class DashboardSummaryTests
         {
             LastLayawayRange = (from, to);
             return Task.FromResult(UpcomingLayaways);
+        }
+
+        public DashboardExternalBackup ExternalBackup { get; init; } =
+            new(DashboardExternalBackupStates.NotConfigured, null, null);
+        public Guid? LastBackupInstallation { get; private set; }
+
+        public Task<DashboardExternalBackup> GetExternalBackupAsync(Guid installationId, CancellationToken cancellationToken)
+        {
+            LastBackupInstallation = installationId;
+            return Task.FromResult(ExternalBackup);
         }
     }
 }

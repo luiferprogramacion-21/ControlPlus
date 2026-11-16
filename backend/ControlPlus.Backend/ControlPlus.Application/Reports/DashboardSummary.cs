@@ -8,7 +8,8 @@ public sealed record DashboardSummary(DateOnly OperatingDate, SalesAmount CashSa
     SalesAmount CreditSales, SalesAmount TotalSales, decimal OpeningBalance,
     decimal PaymentTotal, decimal ManualTotal, decimal NetCashFlow,
     DashboardComparison Comparison, DashboardCash? CurrentCash, DashboardAlerts Alerts,
-    IReadOnlyList<DashboardHour> HourlySales, IReadOnlyList<DashboardActivity> RecentActivity);
+    IReadOnlyList<DashboardHour> HourlySales, IReadOnlyList<DashboardActivity> RecentActivity,
+    DashboardExternalBackup ExternalBackup);
 
 public sealed record DashboardInstallation(Guid Id, string TimeZoneId);
 
@@ -69,9 +70,10 @@ public sealed class DashboardSummaryService(IPermissionChecker permissions, IClo
                 new DateTimeOffset(DateTime.SpecifyKind(x.OccurredAtUtc, DateTimeKind.Utc)),
                 x.CustomerName, x.Total, x.SaleType, x.State))
             .ToArray();
+        var externalBackup = await overviewRepository.GetExternalBackupAsync(installation.Id, cancellationToken);
 
         return Result.Success(new DashboardSummary(date, cash, credit, total,
-            opening, payments, manual, payments + manual, comparison, currentCash, alerts, hourly, recent));
+            opening, payments, manual, payments + manual, comparison, currentCash, alerts, hourly, recent, externalBackup));
     }
 
     /// <summary>

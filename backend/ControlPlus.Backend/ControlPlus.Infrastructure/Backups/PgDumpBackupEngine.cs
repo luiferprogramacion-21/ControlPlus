@@ -10,7 +10,8 @@ using Npgsql;
 namespace ControlPlus.Infrastructure.Backups;
 
 /// <summary>
-/// Respaldo lógico con pg_dump (formato personalizado) verificado con pg_restore --list. Las copias se escriben en la
+/// Respaldo lógico con pg_dump (formato personalizado) verificado con pg_restore --list. La copia guarda dueños y
+/// permisos para que la restauración de emergencia los devuelva; la prueba de restauración los omite. Las copias se escriben en la
 /// subcarpeta «ControlPlus» del destino, primero con un nombre temporal y luego se renombran, y se comprueban leyéndolas
 /// de nuevo. Solo se listan y borran archivos con el nombre exacto que genera ControlPlus.
 /// </summary>
@@ -37,7 +38,7 @@ public sealed partial class PgDumpBackupEngine(IOptions<BackupOptions> options, 
         var dumpExit = await RunAsync("pg_dump.exe",
             ["-w", "-h", builder.Host ?? "127.0.0.1", "-p", builder.Port.ToString(CultureInfo.InvariantCulture),
              "-U", builder.Username ?? string.Empty, "-d", builder.Database ?? string.Empty,
-             "-Fc", "--no-owner", "--no-acl", "-f", target],
+             "-Fc", "-f", target],
             builder.Password, cancellationToken);
         if (dumpExit != 0 || !File.Exists(target))
             throw new BackupStepException($"pg_dump terminó con error (código {dumpExit}).");

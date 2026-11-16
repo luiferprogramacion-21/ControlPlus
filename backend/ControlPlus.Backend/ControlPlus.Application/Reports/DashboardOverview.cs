@@ -26,6 +26,21 @@ public sealed record DashboardHour(int Hour, int Transactions, decimal Total);
 public sealed record DashboardActivity(Guid SaleId, string Number, DateTimeOffset OccurredAt,
     string? CustomerName, decimal Total, string SaleType, string State);
 
+/// <summary>
+/// Estado del último envío a la copia externa cifrada: SIN_CONFIGURAR (sin destino externo activo), SIN_COPIAS,
+/// CORRECTO, FALLIDO o ENVIANDO. Se muestra el último intento y la última copia completada; sin rutas ni errores.
+/// </summary>
+public sealed record DashboardExternalBackup(string State, DateTimeOffset? LastAttemptAt, DateTimeOffset? LastSuccessAt);
+
+public static class DashboardExternalBackupStates
+{
+    public const string NotConfigured = "SIN_CONFIGURAR";
+    public const string NoCopies = "SIN_COPIAS";
+    public const string Succeeded = "CORRECTO";
+    public const string Failed = "FALLIDO";
+    public const string Sending = "ENVIANDO";
+}
+
 public sealed record DashboardSaleTime(DateTime OccurredAtUtc, decimal Total);
 
 public sealed record DashboardSaleRow(Guid Id, string Prefix, string Series, long Consecutive,
@@ -59,4 +74,7 @@ public interface IDashboardOverviewRepository
     /// <summary>Apartados activos cuya fecha límite está entre las dos fechas, ambas incluidas.</summary>
     Task<int> CountUpcomingLayawaysAsync(Guid installationId, DateOnly from, DateOnly to,
         CancellationToken cancellationToken);
+
+    /// <summary>Último envío a la copia externa cifrada de la instalación.</summary>
+    Task<DashboardExternalBackup> GetExternalBackupAsync(Guid installationId, CancellationToken cancellationToken);
 }

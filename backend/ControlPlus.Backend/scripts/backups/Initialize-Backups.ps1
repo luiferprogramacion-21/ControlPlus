@@ -105,7 +105,7 @@ SELECT 'BACKUP_ROLE_OK';
     # Prueba real: respaldo completo con el rol nuevo, verificado y borrado enseguida.
     $env:PGPASSWORD = $backupPassword
     $testDump = Join-Path $env:TEMP ('controlplus-backup-test-' + [guid]::NewGuid().ToString('N') + '.dump')
-    & $pgDump -w -h 127.0.0.1 -p 5432 -U controlplus_backup -d controlplus -Fc --no-owner --no-acl -f $testDump
+    & $pgDump -w -h 127.0.0.1 -p 5432 -U controlplus_backup -d controlplus -Fc -f $testDump
     if ($LASTEXITCODE -ne 0) { throw "pg_dump con controlplus_backup terminó con código $LASTEXITCODE." }
     & $pgRestore --list $testDump | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'El respaldo de prueba no pasó la verificación de pg_restore.' }
