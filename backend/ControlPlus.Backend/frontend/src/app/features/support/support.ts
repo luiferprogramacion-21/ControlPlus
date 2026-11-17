@@ -2,7 +2,7 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { errorText } from '../../core/api';
-import { BackupDestination, BackupDestinationType, BackupStatus, SupportApi } from './support-api';
+import { BackupDestination, BackupDestinationType, BackupStatus, ComponentDiagnosis, diagnosePrinter, diagnoseQueue, SupportApi } from './support-api';
 
 interface DestinationDraft { path: string; active: boolean; }
 
@@ -17,6 +17,8 @@ export class Support implements OnInit {
   readonly status = signal<BackupStatus | null>(null);
   readonly apiUp = signal<boolean | null>(null);
   readonly databaseUp = signal<boolean | null>(null);
+  readonly printer = signal<ComponentDiagnosis | null>(null);
+  readonly queue = signal<ComponentDiagnosis | null>(null);
   readonly loading = signal(false);
   readonly running = signal(false);
   readonly saving = signal<BackupDestinationType | null>(null);
@@ -39,6 +41,9 @@ export class Support implements OnInit {
     this.loading.set(true); this.error.set('');
     const [api, database] = await Promise.all([this.api.healthy('/api/health'), this.api.healthy('/api/health/database')]);
     this.apiUp.set(api); this.databaseUp.set(database);
+    const [printer, queue] = await Promise.all([
+      this.api.printerStatus().catch(() => null), this.api.printQueue().catch(() => null)]);
+    this.printer.set(diagnosePrinter(printer)); this.queue.set(diagnoseQueue(queue));
     try {
       const status = await this.api.status();
       this.status.set(status);

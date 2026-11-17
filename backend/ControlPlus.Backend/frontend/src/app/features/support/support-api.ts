@@ -39,6 +39,35 @@ export interface RestoreOverview {
   rpoMinutes: number; rtoMinutes: number; restoreTestDays: number; lastTest: RestoreTest | null; nextTestDue: string | null; copies: RestorableCopy[];
 }
 
+/** Perfil de impresora activo de la terminal (GET /api/printing/status). */
+export interface PrinterStatus { hasActiveProfile: boolean; profileName: string | null; columns: number | null; }
+export type PrintJobState = 'PENDIENTE' | 'IMPRIMIENDO' | 'IMPRESO' | 'ERROR';
+export interface PrintQueuePage { items: { status: PrintJobState }[]; totalCount: number; }
+/** Lo que Soporte muestra de un componente: texto corto, detalle y tono del distintivo. */
+export interface ComponentDiagnosis { label: string; detail: string; tone: 'success' | 'warning' | 'error' | 'muted'; }
+
+/**
+ * Impresora: solo se sabe si hay un perfil configurado. Que la impresora responda lo confirma la prueba física,
+ * así que nunca se muestra «Disponible».
+ */
+export function diagnosePrinter(status: PrinterStatus | null): ComponentDiagnosis {
+  if (!status) return { label: 'Sin consultar', detail: 'No se pudo leer la configuración de impresión.', tone: 'muted' };
+  if (!status.hasActiveProfile) return { label: 'Sin configurar', detail: 'No hay un perfil de impresora activo (Configuración → Impresión).', tone: 'warning' };
+  return { label: 'Configurada', detail: `Perfil «${status.profileName ?? 'sin nombre'}»${status.columns ? `, ${status.columns} columnas` : ''}.`, tone: 'success' };
+}
+
+/** Cola: estado de los trabajos más recientes (la consulta no filtra por estado). */
+export function diagnoseQueue(page: PrintQueuePage | null): ComponentDiagnosis {
+  if (!page) return { label: 'Sin consultar', detail: 'No se pudo leer la cola de impresión.', tone: 'muted' };
+  if (!page.items.length) return { label: 'Sin trabajos', detail: 'Todavía no se ha enviado nada a imprimir.', tone: 'muted' };
+  const errors = page.items.filter(job => job.status === 'ERROR').length;
+  const pending = page.items.filter(job => job.status === 'PENDIENTE' || job.status === 'IMPRIMIENDO').length;
+  const detail = `Últimos ${page.items.length} de ${page.totalCount} trabajos.`;
+  if (errors) return { label: `${errors} con error`, detail: `${detail} Revíselos en Configuración → Impresión.`, tone: 'error' };
+  if (pending) return { label: `${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}`, detail, tone: 'warning' };
+  return { label: 'Al día', detail, tone: 'success' };
+}
+
 @Injectable({ providedIn: 'root' })
 export class SupportApi {
   private readonly http = inject(HttpClient);
@@ -51,6 +80,8 @@ export class SupportApi {
   updateDestination(type: BackupDestinationType, path: string, active: boolean, expectedVersion: number | null): Promise<BackupDestination> {
     return firstValueFrom(this.http.put<BackupDestination>(`/api/backups/destinations/${type}`, { path, active, expectedVersion }));
   }
+  printerStatus(): Promise<PrinterStatus> { return firstValueFrom(this.http.get<PrinterStatus>('/api/printing/status')); }
+  printQueue(): Promise<PrintQueuePage> { return firstValueFrom(this.http.get<PrintQueuePage>('/api/printing/jobs', { params: { page: 1, pageSize: 20 } })); }
   /** True when the endpoint answers 200; any error means not available. */
   async healthy(path: '/api/health' | '/api/health/database'): Promise<boolean> {
     try { await firstValueFrom(this.http.get(path, { observe: 'response', responseType: 'text' })); return true; }

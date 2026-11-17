@@ -44,8 +44,11 @@
           <li><span>API ASP.NET Core</span><span class="badge" [class.badge--success]="apiUp()" [class.badge--error]="!apiUp()">{{ apiUp() ? 'Disponible' : 'No disponible' }}</span></li>
           <li><span>PostgreSQL</span><span class="badge" [class.badge--success]="databaseUp()" [class.badge--error]="!databaseUp()">{{ databaseUp() ? 'Disponible' : 'No disponible' }}</span></li>
           <li><span>Servicio de respaldos</span><span class="badge" [class.badge--success]="data.serviceEnabled" [class.badge--warning]="!data.serviceEnabled">{{ data.serviceEnabled ? 'Disponible' : 'Apagado' }}</span></li>
-          <li><span>Impresora térmica</span><span class="support-pending">Pendiente de definir</span></li>
-          <li><span>Cola de impresión</span><span class="support-pending">Pendiente de definir</span></li>
+          @for (item of [{ name: 'Impresora térmica', diagnosis: printer() }, { name: 'Cola de impresión', diagnosis: queue() }]; track item.name) {
+            <li><span class="support-component">{{ item.name }}@if (item.diagnosis) { <small>{{ item.diagnosis.detail }}</small> }</span>
+              @if (item.diagnosis; as d) { <span class="badge" [class.badge--success]="d.tone === 'success'" [class.badge--warning]="d.tone === 'warning'" [class.badge--error]="d.tone === 'error'">{{ d.label }}</span> }
+              @else { <span class="support-pending">Consultando…</span> }</li>
+          }
         </ul>
         <div class="support-actions"><button class="button button--secondary" type="button" (click)="refresh()" [disabled]="loading()">{{ loading() ? 'Actualizando…' : 'Actualizar diagnóstico' }}</button></div>
       </section>

@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { SessionService } from '../../core/session.service';
 import { supportGuard } from '../../core/guards';
 import { Support } from './support';
-import { BackupStatus, SupportApi } from './support-api';
+import { BackupStatus, diagnosePrinter, diagnoseQueue, SupportApi } from './support-api';
 
 const status: BackupStatus = {
   serviceEnabled: true, intervalMinutes: 30,
@@ -22,12 +22,14 @@ const status: BackupStatus = {
 };
 
 describe('Soporte y continuidad', () => {
-  const api = { status: vi.fn(), run: vi.fn(), updateDestination: vi.fn(), healthy: vi.fn() };
+  const api = { status: vi.fn(), run: vi.fn(), updateDestination: vi.fn(), healthy: vi.fn(), printerStatus: vi.fn(), printQueue: vi.fn() };
   let permissions: string[];
 
   beforeEach(() => {
     vi.clearAllMocks(); permissions = ['BACKUPS.MANAGE'];
     api.status.mockResolvedValue(status); api.healthy.mockResolvedValue(true); api.run.mockResolvedValue({});
+    api.printerStatus.mockResolvedValue({ hasActiveProfile: true, profileName: 'Caja 80 mm', columns: 48 });
+    api.printQueue.mockResolvedValue({ items: [{ status: 'IMPRESO' }, { status: 'IMPRESO' }], totalCount: 7 });
     TestBed.configureTestingModule({ providers: [
       provideRouter([]),
       { provide: SupportApi, useValue: api },
@@ -64,6 +66,33 @@ describe('Soporte y continuidad', () => {
     expect(text).toContain('Respaldo automático');
     expect(text).toContain('Correcto');
     expect(text).toContain('Falló');
+  });
+
+  it('muestra el estado real de la impresora y de la cola, sin decir que la impresora está disponible', async () => {
+    const fixture = await create();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).not.toContain('Pendiente de definir');
+    expect(text).toContain('Configurada');
+    expect(text).toContain('Perfil «Caja 80 mm», 48 columnas.');
+    expect(text).toContain('Al día');
+    expect(text).toContain('Últimos 2 de 7 trabajos.');
+  });
+
+  it('si no se puede consultar la impresión lo dice, sin bloquear el resto del diagnóstico', async () => {
+    api.printerStatus.mockRejectedValue(new Error('403')); api.printQueue.mockRejectedValue(new Error('403'));
+    const fixture = await create();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('No se pudo leer la configuración de impresión.');
+    expect(text).toContain('No se pudo leer la cola de impresión.');
+    expect(text).toContain('Verificado correctamente');
+  });
+
+  it('resume la impresora y la cola con el tono que corresponde', () => {
+    expect(diagnosePrinter({ hasActiveProfile: false, profileName: null, columns: null })).toMatchObject({ label: 'Sin configurar', tone: 'warning' });
+    expect(diagnoseQueue({ items: [], totalCount: 0 })).toMatchObject({ label: 'Sin trabajos', tone: 'muted' });
+    expect(diagnoseQueue({ items: [{ status: 'IMPRESO' }, { status: 'PENDIENTE' }], totalCount: 2 })).toMatchObject({ label: '1 pendiente', tone: 'warning' });
+    expect(diagnoseQueue({ items: [{ status: 'ERROR' }, { status: 'ERROR' }, { status: 'PENDIENTE' }], totalCount: 3 }))
+      .toMatchObject({ label: '2 con error', tone: 'error' });
   });
 
   it('marca componentes caídos y el servicio apagado deshabilita «Crear respaldo»', async () => {
