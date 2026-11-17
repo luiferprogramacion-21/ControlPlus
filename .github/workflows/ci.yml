@@ -247,6 +247,25 @@ jobs:
           done
           cat "$RUNNER_TEMP/api.log"; exit 1
 
+      - name: Preparar la instalación con el script de arranque (dos veces)
+        env:
+          CONTROLPLUS_SETUP_MASTER_KEY: ${{ env.CONTROLPLUS_E2E_MASTER_KEY }}
+          CONTROLPLUS_SETUP_ADMIN_PASSWORD: ${{ env.CONTROLPLUS_E2E_ADMIN_PASSWORD }}
+        shell: pwsh
+        run: |
+          $arguments = @{
+            ApiUrl = 'http://127.0.0.1:5000'; EstablishmentName = 'Tienda de pruebas E2E'; Identification = 'E2E-900000001'
+            InstallationCode = 'E2E-INSTALACION'; InstallationSerial = 'E2E1'; TerminalCode = 'E2E-TERMINAL'
+            TerminalName = 'Terminal de pruebas E2E'; AdminUserName = 'admin.e2e'; AdminDisplayName = 'Administrador E2E'
+            CashRegisterCode = 'E2E-CAJA'; CashRegisterName = 'Caja de pruebas E2E'
+          }
+          foreach ($run in 1, 2) {
+            $output = & ./scripts/setup/Initialize-ControlPlus.ps1 @arguments 6>&1 | Out-String
+            Write-Host $output
+            if ($output -notmatch 'CONTROLPLUS_INITIAL_SETUP_OK') { throw "La ejecución $run del script no terminó bien." }
+            if ($run -eq 2 -and $output -notmatch 'ya tenía Administrador') { throw 'La segunda ejecución no reconoció la instalación existente.' }
+          }
+
       - name: Instalar Playwright y Chromium
         working-directory: backend/ControlPlus.Backend/e2e
         run: |

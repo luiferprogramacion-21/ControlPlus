@@ -1,11 +1,11 @@
 import { APIRequestContext, expect, request, test } from '@playwright/test';
 
 // Flujo principal de la tienda en el navegador: iniciar sesión, abrir caja, vender y cobrar en efectivo, y cerrar
-// la caja con el arqueo cuadrado. La instalación (primer Administrador, producto con existencias y caja) se prepara
-// por la API, como lo hace el instalador; todo lo demás se hace en la pantalla como lo haría el usuario.
+// la caja con el arqueo cuadrado. El CI deja lista la instalación (negocio, primer Administrador y caja) con
+// scripts/setup/Initialize-ControlPlus.ps1, como en una tienda nueva; aquí solo se crea el producto por la API y todo
+// lo demás se hace en la pantalla como lo haría el usuario.
 
 const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5000';
-const masterKey = process.env.CONTROLPLUS_E2E_MASTER_KEY ?? '';
 const adminUser = 'admin.e2e';
 const adminPassword = process.env.CONTROLPLUS_E2E_ADMIN_PASSWORD ?? '';
 const productName = 'Cuaderno de pruebas E2E';
@@ -18,17 +18,8 @@ async function json<T>(response: Awaited<ReturnType<APIRequestContext['get']>>, 
 }
 
 test.beforeAll(async () => {
-  expect(masterKey, 'Falta CONTROLPLUS_E2E_MASTER_KEY').not.toBe('');
   expect(adminPassword, 'Falta CONTROLPLUS_E2E_ADMIN_PASSWORD').not.toBe('');
   const anonymous = await request.newContext({ baseURL });
-  await json(await anonymous.post('/api/auth/setup', {
-    headers: { 'X-ControlPlus-Master-Key': masterKey },
-    data: {
-      establishmentName: 'Tienda de pruebas E2E', establishmentIdentification: 'E2E-900000001',
-      installationCode: 'E2E-INSTALACION', installationSerial: 'E2E1', terminalCode: 'E2E-TERMINAL',
-      terminalName: 'Terminal de pruebas E2E', userName: adminUser, displayName: 'Administrador E2E', password: adminPassword,
-    },
-  }), 201);
   const login = await json<{ accessToken: string }>(await anonymous.post('/api/auth/login',
     { data: { userName: adminUser, password: adminPassword } }), 200);
   await anonymous.dispose();
@@ -46,7 +37,8 @@ test.beforeAll(async () => {
     },
   }), 201);
   productId = product.id;
-  await json(await api.post('/api/cash/register', { data: { code: 'E2E-CAJA', name: 'Caja de pruebas E2E' } }), 201);
+  const cash = await json<{ isConfigured: boolean; hasOpenShift: boolean }>(await api.get('/api/cash/state'), 200);
+  expect(cash, 'El script de arranque debía dejar la caja configurada y sin turno').toMatchObject({ isConfigured: true, hasOpenShift: false });
   await api.dispose();
 });
 
