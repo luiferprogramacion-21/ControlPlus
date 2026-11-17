@@ -6,6 +6,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { SessionService } from '../../core/session.service';
 import { errorText } from '../../core/api';
+import { LandingCash, landingNeedsCash, landingRoute } from '../../core/landing';
+import { CashApi } from '../cash/cash-api';
 
 /**
  * Inicio de sesión en dos paneles (aprobado por el usuario el 15 de noviembre de 2026, en lugar de la maqueta 02):
@@ -84,6 +86,7 @@ export class Login {
   private readonly fb = inject(FormBuilder);
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
+  private readonly cashApi = inject(CashApi);
   readonly busy = signal(false);
   readonly error = signal('');
   readonly form = this.fb.nonNullable.group({ userName: ['', Validators.required], password: ['', Validators.required] });
@@ -94,8 +97,16 @@ export class Login {
     try {
       const { userName, password } = this.form.getRawValue();
       await this.session.login(userName.trim(), password);
-      await this.router.navigateByUrl('/operacion/catalogo');
+      await this.router.navigateByUrl(landingRoute(this.can, this.isRole, await this.cashForLanding()));
     } catch (e) { this.error.set(errorText(e)); }
     finally { this.busy.set(false); }
+  }
+
+  private readonly can = (permission: string): boolean => this.session.has(permission);
+  private readonly isRole = (...codes: string[]): boolean => this.session.hasRole(...codes);
+  /** Estado de Caja solo para quien vende; si no se puede consultar, el punto de venta explica qué falta. */
+  private async cashForLanding(): Promise<LandingCash | null> {
+    if (!landingNeedsCash(this.can, this.isRole)) return null;
+    try { return await this.cashApi.state(); } catch { return null; }
   }
 }
