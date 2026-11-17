@@ -403,3 +403,133 @@ Activación comunicada por el operador el 17 de noviembre de 2026, con el servic
 - Después reinstaló el servicio desde `c538ccd` con `CONTROLPLUS_SERVICE_OK`.
 
 **No repetir ninguna de las dos migraciones ni ejecutar Down.**
+
+## Auditoría integral del 17 de noviembre de 2026: estado vigente y pendientes de cierre V1
+
+Esta sección es el corte operativo más reciente para Claude, Codex y cualquier otro agente. Cuando una nota histórica anterior diga que algo sigue pendiente y esta sección lo declare cerrado, prevalece esta sección. No elimina las decisiones históricas ni autoriza a rediseñar la Fase 4.
+
+### Estado verificado del árbol, CI y equipo de la tienda
+
+- La auditoría exhaustiva se hizo sobre el corte integrado `c538ccd`, cuyo árbol coincidía con `f82b967`. El trabajo de GitHub Actions `44010581957` terminó correctamente sobre ese árbol: Domain 94/94, Infrastructure 85/85, API 699/699, frontend 593/593 y navegador 1/1, sin pruebas fallidas ni omitidas; también aprobaron el build estricto del backend y el build de producción de Angular.
+- El flujo E2E acreditado cubre solamente iniciar sesión, abrir caja, realizar y cobrar una venta de contado, cerrar caja y verificar el stock. La amplitud de las pruebas de integración no debe confundirse con cobertura E2E completa.
+- Después de ese CI se publicaron cambios de documentación y la simplificación visual de cuotas hasta `9a86149`; por tanto, no atribuir automáticamente el CI de `c538ccd` a revisiones posteriores. Consultar el CI del SHA vigente antes de liberar.
+- En la comprobación del 17 de noviembre, el servicio `ControlPlus` quedó `Running`, con inicio `Automatic`, y usa el ejecutable instalado con SHA-256 `D9094409B261461439906C44CF57368970F5CAB063632F8F7FA2A54288581203`. `/api/health` y `/api/health/database` respondieron HTTP 200. `/openapi/v1.json` respondió 401 en la instalación, es decir, está protegido en ese entorno; no tratar ese 401 como caída de la API.
+- El arranque automático después de reiniciar ya fue comprobado el 16 de noviembre. No permanece como pendiente.
+- `20261116010000_CreditRiskControlsV1` y `20261116020000_CreditInstallmentsV1` ya fueron aplicadas, en ese orden, con los marcadores y respaldos indicados en la sección anterior. No volver a aplicarlas, no ejecutar `Down` y no crear una compensatoria para retirar las cuotas internas: la pantalla usa una sola fecha, pero cada crédito conserva una cuota única interna.
+
+### Cobertura funcional cerrada
+
+El núcleo funcional de la V1 está implementado en usuarios, roles, permisos y auditoría; productos y categorías; caja; ventas, anulaciones y cambios; inventario; clientes; créditos, abonos, anulación de abonos y condonación; proveedores, compras, pedidos y recepción parcial; apartados; reportes; Dashboard; respaldos y restauración; y ejecución como servicio de Windows. La restauración temporal y la restauración real de emergencia ya fueron probadas; no deben seguir apareciendo como pendientes generales.
+
+La auditoría de dependencias no encontró vulnerabilidades conocidas en NuGet, en las dependencias de producción del frontend ni en el proyecto E2E de Playwright. Esto no cierra los pendientes de la cadena de desarrollo indicados abajo.
+
+### Pendientes operativos prioritarios
+
+1. **Impresión térmica real.** El backend de perfiles, cola y reintento existe, pero falta una prueba con la impresora física ejecutando bajo `LocalSystem`: venta real controlada, equipo desconectado, fallo y reintento, ancho, corte, legibilidad y comprobación de que no se dupliquen ni la venta ni el trabajo de impresión. Véanse `docs/printing-implementation.md` y `docs/windows-service.md`.
+2. **Segunda copia local de respaldo.** La copia externa cifrada y la restauración ya funcionan, con RTO observado cercano a un minuto. Falta configurar una copia local en otro disco porque el equipo solo tenía `C:`; conectar un USB u otro disco, vigilar el espacio disponible de OneDrive y ejecutar una copia y verificación controladas.
+3. **Pruebas de aceptación por rol y flujo.** Ejecutar una matriz manual/visual como Cajero, Supervisor y Administrador, incluida la precedencia de revocaciones individuales y las autorizaciones sensibles. No modificar la interfaz fuera del prototipo sin aprobación.
+
+### Brechas funcionales frente al alcance y al paquete oficial de Fase 4
+
+- **Etiquetas de producto:** la maqueta oficial 12c y el permiso `PRODUCTS.LABELS_MANAGE` existen, pero no hay caso de uso, controlador, ruta ni pantalla para diseñar o imprimir etiquetas. Es una brecha del alcance de códigos de barras e impresión, no una mejora opcional ya terminada.
+- **Carrito/borrador recuperable:** el modelo oficial define `ventas.borrador_venta` y `ventas.detalle_borrador_venta`; actualmente solo hay mapeo de persistencia y referencias de integridad, sin servicio, API ni interfaz que permitan recuperar el carrito. Cerrar sesión pierde el carrito y tampoco existe el flujo de bloquear sesión conservándolo.
+- **Configuración general incompleta:** después de la puesta en marcha no existe edición integral de los datos del establecimiento; tampoco gestión real de métodos de pago, prueba de impresión ni administración real de sincronización o actualizaciones, aunque el catálogo contiene permisos relacionados.
+- **Diagnóstico de soporte desactualizado:** la pantalla de soporte muestra Impresora y Cola de impresión como «Pendiente de definir» aunque ya existen configuración y cola. Debe mostrar diagnóstico real sin inventar estado, exponer secretos ni sustituir la prueba física.
+- La operación híbrida/local-first sigue siendo una condición de diseño. No implementar una nube como única fuente de verdad; la sincronización completa continúa pendiente si se decide activarla para V1.
+
+### Permisos sembrados sin efecto funcional completo
+
+Los siguientes códigos existen en el catálogo, pero la auditoría no encontró un endpoint, guard o función de usuario que complete su propósito: `PRODUCTS.LABELS_MANAGE`, `INVENTORY.REPLENISHMENT_ALERTS_READ`, `REPORTS.OPERATIONAL_READ`, `CREDIT.FUTURE_BLOCK`, `PRINT.TEST`, `PAYMENT_METHODS.MANAGE`, `SYNCHRONIZATION.MANAGE`, `TECHNICAL_STATUS.READ` y `UPDATES.MANAGE`.
+
+Antes de la entrega se debe decidir, código por código, entre implementar la función aprobada, ocultar el permiso de la administración o declararlo explícitamente reservado para una fase posterior. Conceder cualquiera de estos permisos hoy puede no producir ningún efecto; no simular que habilita una capacidad inexistente.
+
+### Deuda de pruebas, calidad y seguridad
+
+- Ampliar E2E en navegador para morosos, cupo y excepción de crédito; abonos, anulación y condonación; apartados; pago mixto; anulación y cambio de venta; compras y recepción parcial; permisos/autorizaciones; respaldos/restauración e impresión.
+- Corregir las advertencias `NG01354` del componente reutilizable `cp-payment-methods` anidado en formularios padre y las advertencias de `cdkFocusInitial` sobre elementos no enfocables. Las 593 pruebas pasan, pero esas advertencias no deben normalizarse como estado final.
+- Medir el objetivo de respuesta de hasta un segundo en búsqueda de productos, confirmación de venta, cierre de caja, listado de créditos, reportes de 31 días, Dashboard y recepción de compras. No existe todavía evidencia formal de carga/rendimiento ni un umbral automático de cobertura de código.
+- La auditoría completa de `npm` del frontend reportó 12 entradas de severidad alta en herramientas de desarrollo de la cadena Angular Build/Vite/Vitest/picomatch; no afectan el paquete de producción auditado. Resolver con una actualización controlada y regresión completa, nunca con `npm audit fix --force` sin revisar cambios mayores.
+- No hay configuración de Dependabot ni análisis SAST/CodeQL. Dependabot está decidido para después de la entrega; si se adelanta, debe hacerse como cambio separado y validado.
+
+### Deuda documental y orden recomendado de cierre
+
+Algunos documentos conservan estados históricos ya superados: `docs/credit-risk.md` todavía puede referirse a cuotas como trabajo futuro; `docs/vat-setting-contract.md` puede describir el backend como no implementado; y `docs/backups.md` conserva primero la etapa en que la restauración estaba pendiente antes de documentar su cierre. Mantener el valor histórico, pero añadir un estado vigente inequívoco para impedir que un agente repita migraciones, reabra decisiones cerradas o informe falsos pendientes.
+
+Orden recomendado desde este corte:
+
+1. Confirmar CI del SHA que se pretenda liberar y hacer el smoke autenticado del corte instalado.
+2. Completar la prueba de impresora térmica física.
+3. Configurar el segundo destino local de respaldo y revisar espacio de OneDrive.
+4. Implementar etiquetas de producto conforme a la maqueta 12c.
+5. Implementar borrador/carrito recuperable y bloqueo de sesión conservando la operación.
+6. Resolver configuración incompleta y permisos sembrados sin función.
+7. Ejecutar UAT por roles y ampliar E2E.
+8. Limpiar advertencias, medir rendimiento y actualizar de forma controlada la cadena de desarrollo.
+9. Conciliar los documentos históricos con este corte sin borrar evidencias.
+
+## Revisión de Claude del 17 de noviembre de 2026 y reparto de tareas hasta la entrega
+
+Claude repitió la revisión por su cuenta sobre `9a86149`. Comparó las 38 pantallas del inventario oficial de Fase 4 (sección 3.4 del documento de diseño), con las maquetas en `OneDrive\Documentos\ControlPlus_Fase4_Documento_y_Complementos\…\04_Mockups`, contra el código y este archivo. También verificó la auditoría de Codex de la sección anterior.
+
+### Verificación de la auditoría de Codex
+
+Confirmados con el código:
+
+- etiquetas sin función;
+- borrador de venta solo mapeado;
+- configuración general incompleta;
+- Soporte con «Pendiente de definir»;
+- los 9 permisos (solo aparecen en `20260912012000_HybridPermissionsV1`);
+- 12 avisos altos de `npm audit`, todos en dependencias de desarrollo, con 0 en producción;
+- documentos con estados históricos (por ejemplo, la nota del IVA de apartados «pendiente de activación» y «pendiente comprobar el arranque tras reiniciar» en este archivo);
+- ausencia de mediciones de rendimiento.
+
+No reproducido: las advertencias NG01354 y `cdkFocusInitial`. Las 591 pruebas y el build de producción terminan sin advertencias; si existen, solo aparecen en la consola del navegador.
+
+### Hallazgos adicionales de Claude (no incluidos en la auditoría de Codex)
+
+1. **La sesión vence sin renovarse.** `Jwt:AccessTokenMinutes` vale 30 por defecto y no existe renovación. Al vencer, la siguiente llamada da 401, `core/api.ts` cierra la sesión y se pierde el carrito en memoria. Es la causa más probable de perder ventas en la operación diaria.
+2. **Precio de venta nuevo en la recepción de compras.** La maqueta 18 y el alcance de Fase 4 («actualización histórica de precios») lo exigen. `PurchaseService` guarda siempre `PrecioVentaNuevo = PrecioVentaAnterior` y la pantalla no tiene esa columna.
+3. **Modo de turno sin pantalla** (maqueta 21b). `PUT /api/cash/shift-mode` existe, pero ninguna pantalla lo usa. El desbloqueo con carné está en Caja, no superpuesto en el punto de venta como en la maqueta 06b.
+4. **Instalación nueva sin pantalla ni script de arranque.** `POST /api/auth/setup` (clave maestra) y `POST /api/cash/register` solo se pueden usar a mano. La tienda ya está instalada, pero la guía de instalación de la entrega lo necesita.
+5. **Datos del negocio fijos en el código.** El ticket (`sales/ticket.ts`), el carné, el pedido de compra, la barra superior y la tarjeta «Datos del turno» de Caja muestran «Baratísimo» fijo. El ticket no imprime NIT, dirección ni teléfono, aunque `configuracion.establecimiento` ya tiene `NombreComercial`, `Identificacion`, `Direccion`, `Telefono`, `EncabezadoComprobante` y `PieComprobante`. La tabla no tiene correo: agregarlo exigiría migración. El ticket de una venta a crédito no muestra la fecha de vencimiento.
+6. **Contraseña propia.** `PUT /api/users/{id}/password` admite el cambio con la contraseña actual, pero la pantalla solo está en Administración, a la que Cajero y Supervisor no entran.
+7. **Destino al iniciar sesión.** `auth/login.ts` siempre lleva a Catálogo. El mapa de navegación (maqueta 00) pide destino según rol y caja: sin turno, abrir caja; con turno, punto de venta.
+8. **Base vieja en el servidor.** `controlplus_anterior_20261116213225` (restauración de emergencia del 16 de noviembre) sigue ocupando espacio. Borrarla solo con autorización del usuario y después de la entrega.
+
+### Lista consolidada y estado de decisión
+
+El 17 de noviembre de 2026 el usuario pidió guardar esta revisión y repartir las tareas entre Claude y Codex. Claude recomendó hacer A, D, E, F, I, J, L, M, N, O y el manual; dejar G y H para después de la entrega; y ocultar los permisos de K. **G, H y el público del manual siguen pendientes de decisión del usuario.** No implementarlos hasta que el usuario responda.
+
+| Id | Tarea | Prioridad | Responsable propuesto |
+| --- | --- | --- | --- |
+| A | Renovar la sesión mientras se usa, para no perder la venta | Alta | Claude |
+| B | Prueba física de la impresora térmica bajo `LocalSystem` | Alta | Usuario (con apoyo de Claude) |
+| C | Segundo disco para la copia local y espacio en OneDrive | Alta | Usuario |
+| D | Etiquetas con código de barras (maqueta 12c) | Media | Codex |
+| E | Precio de venta nuevo en la recepción de compras (maqueta 18), solo Administrador y auditado | Media | Codex |
+| F | Datos del establecimiento editables (maqueta 21) y su uso en ticket, carné, pedido, barra superior y Caja | Media | Codex |
+| G | Activar el turno compartido desde la pantalla (21b) y desbloqueo en el POS (06b) | **Pendiente de decisión** | — |
+| H | Venta recuperable o «bloquear sesión» conservando el carrito | **Pendiente de decisión** | — |
+| I | Arranque de una instalación nueva (script guiado de primer Administrador y caja) | Media | Claude |
+| J | Soporte con el estado real de impresora y cola (maqueta 22) | Baja | Claude |
+| K | Ocultar en Administración los 9 permisos sin función (sin borrarlos del catálogo) | Baja | Codex |
+| L | Destino al iniciar sesión según rol y caja | Baja | Claude |
+| M | Cambio de la contraseña propia para todos los roles (requiere aprobar dónde va en la pantalla) | Baja | Claude |
+| N | Fecha de vencimiento en el ticket de venta a crédito | Baja | Codex (junto con F, mismo archivo) |
+| O | Conciliar documentos con estados viejos | Baja | Claude |
+| P | Actualizar herramientas de desarrollo con avisos de seguridad, al final y con regresión completa | Baja | Claude |
+| Q | Ampliar las pruebas de navegador | Baja | Claude |
+| R | Medir el objetivo de 1 segundo | Baja | Claude |
+| — | Manual de uso y guía de instalación y operación | Entrega | Claude (público pendiente) |
+
+### Reglas del reparto
+
+- Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:
+  - `sales/ticket.ts` es de Codex (F y N);
+  - `core/session.service.ts`, `core/api.ts` y `auth/login.ts` son de Claude (A y L);
+  - `layout/shell.ts`: Codex cambia solo el nombre del negocio (F) y Claude solo el acceso a la contraseña propia (M).
+- Antes de editar, revisar `git status` y `git log origin/main..main`. No hacer commit ni push del trabajo ajeno. Subir commits pequeños y esperar el CI en verde.
+- Toda pantalla nueva sigue su maqueta; lo que no tenga maqueta (M) se aprueba antes con el usuario.
+- Si una tarea necesita migración (por ejemplo, el correo del establecimiento), detenerse y pedir aprobación. La activación la hace el operador con script, respaldo, preflight y postflight, como las anteriores.
+- No acceder a `controlplus` desde el agente.
