@@ -2,6 +2,7 @@ import { Component, computed, inject, input, OnInit, output, signal } from '@ang
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
 import { AdminApi, AdminPermission, AdminUser, EffectivePermission } from './admin-api';
+import { isVisibleAdminPermission } from './visible-permissions';
 
 interface Row extends EffectivePermission { module: string; }
 
@@ -52,7 +53,9 @@ export class UserPermissions implements OnInit {
 
   readonly rows = computed<Row[]>(() => {
     const modules = new Map(this.catalog().map(permission => [permission.id, permission.module]));
-    return this.effective().map(item => ({ ...item, module: modules.get(item.id) ?? 'OTROS' }));
+    return this.effective()
+      .filter(item => isVisibleAdminPermission(item.code))
+      .map(item => ({ ...item, module: modules.get(item.id) ?? 'OTROS' }));
   });
   readonly exceptionCount = computed(() => this.effective().filter(item => item.source === 'INDIVIDUAL').length);
   readonly groups = computed(() => {

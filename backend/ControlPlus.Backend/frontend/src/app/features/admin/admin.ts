@@ -12,6 +12,7 @@ import { AuditLog } from './audit-log';
 import { RoleTemplate } from './role-template';
 import { UserCredential } from './user-credential';
 import { UserPermissions } from './user-permissions';
+import { isVisibleAdminPermission } from './visible-permissions';
 
 type Mode = 'create' | 'edit' | 'role' | 'password';
 type Tab = 'users' | 'roles' | 'audit';
@@ -62,7 +63,9 @@ export class Admin implements OnInit {
   isSelf(user: AdminUser): boolean { return user.id === this.session.user()?.id; }
   permissionModules(role: AdminRole): { module: string; permissions: AdminRole['permissions'] }[] {
     const groups = new Map<string, AdminRole['permissions']>();
-    for (const permission of role.permissions) groups.set(permission.module, [...(groups.get(permission.module) ?? []), permission]);
+    for (const permission of role.permissions.filter(item => isVisibleAdminPermission(item.code))) {
+      groups.set(permission.module, [...(groups.get(permission.module) ?? []), permission]);
+    }
     return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([module, permissions]) => ({ module, permissions }));
   }
 
@@ -85,7 +88,7 @@ export class Admin implements OnInit {
   }
 
   async loadRoles(): Promise<void> {
-    try { this.roles.set((await this.api.roles({ page: 1, pageSize: 50 })).items); }
+    try { this.roles.set((await this.api.roles({ page: 1, pageSize: 50 })).items.map(role => this.visibleRole(role))); }
     catch (e) { this.error.set(errorText(e)); }
   }
 
@@ -177,6 +180,7 @@ export class Admin implements OnInit {
   closeCredential(): void { this.credentialUser.set(null); }
 
   roleUpdated(updated: AdminRole): void {
+    updated = this.visibleRole(updated);
     this.roles.update(list => list.map(role => role.id === updated.id ? updated : role));
     this.viewedRole.set(updated);
     this.notice.set('Plantilla actualizada.');
@@ -184,7 +188,11 @@ export class Admin implements OnInit {
 
   private async ensureCatalog(): Promise<boolean> {
     if (this.catalog().length) return true;
-    try { this.catalog.set(await this.api.permissionCatalog()); return true; }
+    try { this.catalog.set((await this.api.permissionCatalog()).filter(permission => isVisibleAdminPermission(permission.code))); return true; }
     catch (e) { this.error.set(errorText(e)); return false; }
+  }
+
+  private visibleRole(role: AdminRole): AdminRole {
+    return { ...role, permissions: role.permissions.filter(permission => isVisibleAdminPermission(permission.code)) };
   }
 }
