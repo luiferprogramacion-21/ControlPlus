@@ -943,6 +943,12 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         Assert.Equal([334m, 333m, 333m], credit.Installments.Select(x => x.Amount));
         Assert.Equal(dates, credit.Installments.Select(x => x.DueOn));
         Assert.All(credit.Installments, x => Assert.Equal("PENDIENTE", x.State));
+        Assert.Contains((await ReadAsync<PagedResult<CreditDto>>(await client.GetAsync(
+            $"/api/credits?dueFrom={dates[1]:yyyy-MM-dd}&dueTo={dates[1]:yyyy-MM-dd}"), HttpStatusCode.OK)).Items,
+            x => x.Id == creditId);
+        Assert.DoesNotContain((await ReadAsync<PagedResult<CreditDto>>(await client.GetAsync(
+            $"/api/credits?dueFrom={day.AddDays(21):yyyy-MM-dd}&dueTo={day.AddDays(29):yyyy-MM-dd}"), HttpStatusCode.OK)).Items,
+            x => x.Id == creditId);
 
         // El abono recorre las cuotas por fecha: paga la primera y deja la segunda parcial.
         var paid = await ReadAsync<CreditPaymentOperationDto>(await PayAsync(client, creditId,

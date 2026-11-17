@@ -14,8 +14,12 @@ public sealed class EfCreditsRepository(OfficialControlPlusDbContext dbContext) 
     {
         var source = dbContext.Credito.AsNoTracking().AsQueryable();
         if (query.CustomerId is Guid customerId) source = source.Where(x => x.Venta.ClienteId == customerId);
-        if (query.DueFrom is DateOnly from) source = source.Where(x => x.FechaVencimiento >= from);
-        if (query.DueTo is DateOnly to) source = source.Where(x => x.FechaVencimiento <= to);
+        if (query.DueFrom is DateOnly from && query.DueTo is DateOnly to)
+            source = source.Where(x => x.CuotaCredito.Any(q => q.FechaVencimiento >= from && q.FechaVencimiento <= to));
+        else if (query.DueFrom is DateOnly onlyFrom)
+            source = source.Where(x => x.CuotaCredito.Any(q => q.FechaVencimiento >= onlyFrom));
+        else if (query.DueTo is DateOnly onlyTo)
+            source = source.Where(x => x.CuotaCredito.Any(q => q.FechaVencimiento <= onlyTo));
         if (!string.IsNullOrWhiteSpace(query.State))
         {
             if (query.State == "VENCIDO")

@@ -1,9 +1,10 @@
 # Integración continua de ControlPlus.
 #
 # Cuándo corre (el repositorio es privado: se cuidan los minutos):
-#   - push a main, pull request y ejecución manual: los tres trabajos.
-#       backend (compilación estricta y pruebas sin base de datos), frontend y
-#       backend con un PostgreSQL 18 descartable.
+#   - push a main, pull request y ejecución manual: los cuatro trabajos.
+#       backend (compilación estricta y pruebas sin base de datos), frontend,
+#       backend con un PostgreSQL 18 descartable y pruebas de navegador del
+#       flujo principal (e2e, base controlplus_e2e_* descartable).
 #   - los push a main que solo cambian documentación (Markdown o carpetas docs)
 #     no ejecutan nada. Si un push mezcla código y documentación, corre completo.
 #   - una ejecución nueva cancela la anterior del mismo push o pull request.
@@ -163,4 +164,106 @@ jobs:
         with:
           name: resultados-trx
           path: ${{ runner.temp }}/trx
+          retention-days: 7
+
+  # Pruebas de navegador del flujo principal (docs/e2e.md): la API publicada sirve la pantalla compilada, como el
+  # servicio de la tienda, contra una base descartable controlplus_e2e_* en un PostgreSQL 18 efímero.
+  e2e:
+    name: Pruebas de navegador (flujo principal)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NG_CLI_ANALYTICS: 'false'
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/ControlPlus.Backend/frontend/package-lock.json
+            backend/ControlPlus.Backend/e2e/package-lock.json
+
+      - name: Compilar la pantalla (producción)
+        working-directory: backend/ControlPlus.Backend/frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Publicar la API con la pantalla dentro
+        run: |
+          dotnet publish ControlPlus.Api/ControlPlus.Api.csproj -c Release -o "$RUNNER_TEMP/api" -m:1 -p:BuildInParallel=false -warnaserror --nologo
+          mkdir -p "$RUNNER_TEMP/api/wwwroot"
+          cp -r frontend/dist/controlplus-frontend/browser/. "$RUNNER_TEMP/api/wwwroot/"
+          test -f "$RUNNER_TEMP/api/wwwroot/index.html"
+
+      - name: Preparar la base descartable y las claves de la prueba
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGDATABASE: postgres
+          PGPASSWORD: ci-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          master_key="$(openssl rand -hex 32)"; jwt_key="$(openssl rand -hex 48)"; admin_password="E2e-$(openssl rand -hex 12)-Aa9"
+          echo "::add-mask::$master_key"; echo "::add-mask::$jwt_key"; echo "::add-mask::$admin_password"
+          psql -X -v ON_ERROR_STOP=1 -c "CREATE DATABASE controlplus_e2e_ci"
+          connection="Host=127.0.0.1;Port=5432;Database=controlplus_e2e_ci;Username=postgres;Password=${PGPASSWORD}"
+          CONTROLPLUS_E2E_CONNECTION="$connection" dotnet run e2e/setup/Prepare-E2EDatabase.cs
+          {
+            echo "ConnectionStrings__ControlPlusDb=$connection"
+            echo "Installation__MasterKey=$master_key"
+            echo "Jwt__SigningKey=$jwt_key"
+            echo "CONTROLPLUS_E2E_MASTER_KEY=$master_key"
+            echo "CONTROLPLUS_E2E_ADMIN_PASSWORD=$admin_password"
+          } >> "$GITHUB_ENV"
+
+      - name: Iniciar la API
+        working-directory: ${{ runner.temp }}/api
+        env:
+          ASPNETCORE_URLS: http://127.0.0.1:5000
+        run: |
+          nohup dotnet ControlPlus.Api.dll > "$RUNNER_TEMP/api.log" 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:5000/api/health/database > /dev/null 2>&1; then echo "API lista"; exit 0; fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/api.log"; exit 1
+
+      - name: Instalar Playwright y Chromium
+        working-directory: backend/ControlPlus.Backend/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Pruebas de navegador
+        working-directory: backend/ControlPlus.Backend/e2e
+        run: npx playwright test
+
+      - name: Guardar evidencia (informe, trazas y registro de la API)
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-evidencia
+          path: |
+            backend/ControlPlus.Backend/e2e/playwright-report
+            backend/ControlPlus.Backend/e2e/test-results
+            ${{ runner.temp }}/api.log
           retention-days: 7

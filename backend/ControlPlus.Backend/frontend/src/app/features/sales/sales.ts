@@ -95,20 +95,20 @@ export class Sales implements OnInit, OnDestroy {
   }
   setCreditPlan(value: 'SINGLE' | 'INSTALLMENTS'): void {
     this.creditPlan = value;
-    if (value === 'INSTALLMENTS' && this.installmentDates.length < 2) {
-      const first = this.dueDate || this.minimumDueDate;
-      this.installmentDates = [first, this.addDaysClamped(first, 30)];
-    }
+    if (value === 'INSTALLMENTS' && this.installmentDates.length < 2) this.installmentDates = this.suggestInstallmentDates(2);
   }
   setInstallmentCount(value: number): void {
     const count = Math.max(2, Math.min(90, Math.trunc(Number(value) || 2)));
-    const dates = [...this.installmentDates];
-    while (dates.length < count) dates.push(this.addDaysClamped(dates.at(-1) || this.minimumDueDate, 30));
-    this.installmentDates = dates.slice(0, count);
+    if (count !== this.installmentDates.length) this.installmentDates = this.suggestInstallmentDates(count);
   }
-  private addDaysClamped(iso: string, days: number): string {
-    if (!iso) return ''; const date = new Date(`${iso}T12:00:00`); date.setDate(date.getDate() + days);
-    const result = date.toISOString().slice(0, 10); return this.maximumDueDate && result > this.maximumDueDate ? this.maximumDueDate : result;
+  private suggestInstallmentDates(count: number): string[] {
+    if (!this.minimumDueDate || !this.maximumDueDate) return Array.from({ length: count }, () => '');
+    const first = new Date(`${this.minimumDueDate}T12:00:00`); const last = new Date(`${this.maximumDueDate}T12:00:00`);
+    const span = Math.round((last.getTime() - first.getTime()) / 86_400_000);
+    return Array.from({ length: count }, (_, index) => {
+      const date = new Date(first); date.setDate(first.getDate() + Math.floor(index * span / Math.max(1, count - 1)));
+      return date.toISOString().slice(0, 10);
+    });
   }
   private pending: { key: string; input: SaleInput; authorizerUserName: string | null } | null = null;
   private suggestTimer: ReturnType<typeof setTimeout> | undefined;
@@ -605,7 +605,7 @@ export class Sales implements OnInit, OnDestroy {
   }
   /** Moves the cursor to the field that blocks the confirmation. */
   private focusInvalid(): void {
-    if (this.saleType() === 'CREDITO') { this.focusField('credit-due-date'); return; }
+    if (this.saleType() === 'CREDITO') { this.focusField(this.creditPlan === 'SINGLE' ? 'credit-due-date' : 'credit-installment-0'); return; }
     this.focusField('cash-received', 'transfer-applied', 'nequi-applied');
   }
   async confirm(): Promise<void> {

@@ -32,7 +32,9 @@ Solo termina con `CREDIT_INSTALLMENTS_ACTIVATION_OK`; ante un fallo conserva la 
 
 ## Pantalla
 
-- **Ventas → cobro a crédito:** «Forma de pago» con «Pago único» (fecha de vencimiento) o «Cuotas» (de 2 a 90). Cada cuota muestra su fecha y su importe; las fechas sugeridas van cada 30 días sin pasar de 90.
+Aprobada por el usuario el 16 de noviembre de 2026 (no estaba en el prototipo): «Pago único» queda por defecto y las cuotas son opcionales.
+
+- **Ventas → cobro a crédito:** «Forma de pago» con «Pago único» (fecha de vencimiento) o «Cuotas» (de 2 a 90). Cada cuota muestra su fecha y su importe; las fechas sugeridas se distribuyen sin repetirse dentro de los 90 días permitidos y siguen siendo editables.
 - **Créditos → detalle:** «Plan de pago» con cada cuota, su vencimiento, su estado (Pendiente, Vencida, Pagada, Anulada) y su saldo.
 
 ## Verificación
