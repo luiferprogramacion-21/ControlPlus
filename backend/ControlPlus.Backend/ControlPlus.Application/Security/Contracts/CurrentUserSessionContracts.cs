@@ -33,4 +33,11 @@ public interface IAuthenticationService
     Task<Result> RecoverInitialAdministratorAsync(
         RecoverInitialAdministratorRequest request,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Emite un token nuevo, con la duración configurada, para la sesión vigente de <paramref name="userId"/>. La
+    /// validación del token actual (usuario activo, no bloqueado y sello de seguridad vigente) ya ocurrió al autenticar
+    /// la solicitud; aquí se exige además un rol activo, igual que al iniciar sesión.
+    /// </summary>
+    Task<Result<AuthenticationResult>> RenewAsync(Guid userId, CancellationToken cancellationToken = default);
 }

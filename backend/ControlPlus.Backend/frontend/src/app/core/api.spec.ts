@@ -12,7 +12,7 @@ describe('Intercepción de autorización', () => {
     expect(errorText(new HttpErrorResponse({ status: 400, error: { errors: { request: ['Costo requerido.'] } } }))).toBe('Costo requerido.');
   });
   it('un rechazo de credenciales del autorizador conserva la sesión del operador', async () => {
-    const session = { token: () => 'token-operador', logout: vi.fn() };
+    const session = { token: () => 'token-operador', logout: vi.fn(), touch: vi.fn() };
     const router = { navigateByUrl: vi.fn() };
     TestBed.configureTestingModule({ providers: [
       provideHttpClient(withInterceptors([authInterceptor])), provideHttpClientTesting(),
@@ -26,6 +26,24 @@ describe('Intercepción de autorización', () => {
     await expect(task).rejects.toBeTruthy();
     expect(session.logout).not.toHaveBeenCalled();
     expect(router.navigateByUrl).not.toHaveBeenCalled();
+    http.verify();
+  });
+  it('las consultas a la API cuentan como actividad de la sesión, la renovación no', async () => {
+    const session = { token: () => 'token-operador', logout: vi.fn(), touch: vi.fn() };
+    TestBed.configureTestingModule({ providers: [
+      provideHttpClient(withInterceptors([authInterceptor])), provideHttpClientTesting(),
+      { provide: SessionService, useValue: session }, { provide: Router, useValue: { navigateByUrl: vi.fn() } },
+    ] });
+    const http = TestBed.inject(HttpTestingController);
+    const client = TestBed.inject(HttpClient);
+    const search = firstValueFrom(client.get('/api/products'));
+    http.expectOne('/api/products').flush({});
+    await search;
+    expect(session.touch).toHaveBeenCalledTimes(1);
+    const renewal = firstValueFrom(client.post('/api/auth/refresh', null));
+    http.expectOne('/api/auth/refresh').flush({});
+    await renewal;
+    expect(session.touch).toHaveBeenCalledTimes(1);
     http.verify();
   });
 });

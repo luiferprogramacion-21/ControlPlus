@@ -30,6 +30,8 @@ public sealed class OpenApiContractTests
 
         var paths = root.GetProperty("paths");
         AssertProtected(paths, "/api/auth/me", "get");
+        AssertProtected(paths, "/api/auth/refresh", "post");
+        AssertResponses(paths, "/api/auth/refresh", "post", "200", "401", "403");
         AssertProtected(paths, "/api/categories", "get");
         AssertProtected(paths, "/api/categories", "post");
         AssertProtected(paths, "/api/products", "get");

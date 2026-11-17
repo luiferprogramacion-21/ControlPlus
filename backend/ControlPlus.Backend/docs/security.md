@@ -22,6 +22,24 @@ Fuera de `Testing`, la API falla al iniciar si `CONTROLPLUS_MASTER_KEY` falta o 
 
 La Master Key se compara en tiempo constante. Nunca se registra, se incluye en respuestas ni se reemplaza por un valor predeterminado en archivos versionados.
 
+### Renovación de la sesión (17 de noviembre de 2026)
+
+Antes, el token duraba `Jwt:AccessTokenMinutes` (30 por defecto) y no se renovaba. Al vencer, la siguiente consulta respondía 401, la pantalla cerraba la sesión y se perdía la venta que estaba en curso.
+
+`POST /api/auth/refresh` (autenticado, sin cuerpo) devuelve un `AuthenticationResult` nuevo, igual que el inicio de sesión, con el mismo usuario y sus permisos vigentes:
+
+- El token actual se valida como en cualquier otra solicitud: usuario activo, no bloqueado y sello de seguridad vigente.
+- Si el usuario fue desactivado, bloqueado o se le revocaron las sesiones (cambio de rol, permisos o contraseña), responde 401. Esto vale también para un token renovado antes de la revocación.
+- Sin rol activo responde 403.
+- No se audita, porque no es una acción de negocio.
+
+La pantalla (`core/session.service.ts`) cuenta como actividad las teclas, los clics y las consultas a la API. Cada 30 segundos revisa si debe renovar la sesión, y la renueva cuando:
+
+- hubo actividad desde que llegó el token actual, y
+- ya pasó la mitad de su duración.
+
+Si nadie usa el sistema durante toda la duración del token, la sesión vence como antes: es la protección cuando alguien deja la caja sola. No hay un límite absoluto de horas para una sesión activa; si se quiere uno, es una decisión del usuario.
+
 ## Concurrencia optimista
 
 Las entidades oficiales cuyo diccionario de Fase 4 define `version` como token de concurrencia se configuran con `IsConcurrencyToken()`. `OfficialControlPlusDbContext` aplica una única estrategia: antes de guardar una entidad modificada, incrementa `version` desde el valor original. EF Core incorpora ese valor original en la actualización, por lo que una modificación concurrente no puede sobrescribirse silenciosamente.

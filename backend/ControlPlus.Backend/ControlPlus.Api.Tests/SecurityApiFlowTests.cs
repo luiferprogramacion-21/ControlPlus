@@ -1106,6 +1106,52 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task SessionRefresh_IssuesANewTokenForTheValidSession_AndRejectsRevokedOrAnonymousSessions()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync("/api/auth/refresh", null)).StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        var refreshed = await client.PostAsync("/api/auth/refresh", null);
+        Assert.Equal(HttpStatusCode.OK, refreshed.StatusCode);
+        var renewed = (await refreshed.Content.ReadFromJsonAsync<AuthenticationResult>())!;
+        Assert.NotEqual(administrator.AccessToken, renewed.AccessToken);
+        Assert.True(renewed.ExpiresAtUtc >= administrator.ExpiresAtUtc);
+        Assert.Equal(administrator.User.Id, renewed.User.Id);
+        Assert.Equal(administrator.User.Permissions.Order(), renewed.User.Permissions.Order());
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", renewed.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/auth/me")).StatusCode);
+        var cashierRoleId = await GetRoleIdAsync(client, RoleCodes.Cashier);
+        var created = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "refresh.cashier.test", "Cajero de renovación", "Cashier-Test-Password-2026!", [cashierRoleId]));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var cashier = (await created.Content.ReadFromJsonAsync<UserDto>())!;
+        var cashierSession = await LoginAsync(client, "refresh.cashier.test", "Cashier-Test-Password-2026!");
+
+        // Al desactivar al Cajero se revocan sus sesiones: ya no puede renovar ni usar el token renovado antes.
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cashierSession.AccessToken);
+        var cashierRenewal = (await (await client.PostAsync("/api/auth/refresh", null))
+            .Content.ReadFromJsonAsync<AuthenticationResult>())!;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", renewed.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsync($"/api/users/{cashier.Id}/deactivate", null)).StatusCode);
+        foreach (var token in new[] { cashierSession.AccessToken, cashierRenewal.AccessToken })
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync("/api/auth/refresh", null)).StatusCode);
+        }
+
+        // La renovación no es una acción de negocio: no deja eventos de auditoría.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(0, await context.EventoAuditoria.CountAsync(item => item.Accion.Contains("Refresh") ||
+            item.Accion.Contains("Renew")));
+    }
+
     private async Task SetupInitialAdministratorAsync(HttpClient client, string password)
     {
         var setup = new SetupFirstAdministratorRequest(

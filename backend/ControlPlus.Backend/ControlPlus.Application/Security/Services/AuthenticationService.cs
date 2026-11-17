@@ -209,7 +209,19 @@ public sealed class AuthenticationService : IAuthenticationService
             cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var authorization = await _userRepository.GetAuthorizationSnapshotAsync(user.Id, cancellationToken);
+        return await IssueAsync(user.Id, cancellationToken);
+    }
+
+    public async Task<Result<AuthenticationResult>> RenewAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        if (userId == Guid.Empty)
+            return Result.Failure<AuthenticationResult>(ApplicationError.Unauthorized());
+        return await IssueAsync(userId, cancellationToken);
+    }
+
+    private async Task<Result<AuthenticationResult>> IssueAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var authorization = await _userRepository.GetAuthorizationSnapshotAsync(userId, cancellationToken);
         if (authorization is null || authorization.HighestRoleLevel == RoleLevel.None)
         {
             return Result.Failure<AuthenticationResult>(ApplicationError.Forbidden(

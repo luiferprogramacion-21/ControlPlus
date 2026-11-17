@@ -32,6 +32,8 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const router = inject(Router);
   const token = session.token();
   const authenticated = token && !request.url.endsWith('/api/auth/login');
+  // Consultar la API cuenta como actividad para renovar la sesión (la propia renovación no).
+  if (authenticated && !request.url.endsWith('/api/auth/refresh')) session.touch();
   return next(authenticated ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : request).pipe(
     catchError(error => {
       const rejectedAuthorizer = request.context.get(authorizationAttempt) &&

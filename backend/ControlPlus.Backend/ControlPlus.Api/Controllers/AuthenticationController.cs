@@ -137,6 +137,26 @@ public sealed class AuthenticationController(
         return FromResult(result);
     }
 
+    /// <summary>
+    /// Renueva la sesión vigente: devuelve un token nuevo con la duración configurada. La pantalla la llama mientras
+    /// el usuario trabaja, para que una venta en curso no se pierda al vencer el token. No se audita (no es una acción
+    /// de negocio); una sesión revocada, un usuario bloqueado o inactivo recibe 401 como cualquier otra solicitud.
+    /// </summary>
+    [HttpPost("refresh")]
+    [ProducesResponseType<AuthenticationResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        if (actor is null)
+        {
+            return MissingActor();
+        }
+
+        return FromResult(await authenticationService.RenewAsync(actor.UserId, cancellationToken), Ok);
+    }
+
     [HttpGet("me")]
     [ProducesResponseType<AuthenticatedUserDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
