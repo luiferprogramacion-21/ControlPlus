@@ -25,6 +25,8 @@ Decisión del 16 de noviembre de 2026 (sección «cierre de Créditos, auditorí
 
 ## Migración y activación
 
+Activada el 17 de noviembre de 2026 por el operador (`CREDIT_RISK_ACTIVATION_OK`, evidencia `CreditRisk-20261117T191945Z-62ffc4a68fb443ada0d44dad913adc66`, respaldo SHA-256 `D4C9502D6C0D3C5FE1299AF56B5BF311FAD87C78AAC0E778B586B02A3F45ED19`). **No repetirla.**
+
 `20261116010000_CreditRiskControlsV1` agrega las dos columnas y el CHECK del cupo sin modificar filas (historial 25→26). La aplica el operador con:
 
 ```powershell

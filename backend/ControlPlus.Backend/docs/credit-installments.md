@@ -10,6 +10,8 @@ La migración `20261116020000_CreditInstallmentsV1` debe ejecutarse después de 
 
 ## Activación por el operador
 
+Activada el 17 de noviembre de 2026 por el operador (`CREDIT_INSTALLMENTS_ACTIVATION_OK`, evidencia `CreditInstallments-20261117T193217Z-94da763b75b44352978a1b7bccd81de6`, respaldo SHA-256 `A0688B63E1E57F226FF3B6B5D9F0C834074C94229B4C041E83BE3B9788C1E23C`). **No repetirla.**
+
 Va después de la activación de morosos y cupo (`docs/credit-risk.md`). Secuencia completa, en PowerShell como Administrador desde `C:\ControlPlus\backend\ControlPlus.Backend`:
 
 ```powershell
