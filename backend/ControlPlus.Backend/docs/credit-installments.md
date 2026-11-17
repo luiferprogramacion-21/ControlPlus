@@ -34,10 +34,7 @@ Solo termina con `CREDIT_INSTALLMENTS_ACTIVATION_OK`; ante un fallo conserva la 
 
 ## Pantalla
 
-Aprobada por el usuario el 16 de noviembre de 2026 (no estaba en el prototipo): «Pago único» queda por defecto y las cuotas son opcionales.
-
-- **Ventas → cobro a crédito:** «Forma de pago» con «Pago único» (fecha de vencimiento) o «Cuotas» (de 2 a 90). Cada cuota muestra su fecha y su importe; las fechas sugeridas se distribuyen sin repetirse dentro de los 90 días permitidos y siguen siendo editables.
-- **Créditos → detalle:** «Plan de pago» con cada cuota, su vencimiento, su estado (Pendiente, Vencida, Pagada, Anulada) y su saldo.
+**Retirada el 17 de noviembre de 2026 a pedido del usuario.** La venta a crédito vuelve a pedir solo la fecha de vencimiento, sin «Forma de pago» ni cuotas, y el detalle del crédito ya no muestra «Plan de pago». El modelo de cuotas queda activo por dentro: cada crédito tiene una cuota única, los abonos se aplican a ella y su anulación la restituye. `POST /api/sales` sigue aceptando `installmentDueDates`, pero la pantalla no lo envía. Volver a mostrarlo requiere una nueva aprobación.
 
 ## Verificación
 

@@ -96,16 +96,4 @@ describe('Sales: crédito desde ambos accesos', () => {
     await component.confirm();
     expect(confirm.mock.calls[1][1]).toBe(key);
   });
-  it('envía las fechas de cuotas y omite el vencimiento único', async () => {
-    confirm.mockResolvedValueOnce({ id: 'sale-id', visibleNumber: 'VTA-1', total: 10000, change: 0, state: 'CONFIRMADA', payments: [], creditId: 'credit-id' });
-    component.startCheckout();
-    component.setCreditPlan('INSTALLMENTS');
-    component.installmentDates = ['2026-11-08', '2026-11-23', '2027-01-20'];
-    expect(component.installmentAmount(0)).toBe(3334);
-    expect(component.canConfirm).toBe(true);
-    await component.confirm();
-    expect(confirm.mock.calls[0][0]).toEqual(expect.objectContaining({
-      dueDate: null, installmentDueDates: ['2026-11-08', '2026-11-23', '2027-01-20']
-    }));
-  });
 });

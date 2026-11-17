@@ -81,35 +81,11 @@ export class Sales implements OnInit, OnDestroy {
   private concessionAuthorization: AuthorizationCredentials | null = null;
   readonly concessionAuthorizedBy = signal('');
   dueDate = '';
-  creditPlan: 'SINGLE' | 'INSTALLMENTS' = 'SINGLE';
-  installmentDates: string[] = [];
   /** Default term of the credit due date, set by the Administrator; null until read or when the seller must choose. */
   readonly creditDefaultDays = signal<number | null>(null);
   readonly creditRulesKnown = signal(false);
   /** Moroso o sobre el cupo para la venta a crédito en curso; null si no aplica o no se pudo consultar (el servidor igual decide). */
   readonly creditRisk = signal<CustomerCreditRisk | null>(null);
-  get creditDueDates(): string[] { return this.creditPlan === 'SINGLE' ? [this.dueDate] : this.installmentDates; }
-  installmentAmount(index: number): number {
-    const count = this.installmentDates.length || 1; const base = Math.floor(this.estimate / count);
-    return base + (index < this.estimate - base * count ? 1 : 0);
-  }
-  setCreditPlan(value: 'SINGLE' | 'INSTALLMENTS'): void {
-    this.creditPlan = value;
-    if (value === 'INSTALLMENTS' && this.installmentDates.length < 2) this.installmentDates = this.suggestInstallmentDates(2);
-  }
-  setInstallmentCount(value: number): void {
-    const count = Math.max(2, Math.min(90, Math.trunc(Number(value) || 2)));
-    if (count !== this.installmentDates.length) this.installmentDates = this.suggestInstallmentDates(count);
-  }
-  private suggestInstallmentDates(count: number): string[] {
-    if (!this.minimumDueDate || !this.maximumDueDate) return Array.from({ length: count }, () => '');
-    const first = new Date(`${this.minimumDueDate}T12:00:00`); const last = new Date(`${this.maximumDueDate}T12:00:00`);
-    const span = Math.round((last.getTime() - first.getTime()) / 86_400_000);
-    return Array.from({ length: count }, (_, index) => {
-      const date = new Date(first); date.setDate(first.getDate() + Math.floor(index * span / Math.max(1, count - 1)));
-      return date.toISOString().slice(0, 10);
-    });
-  }
   private pending: { key: string; input: SaleInput; authorizerUserName: string | null } | null = null;
   private suggestTimer: ReturnType<typeof setTimeout> | undefined;
   private suggestSeq = 0;
@@ -586,9 +562,7 @@ export class Sales implements OnInit, OnDestroy {
       const customer = this.customers().find(item => item.id === this.customerId);
       if (!customer?.isActive) return 'Selecciona un cliente activo para el crédito.';
       if (!(customer.documentType && customer.documentNumber) && !customer.phone) return 'El cliente necesita documento completo o teléfono para crédito.';
-      const dates = this.creditDueDates;
-      if (!this.operatingDate || !dates.length || dates.some(date => !date || date < this.minimumDueDate || date > this.maximumDueDate)) return 'Cada vencimiento debe estar entre mañana y 90 días desde la fecha de caja.';
-      if (this.creditPlan === 'INSTALLMENTS' && (dates.length < 2 || dates.length > 90 || dates.some((date, index) => index > 0 && date <= dates[index - 1]) || dates.length > this.estimate)) return 'Las cuotas requieren fechas crecientes y un peso como mínimo por cuota.';
+      if (!this.operatingDate || !this.dueDate || this.dueDate < this.minimumDueDate || this.dueDate > this.maximumDueDate) return 'El vencimiento debe estar entre mañana y 90 días desde la fecha de caja.';
     } else {
       if (this.applied !== this.estimate) return this.activePayments().length === 1 && this.paymentUsed('EFECTIVO') && this.applied < this.estimate
         ? 'El efectivo no cubre toda la venta. Pulsa «+ Pago mixto» para agregar otro medio.' : 'Los importes de pago deben cubrir el total exacto.';
@@ -605,7 +579,7 @@ export class Sales implements OnInit, OnDestroy {
   }
   /** Moves the cursor to the field that blocks the confirmation. */
   private focusInvalid(): void {
-    if (this.saleType() === 'CREDITO') { this.focusField(this.creditPlan === 'SINGLE' ? 'credit-due-date' : 'credit-installment-0'); return; }
+    if (this.saleType() === 'CREDITO') { this.focusField('credit-due-date'); return; }
     this.focusField('cash-received', 'transfer-applied', 'nequi-applied');
   }
   async confirm(): Promise<void> {
@@ -620,7 +594,7 @@ export class Sales implements OnInit, OnDestroy {
       await this.authorization.open({ title: blocked ? 'Autorizar crédito bloqueado' : 'Autorizar venta a crédito',
         description: (blocked ? `${this.creditRiskText} El bloqueo de créditos está activo: solo un Administrador puede autorizar esta venta. ` : '') +
           'Se registrará la venta a crédito, se descontará inventario y se abrirá la deuda del cliente.' + (this.needsConcessionAuthorization ? ' También autoriza el descuento o el precio mayorista.' : ''),
-        detail: `${this.selectedCustomerName} · ${this.estimate} COP · ${this.creditPlan === 'SINGLE' ? 'vence ' + this.dueDate : this.installmentDates.length + ' cuotas'}`,
+        detail: `${this.selectedCustomerName} · ${this.estimate} COP · vence ${this.dueDate}`,
         operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
         selfAuthorizedRoles: blocked ? ['ADMINISTRADOR'] : ['ADMINISTRADOR', 'SUPERVISOR'],
         onError: message => this.error.set(message),
@@ -650,7 +624,7 @@ export class Sales implements OnInit, OnDestroy {
           receivedAmount: code === 'EFECTIVO' ? Number(this.cashReceived) : null,
           reference: code === 'TRANSFERENCIA' ? this.transferReference.trim() || null : code === 'NEQUI' ? this.nequiReference.trim() || null : null }];
       });
-      this.pending = { key: crypto.randomUUID(), authorizerUserName: authorizationIdentity(credentials), input: { customerId: this.customerId.trim() || null, lines: this.cart().map(line => ({ productId: line.product.id, quantity: Number(line.quantity), priceType: line.priceType, discount: !this.generalDiscount && line.discount ? { type: line.discount.type, value: Number(line.discount.value) } : null })), generalDiscount: this.generalDiscount ? { type: this.generalDiscount.type, value: Number(this.generalDiscount.value) } : null, discountReason: this.discountReason.trim() || null, payments, saleType: this.saleType(), dueDate: this.saleType() === 'CREDITO' && this.creditPlan === 'SINGLE' ? this.dueDate : null, installmentDueDates: this.saleType() === 'CREDITO' && this.creditPlan === 'INSTALLMENTS' ? [...this.installmentDates] : null, authorization: null } };
+      this.pending = { key: crypto.randomUUID(), authorizerUserName: authorizationIdentity(credentials), input: { customerId: this.customerId.trim() || null, lines: this.cart().map(line => ({ productId: line.product.id, quantity: Number(line.quantity), priceType: line.priceType, discount: !this.generalDiscount && line.discount ? { type: line.discount.type, value: Number(line.discount.value) } : null })), generalDiscount: this.generalDiscount ? { type: this.generalDiscount.type, value: Number(this.generalDiscount.value) } : null, discountReason: this.discountReason.trim() || null, payments, saleType: this.saleType(), dueDate: this.saleType() === 'CREDITO' ? this.dueDate : null, authorization: null } };
     }
     this.busy.set(true); this.error.set('');
     try {
@@ -670,7 +644,7 @@ export class Sales implements OnInit, OnDestroy {
   /** Clears the finished sale and leaves the screen ready for the next customer. */
   newSale(): void {
     this.sale.set(null); this.receipt.set(null); this.showDetail.set(false); this.reprintMessage.set(''); this.printed.set(false); this.lastJobStatus.set(null);
-    this.customerId = ''; this.customers.set([]); this.discountReason = ''; this.dueDate = ''; this.creditPlan = 'SINGLE'; this.installmentDates = [];
+    this.customerId = ''; this.customers.set([]); this.discountReason = ''; this.dueDate = '';
     this.concessionAuthorization = null; this.concessionAuthorizedBy.set('');
     this.saleType.set('CONTADO'); this.checkoutMode.set(false); this.feedback.set(''); this.error.set('');
     this.focusField('product-search');

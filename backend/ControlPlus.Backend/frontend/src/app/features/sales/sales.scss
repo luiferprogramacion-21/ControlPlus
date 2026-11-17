@@ -58,9 +58,6 @@
 .auto-print { display:flex; align-items:center; gap:8px; margin-top:12px; font-size:13px; color:var(--cp-text-secondary); }
 .discount-summary { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px; padding:8px 12px; border-radius:8px; background:var(--cp-success-soft); color:var(--cp-text-secondary); font-size:12px; }
 .credit-customer-action { display:grid; gap:8px; margin-top:12px; }
-.credit-checkout-fields { display:grid; gap:8px; }
-.credit-installments { display:grid; grid-template-columns:minmax(120px,.7fr) minmax(180px,1fr); gap:8px 12px; align-items:center; max-height:320px; overflow:auto; padding:4px; }
-@media(max-width:680px) { .credit-installments { grid-template-columns:minmax(0,1fr); } }
 .cart-table tr.is-wholesale td { background:var(--cp-warning-soft); }
 
 .pos-select { max-width:140px; min-height:36px; padding:4px 6px; border:1px solid var(--cp-control-border); border-radius:7px; background:var(--cp-surface); font-size:12px; }

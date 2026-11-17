@@ -68,12 +68,4 @@ describe('Sales: plazo predeterminado del vencimiento del crédito', () => {
     await create(); component.startCashSale();
     expect(component.saleType()).toBe('CONTADO'); expect(component.dueDate).toBe('');
   });
-
-  it('propone fechas de cuotas distintas incluso para 90 cuotas', async () => {
-    await create(); component.startCheckout(); component.setCreditPlan('INSTALLMENTS'); component.setInstallmentCount(90);
-    expect(component.installmentDates).toHaveLength(90);
-    expect(new Set(component.installmentDates).size).toBe(90);
-    expect(component.installmentDates[0]).toBe(component.minimumDueDate);
-    expect(component.installmentDates.at(-1)).toBe(component.maximumDueDate);
-  });
 });

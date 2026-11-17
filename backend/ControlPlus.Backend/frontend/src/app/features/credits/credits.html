@@ -28,12 +28,6 @@
       <section class="panel panel--padded module-form credits-detail-dialog">
         <div class="credit-detail-heading"><h2 id="credit-detail-title">Crédito {{ credit.saleNumber }}</h2><p>{{ credit.customerName }} · {{ credit.documentType && credit.documentNumber ? credit.documentType + ' ' + credit.documentNumber : credit.phone || 'Sin documento' }} · {{ label(credit.state) }}</p></div>
         <div class="credit-summary"><div><span>Total</span><strong>{{ money(credit.adjustedAmount) }}</strong></div><div><span>Pagado</span><strong>{{ money(paid(credit)) }}</strong></div><div><span>Saldo</span><strong>{{ money(credit.balance) }}</strong></div><div><span>Vence</span><strong>{{ credit.dueOn }}</strong></div></div>
-        <h3>Plan de pago</h3>
-        <div class="credit-history-list">
-          @for (installment of credit.installments ?? []; track installment.id) {
-            <div class="credit-history-row"><div class="credit-history-row__description"><strong>Cuota {{ installment.number }}</strong><span>Vence {{ installment.dueOn }} · {{ label(installment.state) }}</span></div><div class="credit-history-row__values"><span>Saldo</span><strong>{{ money(installment.balance) }}</strong><small>de {{ money(installment.amount) }}</small></div></div>
-          }
-        </div>
         @if (error()) { <p class="field-error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="refreshSelected()">Reintentar</button></p> }
         @if (canReadHistory) {
           <h3>Historial de abonos</h3>
