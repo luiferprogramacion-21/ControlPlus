@@ -31,6 +31,8 @@
 
 Al confirmar la venta, el frontend consulta el estado. Con perfil activo muestra el estado del trabajo original y no abre `window.print`; sin perfil usa el ticket del navegador si el cajero tiene activada esa opción. Una falla al consultar el estado tampoco abre el navegador, para evitar una copia duplicada. La reimpresión con perfil encola una copia `REIMPRESION`; sin perfil solo registra la solicitud y el navegador imprime. La plantilla del backend usa exclusivamente los datos históricos del snapshot, incluidos operador y cliente guardados en ventas nuevas; no consulta nombres actuales para snapshots anteriores.
 
+Corrección del 18 de noviembre de 2026, tras la primera prueba con la POS80 real: el procesador imprime en segundo plano y la pantalla de venta consultaba el estado una sola vez, por eso mostraba «PENDIENTE» aunque el ticket ya hubiera salido. Ahora, mientras el trabajo esté `PENDIENTE` o `IMPRIMIENDO`, la pantalla vuelve a consultarlo cada 1,5 s, hasta 30 s, y se detiene al quedar `IMPRESO` o `ERROR`, al pasar a otra venta o al salir de la pantalla.
+
 ## Significado aprobado de `IMPRESO`
 
 El usuario aprobó el 6 de noviembre de 2026 que `IMPRESO` signifique «aceptado por la cola de Windows». No acredita salida física en papel. La API y la interfaz deben expresar esa limitación con claridad; el adaptador solo marca el trabajo cuando la llamada de impresión devuelve éxito. Si el proceso cae entre la aceptación de Windows y la escritura del resultado, queda incierto y no se reintenta automáticamente.

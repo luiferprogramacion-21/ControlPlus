@@ -204,6 +204,22 @@ describe('Sales: punto de venta de contado', () => {
       expect(component.printed()).toBe(true);
       expect(component.reprintMessage()).toContain('PENDIENTE');
     });
+    it('sigue el ticket pendiente hasta que la cola lo acepta', async () => {
+      printingStatus.mockResolvedValue({ hasActiveProfile: true, profileName: 'Caja', columns: 32 });
+      printJobs.mockResolvedValueOnce({ items: [{ id: 'j1', copyType: 'ORIGINAL', status: 'PENDIENTE' }] })
+        .mockResolvedValueOnce({ items: [{ id: 'j1', copyType: 'ORIGINAL', status: 'PENDIENTE' }] })
+        .mockResolvedValue({ items: [{ id: 'j1', copyType: 'ORIGINAL', status: 'IMPRESO' }] });
+      await component.confirm(); await vi.advanceTimersByTimeAsync(10);
+      expect(component.lastJobStatus()).toBe('PENDIENTE');
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(component.lastJobStatus()).toBe('PENDIENTE');
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(component.lastJobStatus()).toBe('IMPRESO');
+      expect(component.reprintMessage()).toContain('Aceptado por la cola de Windows');
+      const calls = printJobs.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(printJobs.mock.calls.length).toBe(calls);
+    });
     it('si no puede consultar el perfil no abre el navegador ni duplica el ticket', async () => {
       printingStatus.mockRejectedValue(new Error('Sin conexión'));
       await component.confirm(); await vi.advanceTimersByTimeAsync(10);

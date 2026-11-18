@@ -9,7 +9,7 @@ import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { CatalogApi, Product } from '../catalog/catalog-api';
 import { CashApi, CashState } from '../cash/cash-api';
-import { CustomerCreditRisk, Sale, SaleDraft, SaleDraftInput, SaleInput, SalesApi, SalePaymentInput, PrintJobStatus } from './sales-api';
+import { CustomerCreditRisk, Sale, SaleDraft, SaleDraftInput, SaleInput, SalesApi, SalePaymentInput, PrintJob, PrintJobStatus } from './sales-api';
 import { Customer } from '../customers/customers-api';
 import { CustomerPicker } from '../customers/customer-picker';
 import { buildTicketHtml, TicketPrinter } from './ticket';
@@ -23,6 +23,9 @@ type PaymentCode = 'EFECTIVO' | 'TRANSFERENCIA' | 'NEQUI';
 const SUGGEST_DELAY_MS = 250;
 /** Espera después del último cambio del carrito antes de guardarlo como borrador. */
 const DRAFT_DELAY_MS = 1200;
+/** El procesador imprime en segundo plano: el estado del ticket se vuelve a consultar hasta que termine. */
+const PRINT_WATCH_INTERVAL_MS = 1500;
+const PRINT_WATCH_ATTEMPTS = 20;
 
 @Component({ selector: 'cp-sales', imports: [A11yModule, FormsModule, CurrencyPipe, DatePipe, MatButtonModule, RouterLink, CustomerPicker, DiscountDialog], templateUrl: './sales.html', styleUrl: './sales.scss' })
 export class Sales implements OnInit, OnDestroy {
@@ -95,6 +98,8 @@ export class Sales implements OnInit, OnDestroy {
   private draftReady = false;
   private draftStored = false;
   private draftTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Cambia para detener la consulta del estado de impresión de una venta anterior. */
+  private printWatch = 0;
   private draftSave: Promise<void> | null = null;
   private readonly draftWatcher = effect(() => {
     const lines = this.cart(); this.saleType();
@@ -123,6 +128,7 @@ export class Sales implements OnInit, OnDestroy {
   }
   ngOnDestroy(): void {
     clearTimeout(this.suggestTimer);
+    this.printWatch++;
     // Al salir de la pantalla (por ejemplo, al cerrar sesión) se guarda de inmediato el último cambio pendiente.
     if (this.draftTimer !== undefined) { clearTimeout(this.draftTimer); this.draftTimer = undefined; void this.persistDraft(); }
   }
@@ -826,8 +832,9 @@ export class Sales implements OnInit, OnDestroy {
         this.printed.set(latest != null);
         this.lastJobStatus.set(latest?.status ?? null);
         this.reprintMessage.set(latest
-          ? `${latest.copyType === 'REIMPRESION' ? 'Reimpresión' : 'Ticket'}: ${latest.status}. ${latest.status === 'IMPRESO' ? 'Aceptado por la cola de Windows.' : ''}`
+          ? this.printJobMessage(latest)
           : 'La venta está confirmada; consulta el estado de impresión antes de solicitar otra copia.');
+        if (latest && (latest.status === 'PENDIENTE' || latest.status === 'IMPRIMIENDO')) void this.watchPrintJob(sale.id, latest.id);
         return;
       }
       const existing = (await this.api.printJobs(sale.id)).items.at(-1);
@@ -855,6 +862,23 @@ export class Sales implements OnInit, OnDestroy {
       this.reprintMessage.set(reprint ? 'Reimpresión enviada y registrada.' : 'Ticket enviado a la impresora.');
     } catch (error) { this.reprintMessage.set(errorText(error)); }
     finally { this.busy.set(false); }
+  }
+  private printJobMessage(job: Pick<PrintJob, 'copyType' | 'status'>): string {
+    return `${job.copyType === 'REIMPRESION' ? 'Reimpresión' : 'Ticket'}: ${job.status}. ${job.status === 'IMPRESO' ? 'Aceptado por la cola de Windows.' : ''}`;
+  }
+  /** Sigue el trabajo hasta que la cola lo acepte o falle, para no dejar «PENDIENTE» en pantalla después de imprimir. */
+  private async watchPrintJob(saleId: string, jobId: string): Promise<void> {
+    const watch = ++this.printWatch;
+    const current = () => watch === this.printWatch && this.sale()?.id === saleId;
+    for (let attempt = 0; attempt < PRINT_WATCH_ATTEMPTS; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, PRINT_WATCH_INTERVAL_MS));
+      if (!current()) return;
+      let job: PrintJob | undefined;
+      try { job = (await this.api.printJobs(saleId)).items.find(item => item.id === jobId); } catch { return; }
+      if (!current() || !job) return;
+      if (job.status !== this.lastJobStatus()) { this.lastJobStatus.set(job.status); this.reprintMessage.set(this.printJobMessage(job)); }
+      if (job.status === 'IMPRESO' || job.status === 'ERROR') return;
+    }
   }
   formatDate(iso: string | undefined): string {
     const date = iso ? new Date(iso) : new Date();
