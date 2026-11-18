@@ -2,6 +2,8 @@
 
 **Estado (6 de noviembre de 2026): integración de perfil, consulta de estado y ruta de reintento preparada; la prueba física sigue pendiente.** No se ha enviado ningún trabajo físico desde este entorno.
 
+**Actualización del 18 de noviembre de 2026:** Primera prueba física comunicada por el usuario el 18 de noviembre de 2026 con la impresora «POSPrinter POS80» (perfil de 42 columnas, luego 32 porque la letra salía pequeña): el ticket de la venta y la reimpresión salen en papel y el usuario confirmó que la reimpresión quedó bien. La pantalla se quedaba en «Pendiente» después de imprimir; se corrigió consultando el trabajo hasta que termine (66781d9). Sigue sin acreditarse: ejecución bajo la cuenta del sistema del servicio instalado, corte de papel, impresora apagada o desconectada con su reintento, y el tamaño de letra definitivo.
+
 **Actualización del 18 de noviembre de 2026:** la maqueta 12c quedó implementada con perfiles `ETIQUETAS`/`HIBRIDA`, selección y cantidades por producto, vista previa Code 128 y lote idempotente en la misma cola local. La prueba física de etiquetas también sigue pendiente.
 
 ## Base existente
