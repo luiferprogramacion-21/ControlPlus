@@ -516,7 +516,7 @@ El 17 de noviembre de 2026 el usuario pidió guardar esta revisión y repartir l
 | K | Ocultar en Administración los 9 permisos sin función (sin borrarlos del catálogo) | Baja | Codex |
 | L | Destino al iniciar sesión según rol y caja | Baja | Claude |
 | M | ~~Cambio de la contraseña propia para todos los roles~~ **Descartada por el usuario el 18 de noviembre de 2026** (ver decisión siguiente) | — | — |
-| S | Correo del usuario y recuperación de la contraseña con un código por correo | Media | Claude |
+| S | Correo del usuario y recuperación de la contraseña con un código por correo | Media | Claude — **hecha y en uso desde el 18 de noviembre de 2026** |
 | N | Fecha de vencimiento en el ticket de venta a crédito | Baja | Codex (junto con F, mismo archivo) |
 | O | Conciliar documentos con estados viejos | Baja | Claude |
 | P | Actualizar herramientas de desarrollo con avisos de seguridad, al final y con regresión completa | Baja | Claude |
@@ -535,6 +535,7 @@ Aprobado por el usuario:
 - **Correo del usuario:** opcional. Se registra al crear o editar el usuario en Administración y se puede buscar (maqueta 19, «Nombre, usuario o correo»). Usa la columna oficial `seguridad.usuario.correo varchar(254)`, sin migración. La auditoría registra solo `HasEmail`/`EmailChanged`, nunca la dirección.
 - **Cuenta que envía los códigos:** `controlplus.pos@gmail.com` (Gmail, confirmado por el usuario el 18 de noviembre de 2026; `smtp.gmail.com:587` con STARTTLS). Su contraseña de aplicación la escribe el operador en el aviso oculto de `scripts/email/Set-EmailSettings.ps1` y queda solo en los User Secrets y en `api-secrets.json` del servicio. Nunca va en el repositorio, en el chat ni en archivos del agente; si se expone, se revoca y se crea otra.
 - La recuperación necesita Internet solo en el momento de enviar el código. Sin conexión, el Administrador sigue restableciendo la contraseña.
+- **Puesta en marcha (18 de noviembre de 2026):** el operador configuró la cuenta con `scripts/email/Set-EmailSettings.ps1` (Gmail aceptó la cuenta, correo de prueba recibido, `EMAIL_SETTINGS_OK`) y reinstaló el servicio. Confirmó una recuperación real de punta a punta: código recibido, contraseña cambiada e ingreso con la nueva. Tareas M (descartada) y S (hecha) cerradas.
 
 ### Reglas del reparto
 

@@ -6,6 +6,8 @@ Decisión del 18 de noviembre de 2026 (AGENTS.md, «Decisión del 18 de noviembr
 - El Administrador restablece las contraseñas de los demás.
 - Quien olvidó su contraseña la recupera con un código enviado a su correo.
 
+**En uso desde el 18 de noviembre de 2026:** cuenta `controlplus.pos@gmail.com` configurada en la tienda y una recuperación real comprobada por el operador.
+
 ## Cómo funciona
 
 1. En la pantalla de ingreso, **«¿Olvidaste tu contraseña?»**. El usuario escribe su usuario y pulsa «Enviar código».
