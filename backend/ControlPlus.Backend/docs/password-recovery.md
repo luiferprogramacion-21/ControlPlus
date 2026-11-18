@@ -47,7 +47,7 @@ Hay que hacerlo una vez en el equipo de la tienda. Para Gmail:
    powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\service\Install-ControlPlusService.ps1
    ```
 
-   - El primero pide la contraseña de aplicación (oculta) y envía un correo de prueba. Si la prueba falla, no guarda nada. Si sale bien, agrega la sección `Email` a los User Secrets de la API, conserva las demás claves y termina con `EMAIL_SETTINGS_OK`.
+   - El primero abre una **ventana de Windows** para pegar la contraseña de aplicación (oculta, con «Mostrar» para revisarla) y el correo donde recibir la prueba (con `-NoWindow` la pide en la consola). Luego envía el correo de prueba. Si la prueba falla, no guarda nada. Si sale bien, agrega la sección `Email` a los User Secrets de la API, conserva las demás claves y termina con `EMAIL_SETTINGS_OK`.
    - El segundo copia la configuración al servicio y termina con `CONTROLPLUS_SERVICE_OK`.
 
 Otro proveedor: indique `-SmtpHost` y `-SmtpPort` (STARTTLS) y, si el usuario de la cuenta no es la dirección, `-UserName`.
