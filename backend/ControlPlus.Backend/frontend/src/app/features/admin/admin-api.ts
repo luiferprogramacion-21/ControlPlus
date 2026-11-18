@@ -10,13 +10,15 @@ export interface RoleSummary { id: string; code: string; name: string; level: nu
 export interface AdminUser {
   id: string; userName: string; displayName: string; isActive: boolean; isLocked: boolean;
   failedLoginAttempts: number; lockedAtUtc: string | null; lastLoginAtUtc: string | null; roles: RoleSummary[];
+  /** Correo opcional para recuperar la contraseña con un código. */
+  email?: string | null;
 }
 export interface IssuedCredential { credentialId: string; userId: string; format: string; credentialToken: string; visibleFragment: string; issuedAtUtc: string; expiresAtUtc: string | null; }
 export interface AdminPermission { id: string; code: string; name: string; description: string | null; module: string; isActive: boolean; }
 export interface AdminRole extends RoleSummary { permissions: AdminPermission[]; }
 /** Source is ROL or INDIVIDUAL; individualEffect is CONCEDER or REVOCAR when an exception exists. */
 export interface EffectivePermission { id: string; code: string; name: string; granted: boolean; source: string; individualEffect: string | null; }
-export interface CreateUserInput { userName: string; displayName: string; password: string; roleIds: string[]; }
+export interface CreateUserInput { userName: string; displayName: string; password: string; roleIds: string[]; email: string | null; }
 
 @Injectable({ providedIn: 'root' })
 export class AdminApi {
@@ -32,7 +34,7 @@ export class AdminApi {
   /** Issues the Code 128 operator credential of a user; the token is returned only this once and the previous one is revoked. */
   issueCredential(userId: string): Promise<IssuedCredential> { return firstValueFrom(this.http.post<IssuedCredential>(`/api/cash/operator-credentials/${userId}`, { expiresAtUtc: null })); }
   createUser(input: CreateUserInput): Promise<AdminUser> { return firstValueFrom(this.http.post<AdminUser>('/api/users', input)); }
-  updateUser(id: string, displayName: string): Promise<AdminUser> { return firstValueFrom(this.http.put<AdminUser>(`/api/users/${id}`, { displayName })); }
+  updateUser(id: string, displayName: string, email: string | null): Promise<AdminUser> { return firstValueFrom(this.http.put<AdminUser>(`/api/users/${id}`, { displayName, email })); }
   setUserActive(user: AdminUser): Promise<AdminUser> {
     return firstValueFrom(this.http.put<AdminUser>(`/api/users/${user.id}/${user.isActive ? 'deactivate' : 'activate'}`, {}));
   }

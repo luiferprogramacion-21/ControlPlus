@@ -1152,6 +1152,58 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
             item.Accion.Contains("Renew")));
     }
 
+    [Fact]
+    public async Task UserEmail_IsOptionalValidatedSearchable_AndOnlyTheAdministratorChangesOwnPassword()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        var cashierRoleId = await GetRoleIdAsync(client, RoleCodes.Cashier);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "email.invalid.test", "Correo inválido", "Cashier-Test-Password-2026!", [cashierRoleId], "sin-arroba"))).StatusCode);
+        var created = await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "email.cashier.test", "Cajera con correo", "Cashier-Test-Password-2026!", [cashierRoleId], "  cajera.pruebas@example.com "));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var cashier = (await created.Content.ReadFromJsonAsync<UserDto>())!;
+        Assert.Equal("cajera.pruebas@example.com", cashier.Email);
+        var withoutEmail = (await (await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "noemail.cashier.test", "Cajero sin correo", "Cashier-Test-Password-2026!", [cashierRoleId])))
+            .Content.ReadFromJsonAsync<UserDto>())!;
+        Assert.Null(withoutEmail.Email);
+
+        var found = (await (await client.GetAsync("/api/users?search=pruebas@example")).Content
+            .ReadFromJsonAsync<PagedResult<UserDto>>())!;
+        Assert.Equal(cashier.Id, Assert.Single(found.Items).Id);
+
+        // El Administrador corrige y quita el correo, y también registra el suyo.
+        var updated = (await (await client.PutAsJsonAsync($"/api/users/{cashier.Id}",
+            new UpdateUserRequest("Cajera con correo", "nuevo.correo@example.com"))).Content.ReadFromJsonAsync<UserDto>())!;
+        Assert.Equal("nuevo.correo@example.com", updated.Email);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync($"/api/users/{cashier.Id}",
+            new UpdateUserRequest("Cajera con correo", "mal correo@example.com"))).StatusCode);
+        var cleared = (await (await client.PutAsJsonAsync($"/api/users/{cashier.Id}",
+            new UpdateUserRequest("Cajera con correo", " "))).Content.ReadFromJsonAsync<UserDto>())!;
+        Assert.Null(cleared.Email);
+        var ownEmail = await client.PutAsJsonAsync($"/api/users/{administrator.User.Id}",
+            new UpdateUserRequest("Administrador ficticio", "admin.pruebas@example.com"));
+        Assert.Equal(HttpStatusCode.OK, ownEmail.StatusCode);
+        Assert.Equal("admin.pruebas@example.com", (await ownEmail.Content.ReadFromJsonAsync<UserDto>())!.Email);
+
+        // Cajero y Supervisor no cambian su propia contraseña desde la sesión; el Administrador sí.
+        var cashierSession = await LoginAsync(client, "email.cashier.test", "Cashier-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cashierSession.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync($"/api/users/{cashier.Id}/password",
+            new ChangePasswordRequest("Cashier-Test-Password-2026!", "Cashier-Self-Test-Password-2026!"))).StatusCode);
+        Assert.Equal(cashier.Id, (await LoginAsync(client, "email.cashier.test", "Cashier-Test-Password-2026!")).User.Id);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"/api/users/{administrator.User.Id}/password",
+            new ChangePasswordRequest("Initial-Test-Password-2026!", "Initial-Changed-Password-2026!"))).StatusCode);
+        Assert.Equal(administrator.User.Id, (await LoginAsync(client, "initial.admin.test", "Initial-Changed-Password-2026!")).User.Id);
+    }
+
     private async Task SetupInitialAdministratorAsync(HttpClient client, string password)
     {
         var setup = new SetupFirstAdministratorRequest(

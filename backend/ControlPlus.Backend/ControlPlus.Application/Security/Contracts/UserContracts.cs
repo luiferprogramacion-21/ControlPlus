@@ -3,13 +3,16 @@ using ControlPlus.Domain.Security.Enums;
 
 namespace ControlPlus.Application.Security.Contracts;
 
+/// <param name="Email">Correo opcional del usuario; sirve para recuperar la contraseña con un código.</param>
 public sealed record CreateUserRequest(
     string UserName,
     string DisplayName,
     string Password,
-    IReadOnlyCollection<Guid> RoleIds);
+    IReadOnlyCollection<Guid> RoleIds,
+    string? Email = null);
 
-public sealed record UpdateUserRequest(string DisplayName);
+/// <param name="Email">Correo del usuario; vacío o nulo lo quita.</param>
+public sealed record UpdateUserRequest(string DisplayName, string? Email = null);
 
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 
@@ -34,7 +37,8 @@ public sealed record UserDto(
     int FailedLoginAttempts,
     DateTimeOffset? LockedAtUtc,
     DateTimeOffset? LastLoginAtUtc,
-    IReadOnlyCollection<RoleSummaryDto> Roles);
+    IReadOnlyCollection<RoleSummaryDto> Roles,
+    string? Email = null);
 
 public sealed record RoleSummaryDto(Guid Id, string Code, string Name, RoleLevel Level, bool IsActive);
 

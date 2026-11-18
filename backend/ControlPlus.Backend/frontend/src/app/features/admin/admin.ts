@@ -40,7 +40,7 @@ export class Admin implements OnInit {
   readonly error = signal('');
   readonly notice = signal('');
   search = ''; status: 'all' | 'active' | 'inactive' | 'locked' = 'all'; page = 1; pageSize = 20;
-  form = { userName: '', displayName: '', password: '', confirmPassword: '', currentPassword: '', roleId: '' };
+  form = { userName: '', displayName: '', email: '', password: '', confirmPassword: '', currentPassword: '', roleId: '' };
   private requestId = 0;
 
   get canReadUsers(): boolean { return this.session.has('USERS.READ'); }
@@ -97,7 +97,7 @@ export class Admin implements OnInit {
 
   private open(mode: Mode, user: AdminUser | null): void {
     this.selected.set(user); this.mode.set(mode); this.error.set(''); this.notice.set('');
-    this.form = { userName: '', displayName: user?.displayName ?? '', password: '', confirmPassword: '', currentPassword: '', roleId: user?.roles[0]?.id ?? '' };
+    this.form = { userName: '', displayName: user?.displayName ?? '', email: user?.email ?? '', password: '', confirmPassword: '', currentPassword: '', roleId: user?.roles[0]?.id ?? '' };
   }
   create(): void { if (this.canChooseRole) this.open('create', null); }
   edit(user: AdminUser): void { if (this.canManageUsers) this.open('edit', user); }
@@ -112,8 +112,8 @@ export class Admin implements OnInit {
         if (!f.userName.trim()) return 'Indica el nombre de usuario.';
         if (!f.displayName.trim()) return 'Indica el nombre visible.';
         if (!f.roleId) return 'Selecciona un rol.';
-        return this.passwordIssue();
-      case 'edit': return f.displayName.trim() ? '' : 'Indica el nombre visible.';
+        return this.emailIssue() || this.passwordIssue();
+      case 'edit': return f.displayName.trim() ? this.emailIssue() : 'Indica el nombre visible.';
       case 'role': return f.roleId ? '' : 'Selecciona un rol.';
       case 'password': {
         const self = this.selected() && this.isSelf(this.selected()!);
@@ -122,6 +122,11 @@ export class Admin implements OnInit {
       }
       default: return '';
     }
+  }
+  /** El correo es opcional; si se escribe, debe parecer una dirección (el servidor también lo valida). */
+  private emailIssue(): string {
+    const email = this.form.email.trim();
+    return !email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? '' : 'El correo no es válido.';
   }
   private passwordIssue(): string {
     if (!this.form.password.trim()) return 'Indica la contraseña.';
@@ -137,8 +142,8 @@ export class Admin implements OnInit {
     this.saving.set(true); this.error.set('');
     const f = this.form;
     try {
-      if (mode === 'create') await this.api.createUser({ userName: f.userName.trim(), displayName: f.displayName.trim(), password: f.password, roleIds: [f.roleId] });
-      else if (mode === 'edit' && user) await this.api.updateUser(user.id, f.displayName.trim());
+      if (mode === 'create') await this.api.createUser({ userName: f.userName.trim(), displayName: f.displayName.trim(), password: f.password, roleIds: [f.roleId], email: f.email.trim() || null });
+      else if (mode === 'edit' && user) await this.api.updateUser(user.id, f.displayName.trim(), f.email.trim() || null);
       else if (mode === 'role' && user) await this.api.assignRole(user.id, f.roleId);
       else if (mode === 'password' && user) await this.api.changePassword(user.id, f.password, this.isSelf(user) ? f.currentPassword : '');
       const message = mode === 'create' ? 'Usuario creado.' : mode === 'edit' ? 'Usuario actualizado.' : mode === 'role' ? 'Rol actualizado.' : 'Contraseña actualizada.';

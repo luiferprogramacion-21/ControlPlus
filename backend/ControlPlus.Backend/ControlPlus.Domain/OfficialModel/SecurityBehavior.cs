@@ -13,6 +13,7 @@ public partial class Usuario
     public string NormalizedUserName => NombreUsuarioNormalizado;
     public string DisplayName => NombreCompleto;
     public string SecurityStamp => SelloSeguridad;
+    public string? Email => Correo;
     public int FailedLoginAttempts => IntentosFallidos;
     public DateTimeOffset? LockedAtUtc => BloqueoHasta is null ? null : new DateTimeOffset(DateTime.SpecifyKind(BloqueoHasta.Value, DateTimeKind.Utc));
     public DateTimeOffset? LastLoginAtUtc => UltimoAcceso is null ? null : new DateTimeOffset(DateTime.SpecifyKind(UltimoAcceso.Value, DateTimeKind.Utc));
@@ -84,6 +85,13 @@ public partial class Usuario
     {
         NombreCompleto = DomainGuard.RequiredText(displayName, nameof(displayName));
         Touch(updatedAtUtc);
+    }
+
+    /// <summary>Correo opcional para recuperar la contraseña; nulo lo quita. La validación de formato es de la aplicación.</summary>
+    public void ChangeEmail(string? email, DateTimeOffset changedAtUtc)
+    {
+        Correo = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+        Touch(changedAtUtc);
     }
 
     public void Activate(DateTimeOffset changedAtUtc)

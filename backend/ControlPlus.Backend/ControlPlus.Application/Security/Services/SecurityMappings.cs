@@ -23,7 +23,8 @@ internal static class SecurityMappings
                 .Select(userRole => ToSummaryDto(userRole.Role))
                 .OrderBy(role => role.Level)
                 .ThenBy(role => role.Code, StringComparer.Ordinal)
-                .ToArray());
+                .ToArray(),
+            user.Email);
 
     public static RoleSummaryDto ToSummaryDto(Role role) =>
         new(role.Id, role.Code, role.Name, role.Level, role.IsActive);

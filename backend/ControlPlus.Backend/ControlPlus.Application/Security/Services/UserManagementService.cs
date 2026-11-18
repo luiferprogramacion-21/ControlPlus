@@ -71,6 +71,12 @@ public sealed class UserManagementService : IUserManagementService
             return Result.Failure<UserDto>(password.Error!);
         }
 
+        var email = SecurityInput.OptionalEmail(request.Email);
+        if (email.IsFailure)
+        {
+            return Result.Failure<UserDto>(email.Error!);
+        }
+
         var requestedRoleIds = request.RoleIds?.Where(id => id != Guid.Empty).Distinct().ToArray() ?? Array.Empty<Guid>();
         if (requestedRoleIds.Length != 1)
         {
@@ -100,6 +106,7 @@ public sealed class UserManagementService : IUserManagementService
 
         var now = _clock.UtcNow;
         var user = User.Create(userName.Value!, displayName.Value!, _passwordHasher.Hash(password.Value!), now);
+        user.ChangeEmail(email.Value, now);
         var role = roles.Single();
         user.AddRole(role, now, actor.UserId);
 
@@ -111,7 +118,7 @@ public sealed class UserManagementService : IUserManagementService
             AuditAction.UserCreated,
             nameof(User),
             user.Id,
-            new { user.UserName, user.DisplayName, Role = role.Code },
+            new { user.UserName, user.DisplayName, Role = role.Code, HasEmail = user.Email is not null },
             cancellationToken);
 
         await AuditWriter.WriteAsync(
@@ -149,6 +156,12 @@ public sealed class UserManagementService : IUserManagementService
             return Result.Failure<UserDto>(displayName.Error!);
         }
 
+        var email = SecurityInput.OptionalEmail(request.Email);
+        if (email.IsFailure)
+        {
+            return Result.Failure<UserDto>(email.Error!);
+        }
+
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
         if (user is null)
         {
@@ -160,7 +173,10 @@ public sealed class UserManagementService : IUserManagementService
             return Result.Failure<UserDto>(SecurityErrors.CannotManageSameOrHigherRole);
         }
 
+        // El Administrador también edita su propio nombre y correo (para recuperar su contraseña).
+        var emailChanged = !string.Equals(user.Email, email.Value, StringComparison.OrdinalIgnoreCase);
         user.UpdateDisplayName(displayName.Value!, _clock.UtcNow);
+        user.ChangeEmail(email.Value, _clock.UtcNow);
         await _userRepository.UpdateAsync(user, cancellationToken);
         await AuditWriter.WriteAsync(
             _auditRepository,
@@ -169,7 +185,7 @@ public sealed class UserManagementService : IUserManagementService
             AuditAction.UserUpdated,
             nameof(User),
             user.Id,
-            new { user.DisplayName },
+            new { user.DisplayName, EmailChanged = emailChanged, HasEmail = user.Email is not null },
             cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -340,6 +356,14 @@ public sealed class UserManagementService : IUserManagementService
 
         if (actor.UserId == userId)
         {
+            // Decisión del 17 de noviembre de 2026: solo el Administrador cambia su propia contraseña desde la
+            // sesión; Cajero y Supervisor la recuperan por correo o se la restablece el Administrador.
+            if (actor.HighestRoleLevel != RoleLevel.Administrador)
+            {
+                return Result.Failure(ApplicationError.Forbidden(
+                    "Su contraseña la cambia el Administrador, o recupérela con «¿Olvidaste tu contraseña?»."));
+            }
+
             var currentPassword = SecurityInput.RequiredPassword(request.CurrentPassword, "contraseña actual");
             if (currentPassword.IsFailure)
             {

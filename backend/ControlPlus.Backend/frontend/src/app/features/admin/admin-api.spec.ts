@@ -27,17 +27,17 @@ describe('AdminApi: usuarios y roles', () => {
   });
 
   it('crea un usuario con exactamente los campos del contrato', async () => {
-    const task = api.createUser({ userName: 'ana', displayName: 'Ana', password: 'x', roleIds: ['r1'] });
+    const task = api.createUser({ userName: 'ana', displayName: 'Ana', password: 'x', roleIds: ['r1'], email: 'ana@example.com' });
     const request = http.expectOne('/api/users');
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ userName: 'ana', displayName: 'Ana', password: 'x', roleIds: ['r1'] });
+    expect(request.request.body).toEqual({ userName: 'ana', displayName: 'Ana', password: 'x', roleIds: ['r1'], email: 'ana@example.com' });
     request.flush(user); await task;
   });
 
   it('edita el nombre, asigna el rol y reactiva con las rutas del contrato', async () => {
-    const edit = api.updateUser('u1', 'Ana María');
+    const edit = api.updateUser('u1', 'Ana María', null);
     const put = http.expectOne('/api/users/u1');
-    expect(put.request.method).toBe('PUT'); expect(put.request.body).toEqual({ displayName: 'Ana María' });
+    expect(put.request.method).toBe('PUT'); expect(put.request.body).toEqual({ displayName: 'Ana María', email: null });
     put.flush(user); await edit;
     const role = api.assignRole('u1', 'r2');
     const post = http.expectOne('/api/users/u1/roles');

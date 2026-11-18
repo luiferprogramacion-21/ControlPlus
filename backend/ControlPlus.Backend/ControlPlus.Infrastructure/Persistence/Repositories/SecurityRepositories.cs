@@ -132,7 +132,8 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
             var pattern = $"%{query.Search.Trim()}%";
             users = users.Where(user =>
                 EF.Functions.ILike(user.NombreUsuario, pattern) ||
-                EF.Functions.ILike(user.NombreCompleto, pattern));
+                EF.Functions.ILike(user.NombreCompleto, pattern) ||
+                (user.Correo != null && EF.Functions.ILike(user.Correo, pattern)));
         }
 
         if (query.IsActive is bool isActive)

@@ -13,6 +13,19 @@ internal static class SecurityInput
             : Result.Success(normalized);
     }
 
+    /// <summary>Correo opcional: vacío es «sin correo»; si se da, una dirección simple de hasta 254 caracteres.</summary>
+    public static Result<string?> OptionalEmail(string? value)
+    {
+        var normalized = value?.Trim();
+        if (string.IsNullOrEmpty(normalized)) return Result.Success<string?>(null);
+        return normalized.Length <= 254 && EmailPattern.IsMatch(normalized)
+            ? Result.Success<string?>(normalized)
+            : Result.Failure<string?>(ApplicationError.Validation("El correo no es válido."));
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex EmailPattern = new(
+        @"^[^@\s]+@[^@\s]+\.[^@\s]+$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
     public static Result<string> RequiredPassword(string? value, string fieldName = "contraseña")
     {
         return string.IsNullOrWhiteSpace(value)

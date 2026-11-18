@@ -17,7 +17,7 @@
     <section class="panel module-panel">
       <div class="module-toolbar"><h3>Usuarios</h3>
         <form class="directory-filters" (submit)="$event.preventDefault(); find()">
-          <label class="sr-only" for="user-search">Buscar usuario</label><input id="user-search" class="text-field" name="search" [(ngModel)]="search" placeholder="Usuario o nombre">
+          <label class="sr-only" for="user-search">Buscar usuario</label><input id="user-search" class="text-field" name="search" [(ngModel)]="search" placeholder="Nombre, usuario o correo">
           <select class="text-field" name="status" [(ngModel)]="status" aria-label="Estado" (ngModelChange)="find()"><option value="all">Todos</option><option value="active">Activos</option><option value="inactive">Inactivos</option><option value="locked">Bloqueados</option></select>
           <button class="button button--secondary" type="submit">Buscar</button>
           @if (canChooseRole) { <button class="button button--primary" type="button" (click)="create()">Nuevo usuario</button> }
@@ -88,6 +88,8 @@
         }
         @if (currentMode === 'create' || currentMode === 'edit') {
           <label class="field-label field-label--spaced" for="admin-display-name">Nombre visible</label><input id="admin-display-name" class="text-field" name="displayName" [(ngModel)]="form.displayName" required autocomplete="off">
+          <label class="field-label field-label--spaced" for="admin-email">Correo <span>(opcional)</span></label><input id="admin-email" class="text-field" type="email" name="email" [(ngModel)]="form.email" autocomplete="off" maxlength="254">
+          <p class="form-hint">Sirve para que el usuario recupere su contraseña con un código si la olvida.</p>
         }
         @if (currentMode === 'create' || currentMode === 'role') {
           <label class="field-label field-label--spaced" for="admin-role">Rol</label>

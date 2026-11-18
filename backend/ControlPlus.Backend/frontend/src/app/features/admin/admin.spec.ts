@@ -45,7 +45,7 @@ describe('Admin: usuarios, roles y permisos', () => {
     expect(component.error()).toContain('confirmación');
     component.form.confirmPassword = 'clave';
     await component.save();
-    expect(api.createUser).toHaveBeenCalledWith({ userName: 'nuevo', displayName: 'Nuevo', password: 'clave', roleIds: ['r-cash'] });
+    expect(api.createUser).toHaveBeenCalledWith({ userName: 'nuevo', displayName: 'Nuevo', password: 'clave', roleIds: ['r-cash'], email: null });
     expect(component.mode()).toBeNull();
     expect(component.notice()).toBe('Usuario creado.');
   });
@@ -101,6 +101,25 @@ describe('Admin: usuarios, roles y permisos', () => {
     vi.mocked(window.confirm).mockReturnValue(false);
     await component.toggle(user('ana'));
     expect(api.setUserActive).toHaveBeenCalledOnce();
+  });
+
+  it('registra, valida y quita el correo del usuario', async () => {
+    await component.ngOnInit();
+    api.createUser.mockResolvedValue(user('nuevo')); api.updateUser.mockResolvedValue(user('ana'));
+    component.create();
+    component.form = { ...component.form, userName: 'nuevo', displayName: 'Nuevo', email: 'sin arroba', password: 'clave', confirmPassword: 'clave', roleId: 'r-cash' };
+    await component.save();
+    expect(api.createUser).not.toHaveBeenCalled();
+    expect(component.error()).toBe('El correo no es válido.');
+    component.form.email = ' nuevo@example.com ';
+    await component.save();
+    expect(api.createUser).toHaveBeenCalledWith(expect.objectContaining({ email: 'nuevo@example.com' }));
+
+    component.edit({ ...user('ana'), email: 'ana@example.com' });
+    expect(component.form.email).toBe('ana@example.com');
+    component.form.email = '';
+    await component.save();
+    expect(api.updateUser).toHaveBeenCalledWith('ana', expect.any(String), null);
   });
 
   it('muestra el error de la API sin cerrar el formulario', async () => {
