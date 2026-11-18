@@ -46,7 +46,8 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
     private static bool IsForeignKeyViolation(Exception exception)
     {
         for (var current = exception; current is not null; current = current.InnerException)
-            if (current is Npgsql.PostgresException { SqlState: "23503" }) return true;
+            // 23503: clave foránea NO ACTION; 23001: clave foránea RESTRICT (por ejemplo, la auditoría).
+            if (current is Npgsql.PostgresException { SqlState: "23503" or "23001" }) return true;
         return false;
     }
 
