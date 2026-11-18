@@ -499,7 +499,7 @@ No reproducido: las advertencias NG01354 y `cdkFocusInitial`. Las 591 pruebas y 
 
 ### Lista consolidada y estado de decisión
 
-El 17 de noviembre de 2026 el usuario pidió guardar esta revisión y repartir las tareas entre Claude y Codex. Claude recomendó hacer A, D, E, F, I, J, L, M, N, O y el manual; dejar G y H para después de la entrega; y ocultar los permisos de K. **G, H y el público del manual siguen pendientes de decisión del usuario.** No implementarlos hasta que el usuario responda.
+El 17 de noviembre de 2026 el usuario pidió guardar esta revisión y repartir las tareas entre Claude y Codex. Claude recomendó hacer A, D, E, F, I, J, L, M, N, O y el manual; dejar G y H para después de la entrega; y ocultar los permisos de K. El 18 de noviembre de 2026 el usuario aprobó G y H para la V1 y pidió un manual con una parte por rol.
 
 | Id | Tarea | Prioridad | Responsable propuesto |
 | --- | --- | --- | --- |
@@ -509,7 +509,7 @@ El 17 de noviembre de 2026 el usuario pidió guardar esta revisión y repartir l
 | D | Etiquetas con código de barras (maqueta 12c) | Media | Codex |
 | E | Precio de venta nuevo en la recepción de compras (maqueta 18), solo Administrador y auditado | Media | Codex |
 | F | Datos del establecimiento editables (maqueta 21) y su uso en ticket, carné, pedido, barra superior y Caja | Media | Codex |
-| G | Activar el turno compartido desde la pantalla (21b) y desbloqueo en el POS (06b) | **Pendiente de decisión** | — |
+| G | Elegir turno individual o compartido desde la pantalla (21b) y desbloqueo con carné en el POS (06b) | **Aprobada para la V1 el 18 de noviembre de 2026** (el usuario quiere poder usar ambos modos) | Claude, después de H |
 | H | Venta recuperable o «bloquear sesión» conservando el carrito | **Aprobada para la V1 el 18 de noviembre de 2026** | Claude |
 | I | Arranque de una instalación nueva (script guiado de primer Administrador y caja) | Media | Claude |
 | J | Soporte con el estado real de impresora y cola (maqueta 22) | Baja | Claude |
