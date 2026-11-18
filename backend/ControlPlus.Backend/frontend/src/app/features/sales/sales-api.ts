@@ -5,10 +5,14 @@ import { AuthorizationBody, authorizationContext } from '../../core/api';
 import { Page } from '../../core/api';
 import { Customer, CustomersApi } from '../customers/customers-api';
 import type { SaleReceipt } from './ticket';
+import type { Product } from '../catalog/catalog-api';
 
 export interface SaleDiscount { type: 'PORCENTAJE' | 'VALOR_FIJO'; value: number; }
 export interface SaleLineInput { productId: string; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; discount: SaleDiscount | null; }
 export interface SalePaymentInput { methodCode: 'EFECTIVO' | 'TRANSFERENCIA' | 'NEQUI'; appliedAmount: number; receivedAmount: number | null; reference: string | null; }
+export interface SaleDraftLine { productId: string; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; discount: SaleDiscount | null; }
+export interface SaleDraftInput { saleType: 'CONTADO' | 'CREDITO'; customerId: string | null; lines: SaleDraftLine[]; generalDiscount: SaleDiscount | null; discountReason: string | null; }
+export interface SaleDraft extends SaleDraftInput { id: string; updatedAtUtc: string; }
 export interface SaleInput { customerId: string | null; lines: SaleLineInput[]; generalDiscount: SaleDiscount | null; discountReason: string | null; payments: SalePaymentInput[]; saleType: 'CONTADO' | 'CREDITO'; dueDate: string | null; authorization: AuthorizationBody | null; }
 export interface Sale {
   id: string; visibleNumber: string; total: number; change: number; state: string; payments: (SalePaymentInput & { methodName?: string })[]; creditId: string | null;
@@ -69,6 +73,15 @@ export function printJobStatusText(job: Pick<PrintJob, 'status' | 'error'>): str
 export class SalesApi {
   private readonly http = inject(HttpClient);
   private readonly customersApi = inject(CustomersApi);
+  /** Venta recuperable: el borrador del carrito en curso; null si no hay (204). */
+  async currentDraft(): Promise<SaleDraft | null> {
+    const response = await firstValueFrom(this.http.get<SaleDraft>('/api/sales/drafts/current', { observe: 'response' }));
+    return response.status === 204 ? null : response.body;
+  }
+  saveDraft(input: SaleDraftInput): Promise<SaleDraft> { return firstValueFrom(this.http.put<SaleDraft>('/api/sales/drafts/current', input)); }
+  discardDraft(): Promise<unknown> { return firstValueFrom(this.http.delete('/api/sales/drafts/current')); }
+  product(id: string): Promise<Product> { return firstValueFrom(this.http.get<Product>(`/api/products/${id}`)); }
+  customer(id: string): Promise<Customer> { return this.customersApi.get(id); }
   confirm(input: SaleInput, key: string): Promise<Sale> {
     return firstValueFrom(this.http.post<Sale>('/api/sales', input, { headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined }));
   }

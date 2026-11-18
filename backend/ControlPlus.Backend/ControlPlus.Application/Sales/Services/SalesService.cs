@@ -33,7 +33,8 @@ public sealed partial class SalesService(
     IPermissionRepository permissionRepository,
     IAuthorizerCredentialResolver credentialResolver,
     IClock clock,
-    ICustomerCreditExposureReader creditExposure) : ISalesService
+    ICustomerCreditExposureReader creditExposure,
+    ISaleDraftRepository draftRepository) : ISalesService
 {
     private const int MaximumPageSize = 200;
     private static readonly HashSet<string> ApprovedPaymentMethods =
@@ -488,6 +489,8 @@ public sealed partial class SalesService(
         if (cashMovement is not null) await repository.AddCashMovementAsync(cashMovement, cancellationToken);
         if (payments.Length > 0) await repository.AddPaymentsAsync(payments, cancellationToken);
         await repository.AddInventoryMovementsAsync(inventoryMovements, cancellationToken);
+        // Venta recuperable: el borrador del carrito se cierra como CONVERTIDO en la misma transacción que la venta.
+        await draftRepository.ConvertActiveAsync(actor.UserId, shift.Id, sale.Id, now.UtcDateTime, cancellationToken);
 
         var response = Map(sale, details, payments, methodsByCode) with { CreditId = credit?.Id };
         var receiptVatPercentage = ReceiptVatPercentage(sale, details);

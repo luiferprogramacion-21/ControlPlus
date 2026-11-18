@@ -92,3 +92,6 @@
   .pos-sale-detail__values { align-items:flex-start; text-align:left; }
   .pos-sale-detail__actions .button { width:100%; }
 }
+
+.draft-banner { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.draft-banner p { flex:1 1 260px; margin:0; }

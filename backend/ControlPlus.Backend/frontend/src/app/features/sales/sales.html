@@ -2,6 +2,14 @@
   @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert"><span>!</span>{{ error() }}</div> }
   @if (blockReason && !sale()) { <div class="inline-feedback inline-feedback--error" role="status"><span>!</span>{{ blockReason }} <a class="link-button" routerLink="/operacion/caja">Ir a Caja</a></div> }
 
+  @if (pendingDraft(); as draft) { @if (!sale()) {
+    <div class="inline-feedback inline-feedback--warning draft-banner" role="status"><span>!</span>
+      <p>Hay una venta sin terminar: {{ draft.lines.length }} {{ draft.lines.length === 1 ? 'producto' : 'productos' }}, guardada a las {{ draft.updatedAtUtc | date:'HH:mm' }}.</p>
+      <button class="button button--primary" type="button" (click)="recoverDraft()" [disabled]="recoveringDraft()">{{ recoveringDraft() ? 'Recuperando…' : 'Recuperar venta' }}</button>
+      <button class="button button--secondary" type="button" (click)="discardDraft()" [disabled]="recoveringDraft()">Descartar</button>
+    </div>
+  } }
+
   @if (sale(); as result) {
     <section class="panel success-page">
       <div class="panel-heading success-page__heading"><h2>{{ result.creditId ? 'Crédito registrado' : 'Venta confirmada' }}</h2></div>

@@ -1,5 +1,5 @@
 import { A11yModule } from '@angular/cdk/a11y';
-import { Component, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, ViewChild } from '@angular/core';
+import { Component, effect, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, untracked, ViewChild } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -9,7 +9,7 @@ import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { CatalogApi, Product } from '../catalog/catalog-api';
 import { CashApi, CashState } from '../cash/cash-api';
-import { CustomerCreditRisk, Sale, SaleInput, SalesApi, SalePaymentInput, PrintJobStatus } from './sales-api';
+import { CustomerCreditRisk, Sale, SaleDraft, SaleDraftInput, SaleInput, SalesApi, SalePaymentInput, PrintJobStatus } from './sales-api';
 import { Customer } from '../customers/customers-api';
 import { CustomerPicker } from '../customers/customer-picker';
 import { buildTicketHtml, TicketPrinter } from './ticket';
@@ -21,6 +21,8 @@ interface CartLine { product: Product; quantity: number; priceType: 'MINORISTA' 
 interface ReceiptMeta { customer: string; operator: string; items: number; units: number; }
 type PaymentCode = 'EFECTIVO' | 'TRANSFERENCIA' | 'NEQUI';
 const SUGGEST_DELAY_MS = 250;
+/** Espera después del último cambio del carrito antes de guardarlo como borrador. */
+const DRAFT_DELAY_MS = 1200;
 
 @Component({ selector: 'cp-sales', imports: [A11yModule, FormsModule, CurrencyPipe, DatePipe, MatButtonModule, RouterLink, CustomerPicker, DiscountDialog], templateUrl: './sales.html', styleUrl: './sales.scss' })
 export class Sales implements OnInit, OnDestroy {
@@ -87,6 +89,21 @@ export class Sales implements OnInit, OnDestroy {
   /** Moroso o sobre el cupo para la venta a crédito en curso; null si no aplica o no se pudo consultar (el servidor igual decide). */
   readonly creditRisk = signal<CustomerCreditRisk | null>(null);
   private pending: { key: string; input: SaleInput; authorizerUserName: string | null } | null = null;
+  /** Venta recuperable (decisión del 18 de noviembre de 2026): borrador encontrado al entrar, pendiente de decisión. */
+  readonly pendingDraft = signal<SaleDraft | null>(null);
+  readonly recoveringDraft = signal(false);
+  private draftReady = false;
+  private draftStored = false;
+  private draftTimer: ReturnType<typeof setTimeout> | undefined;
+  private draftSave: Promise<void> | null = null;
+  private readonly draftWatcher = effect(() => {
+    const lines = this.cart(); this.saleType();
+    untracked(() => {
+      // Empezar otra venta con el aviso a la vista descarta la que quedó sin terminar.
+      if (this.pendingDraft() && lines.length && !this.recoveringDraft()) void this.discardDraft('Se descartó la venta sin terminar porque empezaste otra.');
+      this.scheduleDraftSave();
+    });
+  });
   private suggestTimer: ReturnType<typeof setTimeout> | undefined;
   private suggestSeq = 0;
   @ViewChild('productSearch') private productSearch?: ElementRef<HTMLInputElement>;
@@ -95,7 +112,7 @@ export class Sales implements OnInit, OnDestroy {
   private static loadAutoPrint(): boolean { try { return localStorage.getItem(Sales.AUTO_PRINT_KEY) !== '0'; } catch { return true; } }
   setAutoPrint(value: boolean): void { this.autoPrint.set(value); try { localStorage.setItem(Sales.AUTO_PRINT_KEY, value ? '1' : '0'); } catch { /* sin almacenamiento: queda solo en esta sesión */ } }
 
-  ngOnInit(): void { if (this.route.snapshot.queryParamMap.get('modalidad') === 'credito' && this.canRequestCredit) this.saleType.set('CREDITO'); void this.refreshCash(); if (this.canRequestCredit) void this.loadCreditRules(); void this.loadPricingRules(); }
+  ngOnInit(): void { if (this.route.snapshot.queryParamMap.get('modalidad') === 'credito' && this.canRequestCredit) this.saleType.set('CREDITO'); void this.refreshCash(); if (this.canRequestCredit) void this.loadCreditRules(); void this.loadPricingRules(); void this.loadDraft(); }
   private async loadPricingRules(): Promise<void> {
     try { this.wholesaleMin.set((await this.api.pricingRules()).wholesaleMinimumQuantity); }
     catch { /* The server still enforces the minimum; the screen keeps the default. */ }
@@ -104,7 +121,98 @@ export class Sales implements OnInit, OnDestroy {
     try { this.creditDefaultDays.set((await this.api.creditRules()).defaultDays); this.creditRulesKnown.set(true); }
     catch { /* The server still validates the due date; the screen keeps asking for it. */ }
   }
-  ngOnDestroy(): void { clearTimeout(this.suggestTimer); }
+  ngOnDestroy(): void {
+    clearTimeout(this.suggestTimer);
+    // Al salir de la pantalla (por ejemplo, al cerrar sesión) se guarda de inmediato el último cambio pendiente.
+    if (this.draftTimer !== undefined) { clearTimeout(this.draftTimer); this.draftTimer = undefined; void this.persistDraft(); }
+  }
+
+  private async loadDraft(): Promise<void> {
+    try {
+      if (!this.session.has('SALES.CREATE')) return;
+      const draft = await this.api.currentDraft();
+      if (!draft) return;
+      this.draftStored = true;
+      if (!this.cart().length && !this.sale()) this.pendingDraft.set(draft);
+    } catch { /* sin borrador o sin turno: se vende normalmente */ }
+    finally { if (!this.pendingDraft()) this.draftReady = true; }
+  }
+
+  /** Programa el guardado del carrito (no se guarda mientras el aviso de recuperación espera una decisión). */
+  private scheduleDraftSave(): void {
+    if (!this.draftReady) return;
+    clearTimeout(this.draftTimer);
+    this.draftTimer = setTimeout(() => { this.draftTimer = undefined; void this.persistDraft(); }, DRAFT_DELAY_MS);
+  }
+
+  /** Guarda o descarta el borrador. Es de mejor esfuerzo: un fallo nunca bloquea la venta. */
+  private async persistDraft(): Promise<void> {
+    if (!this.draftReady || this.sale() || this.pending) return;
+    const previous = this.draftSave;
+    const run = (async () => {
+      await previous?.catch(() => undefined);
+      try {
+        if (!this.cart().length) {
+          if (this.draftStored) { await this.api.discardDraft(); this.draftStored = false; }
+          return;
+        }
+        await this.api.saveDraft(this.draftInput());
+        this.draftStored = true;
+      } catch { /* se reintenta con el siguiente cambio */ }
+    })();
+    this.draftSave = run;
+    try { await run; } finally { if (this.draftSave === run) this.draftSave = null; }
+  }
+
+  private draftInput(): SaleDraftInput {
+    return {
+      saleType: this.saleType(), customerId: this.customerId.trim() || null,
+      lines: this.cart().map(line => ({ productId: line.product.id, quantity: Number(line.quantity), priceType: line.priceType,
+        discount: !this.generalDiscount && line.discount ? { type: line.discount.type, value: Number(line.discount.value) } : null })),
+      generalDiscount: this.generalDiscount ? { type: this.generalDiscount.type, value: Number(this.generalDiscount.value) } : null,
+      discountReason: this.discountReason.trim() || null,
+    };
+  }
+
+  /** Vuelve a armar el carrito guardado. Los productos inactivos o agotados se quitan; el resto se valida al cobrar. */
+  async recoverDraft(): Promise<void> {
+    const draft = this.pendingDraft();
+    if (!draft || this.recoveringDraft()) return;
+    this.recoveringDraft.set(true); this.error.set('');
+    try {
+      const found = await Promise.all(draft.lines.map(line =>
+        this.api.product(line.productId).then(product => ({ line, product }), () => null)));
+      const usable = found.filter((item): item is NonNullable<typeof item> => !!item && item.product.isActive && item.product.availableStock > 0);
+      const removed = draft.lines.length - usable.length;
+      let customerNote = '';
+      if (draft.customerId) {
+        try { const customer = await this.api.customer(draft.customerId); this.customers.set([customer]); this.customerId = customer.id; }
+        catch { customerNote = ' No se pudo cargar el cliente: elígelo de nuevo.'; }
+      }
+      this.generalDiscount = draft.generalDiscount;
+      this.discountReason = draft.discountReason ?? '';
+      if (draft.saleType === 'CREDITO' && this.canRequestCredit) this.saleType.set('CREDITO');
+      this.cart.set(usable.map(({ line, product }) => ({ product, quantity: Math.min(line.quantity, product.availableStock),
+        priceType: line.priceType, discount: line.discount })));
+      this.feedbackKind.set('success');
+      this.feedback.set(`Venta recuperada: ${usable.length} ${usable.length === 1 ? 'producto' : 'productos'}.` +
+        (removed ? ` ${removed} ya no ${removed === 1 ? 'está disponible y se quitó' : 'están disponibles y se quitaron'}.` : '') + customerNote +
+        (this.needsConcessionAuthorization ? ' El descuento o el precio mayorista se autorizan de nuevo al cobrar.' : ''));
+    } catch (error) { this.error.set(errorText(error)); }
+    finally {
+      this.pendingDraft.set(null); this.recoveringDraft.set(false); this.draftReady = true;
+      this.scheduleDraftSave(); this.focusSearch();
+    }
+  }
+
+  /** Descarta el borrador encontrado al entrar. */
+  async discardDraft(message = 'Se descartó la venta sin terminar.'): Promise<void> {
+    if (!this.pendingDraft()) return;
+    this.pendingDraft.set(null); this.draftReady = true;
+    this.feedbackKind.set('info'); this.feedback.set(message);
+    try { await this.api.discardDraft(); this.draftStored = false; } catch { /* se reemplaza con la próxima venta */ }
+    this.scheduleDraftSave();
+  }
   get hasCustomerAccess(): boolean { return this.session.has('CUSTOMERS.BASIC_MANAGE') || this.session.has('CUSTOMERS.MANAGE'); }
   get canRequestCredit(): boolean { return this.session.has('SALES.CREATE') && this.session.has('CREDIT.REQUEST'); }
   get operatingDate(): string { return this.cashState()?.currentShift?.operatingDate ?? ''; }
@@ -614,6 +722,7 @@ export class Sales implements OnInit, OnDestroy {
   }
   private async submitSale(credentials: AuthorizationCredentials | null): Promise<void> {
     if (this.busy()) return;
+    clearTimeout(this.draftTimer); this.draftTimer = undefined;
     if (this.pending?.authorizerUserName && this.pending.authorizerUserName !== authorizationIdentity(credentials))
       throw new Error('Reintenta con el mismo usuario autorizador; la clave de esta venta conserva su identidad.');
     if (!this.pending) {
@@ -628,8 +737,12 @@ export class Sales implements OnInit, OnDestroy {
     }
     this.busy.set(true); this.error.set('');
     try {
+      // Ya marcada «en proceso» (sin dobles envíos): el último guardado del borrador termina antes de confirmar,
+      // porque la venta lo cierra en el servidor.
+      if (this.draftSave) await this.draftSave.catch(() => undefined);
       const meta: ReceiptMeta = { customer: this.selectedCustomerName, operator: this.session.user()?.displayName ?? '', items: this.cart().length, units: this.units };
       const result = await this.api.confirm({ ...this.pending.input, authorization: credentials ? authorizationBody(credentials) : null }, this.pending.key);
+      this.draftStored = false;
       this.receipt.set(meta); this.showDetail.set(false); this.reprintMessage.set(''); this.printed.set(false); this.lastJobStatus.set(null); this.sale.set(result);
       this.pending = null; this.cart.set([]); this.results.set([]); this.selectedProductId.set(null); this.cashApplied = this.cashReceived = this.transferApplied = this.nequiApplied = 0; this.generalDiscount = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.activePayments.set(['EFECTIVO']); this.checkoutMode.set(false);
       this.focusField('new-sale');

@@ -43,6 +43,7 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<ICashRepository, EfCashRepository>();
         services.AddScoped<ICashTransactionManager, EfCashTransactionManager>();
         services.AddScoped<ISalesRepository, EfSalesRepository>();
+        services.AddScoped<ISaleDraftRepository, EfSaleDraftRepository>();
         services.AddScoped<ControlPlus.Application.Credits.Ports.ICustomerCreditExposureReader, EfCustomerCreditExposureReader>();
         services.AddScoped<IFinancialSalesReportRepository, EfFinancialSalesReportRepository>();
         services.AddScoped<ISalesOverviewRepository, EfSalesOverviewRepository>();

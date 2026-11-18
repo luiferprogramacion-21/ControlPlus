@@ -161,6 +161,7 @@ builder.Services.AddScoped<ICatalogService, CatalogService>();
 builder.Services.AddScoped<ICashService, CashService>();
 builder.Services.AddScoped<IAuthorizerCredentialResolver, AuthorizerCredentialResolver>();
 builder.Services.AddScoped<ISalesService, SalesService>();
+builder.Services.AddScoped<ISaleDraftService, SaleDraftService>();
 builder.Services.AddScoped<IReceiptPrintingService, ReceiptPrintingService>();
 builder.Services.AddSingleton<IPrintSpooler, WindowsGdiPrintSpooler>();
 builder.Services.AddHostedService<PrintQueueWorker>();
