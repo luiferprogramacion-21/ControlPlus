@@ -125,5 +125,7 @@ public enum AuditAction
     PasswordRecoveryFailed = 121,
     PasswordRecovered = 122,
     // Borrado de un usuario sin historial (decisión del 18 de noviembre de 2026).
-    UserDeleted = 123
+    UserDeleted = 123,
+    // Borrado o retiro de un perfil de impresora (decisión del 18 de noviembre de 2026).
+    PrintProfileDeleted = 124
 }

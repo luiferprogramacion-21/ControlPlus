@@ -30,6 +30,18 @@ public sealed class PrintingController(CurrentActorContextResolver actorResolver
         return actor is null ? MissingActor() : FromResult(await printing.ListProfilesAsync(actor, ct), Ok);
     }
 
+    /// <summary>Borra un perfil sin historial de impresión; con historial lo retira y conserva sus trabajos.</summary>
+    [HttpDelete("profiles/{profileId:guid}")]
+    [PermissionAuthorize(PermissionCodes.ConfigurationManage)]
+    [ProducesResponseType<DeletePrintProfileResultDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> DeleteProfile(Guid profileId, CancellationToken ct)
+    {
+        var actor = await GetActorAsync(ct);
+        return actor is null ? MissingActor() : FromResult(await printing.DeleteProfileAsync(actor, profileId, ct), Ok);
+    }
+
     /// <summary>Indica si la terminal tiene un perfil de recibos listo, sin revelar la cola de Windows.</summary>
     [HttpGet("status")]
     [PermissionAuthorize(PermissionCodes.SalesCreate)]

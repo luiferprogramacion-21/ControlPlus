@@ -19,6 +19,7 @@ export class PrintSettings implements OnInit {
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly creating = signal(false);
+  readonly deleting = signal(false);
   readonly error = signal('');
   readonly formError = signal('');
   readonly notice = signal('');
@@ -75,6 +76,19 @@ export class PrintSettings implements OnInit {
       await this.reload();
     } catch (e) { this.formError.set(errorText(e)); }
     finally { this.saving.set(false); }
+  }
+
+  /** Decisión del 18 de noviembre de 2026: se borra el perfil; si ya imprimió, se retira y se conserva su historial. */
+  async remove(profile: PrintProfile): Promise<void> {
+    if (!this.session.has('CONFIGURATION.MANAGE') || this.deleting() ||
+      !confirm(`¿Eliminar el perfil «${profile.name}»?${profile.isDefault ? ' Es el predeterminado: mientras no haya otro, no se imprimirá desde el sistema.' : ''}`)) return;
+    this.deleting.set(true); this.error.set(''); this.notice.set('');
+    try {
+      const result = await this.api.deletePrintProfile(profile.id);
+      this.notice.set(result.physicallyDeleted ? 'Perfil eliminado.' : 'Perfil eliminado. Se conserva el historial de lo que imprimió.');
+      await this.reload();
+    } catch (e) { this.error.set(errorText(e)); }
+    finally { this.deleting.set(false); }
   }
 
   async retry(job: PrintJob): Promise<void> {

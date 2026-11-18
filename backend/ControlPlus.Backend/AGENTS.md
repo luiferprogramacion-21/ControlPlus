@@ -548,6 +548,10 @@ Aprobado por el usuario: **solo el Administrador** vigente (rol Administrador y 
 
 Botón «Eliminar» en Administración → Usuarios.
 
+### Decisión del 18 de noviembre de 2026: eliminar perfiles de impresora
+
+El Administrador con `CONFIGURATION.MANAGE` elimina perfiles desde Configuración → Impresión (`DELETE /api/printing/profiles/{profileId}`). Sin trabajos de impresión se borra con su plantilla; con historial se retira (inactivo, sin ser predeterminado, oculto y con el nombre liberado) y conserva sus trabajos; con trabajos pendientes o en curso responde 409. Auditado como `PrintProfileDeleted`. Sin migración. Véase `docs/printing-implementation.md`.
+
 ### Reglas del reparto
 
 - Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:

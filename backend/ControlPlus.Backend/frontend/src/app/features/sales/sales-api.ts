@@ -125,6 +125,8 @@ export class SalesApi {
   retryPrintJob(saleId: string, jobId: string): Promise<PrintJob> { return firstValueFrom(this.http.post<PrintJob>(`/api/sales/${saleId}/print-jobs/${jobId}/retry`, null)); }
   retryAdminPrintJob(jobId: string): Promise<PrintJob> { return firstValueFrom(this.http.post<PrintJob>(`/api/printing/jobs/${jobId}/retry`, null)); }
   printProfiles(): Promise<PrintProfile[]> { return firstValueFrom(this.http.get<PrintProfile[]>('/api/printing/profiles')); }
+  /** Sin historial de impresión se borra; con historial solo se retira y conserva sus trabajos. */
+  deletePrintProfile(id: string): Promise<{ physicallyDeleted: boolean }> { return firstValueFrom(this.http.delete<{ physicallyDeleted: boolean }>(`/api/printing/profiles/${id}`)); }
   createPrintProfile(input: CreatePrintProfileInput): Promise<PrintProfile> { return firstValueFrom(this.http.post<PrintProfile>('/api/printing/profiles', input)); }
   printQueue(page = 1, pageSize = 20): Promise<Page<PrintJob>> { return firstValueFrom(this.http.get<Page<PrintJob>>('/api/printing/jobs', { params: { page, pageSize } })); }
 }

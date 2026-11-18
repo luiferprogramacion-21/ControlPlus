@@ -3,11 +3,12 @@
 <section class="panel module-panel">
   <div class="module-toolbar"><div><h3>Perfiles de impresión</h3><p class="muted">Admite impresoras de recibos, etiquetas o equipos térmicos híbridos.</p></div><button class="button button--primary" type="button" (click)="startCreate()">Agregar perfil</button></div>
   @if (loading()) { <p class="muted" role="status">Cargando…</p> }
-  <div class="table-wrap module-table-wrap"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Cola de Windows</th><th>Configuración</th><th>Estado</th></tr></thead><tbody>
+  <div class="table-wrap module-table-wrap"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Cola de Windows</th><th>Configuración</th><th>Estado</th><th></th></tr></thead><tbody>
     @for (profile of profiles(); track profile.id) {
       <tr><td><strong>{{ profile.name }}</strong></td><td>{{ profile.printerType === 'HIBRIDA' ? 'Híbrida' : profile.printerType === 'ETIQUETAS' ? 'Etiquetas' : 'Recibos' }}</td><td>{{ profile.systemQueueName }}</td><td>{{ profile.columns ? profile.columns + ' columnas' : '' }}{{ profile.labelWidthMm && profile.labelHeightMm ? (profile.columns ? ' · ' : '') + profile.labelWidthMm + ' × ' + profile.labelHeightMm + ' mm' : '' }}{{ profile.resolutionDpi ? ' · ' + profile.resolutionDpi + ' DPI' : '' }}</td>
-        <td><span class="status-pill" [class.status-pill--warning]="!profile.active">{{ profile.active ? 'Activo' : 'Inactivo' }}</span>@if (profile.isDefault) { <span class="status-pill"> Predeterminado</span> }</td></tr>
-    } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="5">No hay perfiles. Sin un perfil no se generan trabajos de impresión.</td></tr> } }
+        <td><span class="status-pill" [class.status-pill--warning]="!profile.active">{{ profile.active ? 'Activo' : 'Inactivo' }}</span>@if (profile.isDefault) { <span class="status-pill"> Predeterminado</span> }</td>
+        <td class="align-right">@if (session.has('CONFIGURATION.MANAGE')) { <button class="table-action table-action--danger" type="button" (click)="remove(profile)" [disabled]="deleting()">Eliminar</button> }</td></tr>
+    } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="6">No hay perfiles. Sin un perfil no se generan trabajos de impresión.</td></tr> } }
   </tbody></table></div>
 </section>
 <section class="panel module-panel">

@@ -15,6 +15,9 @@ public sealed record PrintProfileDto(Guid Id, string Name, string SystemQueueNam
 
 public sealed record PrintStatusDto(bool HasActiveProfile, string? ProfileName, int? Columns);
 
+/// <param name="PhysicallyDeleted">Verdadero si el perfil se borró; falso si tenía historial de impresión y solo se retiró.</param>
+public sealed record DeletePrintProfileResultDto(bool PhysicallyDeleted);
+
 public sealed record PrintJobDto(Guid Id, Guid SaleId, string CopyType, int CopyNumber,
     string Status, int Attempts, DateTimeOffset RequestedAtUtc,
     DateTimeOffset? QueueAcceptedAtUtc, string? Error);
@@ -26,6 +29,8 @@ public interface IReceiptPrintingService
     Task<Result<PrintProfileDto>> CreateProfileAsync(ActorContext actor,
         CreatePrintProfileRequest request, CancellationToken ct = default);
     Task<Result<IReadOnlyCollection<PrintProfileDto>>> ListProfilesAsync(ActorContext actor,
+        CancellationToken ct = default);
+    Task<Result<DeletePrintProfileResultDto>> DeleteProfileAsync(ActorContext actor, Guid profileId,
         CancellationToken ct = default);
     Task<Result<PrintStatusDto>> GetStatusAsync(ActorContext actor, CancellationToken ct = default);
     Task<Result<PagedResult<PrintJobDto>>> ListJobsAsync(ActorContext actor,

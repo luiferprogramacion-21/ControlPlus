@@ -112,13 +112,65 @@ public sealed class ReceiptPrintingService(
         var terminal = await GetActiveTerminalAsync(ct);
         if (terminal is null) return Result.Failure<IReadOnlyCollection<PrintProfileDto>>(
             ApplicationError.NotFound("la terminal activa"));
-        var profiles = await db.PerfilImpresora.AsNoTracking().Where(x => x.TerminalId == terminal.Id)
+        // Los perfiles retirados (con historial de impresión) se conservan en la base pero no se muestran.
+        var profiles = await db.PerfilImpresora.AsNoTracking().Where(x => x.TerminalId == terminal.Id && x.Activo)
             .OrderBy(x => x.Nombre).ToArrayAsync(ct);
         var codes = profiles.Select(x => ReceiptTemplateCode(x.Id)).ToArray();
         var templates = await db.PlantillaImpresion.AsNoTracking().Where(x => codes.Contains(x.Codigo))
             .ToDictionaryAsync(x => x.Codigo, ct);
         return Result.Success<IReadOnlyCollection<PrintProfileDto>>(profiles.Select(p => ToProfile(p,
             templates.TryGetValue(ReceiptTemplateCode(p.Id), out var t) ? ReadColumns(t.Configuracion) : 0)).ToArray());
+    }
+
+    /// <summary>
+    /// Borra un perfil de impresora. Sin trabajos de impresión se elimina con su plantilla; con historial se retira
+    /// (inactivo, sin ser predeterminado y con el nombre liberado) para conservar la trazabilidad de las copias.
+    /// Mientras tenga trabajos pendientes o en curso no se toca.
+    /// </summary>
+    public async Task<Result<DeletePrintProfileResultDto>> DeleteProfileAsync(ActorContext actor, Guid profileId,
+        CancellationToken ct = default)
+    {
+        var auth = await users.GetAuthorizationSnapshotAsync(actor.UserId, ct);
+        if (auth is null) return Result.Failure<DeletePrintProfileResultDto>(ApplicationError.Unauthorized());
+        if (auth.HighestRoleLevel != RoleLevel.Administrador ||
+            !auth.PermissionCodes.Contains(PermissionCodes.ConfigurationManage, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<DeletePrintProfileResultDto>(ApplicationError.Forbidden());
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var terminal = await GetLockedActiveTerminalAsync(ct);
+        if (terminal is null) return Result.Failure<DeletePrintProfileResultDto>(ApplicationError.NotFound("la terminal activa"));
+        var profile = await db.PerfilImpresora.AsTracking()
+            .SingleOrDefaultAsync(x => x.Id == profileId && x.TerminalId == terminal.Id && x.Activo, ct);
+        if (profile is null) return Result.Failure<DeletePrintProfileResultDto>(ApplicationError.NotFound("el perfil de impresora"));
+
+        var inProgress = new[] { "PENDIENTE", "IMPRIMIENDO" };
+        if (await db.TrabajoImpresion.AnyAsync(x => x.PerfilImpresoraId == profile.Id && inProgress.Contains(x.Estado), ct))
+            return Result.Failure<DeletePrintProfileResultDto>(ApplicationError.Conflict(
+                "El perfil tiene trabajos de impresión pendientes o en curso. Espera a que terminen o revisa la cola antes de eliminarlo."));
+
+        var hasHistory = await db.TrabajoImpresion.AnyAsync(x => x.PerfilImpresoraId == profile.Id, ct);
+        var details = new { profile.Id, profile.TerminalId, profile.Nombre, profile.NombreSistema, profile.TipoImpresora,
+            profile.EsPredeterminada, PhysicallyDeleted = !hasHistory };
+        if (hasHistory)
+        {
+            var now = clock.UtcNow.UtcDateTime;
+            var suffix = $" (eliminado {now:yyyyMMddHHmmss})";
+            profile.Nombre = profile.Nombre[..Math.Min(profile.Nombre.Length, 150 - suffix.Length)] + suffix;
+            profile.Activo = false;
+            profile.EsPredeterminada = false;
+            profile.FechaModificacion = now;
+        }
+        else
+        {
+            var codes = new[] { ReceiptTemplateCode(profile.Id), LabelTemplateCode(profile.Id) };
+            db.PlantillaImpresion.RemoveRange(await db.PlantillaImpresion.AsTracking()
+                .Where(x => codes.Contains(x.Codigo)).ToListAsync(ct));
+            db.PerfilImpresora.Remove(profile);
+        }
+        await WriteAuditAsync(actor.UserId, AuditAction.PrintProfileDeleted, nameof(PerfilImpresora), profile.Id, details, ct);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return Result.Success(new DeletePrintProfileResultDto(!hasHistory));
     }
 
     public async Task<Result<PrintStatusDto>> GetStatusAsync(ActorContext actor, CancellationToken ct = default)

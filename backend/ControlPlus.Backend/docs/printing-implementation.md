@@ -33,6 +33,16 @@ Al confirmar la venta, el frontend consulta el estado. Con perfil activo muestra
 
 Corrección del 18 de noviembre de 2026, tras la primera prueba con la POS80 real: el procesador imprime en segundo plano y la pantalla de venta consultaba el estado una sola vez, por eso mostraba «PENDIENTE» aunque el ticket ya hubiera salido. Ahora, mientras el trabajo esté `PENDIENTE` o `IMPRIMIENDO`, la pantalla vuelve a consultarlo cada 1,5 s, hasta 30 s, y se detiene al quedar `IMPRESO` o `ERROR`, al pasar a otra venta o al salir de la pantalla.
 
+## Eliminar perfiles de impresora
+
+Decisión del 18 de noviembre de 2026: el Administrador con `CONFIGURATION.MANAGE` puede eliminar un perfil desde Configuración → Impresión («Eliminar»), con `DELETE /api/printing/profiles/{profileId}`.
+
+- **Sin trabajos de impresión:** se borra el perfil y su plantilla. Responde `{ "physicallyDeleted": true }`.
+- **Con trabajos de impresión:** el historial referencia el perfil y no se borra. El perfil se **retira**: queda inactivo, deja de ser predeterminado, se oculta de la lista y se renombra con el sufijo « (eliminado AAAAMMDDHHMMSS)» para liberar su nombre y poder crear otro igual. Sus trabajos y reimpresiones se conservan. Responde `{ "physicallyDeleted": false }`.
+- **Con trabajos `PENDIENTE` o `IMPRIMIENDO`:** responde 409 y no cambia nada.
+- Si era el predeterminado, no se elige otro automáticamente: sin perfil predeterminado las ventas usan el ticket del navegador si está activado.
+- Queda en la auditoría de negocio (`PrintProfileDeleted`). Sin migración.
+
 ## Significado aprobado de `IMPRESO`
 
 El usuario aprobó el 6 de noviembre de 2026 que `IMPRESO` signifique «aceptado por la cola de Windows». No acredita salida física en papel. La API y la interfaz deben expresar esa limitación con claridad; el adaptador solo marca el trabajo cuando la llamada de impresión devuelve éxito. Si el proceso cae entre la aceptación de Windows y la escritura del resultado, queda incierto y no se reintenta automáticamente.
