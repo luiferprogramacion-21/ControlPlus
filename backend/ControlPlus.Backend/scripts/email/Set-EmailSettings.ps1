@@ -35,6 +35,12 @@ if (-not (Test-Path -LiteralPath $dotnet)) { $dotnet = 'dotnet' }
 if ([string]::IsNullOrWhiteSpace($UserName)) { $UserName = $FromAddress }
 $FromAddress = $FromAddress.Trim(); $UserName = $UserName.Trim(); $SmtpHost = $SmtpHost.Trim()
 if ($FromAddress -notmatch '^[^@\s]+@[^@\s]+\.[^@\s]+$') { throw "«$FromAddress» no parece un correo." }
+if ($SendTestTo) {
+    $SendTestTo = $SendTestTo.Trim()
+    if ($SendTestTo -notmatch '^[^@\s]+@[^@\s]+\.[^@\s]+$') {
+        throw "-SendTestTo debe ser un correo real donde recibir la prueba (por ejemplo su correo personal); «$SendTestTo» no lo es. No se cambió nada."
+    }
+}
 
 $password = $null
 try {
