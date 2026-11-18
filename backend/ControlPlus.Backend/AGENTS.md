@@ -325,6 +325,7 @@ Proveedores no añadió migraciones ni modificó entidades oficiales, `OfficialC
 - `docs/purchases.md`: compras independientes, recepción, anulación completa, catálogo de motivos, costo, numeración, concurrencia y límites de los cortes 1 y 2.
 - `docs/decisions/`: registro breve de decisiones nuevas de Fase 5, incluida persistencia, concurrencia y migraciones.
 - `docs/testing.md`: cómo ejecutar pruebas y evidencia mínima esperada.
+- `docs/manual-de-uso.md`: manual de uso para quienes trabajan en la tienda, con una parte para cada rol (Cajero, Supervisor y Administrador).
 
 ## Decisión de autorización del 5 de noviembre de 2026
 
@@ -522,7 +523,7 @@ El 17 de noviembre de 2026 el usuario pidió guardar esta revisión y repartir l
 | P | Actualizar herramientas de desarrollo con avisos de seguridad, al final y con regresión completa | Baja | Claude |
 | Q | Ampliar las pruebas de navegador | Baja | Claude |
 | R | Medir el objetivo de 1 segundo | Baja | Claude |
-| — | Manual de uso y guía de instalación y operación | Entrega | Claude — **un manual con una parte para cada rol** (Administrador/dueño, Supervisor y Cajero), aprobado el 18 de noviembre de 2026 |
+| — | Manual de uso y guía de instalación y operación | Entrega | Claude — **un manual con una parte para cada rol** (Administrador/dueño, Supervisor y Cajero), aprobado el 18 de noviembre de 2026 — **primera versión escrita en `docs/manual-de-uso.md` el 18 de noviembre de 2026**: parte común, Cajero, Supervisor, Administrador y anexo de permisos; falta revisarla con quienes lo usarán y, si se quiere, añadir capturas de pantalla |
 
 ### Decisión del 18 de noviembre de 2026: contraseñas y correo del usuario
 

@@ -1,0 +1,499 @@
+# Manual de uso de ControlPlus — Baratísimo
+
+Este manual explica cómo trabajar con ControlPlus, el sistema de punto de venta de la tienda. Está pensado para quienes lo usan todos los días, no para quien lo instala.
+
+Tiene cuatro partes. Lee la primera y la que corresponda a tu rol:
+
+| Parte | Para quién |
+| --- | --- |
+| **1. Lo básico** | Todos |
+| **2. Cajero** | Quien atiende el mostrador y cobra |
+| **3. Supervisor** | Quien coordina la caja, autoriza a los cajeros y recibe mercancía |
+| **4. Administrador (dueño)** | Quien configura el negocio y responde por él |
+
+Cada persona tiene **un solo rol**. Lo que ves en el menú depende de él: si una opción no aparece, tu rol no la tiene. El Administrador puede dar o quitar permisos sueltos a una persona, así que tu menú puede ser un poco distinto al de este manual.
+
+> Este manual describe la versión del 18 de noviembre de 2026. Si algo en pantalla no coincide, avisa al Administrador.
+
+---
+
+# Parte 1. Lo básico (todos)
+
+## 1.1 Ingresar y salir
+
+1. Abre ControlPlus con el acceso directo del escritorio (o en el navegador, en `http://localhost:5000`).
+2. Escribe tu **usuario** y tu **contraseña** y pulsa Ingresar.
+3. El sistema te lleva a donde empiezas a trabajar:
+   - si vendes y no hay caja abierta, a **Caja** para abrirla;
+   - si vendes y ya hay caja abierta, al **punto de venta**;
+   - el Administrador entra al **Dashboard**.
+4. Para salir, usa el botón de salir de la barra superior.
+
+**Cuidado con tu contraseña.** Tras **5 intentos fallidos** tu usuario se bloquea. Lo reactiva una persona con un rol superior (el Administrador).
+
+**La sesión se renueva sola mientras trabajas.** Si dejas el sistema sin usar unos 30 minutos, se cierra por seguridad. Si tenías una venta a medias, no se pierde (ver 2.7).
+
+## 1.2 Olvidé mi contraseña
+
+Nadie cambia su propia contraseña desde dentro del sistema. Hay dos caminos:
+
+- **Por correo (lo más rápido):** en la pantalla de ingreso pulsa **«¿Olvidaste tu contraseña?»**, escribe tu usuario y el sistema envía un **código de 6 números** al correo que el Administrador registró en tu usuario. Escribe el código y tu contraseña nueva. El código vale unos 10 minutos. Equivocarte con el código cuenta como intento fallido.
+  - Necesita que tu usuario tenga correo registrado y que el computador tenga Internet en ese momento.
+- **Con el Administrador:** él te pone una contraseña nueva desde Administración → Usuarios. Es la salida cuando no tienes correo o no hay Internet.
+
+## 1.3 El menú y la pantalla
+
+- A la izquierda está el **menú**. Se puede plegar para tener más espacio.
+- Arriba aparece el nombre de la tienda y tu nombre.
+- Las opciones del menú (según tu rol): Dashboard, Punto de venta, Historial de ventas, Caja, Inventario, Clientes, Créditos y abonos, Compras, Recepción de compras, Proveedores, Reportes, Apartados, Configuración, Administración y Catálogo.
+
+## 1.4 Cuando el sistema pide la autorización de otra persona
+
+Algunas operaciones delicadas necesitan que **otra persona con más autoridad** las apruebe. Aparece una ventana que dice qué se va a hacer y pide los datos del autorizador:
+
+- escribe su **usuario y contraseña**, **o**
+- escanea su **carné** con el lector de códigos de barras.
+
+Reglas:
+
+- El autorizador debe ser de un **rol superior** al tuyo: un Cajero lo autoriza un Supervisor o el Administrador; un Supervisor lo autoriza el Administrador.
+- Tu sesión **no cambia**: sigues siendo tú quien hace la operación. La contraseña que escribe el autorizador se borra al terminar.
+- Si el autorizador se equivoca de contraseña, cuenta como intento fallido **de su usuario** (5 intentos lo bloquean).
+- El Administrador **no necesita** autorizador en las operaciones que le corresponden: queda registrado como quien pidió y quien aprobó.
+
+Todo lo que se autoriza queda registrado en la auditoría.
+
+## 1.5 El carné de operador
+
+Es una tarjeta con un **código de barras** (Code 128) a nombre de una persona. Se escanea con el lector, que escribe el código y pulsa Enter. Sirve para:
+
+- desbloquear el punto de venta en **turno compartido** (ver 2.2);
+- autorizar operaciones en lugar de escribir usuario y contraseña.
+
+El Administrador lo emite en Administración → Usuarios → **Carné**. Si se pierde, se emite otro y el anterior deja de servir. El sistema guarda solo una huella del código, no el código.
+
+## 1.6 Si algo no funciona
+
+| Qué ves | Qué hacer |
+| --- | --- |
+| «El turno abierto pertenece a otro usuario. Solo su responsable puede vender.» | La caja está abierta a nombre de otra persona (turno individual). Pide que la cierren y la abran a tu nombre, o que se abra como turno compartido. |
+| «El turno es compartido: inicia tu sesión de operador en Caja para vender.» | Escanea tu carné (ver 2.2). |
+| Un producto no aparece al buscarlo | Puede estar agotado (los agotados se ocultan de los listados normales; al escribir su nombre o código sí aparecen, marcados como agotados) o inactivo. |
+| Te devolvió a la pantalla de ingreso | La sesión se cerró por inactividad o el Administrador cambió tus permisos. Ingresa de nuevo. |
+| El ticket no sale | Ver 2.6. |
+| No hay Internet | ControlPlus sigue vendiendo. Solo fallan el envío de códigos por correo y la copia externa de respaldo, que se envía cuando vuelve la conexión. |
+| Cualquier error que no entiendas | Anota la hora y lo que hacías y avisa al Administrador: todo queda en la auditoría. |
+
+---
+
+# Parte 2. Cajero
+
+## 2.1 Tu día en resumen
+
+1. **Abrir la caja** con el fondo inicial (con la autorización de un Supervisor o del Administrador).
+2. **Vender**: buscar productos, cobrar, entregar el ticket y el cambio.
+3. Si hace falta: ventas a crédito, abonos, apartados.
+4. Al terminar, **un Supervisor o el Administrador cierra la caja** con el arqueo.
+
+## 2.2 Abrir la caja
+
+Menú **Caja** → bloque **Apertura de caja**.
+
+1. Escribe el **fondo inicial** (el efectivo con el que empiezas). Puede ser cero.
+2. Elige la **modalidad del turno**:
+   - **Turno individual** (viene marcado): una sola persona abre, vende y cierra. Todas las ventas quedan a su nombre.
+   - **Turno compartido**: varias personas se turnan en el mismo mostrador. Cada una se identifica con su carné antes de cada venta.
+3. Escribe una observación si quieres y pulsa **Iniciar turno**.
+4. Como Cajero, el sistema abre la **ventana de autorización**: un Supervisor o el Administrador escribe su usuario y contraseña, o escanea su carné.
+
+Si quedó **una caja abierta del día anterior**, el sistema te lo avisa: hay que cerrarla (con arqueo) antes de abrir otra.
+
+**En turno compartido**, antes de vender cada persona se identifica: en el punto de venta aparece **«Escanee el carné del empleado»**. Escanea tu propio carné (el de la persona que inició sesión). Cada venta confirmada **cierra esa sesión** y el punto de venta se bloquea para el siguiente. Si el carné no sirve (ajeno, vencido o dañado), el sistema lo explica y **no te saca del sistema**.
+
+## 2.3 Vender de contado
+
+Menú **Punto de venta**.
+
+1. **Agregar productos.** Busca por código interno, **código de barras** (con el lector), referencia o nombre, y pulsa **Agregar · Enter**. Con el lector basta escanear. Escanear el mismo producto varias veces suma la cantidad.
+2. **Ajustar cantidades.** Pulsa **Cantidad · F4** o cambia el número en la línea. Las cantidades son siempre **enteras** (unidad, paquete o metro). No se puede vender más de lo que hay en existencias. **Quitar · Supr** saca la línea.
+3. **Cliente.** Es opcional en una venta de contado. Búscalo si quieres dejarlo en la venta.
+4. Pulsa **Cobrar · F9** y registra el pago (ver 2.5).
+5. **Confirmar venta · Enter**. El sistema registra el pago, descuenta el inventario y manda el ticket a imprimir.
+
+Atajos útiles: **Enter** agrega, **F4** cantidad, **Supr** quita, **Esc** vuelve, **Nueva venta · Enter** empieza otra.
+
+**Cancelar antes de cobrar:** pulsa **Cancelar venta**; el sistema pregunta «¿Cancelar esta venta?». **Confirmar cancelación** la descarta; **Continuar venta** vuelve.
+
+## 2.4 Descuentos y precio mayorista
+
+- Puedes dar descuento **hasta 5 %**: **Desc. producto** (a una línea) o **Desc. venta total**, en porcentaje o en pesos.
+- El **precio mayorista** solo aplica desde **12 unidades de un mismo producto** en la venta (el Administrador puede cambiar ese mínimo).
+- **Para cualquiera de los dos necesitas la autorización de un Supervisor o del Administrador.** El sistema la pide al pulsar «Aplicar» o al elegir mayorista. Una vez autorizada, no se pide otra vez para esa venta.
+- El **motivo** del descuento es opcional.
+- **No se acumulan** mayorista y descuento manual en el mismo producto.
+- **Nunca se vende por debajo del costo.** Si el descuento lo deja por debajo, el sistema lo rechaza.
+
+## 2.5 Cobrar y el cambio
+
+Se puede pagar con **Efectivo, Transferencia o Nequi**, solos o combinados:
+
+- **Efectivo exacto** llena el valor justo.
+- **+ Pago mixto** agrega otro medio. El sistema calcula solo lo que falta (**Usar saldo pendiente**).
+- En **Transferencia y Nequi** la referencia es opcional.
+- En efectivo escribe lo que **recibes** del cliente. El **Cambio** aparece grande: es lo que devuelves.
+
+## 2.6 El ticket y la impresión
+
+- Al confirmar la venta, el ticket se manda a la impresora **automáticamente**.
+- Debajo del total verás el estado: **Pendiente** (en la cola) y enseguida **Impreso**. «Impreso» significa que **Windows aceptó el trabajo**; no garantiza que haya salido papel. Si no sale, revisa la impresora (papel, encendida, cable).
+- **Reimprimir** saca otra copia, marcada como **REIMPRESIÓN**. Queda registrada quién y cuándo.
+- **Error:** si el estado dice Error, aparece **Reintentar ticket**. La venta **ya está registrada**: un fallo de impresión nunca borra ni duplica la venta.
+- Si te quedas sin impresora, la venta se cobra igual; después se puede reimprimir desde **Historial de ventas**.
+
+## 2.7 Venta sin terminar
+
+Si se cierra la sesión, se va la luz o se apaga el equipo con una venta a medias, **el carrito se conserva** (el sistema lo guarda solo cada vez que cambias algo).
+
+Al volver al punto de venta aparece el aviso **«Hay una venta sin terminar…»**:
+
+- **Recuperar venta:** vuelve a armar el carrito. Quita lo que ya no tiene existencias y te lo dice. Si había descuentos o mayorista, se autorizan otra vez al cobrar.
+- **Descartar:** borra la venta guardada.
+
+El carrito guardado es solo tuyo y del turno abierto.
+
+## 2.8 Vender a crédito y cobrar abonos
+
+**Vender a crédito**: arma el carrito como siempre y, en lugar de cobrar, pulsa **Registrar crédito** (y **Continuar crédito**). Si te equivocas, **Venta de contado** te devuelve al cobro normal.
+
+- El **cliente es obligatorio**, con documento completo o teléfono.
+- No se cobra nada en el momento: se registra la deuda por el total.
+- Elige la **fecha de vencimiento** (desde mañana hasta 90 días). El sistema propone una fecha según la configuración del negocio.
+- Necesitas la **autorización de un Supervisor o del Administrador**.
+- El sistema **avisa** si el cliente tiene créditos vencidos o si esta venta supera su **cupo**. Si el Administrador activó el bloqueo, solo **el Administrador** puede autorizar la excepción.
+- **No hay intereses ni recargos**: la deuda nunca crece.
+
+**Cobrar un abono**: menú **Créditos y abonos** → busca al cliente → **Abonar**.
+
+- Hace falta un **turno abierto** a tu nombre (o tu sesión de operador en turno compartido).
+- Se puede pagar en uno o varios medios. En Transferencia y Nequi la **referencia es obligatoria**.
+- Un abono parcial deja saldo; uno total deja el crédito en **Pagado**.
+- Puedes consultar el **historial de abonos** del crédito.
+- **Anular un abono** o **condonar un saldo** no te corresponde (ver partes 3 y 4).
+
+## 2.9 Apartados
+
+Un apartado separa productos para un cliente mientras los va pagando. Menú **Apartados**.
+
+- **Nuevo apartado:** el cliente es obligatorio. Se exige un **pago inicial** (normalmente el 20 % del total; siempre al menos $1) y se fija una **fecha límite** (15 días por defecto). Necesitas la autorización de un Supervisor o del Administrador.
+- **Abonar:** cada pago queda registrado.
+- **Entregar productos:** solo cuando el apartado está **pagado por completo**.
+- **Cancelar un apartado** lo hace un Supervisor o el Administrador, que decide cuánto se devuelve.
+
+## 2.10 Clientes
+
+Menú **Clientes** → **Nuevo cliente**. Lleva nombre, **dirección** (obligatoria), teléfono y, si quieres, documento. El documento no se puede repetir. Puedes consultar su **historial**.
+
+## 2.11 Consultar productos y existencias
+
+- **Catálogo** muestra los productos, sus precios y códigos.
+- **Inventario** muestra las existencias y las **alertas de reposición** (productos con poco stock o agotados). Solo consulta: los ajustes los hace el Administrador.
+
+## 2.12 Lo que no puedes hacer, y a quién pedirlo
+
+| Necesitas | Quién |
+| --- | --- |
+| Cerrar la caja | Supervisor o Administrador |
+| Anular una venta | Supervisor o Administrador |
+| Cambio de producto de una venta ya hecha | Supervisor o Administrador |
+| Anular un abono, condonar un crédito | Supervisor / Administrador (anular) · solo Administrador (condonar) |
+| Un descuento mayor a 5 % | Supervisor (hasta 20 %) o Administrador (hasta 80 %) |
+| Corregir un precio, nombre o código de un producto | Administrador |
+| Ajustar el inventario | Administrador |
+| Reactivar tu usuario bloqueado | Administrador |
+
+## 2.13 Al terminar tu turno
+
+1. Confirma que no quedan ventas a medias (recupera o descarta).
+2. Avisa al Supervisor o al Administrador para el **cierre de caja**.
+3. Sal del sistema con el botón de salir de la barra superior.
+
+---
+
+# Parte 3. Supervisor
+
+El Supervisor hace todo lo que hace un Cajero, **sin necesitar la autorización de nadie en lo que le corresponde**, y además coordina la caja y autoriza a los cajeros. Lo que necesita aprobación de otra persona la da **el Administrador**.
+
+## 3.1 Qué cambia respecto al Cajero
+
+| Tema | Supervisor |
+| --- | --- |
+| Abrir la caja | Solo, sin autorización |
+| Descuento | Hasta 20 %, sin autorización |
+| Mayorista | Sin autorización |
+| Venta a crédito | Sin autorización (con el permiso de crédito) |
+| Crear un apartado | Sin autorización |
+| Cerrar la caja | Sí, con arqueo |
+| Anular venta, cambio de producto | Sí, con la autorización de un Administrador |
+| Autorizar a un Cajero | Sí (descuento, mayorista, crédito, apartado, apertura de caja) |
+| Reportes y Dashboard | No aparecen salvo que el Administrador te los conceda |
+| Configuración | Solo la pestaña **Caja y turnos** |
+
+## 3.2 Abrir la caja y elegir la modalidad
+
+Igual que en 2.2, pero sin ventana de autorización. Al abrir eliges **Turno individual** (por defecto) o **Turno compartido** para ese turno.
+
+**Modalidad predeterminada del negocio:** Configuración → **Caja y turnos**. Elige individual o compartido. Solo se puede cambiar **sin turno abierto** y vale desde el siguiente turno.
+
+## 3.3 Movimientos de caja
+
+En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto** o una **Sangría** (retiro de efectivo de la caja), con su **concepto**, y pulsa **Registrar movimiento**. Quedan en **Movimientos recientes**.
+
+## 3.4 Arqueo y cierre de caja
+
+En **Caja**, bloque **Arqueo de caja**:
+
+1. El sistema muestra lo **esperado** por medio de pago.
+2. Cuenta el **efectivo físico** y escribe lo contado. **Solo se cuenta el efectivo.** Nequi, transferencias y otros medios se muestran como información: el sistema da su total esperado por bueno.
+3. La **diferencia** es contado menos esperado. No hay cierre «a ciegas»: ves el esperado.
+4. Si hay diferencia, el sistema pide un **motivo** y la **autorización de un Administrador**. Si no hay diferencia, no hace falta.
+5. Pulsa **Cerrar caja**.
+
+Al cerrar, el sistema finaliza las sesiones de operador abiertas y hace una copia de respaldo automática.
+
+## 3.5 Autorizar a un Cajero
+
+Cuando un Cajero necesita tu aprobación aparece la ventana de autorización (1.4). Tú escribes **tu usuario y contraseña** o escaneas **tu carné**. Lo puedes autorizar si tienes el permiso correspondiente:
+
+- **Descuento o precio mayorista** (hasta tu límite de 20 % en descuentos).
+- **Crédito** de un Cajero.
+- **Apartado** de un Cajero.
+- **Apertura de caja** de un Cajero.
+
+Autoriza solo lo que revisaste: queda a tu nombre en la auditoría.
+
+## 3.6 Historial de ventas: imprimir, anular, cambiar productos
+
+Menú **Historial de ventas**: lista las ventas con sus pagos y productos. **Ver detalle** y **Imprimir** (reimprime con marca de copia).
+
+**Anular una venta**
+
+1. Abre la venta → **Anular venta**.
+2. Elige el **motivo** y escribe una observación si hace falta.
+3. Pide la autorización de un **Administrador** (ventana 1.4).
+4. La venta queda **Anulada**, el inventario **se repone** y el dinero se devuelve por los mismos medios con que se pagó. Queda auditado.
+
+   Para anular necesitas **tu caja abierta** (a tu nombre, o con tu sesión de operador en turno compartido): el reverso se registra en el turno abierto. Si hay que devolver efectivo, la caja debe tener con qué cubrirlo.
+   Una venta **a crédito** solo se puede anular si su crédito está **intacto**, sin ningún abono.
+
+**Cambio de productos** (una venta ya hecha; no es una anulación)
+
+1. Busca la venta en el historial → **Cambio de productos**.
+2. Se permite hasta **15 días** después de la venta (el Administrador puede cambiar ese plazo).
+3. Elige lo que devuelve el cliente y lo que se lleva. La **diferencia** se paga o se suma al crédito, según corresponda.
+4. Autoriza un **Administrador**.
+
+## 3.7 Créditos
+
+En **Créditos y abonos** puedes registrar abonos (como el Cajero) y además:
+
+- **Anular un abono** (si se registró por error): eliges el motivo y autoriza un Administrador. El saldo del crédito se restituye y el dinero se revierte en caja.
+- **Condonar un saldo** no es tuyo: solo el Administrador.
+
+## 3.8 Apartados
+
+- **Crear:** sin segunda autorización.
+- **Cancelar:** pides la autorización de un **Administrador** y decides cuánto se devuelve al cliente.
+- Abonar y entregar: igual que el Cajero.
+
+## 3.9 Catálogo y etiquetas
+
+- **Crear productos** (con cantidad y costo inicial si ya tienes mercancía) y **consultar** las categorías; crear o cambiar categorías es del Administrador. Cada producto recibe una **referencia automática** (abreviatura de la categoría + número, por ejemplo `PAP-000004`).
+- **No ves los costos** ni cambias el nombre, código o precio de un producto ya creado: eso es del Administrador.
+- **Etiquetas:** Catálogo → **Etiquetas de productos**. Elige los productos, revisa la **vista previa** y pulsa **Imprimir etiquetas**. Necesita una impresora de etiquetas configurada por el Administrador.
+
+## 3.10 Compras: pedidos y recepciones
+
+Para pedir y recibir mercancía de los proveedores:
+
+- **Pedidos por proveedor:** **Nuevo pedido** → elige el proveedor, agrega productos con su cantidad → **Crear pedido**.
+- **Recepciones:** cuando llega la mercancía, **Recepción de compras** → abre el pedido → **Registrar recepción**. Puedes recibir **parcial** (solo lo que llegó) o **Recibir todo lo pendiente**. Lo recibido entra al inventario y actualiza el costo.
+- **Compra directa:** una compra sin pedido previo, con proveedor, productos, costos y número de factura.
+- No creas ni editas proveedores, ni anulas compras: eso es del Administrador.
+
+---
+
+# Parte 4. Administrador (dueño)
+
+El Administrador es responsable de que el sistema sea confiable: configura el negocio, maneja personas y permisos, y puede hacer todo lo que hacen los demás roles. En las operaciones que le corresponden **no necesita la autorización de nadie**.
+
+## 4.1 Primer día: lista de verificación
+
+1. **Instalación inicial** (una sola vez): crea el primer Administrador con la clave maestra y deja lista la caja. Está en `docs/initial-setup.md`.
+2. **Configuración → Establecimiento:** nombre comercial, NIT, teléfono, dirección y los textos de encabezado y pie del ticket.
+3. **Administración → Usuarios:** crea los Supervisores y Cajeros (ver 4.2), con su **correo** para que puedan recuperar la contraseña.
+4. **Carné** para quienes lo necesiten (turno compartido o autorizaciones rápidas).
+5. **Catálogo:** categorías con su abreviatura, y productos con precios, existencias y costos.
+6. **Impresora:** instalar en Windows y crear el perfil (ver 4.7).
+7. **Respaldos:** comprobar en Soporte y continuidad que el último respaldo fue exitoso (ver 4.11).
+8. **Prueba completa:** abrir caja, vender, imprimir, anular, cerrar.
+
+## 4.2 Usuarios, roles y permisos
+
+Administración → **Usuarios**.
+
+- **Nuevo usuario:** nombre, usuario, **correo** (opcional pero recomendado), **rol** (Cajero, Supervisor o Administrador) y contraseña inicial.
+- **Editar:** cambia nombre y correo.
+- **Rol:** cambia el rol de la persona. Sus sesiones abiertas se cierran.
+- **Contraseña:** **restablece** la contraseña de otra persona. Solo tú puedes hacerlo. (Tú puedes cambiar la tuya aquí mismo.)
+- **Permisos:** concede o quita permisos sueltos a una persona. **Quitar siempre prevalece** sobre lo que da el rol. Cada cambio cierra las sesiones de esa persona y queda auditado.
+- **Inactivar / Reactivar acceso:** quien está inactivo no puede ingresar; reactivar acceso también desbloquea a quien falló 5 veces.
+- **Eliminar:** borra por completo a un usuario, **solo si nunca trabajó en el sistema**. Si ya tiene historial, solo se inactiva. No puedes eliminarte a ti mismo.
+
+Administración → **Roles:** muestra la plantilla de permisos de cada rol; puedes ajustarla o restaurarla. Siempre debe haber **al menos un Administrador activo**.
+
+## 4.3 Carné
+
+En **Usuarios** → **Carné**: emite el carné de una persona (código Code 128). El código se muestra **una sola vez** para imprimirlo; emitir otro desactiva el anterior.
+
+## 4.4 Catálogo
+
+Menú **Catálogo**.
+
+- **Categorías:** toda categoría lleva una **abreviatura** única de 2 a 10 letras (por ejemplo PAP, JUG). Con ella se arman las referencias de sus productos (`PAP-000004`). Las referencias ya asignadas no cambian aunque cambies la abreviatura.
+- **Productos:** nombre, categoría, unidad (**unidad, paquete o metro**), precio minorista y mayorista, stock mínimo, proveedor preferido. Puedes dejar activado **Generar código** (el sistema crea un código de barras propio) o registrar uno existente, que no puede repetirse.
+- **Existencias iniciales:** al crear un producto puedes indicar cantidad y costo de entrada.
+- **Costos:** pestaña **Costos**, con el historial de precios de compra.
+- **Editar:** cambios de nombre, código o precio quedan **auditados**.
+- **Inactivar** un producto lo saca de la venta sin perder su historial.
+- **Borrar:** solo si **no tiene ningún historial** (ventas, compras, apartados…). Pide confirmación. Si tiene historial, solo se inactiva.
+- **Agotados:** se ocultan de los listados normales; en **Inventario** puedes filtrarlos.
+
+## 4.5 Inventario
+
+Menú **Inventario**: existencias, **Movimientos** (kardex de cada cambio) y alertas. Filtra por **Estado**: disponibles, stock bajo, agotados o inactivos.
+
+**Registrar ajuste** (conteo físico, merma o daño, pérdida, corrección de registro): elige el producto, la **cantidad a sumar o restar**, el **motivo** y confirma. Todo cambio de existencias genera un movimiento, y los ajustes quedan auditados.
+
+## 4.6 Configuración
+
+Menú **Configuración**, con siete pestañas:
+
+| Pestaña | Para qué sirve |
+| --- | --- |
+| **Establecimiento** | Nombre comercial, NIT o documento, teléfono, dirección y los textos de encabezado y pie del ticket. |
+| **Caja y turnos** | Modalidad predeterminada: individual o compartido (solo sin turno abierto). |
+| **Cambios, apartados y créditos** | Plazo de cambios de producto (15 días), pago inicial mínimo de apartados (20 %, se puede apagar; siempre al menos $1), plazo límite de apartados (15 días), plazo sugerido de los créditos (1 a 90 días) y **mínimo mayorista** (12 unidades). También el **bloqueo de créditos a morosos y de cupo excedido**: si lo activas, solo tú puedes autorizar una excepción. |
+| **IVA** | Apaga o enciende el IVA incluido en las ventas nuevas (viene apagado). No cambia precios ni totales; solo guarda la base y el IVA de cada venta. |
+| **Numeración** | Muestra la numeración de ventas, abonos, apartados, compras, cambios y pedidos. Se crea sola al primer uso: aquí solo se consulta y, antes del primer documento, se ajusta. |
+| **Motivos** | Catálogos de motivos de anulación y cierre (ventas, compras, pedidos). Si falta alguno, **Completar faltantes**. |
+| **Impresión** | Perfiles de impresora y cola de impresión (ver 4.7). |
+
+## 4.7 Impresora
+
+1. **Instala la impresora en Windows** con el controlador del fabricante y comprueba que imprime una página de prueba. En sus preferencias elige el ancho de papel (80 mm o 58 mm) y, si aparece, el corte automático.
+2. En PowerShell: `Get-Printer | Select-Object Name` y copia el **nombre exacto**.
+3. Configuración → **Impresión** → **Agregar perfil**:
+   - **Nombre** del perfil (por ejemplo «Recibos caja»);
+   - **Cola de Windows:** el nombre exacto del paso 2;
+   - **Columnas:** 42 para papel de 80 mm, 32 para 58 mm. **Menos columnas = letra más grande.** Si la letra sale pequeña, crea otro perfil con menos columnas (mínimo 24);
+   - marca **Usar como predeterminado**.
+4. Haz una venta pequeña y comprueba que el ticket sale **una sola vez**.
+
+La tabla **Cola de impresión** muestra cada trabajo y su estado. **Reintentar** vuelve a mandar uno con error.
+
+**Eliminar un perfil:** botón **Eliminar** en su fila. Si el perfil nunca imprimió nada, se borra. Si ya imprimió, se **retira**: desaparece de la lista pero se conserva el historial de lo que imprimió. Si era el predeterminado, mientras no haya otro las ventas no se imprimen desde el sistema.
+
+## 4.8 Proveedores y compras
+
+- **Proveedores:** solo tú los creas, editas e inactivas. El documento (NIT o cédula) no se puede repetir.
+- **Compras y pedidos:** además de lo del Supervisor (3.10), tú puedes **anular una compra** ya confirmada (completa, con motivo), **anular un pedido** y **Cerrar con pendientes** un pedido cuyo faltante ya no va a llegar.
+- **Anular una compra** resta lo que había entrado al inventario y devuelve el costo anterior. No se puede si el producto ya tuvo movimientos posteriores.
+
+## 4.9 Ventas, créditos y apartados: lo que solo tú haces
+
+- **Anular una venta** sin segundo autorizador (Historial de ventas → **Anular venta**).
+- **Cambios de producto** con tu propia autorización.
+- **Condonar el saldo de un crédito:** Créditos y abonos → **Condonar saldo**, con motivo. El crédito queda **Anulado**, la mercancía no vuelve y los abonos ya hechos se conservan.
+- **Anular un abono** sin segundo autorizador.
+- **Cancelar un apartado** y decidir cuánto se devuelve.
+- **Descuentos hasta 80 %.** Ningún rol puede pasar de 80 %, ni vender bajo el costo.
+
+## 4.10 Dashboard y Reportes
+
+- **Dashboard:** el resumen del día: ventas, comparación con el mismo lapso de ayer, caja actual (efectivo esperado del turno abierto), alertas (stock bajo, créditos vencidos, apartados próximos a vencer), ventas por hora, actividad reciente y estado del respaldo externo.
+- **Reportes:** ventas por día, flujo de caja por día, medios de pago y, con costos, **margen comercial estimado**. Hay versión en pantalla y en PDF.
+  - El margen usa el costo histórico de cada venta y el precio con IVA incluido. **No es utilidad contable**: no descuenta impuestos ni gastos.
+  - Si falta el costo de algún producto, el sistema dice cuántas líneas faltan en vez de inventar el dato.
+
+## 4.11 Respaldos y restauración
+
+Menú **Soporte y continuidad**.
+
+- El sistema hace una **copia de la base de datos** cada 30 minutos, después de cada cierre de caja y cuando la pides con el botón **Crear respaldo**.
+- Cada copia va a **dos destinos**: una copia **local** en un disco distinto al de la base y una copia **externa cifrada** en la carpeta de OneDrive o Google Drive.
+- Se conservan 7 copias diarias, 4 semanales y 12 mensuales.
+- **Probar restauración** restaura una copia en una base temporal para comprobar que sirve y la borra al terminar. **No toca** tus datos reales.
+- **Restaurar la operación real** no está en pantalla, a propósito: se hace con un script de emergencia (`scripts/backups/emergency/Restore-ControlPlusDatabase.ps1`), que conserva la base anterior. Detalle en `docs/backups.md`.
+
+> Un respaldo en el mismo disco que la base no protege contra la falla de ese disco. Conecta un **USB o segundo disco** y configúralo como destino local.
+
+## 4.12 Auditoría
+
+Administración → **Auditoría**: lista de solo lectura de las acciones críticas (usuarios y permisos, productos, caja, ventas, inventario, créditos, apartados, impresión). Filtra por fecha, usuario y acción. Nadie puede modificarla.
+
+## 4.13 Mantenimiento del equipo
+
+- **ControlPlus corre como servicio de Windows** («ControlPlus»): arranca solo al encender el equipo, después de PostgreSQL, y se reinicia si falla. No hace falta abrir nada para que funcione; solo el navegador o el acceso directo.
+- **Si el sistema no responde:** en `http://localhost:5000/api/health` debe decir que está sano, y en `/api/health/database` que la base responde. Si no, reinicia el servicio ControlPlus desde Servicios de Windows.
+- **Actualizar el sistema:** con `scripts/service/Install-ControlPlusService.ps1` como Administrador de Windows. Si la versión nueva incluye cambios en la base de datos, se aplican por separado, con respaldo previo y por el procedimiento que acompañe esa versión. **Nunca se aplican al arrancar.** Detalle en `docs/windows-service.md`.
+- **Correo para recuperar contraseñas:** se configura con `scripts/email/Set-EmailSettings.ps1` (pide la contraseña de aplicación de la cuenta en una ventana oculta). Esa contraseña no se escribe en ningún archivo del proyecto.
+
+## 4.14 Reglas fijas del negocio
+
+Estas reglas no se pueden cambiar con permisos:
+
+- Descuento máximo: **Cajero 5 %, Supervisor 20 %, Administrador 80 %.** Nunca más de 80 %.
+- **Nunca se vende bajo costo.** Mayorista y descuento manual no se acumulan.
+- Todas las cantidades son **enteras**; no se vende por peso.
+- **Cliente obligatorio** en créditos y apartados.
+- **No hay intereses** ni recargos en créditos.
+- El arqueo cuenta **solo el efectivo físico**.
+- Anulaciones, cambios y operaciones sensibles **siempre dejan auditoría**.
+- Un producto, usuario o perfil **con historial no se borra**: se inactiva o retira.
+- Siempre debe existir **al menos un Administrador activo**.
+
+---
+
+## Anexo: quién puede qué (resumen)
+
+| Operación | Cajero | Supervisor | Administrador |
+| --- | :---: | :---: | :---: |
+| Vender de contado | ✔ | ✔ | ✔ |
+| Descuento | 5 % con autorización | 20 % | 80 % |
+| Precio mayorista | con autorización | ✔ | ✔ |
+| Vender a crédito | con autorización | ✔ | ✔ |
+| Abonar a un crédito | ✔ | ✔ | ✔ |
+| Anular un abono | — | con Administrador | ✔ |
+| Condonar un crédito | — | — | ✔ |
+| Crear un apartado | con autorización | ✔ | ✔ |
+| Cancelar un apartado | — | con Administrador | ✔ |
+| Abrir la caja | con autorización | ✔ | ✔ |
+| Movimientos de caja | — | ✔ | ✔ |
+| Cerrar la caja | — | ✔ (con Administrador si hay diferencia) | ✔ |
+| Anular una venta | — | con Administrador | ✔ |
+| Cambio de productos | — | con Administrador | ✔ |
+| Reimprimir tickets | ✔ | ✔ | ✔ |
+| Ver existencias | ✔ | ✔ | ✔ |
+| Ajustar el inventario | — | — | ✔ |
+| Crear productos | — | ✔ | ✔ |
+| Cambiar precio, nombre o código | — | — | ✔ |
+| Ver costos | — | — | ✔ |
+| Etiquetas de productos | — | ✔ | ✔ |
+| Pedidos y recepciones | — | ✔ | ✔ |
+| Crear proveedores, anular compras | — | — | ✔ |
+| Reportes y Dashboard | — | — | ✔ |
+| Usuarios, roles, auditoría | — | — | ✔ |
+| Configuración e impresión | — | solo turno | ✔ |
+| Respaldos | — | — | ✔ |
+
+«Con autorización» significa que otra persona de rol superior debe aprobarlo en la ventana de autorización. El Administrador puede dar o quitar permisos sueltos, así que la tabla es la plantilla por defecto.
