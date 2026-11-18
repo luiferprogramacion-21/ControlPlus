@@ -533,7 +533,7 @@ Aprobado por el usuario:
   - el Administrador la restablece, como hasta ahora;
   - el usuario la recupera **por correo**, con «¿Olvidaste tu contraseña?» en la pantalla de ingreso y un código de un solo uso.
 - **Correo del usuario:** opcional. Se registra al crear o editar el usuario en Administración y se puede buscar (maqueta 19, «Nombre, usuario o correo»). Usa la columna oficial `seguridad.usuario.correo varchar(254)`, sin migración. La auditoría registra solo `HasEmail`/`EmailChanged`, nunca la dirección.
-- **Cuenta que envía los códigos:** el usuario indicó `controlplus.pos@dmail.com`. Falta confirmar si el dominio es `gmail.com`. La contraseña de esa cuenta (contraseña de aplicación) se guarda como secreto local, nunca en el repositorio.
+- **Cuenta que envía los códigos:** `controlplus.pos@gmail.com` (Gmail, confirmado por el usuario el 18 de noviembre de 2026; `smtp.gmail.com:587` con STARTTLS). Su contraseña de aplicación la escribe el operador en el aviso oculto de `scripts/email/Set-EmailSettings.ps1` y queda solo en los User Secrets y en `api-secrets.json` del servicio. Nunca va en el repositorio, en el chat ni en archivos del agente; si se expone, se revoca y se crea otra.
 - La recuperación necesita Internet solo en el momento de enviar el código. Sin conexión, el Administrador sigue restableciendo la contraseña.
 
 ### Reglas del reparto
