@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { TicketPrinter } from '../sales/ticket';
+import { EstablishmentService } from '../../core/establishment';
 import { AdminApi, AdminUser, IssuedCredential } from './admin-api';
 import { buildCredentialCardHtml } from './credential-card';
 import { buildPdfFromJpeg, CredentialCardExporter } from './credential-card-export';
@@ -15,7 +16,7 @@ describe('Carné de operador', () => {
   const jpeg = vi.fn(); const pdf = vi.fn(); const save = vi.fn();
 
   const create = () => {
-    TestBed.configureTestingModule({ providers: [{ provide: AdminApi, useValue: { issueCredential } }, { provide: TicketPrinter, useValue: { print } }, { provide: CredentialCardExporter, useValue: { jpeg, pdf, save } }] });
+    TestBed.configureTestingModule({ providers: [{ provide: AdminApi, useValue: { issueCredential } }, { provide: TicketPrinter, useValue: { print } }, { provide: CredentialCardExporter, useValue: { jpeg, pdf, save } }, { provide: EstablishmentService, useValue: { name: () => 'Negocio de prueba' } }] });
     const fixture = TestBed.createComponent(UserCredential);
     fixture.componentRef.setInput('user', user);
     return fixture.componentInstance;
@@ -97,8 +98,8 @@ describe('Carné de operador', () => {
   });
 
   it('la tarjeta solo contiene los datos necesarios', () => {
-    const html = buildCredentialCardHtml({ displayName: 'Luis', userName: 'luis', roleName: 'Cajero', token: 'ABC123', fragment: 'ABC123' });
-    expect(html).toContain('Baratísimo');
+    const html = buildCredentialCardHtml({ businessName: 'Negocio de prueba', displayName: 'Luis', userName: 'luis', roleName: 'Cajero', token: 'ABC123', fragment: 'ABC123' });
+    expect(html).toContain('Negocio de prueba');
     expect(html).toContain('Cajero · luis');
   });
 });

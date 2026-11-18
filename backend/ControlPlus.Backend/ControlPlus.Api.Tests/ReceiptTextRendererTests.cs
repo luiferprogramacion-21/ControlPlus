@@ -40,13 +40,24 @@ public sealed class ReceiptTextRendererTests
     {
         var receipt = new SaleReceiptDto(Guid.CreateVersion7(), "V-000004",
             new DateTimeOffset(2026, 11, 6, 16, 30, 0, TimeSpan.Zero), new DateOnly(2026, 11, 6),
-            "CREDITO", "CONFIRMADA", 5000m, 0m, 5000m, 0m, [], [], "Cajero histórico", "Cliente histórico");
-        var output = Encoding.UTF8.GetString(ReceiptTextRenderer.Render(receipt, "Baratísimo", 32, true));
+            "CREDITO", "CONFIRMADA", 5000m, 0m, 5000m, 0m, [], [], "Cajero histórico", "Cliente histórico",
+            DueDate: new DateOnly(2026, 11, 30), EstablishmentName: "Tienda histórica",
+            EstablishmentIdentification: "900-1", EstablishmentPhone: "555", EstablishmentAddress: "Ocaña",
+            ReceiptHeader: "Compra local", ReceiptFooter: "Vuelva pronto");
+        var output = Encoding.UTF8.GetString(ReceiptTextRenderer.Render(receipt,
+            new ReceiptEstablishmentInfo("Nombre actual", "NIT actual", ReceiptFooter: "Pie actual"), 32, true));
         Assert.Contains("REIMPRESIÓN", output);
+        Assert.Contains("Tienda histórica", output);
+        Assert.DoesNotContain("Nombre actual", output);
+        Assert.Contains("NIT: 900-1", output);
+        Assert.Contains("Compra local", output);
         Assert.Contains("Atendió: Cajero histórico", output);
         Assert.Contains("Cliente: Cliente histórico", output);
         Assert.Contains("06/11/2026 11:30", output);
         Assert.Contains("Venta a crédito", output);
+        Assert.Contains("Vence: 30/11/2026", output);
+        Assert.Contains("Vuelva pronto", output);
+        Assert.DoesNotContain("Pie actual", output);
         Assert.DoesNotContain("Descuento", output);
     }
 

@@ -167,7 +167,11 @@ public sealed record SaleReceiptDto(Guid SaleId, string VisibleNumber, DateTimeO
     decimal DiscountTotal, decimal Total, decimal Change,
     IReadOnlyCollection<SaleLineDto> Lines, IReadOnlyCollection<SaleReceiptPaymentDto> Payments,
     string? OperatorName = null, string? CustomerName = null,
-    decimal? VatPercentage = null, decimal? TaxableBaseTotal = null, decimal? VatTotal = null);
+    decimal? VatPercentage = null, decimal? TaxableBaseTotal = null, decimal? VatTotal = null,
+    DateOnly? DueDate = null,
+    string? EstablishmentName = null, string? EstablishmentIdentification = null,
+    string? EstablishmentPhone = null, string? EstablishmentAddress = null,
+    string? ReceiptHeader = null, string? ReceiptFooter = null);
 
 public sealed record SaleReceiptPaymentDto(string MethodCode, decimal AppliedAmount,
     decimal? ReceivedAmount, decimal Change);

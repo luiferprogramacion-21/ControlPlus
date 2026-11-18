@@ -4,6 +4,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { SessionService } from '../core/session.service';
+import { EstablishmentService } from '../core/establishment';
 import { Icon } from './icon';
 import { paginatorIntlProvider } from './paginator-intl';
 
@@ -19,7 +20,7 @@ import { paginatorIntlProvider } from './paginator-intl';
       @if (menuOpen()) {
         <div class="drawer-backdrop" (click)="menuOpen.set(false)" aria-hidden="true"></div>
         <aside id="main-navigation" class="sidebar" role="dialog" aria-modal="true" aria-label="Navegación principal" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown)="onMenuKeydown($event)">
-          <div class="brand brand--sidebar"><img class="brand__mark brand__mark--logo" src="controlplus-icon.png" alt="" width="36" height="36"><span><strong>ControlPlus</strong><small>Baratísimo</small></span>
+          <div class="brand brand--sidebar"><img class="brand__mark brand__mark--logo" src="controlplus-icon.png" alt="" width="36" height="36"><span><strong>ControlPlus</strong><small>{{ establishment.name() }}</small></span>
             <button class="icon-button icon-button--dark drawer-close" type="button" aria-label="Cerrar menú" (click)="menuOpen.set(false)" cdkFocusInitial><cp-icon name="close" /></button>
           </div>
           <p class="sidebar__label">NAVEGACIÓN</p>
@@ -46,7 +47,7 @@ import { paginatorIntlProvider } from './paginator-intl';
       <section class="shell-content" [attr.inert]="menuOpen() ? '' : null">
         <header class="topbar">
           <div class="topbar__leading"><button class="icon-button menu-toggle" type="button" aria-label="Abrir menú" [attr.aria-expanded]="menuOpen()" [attr.aria-controls]="menuOpen() ? 'main-navigation' : null" (click)="menuOpen.set(true)"><cp-icon name="menu" /></button><div><h1>{{ pageTitle() }}</h1><p>{{ pageSubtitle() }}</p></div></div>
-          <div class="topbar__status"><strong class="store-name">Baratísimo</strong><span>{{ session.user()?.displayName }}</span><button class="icon-button" type="button" (click)="logout()" aria-label="Cerrar sesión" title="Cerrar sesión"><cp-icon name="lock" /></button></div>
+          <div class="topbar__status"><strong class="store-name">{{ establishment.name() }}</strong><span>{{ session.user()?.displayName }}</span><button class="icon-button" type="button" (click)="logout()" aria-label="Cerrar sesión" title="Cerrar sesión"><cp-icon name="lock" /></button></div>
         </header>
         <main id="main-content" class="workspace" [class.workspace--bounded]="boundedWorkspace()" tabindex="-1"><router-outlet /></main>
       </section>
@@ -54,6 +55,7 @@ import { paginatorIntlProvider } from './paginator-intl';
 })
 export class Shell {
   readonly session = inject(SessionService);
+  readonly establishment = inject(EstablishmentService);
   readonly menuOpen = signal(false);
   readonly boundedWorkspace = signal(false);
   readonly pageTitle = signal('Caja');
@@ -62,6 +64,7 @@ export class Shell {
   private readonly router = inject(Router);
 
   constructor() {
+    void this.establishment.load().catch(() => undefined);
     this.syncHeader(this.router.url);
     this.router.events.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd), takeUntilDestroyed())
       .subscribe(event => { this.menuOpen.set(false); this.syncHeader(event.urlAfterRedirects); });

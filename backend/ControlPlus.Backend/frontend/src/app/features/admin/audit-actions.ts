@@ -67,6 +67,9 @@ export const AUDIT_ACTION_GROUPS: AuditActionGroup[] = [
     BackupRequested: 'Respaldo manual solicitado', BackupDestinationUpdated: 'Destino de respaldo modificado',
     BackupRestoreTested: 'Prueba de restauración',
   } },
+  { module: 'Configuración', actions: {
+    EstablishmentUpdated: 'Datos del establecimiento modificados',
+  } },
 ];
 
 const LABELS: Record<string, string> = Object.assign({}, ...AUDIT_ACTION_GROUPS.map((group) => group.actions));

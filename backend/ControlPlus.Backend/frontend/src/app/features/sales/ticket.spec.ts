@@ -14,8 +14,8 @@ describe('ticket', () => {
     expect(html).toContain('Camisa &lt;b&gt;azul&lt;/b&gt; &amp; más'); expect(html).not.toContain('<b>azul</b>');
   });
   it('muestra número, total, descuento, medio de pago y cambio', () => {
-    const html = buildTicketHtml(receipt, { operator: 'Cajero Uno', customer: 'Ana' });
-    for (const text of ['VTA-001-000010', 'TOTAL', '$ 50.000', '-$ 5.000', 'Efectivo', 'Cambio', '$ 10.000', 'Atendió: Cajero Uno', 'Cliente: Ana', 'Ticket de venta']) expect(html).toContain(text);
+    const html = buildTicketHtml({ ...receipt, establishmentName: 'Tienda Central', establishmentIdentification: '900-1', establishmentPhone: '555', establishmentAddress: 'Ocaña', receiptHeader: 'Compra local', receiptFooter: 'Vuelva pronto' }, { operator: 'Cajero Uno', customer: 'Ana' });
+    for (const text of ['VTA-001-000010', 'TOTAL', '$ 50.000', '-$ 5.000', 'Efectivo', 'Cambio', '$ 10.000', 'Atendió: Cajero Uno', 'Cliente: Ana', 'Ticket de venta', 'Tienda Central', 'NIT: 900-1', 'Ocaña', 'Compra local', 'Vuelva pronto']) expect(html).toContain(text);
   });
   describe('desglose de IVA', () => {
     // Price with VAT included: Subtotal + IVA = TOTAL, and the total never changes.
@@ -51,7 +51,7 @@ describe('ticket', () => {
     });
   });
   it('marca la reimpresión y la venta a crédito sin pagos', () => {
-    const html = buildTicketHtml({ ...receipt, payments: [], change: 0 }, {}, true);
-    expect(html).toContain('REIMPRESIÓN'); expect(html).toContain('Venta a crédito'); expect(html).not.toContain('Cambio');
+    const html = buildTicketHtml({ ...receipt, saleType: 'CREDITO', dueDate: '2026-11-30', payments: [], change: 0 }, {}, true);
+    expect(html).toContain('REIMPRESIÓN'); expect(html).toContain('Venta a crédito'); expect(html).toContain('Vence: 30 de noviembre de 2026'); expect(html).not.toContain('Cambio');
   });
 });

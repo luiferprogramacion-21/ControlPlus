@@ -4,6 +4,7 @@ import { SessionService } from '../../core/session.service';
 import { CashApi, Reconciliation } from './cash-api';
 import { Cash } from './cash';
 import { AuthorizationDialog, AuthorizationPrompt } from '../../shared/authorization-dialog';
+import { EstablishmentService } from '../../core/establishment';
 
 describe('Cierre de caja', () => {
   const reconciliation: Reconciliation = {
@@ -28,6 +29,7 @@ describe('Cierre de caja', () => {
       { provide: CashApi, useValue: api },
       { provide: SessionService, useValue: { has: (permission: string) => permission === 'CASH.SHIFT_MANAGE', user: () => ({ userName: 'operador' }) } },
       { provide: AuthorizationDialog, useValue: dialog },
+      { provide: EstablishmentService, useValue: { name: () => 'Tienda', load: () => Promise.resolve() } },
     ] });
     screen = TestBed.runInInjectionContext(() => new Cash());
     screen.reconciliation.set(reconciliation);

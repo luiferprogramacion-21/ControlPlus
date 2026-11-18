@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Establishments.Contracts;
 using ControlPlus.Application.Sales.Contracts;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Infrastructure.Persistence;
@@ -80,6 +81,55 @@ public sealed class SalesSettingsApiTests : IAsyncLifetime
         using var data = JsonDocument.Parse(audit.DatosNuevos!);
         Assert.Equal(12, data.RootElement.GetProperty("Previous").GetProperty("WholesaleMinimumQuantity").GetInt32());
         Assert.Equal(6, data.RootElement.GetProperty("New").GetProperty("WholesaleMinimumQuantity").GetInt32());
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task EstablishmentData_AreReadableByTheOperation_AndOnlyAdministratorUpdatesThem()
+    {
+        using var client = CreateClient();
+        var (admin, supervisor, cashier) = await BootstrapAsync(client);
+
+        SetBearer(client, cashier);
+        var visible = await ReadAsync<EstablishmentDto>(
+            await client.GetAsync("/api/establishment"), HttpStatusCode.OK);
+        Assert.Equal("Comercio ficticio de ventas", visible.CommercialName);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync("/api/establishment",
+            new UpdateEstablishmentRequest("No permitido", "NIT-X", null, null, null, null,
+                visible.Version))).StatusCode);
+
+        SetBearer(client, admin);
+        var updated = await ReadAsync<EstablishmentDto>(await client.PutAsJsonAsync(
+            "/api/establishment", new UpdateEstablishmentRequest(
+                "Tienda Central", "901234567-8", "3150000000", "Ocaña, Norte de Santander",
+                "Compra local", "Gracias por su compra", visible.Version)), HttpStatusCode.OK);
+        Assert.Equal("Tienda Central", updated.CommercialName);
+        Assert.Equal("901234567-8", updated.Identification);
+        Assert.True(updated.Version > visible.Version);
+
+        SetBearer(client, supervisor);
+        Assert.Equal("Tienda Central", (await ReadAsync<EstablishmentDto>(
+            await client.GetAsync("/api/establishment"), HttpStatusCode.OK)).CommercialName);
+
+        SetBearer(client, admin);
+        await AssertProblemAsync(await client.PutAsJsonAsync("/api/establishment", new
+        {
+            commercialName = "Tienda Central", identification = "901234567-8",
+            expectedVersion = updated.Version, email = "no-existe@controlplus.local"
+        }), HttpStatusCode.BadRequest, "validation.failed");
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var establishment = await db.Establecimiento.AsNoTracking().SingleAsync();
+        Assert.Equal("3150000000", establishment.Telefono);
+        Assert.Equal("Compra local", establishment.EncabezadoComprobante);
+        Assert.Equal("Gracias por su compra", establishment.PieComprobante);
+        var audit = await db.EventoAuditoria.AsNoTracking()
+            .SingleAsync(x => x.Accion == "ESTABLISHMENTUPDATED");
+        using var data = JsonDocument.Parse(audit.DatosNuevos!);
+        Assert.Equal("Comercio ficticio de ventas",
+            data.RootElement.GetProperty("Previous").GetProperty("CommercialName").GetString());
+        Assert.Equal("Tienda Central",
+            data.RootElement.GetProperty("New").GetProperty("CommercialName").GetString());
     }
 
     [Theory, Trait("Category", "Integration")]

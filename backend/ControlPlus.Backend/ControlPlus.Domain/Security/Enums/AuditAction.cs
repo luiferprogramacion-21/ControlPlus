@@ -118,5 +118,6 @@ public enum AuditAction
     BackupRestoreTested = 110,
     CreditPaymentCancelled = 111,
     CreditPaymentCancellationAuthorizationRejected = 112,
-    CreditForgiven = 113
+    CreditForgiven = 113,
+    EstablishmentUpdated = 114
 }

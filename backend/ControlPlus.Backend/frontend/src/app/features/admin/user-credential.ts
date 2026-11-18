@@ -3,6 +3,7 @@ import { Component, computed, inject, input, output, signal } from '@angular/cor
 import { DomSanitizer } from '@angular/platform-browser';
 import { errorText } from '../../core/api';
 import { code128Svg } from '../../core/code128';
+import { EstablishmentService } from '../../core/establishment';
 import { TicketPrinter } from '../sales/ticket';
 import { AdminApi, AdminUser, IssuedCredential } from './admin-api';
 import { buildCredentialCardHtml, CredentialCard } from './credential-card';
@@ -30,7 +31,7 @@ import { CredentialCardExporter } from './credential-card-export';
           @if (!user().isActive) { <p class="field-error">El usuario está inactivo y no puede recibir carné.</p> }
         } @else {
           <div class="credential-preview" aria-label="Vista previa del carné">
-            <div class="credential-preview__head"><strong>Baratísimo</strong><span>Credencial de operador</span></div>
+            <div class="credential-preview__head"><strong>{{ establishment.name() }}</strong><span>Credencial de operador</span></div>
             <p><b>{{ user().displayName }}</b><br><small>{{ roleName() }} · {{ user().userName }}</small></p>
             <div class="credential-preview__barcode" [innerHTML]="barcode()"></div>
             <small>…{{ issued()!.visibleFragment }}</small>
@@ -51,6 +52,7 @@ export class UserCredential {
   private readonly printer = inject(TicketPrinter);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly exporter = inject(CredentialCardExporter);
+  readonly establishment = inject(EstablishmentService);
   readonly user = input.required<AdminUser>();
   readonly closed = output<void>();
   readonly issued = signal<IssuedCredential | null>(null);
@@ -70,7 +72,7 @@ export class UserCredential {
   }
 
   private card(value: IssuedCredential): CredentialCard {
-    return { displayName: this.user().displayName, userName: this.user().userName, roleName: this.roleName(), token: value.credentialToken, fragment: value.visibleFragment };
+    return { businessName: this.establishment.name(), displayName: this.user().displayName, userName: this.user().userName, roleName: this.roleName(), token: value.credentialToken, fragment: value.visibleFragment };
   }
 
   /** Saves the card as an image or a PDF (card-sized page) so it can be printed anywhere. */

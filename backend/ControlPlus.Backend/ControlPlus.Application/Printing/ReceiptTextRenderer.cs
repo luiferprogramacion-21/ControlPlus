@@ -10,13 +10,24 @@ public static class ReceiptTextRenderer
     private static readonly CultureInfo ColombianCulture = CultureInfo.GetCultureInfo("es-CO");
 
     public static byte[] Render(SaleReceiptDto receipt, string storeName, int columns, bool reprint = false)
+        => Render(receipt, new ReceiptEstablishmentInfo(storeName), columns, reprint);
+
+    public static byte[] Render(SaleReceiptDto receipt, ReceiptEstablishmentInfo establishment,
+        int columns, bool reprint = false)
     {
         ArgumentNullException.ThrowIfNull(receipt);
+        ArgumentNullException.ThrowIfNull(establishment);
         if (columns is < 24 or > 80) throw new ArgumentOutOfRangeException(nameof(columns));
-        if (string.IsNullOrWhiteSpace(storeName)) throw new ArgumentException("Store name is required.", nameof(storeName));
+        var storeName = receipt.EstablishmentName ?? establishment.Name;
+        if (string.IsNullOrWhiteSpace(storeName))
+            throw new ArgumentException("Store name is required.", nameof(establishment));
 
         var text = new StringBuilder();
-        AppendCentered(text, "Baratísimo", columns);
+        AppendBlock(text, receipt.ReceiptHeader ?? establishment.ReceiptHeader, columns, centered: true);
+        AppendCentered(text, Clean(storeName), columns);
+        AppendBusinessLine(text, "NIT: ", receipt.EstablishmentIdentification ?? establishment.Identification, columns);
+        AppendBusinessLine(text, string.Empty, receipt.EstablishmentAddress ?? establishment.Address, columns);
+        AppendBusinessLine(text, "Tel: ", receipt.EstablishmentPhone ?? establishment.Phone, columns);
         AppendCentered(text, reprint ? "REIMPRESIÓN" : "Ticket de venta", columns);
         AppendRule(text, columns);
         foreach (var part in Wrap(Clean(receipt.VisibleNumber), columns))
@@ -57,13 +68,37 @@ public static class ReceiptTextRenderer
         }
         AppendAmount(text, "TOTAL", receipt.Total, columns);
         AppendRule(text, columns);
-        if (receipt.Payments.Count == 0) AppendCentered(text, "Venta a crédito", columns);
+        if (receipt.Payments.Count == 0)
+        {
+            AppendCentered(text, "Venta a crédito", columns);
+            if (receipt.DueDate is { } dueDate)
+                AppendCentered(text, $"Vence: {dueDate:dd/MM/yyyy}", columns);
+        }
         foreach (var payment in receipt.Payments)
             AppendAmount(text, PaymentName(Clean(payment.MethodCode)), payment.AppliedAmount, columns);
         if (receipt.Change > 0) AppendAmount(text, "Cambio", receipt.Change, columns);
         text.AppendLine();
-        AppendCentered(text, "¡Gracias por su compra!", columns);
+        var footer = receipt.ReceiptFooter ?? establishment.ReceiptFooter;
+        if (string.IsNullOrWhiteSpace(footer)) AppendCentered(text, "¡Gracias por su compra!", columns);
+        else AppendBlock(text, footer, columns, centered: true);
         return Encoding.UTF8.GetBytes(text.ToString());
+    }
+
+    private static void AppendBusinessLine(StringBuilder text, string prefix, string? value, int columns)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        foreach (var part in Wrap(prefix + Clean(value), columns)) text.AppendLine(part);
+    }
+
+    private static void AppendBlock(StringBuilder text, string? value, int columns, bool centered)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        foreach (var line in value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n'))
+        foreach (var part in Wrap(Clean(line.Trim()), columns))
+        {
+            if (centered) text.AppendLine(part.PadLeft((columns + part.Length) / 2));
+            else text.AppendLine(part);
+        }
     }
 
     private static string Clean(string value) => new(value.Where(c => !char.IsControl(c)).ToArray());
@@ -107,3 +142,11 @@ public static class ReceiptTextRenderer
         text.AppendLine(safeLabel + value.PadLeft(columns - safeLabel.Length));
     }
 }
+
+public sealed record ReceiptEstablishmentInfo(
+    string Name,
+    string? Identification = null,
+    string? Phone = null,
+    string? Address = null,
+    string? ReceiptHeader = null,
+    string? ReceiptFooter = null);

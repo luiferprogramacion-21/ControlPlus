@@ -498,7 +498,14 @@ public sealed partial class SalesService(
                 CustomerName = receiptCustomer?.NombreCompleto,
                 VatPercentage = receiptVatPercentage,
                 TaxableBaseTotal = receiptVatPercentage is > 0 ? sale.BaseGravableTotal : null,
-                VatTotal = receiptVatPercentage is > 0 ? sale.ImpuestoIncluidoTotal : null
+                VatTotal = receiptVatPercentage is > 0 ? sale.ImpuestoIncluidoTotal : null,
+                DueDate = credit?.FechaVencimiento,
+                EstablishmentName = establishment.NombreComercial,
+                EstablishmentIdentification = establishment.Identificacion,
+                EstablishmentPhone = establishment.Telefono,
+                EstablishmentAddress = establishment.Direccion,
+                ReceiptHeader = establishment.EncabezadoComprobante,
+                ReceiptFooter = establishment.PieComprobante
             }, response.Payments);
         await repository.AddReceiptSnapshotAsync(new DocumentoEmitido
         {
@@ -641,15 +648,26 @@ public sealed partial class SalesService(
             return Result.Failure<SaleReceiptDto>(ApplicationError.Conflict("La venta no está confirmada."));
         var snapshot = await repository.GetReceiptSnapshotAsync(sale.InstalacionId, sale.Id, cancellationToken);
         if (snapshot is not null)
-            return SaleReceiptSnapshotCodec.TryDecode(snapshot, sale.Id, out var historicalReceipt)
-                ? Result.Success(historicalReceipt!)
-                : Result.Failure<SaleReceiptDto>(ApplicationError.Conflict("El comprobante histórico no está disponible."));
+        {
+            if (!SaleReceiptSnapshotCodec.TryDecode(snapshot, sale.Id, out var historicalReceipt))
+                return Result.Failure<SaleReceiptDto>(
+                    ApplicationError.Conflict("El comprobante histórico no está disponible."));
+            if (historicalReceipt!.EstablishmentName is not null &&
+                (historicalReceipt.SaleType != "CREDITO" || historicalReceipt.DueDate is not null))
+                return Result.Success(historicalReceipt);
+
+            // Los snapshots anteriores a estos campos siguen siendo válidos. Se completan con los datos disponibles
+            // sin reescribir ni alterar su hash histórico.
+            var sourceSale = await repository.GetSaleAsync(saleId, cancellationToken);
+            var sourceEstablishment = await repository.GetActiveEstablishmentAsync(cancellationToken);
+            return Result.Success(CompleteReceipt(historicalReceipt, sourceSale, sourceEstablishment));
+        }
         var legacySale = await repository.GetSaleAsync(saleId, cancellationToken);
-        return legacySale is null
-            ? Result.Failure<SaleReceiptDto>(ApplicationError.NotFound("la venta"))
-            : legacySale.Estado != "CONFIRMADA"
-                ? Result.Failure<SaleReceiptDto>(ApplicationError.Conflict("La venta no está confirmada."))
-                : Result.Success(ToReceipt(legacySale));
+        if (legacySale is null) return Result.Failure<SaleReceiptDto>(ApplicationError.NotFound("la venta"));
+        if (legacySale.Estado != "CONFIRMADA")
+            return Result.Failure<SaleReceiptDto>(ApplicationError.Conflict("La venta no está confirmada."));
+        return Result.Success(CompleteReceipt(ToReceipt(legacySale), legacySale,
+            await repository.GetActiveEstablishmentAsync(cancellationToken)));
     }
 
     public async Task<Result<SaleReprintRequestDto>> RequestReprintAsync(ActorContext actor, Guid saleId,
@@ -713,9 +731,22 @@ public sealed partial class SalesService(
         {
             VatPercentage = vatPercentage,
             TaxableBaseTotal = vatPercentage is > 0 ? sale.BaseGravableTotal : null,
-            VatTotal = vatPercentage is > 0 ? sale.ImpuestoIncluidoTotal : null
+            VatTotal = vatPercentage is > 0 ? sale.ImpuestoIncluidoTotal : null,
+            DueDate = sale.Credito?.FechaVencimiento
         };
     }
+
+    private static SaleReceiptDto CompleteReceipt(
+        SaleReceiptDto receipt, Venta? sale, Establecimiento? establishment) => receipt with
+        {
+            DueDate = receipt.DueDate ?? sale?.Credito?.FechaVencimiento,
+            EstablishmentName = receipt.EstablishmentName ?? establishment?.NombreComercial,
+            EstablishmentIdentification = receipt.EstablishmentIdentification ?? establishment?.Identificacion,
+            EstablishmentPhone = receipt.EstablishmentPhone ?? establishment?.Telefono,
+            EstablishmentAddress = receipt.EstablishmentAddress ?? establishment?.Direccion,
+            ReceiptHeader = receipt.ReceiptHeader ?? establishment?.EncabezadoComprobante,
+            ReceiptFooter = receipt.ReceiptFooter ?? establishment?.PieComprobante
+        };
 
     private static decimal? ReceiptVatPercentage(Venta sale, IEnumerable<DetalleVenta> details)
     {

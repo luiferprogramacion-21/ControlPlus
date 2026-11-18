@@ -268,9 +268,12 @@ public sealed class ReceiptPrintingService(
             return null;
         var columns = ReadColumns(template.Configuracion);
         if (columns is < 24 or > 80) return null;
-        var establishmentName = await db.Establecimiento.AsNoTracking()
-            .Where(x => x.Id == template.EstablecimientoId).Select(x => x.NombreComercial).SingleAsync(ct);
-        var content = ReceiptTextRenderer.Render(receipt!, establishmentName, columns, requestId is not null);
+        var establishment = await db.Establecimiento.AsNoTracking()
+            .Where(x => x.Id == template.EstablecimientoId)
+            .Select(x => new ReceiptEstablishmentInfo(x.NombreComercial, x.Identificacion, x.Telefono,
+                x.Direccion, x.EncabezadoComprobante, x.PieComprobante))
+            .SingleAsync(ct);
+        var content = ReceiptTextRenderer.Render(receipt!, establishment, columns, requestId is not null);
         var nextCopy = requestId is null ? 0 :
             1 + (await db.TrabajoImpresion.Where(x => x.DocumentoEmitidoId == document.Id &&
                 x.TipoCopia == "REIMPRESION").MaxAsync(x => (int?)x.NumeroReimpresion, ct) ?? 0);

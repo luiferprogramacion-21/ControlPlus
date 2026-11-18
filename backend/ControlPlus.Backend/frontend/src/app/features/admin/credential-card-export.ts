@@ -16,7 +16,7 @@ export function drawCredentialCard(canvas: HTMLCanvasElement, card: CredentialCa
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = '#000'; ctx.lineWidth = 0.3 * s; ctx.strokeRect(0.15 * s, 0.15 * s, canvas.width - 0.3 * s, canvas.height - 0.3 * s);
   ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic';
-  ctx.font = `bold ${4.6 * s}px Arial, Helvetica, sans-serif`; ctx.textAlign = 'left'; ctx.fillText('Baratísimo', 5 * s, 10 * s);
+  ctx.font = `bold ${4.6 * s}px Arial, Helvetica, sans-serif`; ctx.textAlign = 'left'; ctx.fillText(card.businessName, 5 * s, 10 * s, 48 * s);
   ctx.font = `${2.5 * s}px Arial, Helvetica, sans-serif`; ctx.textAlign = 'right'; ctx.fillText('CREDENCIAL DE OPERADOR', (CARD_WIDTH_MM - 5) * s, 10 * s);
   ctx.textAlign = 'left';
   ctx.font = `bold ${3.9 * s}px Arial, Helvetica, sans-serif`; ctx.fillText(card.displayName, 5 * s, 19 * s, (CARD_WIDTH_MM - 10) * s);

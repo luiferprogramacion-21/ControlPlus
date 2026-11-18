@@ -1,6 +1,6 @@
 import { code128Svg } from '../../core/code128';
 
-export interface CredentialCard { displayName: string; userName: string; roleName: string; token: string; fragment: string; }
+export interface CredentialCard { businessName: string; displayName: string; userName: string; roleName: string; token: string; fragment: string; }
 
 const escape = (value: string): string => value.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -22,7 +22,7 @@ export function buildCredentialCardHtml(card: CredentialCard): string {
   .barcode svg { width: 100% !important; height: 15mm !important; }
   .barcode small { display: block; font-size: 7pt; letter-spacing: 1px; }
 </style></head><body><div class="card">
-  <header><strong>Baratísimo</strong><span>Credencial de operador</span></header>
+  <header><strong>${escape(card.businessName)}</strong><span>Credencial de operador</span></header>
   <p class="person"><b>${escape(card.displayName)}</b><small>${escape(card.roleName)} · ${escape(card.userName)}</small></p>
   <div class="barcode">${code128Svg(card.token, 1.4, 60)}<small>…${escape(card.fragment)}</small></div>
 </div></body></html>`;

@@ -269,7 +269,7 @@ describe('Configuración', () => {
       expect([all.tab(), all.canNumber, all.canConfigure]).toEqual(['numbering', true, true]);
       permissions = ['CONFIGURATION.MANAGE'];
       const onlyConfig = TestBed.createComponent(Config).componentInstance;
-      expect([onlyConfig.tab(), onlyConfig.canNumber, onlyConfig.canConfigure]).toEqual(['settings', false, true]);
+      expect([onlyConfig.tab(), onlyConfig.canNumber, onlyConfig.canConfigure]).toEqual(['establishment', false, true]);
       permissions = ['NUMBERING.MANAGE'];
       const onlyNumbering = TestBed.createComponent(Config).componentInstance;
       expect([onlyNumbering.tab(), onlyNumbering.canNumber, onlyNumbering.canConfigure]).toEqual(['numbering', true, false]);

@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { errorText } from '../../core/api';
+import { EstablishmentService } from '../../core/establishment';
 import { SessionService } from '../../core/session.service';
 import { CashApi, CashMovement, CashState, ClosureDifferenceReason, Reconciliation } from './cash-api';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody } from '../../shared/authorization-dialog';
@@ -17,6 +18,7 @@ export class Cash implements OnInit {
   readonly api = inject(CashApi);
   private readonly authorization = inject(AuthorizationDialog);
   readonly session = inject(SessionService);
+  readonly establishment = inject(EstablishmentService);
   readonly state = signal<CashState | null>(null);
   readonly reconciliation = signal<Reconciliation | null>(null);
   readonly closingMode = signal(false);
@@ -39,7 +41,7 @@ export class Cash implements OnInit {
   counted: Record<string, number | null> = {};
   reasonId = '';
   differenceObservation = '';
-  ngOnInit(): void { void this.refresh(); }
+  ngOnInit(): void { void this.establishment.load().catch(() => undefined); void this.refresh(); }
   modeLabel(mode: string | null | undefined): string {
     return mode === 'INDIVIDUAL' ? 'Individual' : mode === 'COMPARTIDO' ? 'Compartido' : 'No disponible';
   }

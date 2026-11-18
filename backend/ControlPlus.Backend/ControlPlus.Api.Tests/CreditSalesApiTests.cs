@@ -149,6 +149,12 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         Assert.Equal("CERRADA", await db.SesionOperador.Where(x => x.Id == session.Id)
             .Select(x => x.Estado).SingleAsync());
 
+        var receipt = await ReadAsync<SaleReceiptDto>(
+            await client.GetAsync($"/api/sales/{sale.Id}/receipt"), HttpStatusCode.OK);
+        Assert.Equal(credit.FechaVencimiento, receipt.DueDate);
+        Assert.Equal("Comercio ficticio de crédito", receipt.EstablishmentName);
+        Assert.Equal("CREDIT-SALES-TEST", receipt.EstablishmentIdentification);
+
         var audit = await ReadAuditTextAsync(db);
         foreach (var sensitive in new[] { key, SupervisorPassword, CashierPassword,
                      scenario.Cashier.AccessToken, "Dirección privada de crédito", "correo-privado@prueba.invalid" })

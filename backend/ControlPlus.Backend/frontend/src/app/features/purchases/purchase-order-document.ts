@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { Establishment, EstablishmentService } from '../../core/establishment';
 import { Supplier } from '../suppliers/suppliers-api';
 import { escapeHtml, printTicket } from '../sales/ticket';
 import { Order } from './orders-api';
@@ -12,7 +13,7 @@ const supplierDocument = (supplier: Supplier): string => supplier.documentNumber
   : 'Sin documento registrado';
 
 /** Builds the supplier-facing purchase order generated when an order is sent. */
-export function buildPurchaseOrderHtml(order: Order, supplier: Supplier, operatorName = ''): string {
+export function buildPurchaseOrderHtml(order: Order, supplier: Supplier, operatorName = '', establishment?: Establishment | null): string {
   const rows = order.lines.map((line, index) => `<tr>
     <td class="index">${index + 1}</td>
     <td><strong>${escapeHtml(line.productName)}</strong><small>${escapeHtml(line.productCode)}</small></td>
@@ -21,6 +22,9 @@ export function buildPurchaseOrderHtml(order: Order, supplier: Supplier, operato
   </tr>`).join('');
   const contact = [supplier.phone, supplier.email, supplier.address].filter(Boolean).map(value => escapeHtml(value!)).join(' · ');
   const totalUnits = order.lines.reduce((sum, line) => sum + line.requestedQuantity, 0);
+  const businessName = establishment?.commercialName || 'Baratísimo';
+  const businessContact = [establishment?.identification ? `NIT ${establishment.identification}` : null,
+    establishment?.phone, establishment?.address].filter(Boolean).map(value => escapeHtml(value!)).join(' · ');
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pedido ${escapeHtml(order.visibleNumber)}</title><style>
 @page { size: A4 portrait; margin: 14mm; }
 * { box-sizing: border-box; } body { margin: 0; color: #17263a; font: 12px/1.45 Arial, sans-serif; }
@@ -36,7 +40,7 @@ td { padding: 10px; border-bottom: 1px solid #d9e1eb; vertical-align: top; } td 
 .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 70px; margin-top: 58px; } .signature { padding-top: 7px; border-top: 1px solid #68788c; text-align: center; }
 footer { position: fixed; right: 0; bottom: 0; left: 0; color: #718096; font-size: 9px; text-align: center; }
 </style></head><body>
-<header><div class="brand">Baratísimo<small>ControlPlus · Pedido a proveedor</small></div><div class="document"><h1>Pedido de compra</h1><strong>${escapeHtml(order.visibleNumber)}</strong><div>${escapeHtml(formatDate(order.sentAt ?? order.createdAt))}</div></div></header>
+<header><div class="brand">${escapeHtml(businessName)}<small>ControlPlus · Pedido a proveedor${businessContact ? `<br>${businessContact}` : ''}</small></div><div class="document"><h1>Pedido de compra</h1><strong>${escapeHtml(order.visibleNumber)}</strong><div>${escapeHtml(formatDate(order.sentAt ?? order.createdAt))}</div></div></header>
 <section class="meta"><div class="card"><span class="label">Proveedor</span><b>${escapeHtml(supplier.name)}</b><p>${escapeHtml(supplierDocument(supplier))}${contact ? `<br>${contact}` : ''}</p></div><div class="card"><span class="label">Información del pedido</span><b>${order.lines.length} producto(s) · ${totalUnits.toLocaleString('es-CO')} unidades</b><p>Estado: Enviado${operatorName ? `<br>Generado por ${escapeHtml(operatorName)}` : ''}</p></div></section>
 <table><thead><tr><th>#</th><th>Producto</th><th class="quantity">Cantidad</th><th>Observación</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="summary"><span>Total de productos <strong>${order.lines.length}</strong></span><span>Total de unidades <strong>${totalUnits.toLocaleString('es-CO')}</strong></span></div>
@@ -47,7 +51,11 @@ footer { position: fixed; right: 0; bottom: 0; left: 0; color: #718096; font-siz
 
 @Injectable({ providedIn: 'root' })
 export class PurchaseOrderDocumentPrinter {
-  print(order: Order, supplier: Supplier, operatorName = ''): Promise<void> {
-    return printTicket(buildPurchaseOrderHtml(order, supplier, operatorName));
+  private readonly establishment = inject(EstablishmentService);
+
+  async print(order: Order, supplier: Supplier, operatorName = ''): Promise<void> {
+    let business = this.establishment.value();
+    if (!business) try { business = await this.establishment.load(); } catch { /* se conserva el nombre de respaldo */ }
+    return printTicket(buildPurchaseOrderHtml(order, supplier, operatorName, business));
   }
 }

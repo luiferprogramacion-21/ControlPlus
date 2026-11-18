@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { MatPaginatorIntl } from '@angular/material/paginator';
 import { SessionService } from '../core/session.service';
+import { EstablishmentService } from '../core/establishment';
 import { Shell } from './shell';
 import { SpanishPaginatorIntl } from './paginator-intl';
 
@@ -9,7 +10,7 @@ describe('Paginador en español', () => {
   it('el menú lo entrega a las pantallas que contiene (no se registra en el paquete inicial)', async () => {
     await TestBed.configureTestingModule({
       imports: [Shell],
-      providers: [provideRouter([]), { provide: SessionService, useValue: { has: () => false, user: () => null, logout: () => Promise.resolve() } }],
+      providers: [provideRouter([]), { provide: SessionService, useValue: { has: () => false, user: () => null, logout: () => Promise.resolve() } }, { provide: EstablishmentService, useValue: { name: () => 'Tienda', load: () => Promise.resolve() } }],
     }).compileComponents();
     const fixture = TestBed.createComponent(Shell);
     const intl = fixture.debugElement.injector.get(MatPaginatorIntl);
