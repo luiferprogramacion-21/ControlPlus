@@ -107,11 +107,13 @@ public sealed class PasswordRecoveryApiTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var actions = await db.EventoAuditoria.AsNoTracking().Where(x => x.EntidadId == cashierId)
             .Select(x => x.Accion).ToListAsync();
-        Assert.Contains("PasswordRecoveryRequested", actions);
-        Assert.Contains("PasswordRecoveryFailed", actions);
-        Assert.Contains("PasswordRecovered", actions);
-        Assert.DoesNotContain(await db.EventoAuditoria.AsNoTracking().Select(x => x.DatosNuevos ?? "").ToListAsync(),
-            data => data.Contains(CashierEmail) || data.Contains(code));
+        // La auditoría guarda el nombre de la acción en mayúsculas.
+        Assert.Contains("PASSWORDRECOVERYREQUESTED", actions);
+        Assert.Contains("PASSWORDRECOVERYFAILED", actions);
+        Assert.Contains("PASSWORDRECOVERED", actions);
+        // Ni el correo ni el código quedan en la auditoría (la columna es jsonb: se compara en memoria).
+        var auditData = await db.EventoAuditoria.AsNoTracking().Select(x => x.DatosNuevos).ToListAsync();
+        Assert.DoesNotContain(auditData, data => data != null && (data.Contains(CashierEmail) || data.Contains(code)));
     }
 
     [Fact, Trait("Category", "Integration")]
