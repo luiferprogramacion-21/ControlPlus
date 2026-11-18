@@ -153,6 +153,7 @@ builder.Services.AddSecurityInfrastructure(builder.Configuration);
 builder.Services.AddControlPlusJwtAuthentication(builder.Configuration);
 
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();
 builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
@@ -213,6 +214,11 @@ builder.Services.AddRateLimiter(options =>
         RateLimitPartition.GetFixedWindowLimiter(
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => FixedWindow(10)));
+    // Pedir y usar códigos de recuperación de contraseña: pocos por minuto, para no enviar correos en masa.
+    options.AddPolicy("password-recovery", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => FixedWindow(6)));
 });
 
 static FixedWindowRateLimiterOptions FixedWindow(int permitLimit) => new()

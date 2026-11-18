@@ -24,6 +24,10 @@ public static class SecurityServiceCollectionExtensions
         IConfiguration configuration)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.Configure<ControlPlus.Infrastructure.Email.EmailOptions>(
+            configuration.GetSection(ControlPlus.Infrastructure.Email.EmailOptions.SectionName));
+        services.AddSingleton<IEmailSender, ControlPlus.Infrastructure.Email.SmtpEmailSender>();
+        services.AddSingleton<IPasswordRecoveryCodes, PasswordRecoveryCodes>();
 
         services.AddSingleton<IPasswordHasher, AspNetPasswordHasher>();
         services.AddScoped<ITokenIssuer, JwtTokenIssuer>();

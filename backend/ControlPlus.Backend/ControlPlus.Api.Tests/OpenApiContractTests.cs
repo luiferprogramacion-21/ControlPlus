@@ -83,6 +83,10 @@ public sealed class OpenApiContractTests
         AssertAnonymous(paths, "/api/auth/login", "post");
         AssertAnonymous(paths, "/api/auth/setup", "post");
         AssertAnonymous(paths, "/api/auth/recover-initial-administrator", "post");
+        AssertAnonymous(paths, "/api/auth/password-recovery", "post");
+        AssertAnonymous(paths, "/api/auth/password-recovery/confirm", "post");
+        AssertResponses(paths, "/api/auth/password-recovery", "post", "202", "400", "429", "503");
+        AssertResponses(paths, "/api/auth/password-recovery/confirm", "post", "204", "400", "429");
         Assert.False(paths.TryGetProperty("/api/users/{userId}/roles/{roleId}", out _));
 
         AssertResponses(paths, "/api/categories", "post", "201", "400", "401", "403", "409");

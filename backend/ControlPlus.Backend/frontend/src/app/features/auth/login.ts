@@ -5,7 +5,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { SessionService } from '../../core/session.service';
+import { HttpErrorResponse } from '@angular/common/http';
 import { errorText } from '../../core/api';
+import { PasswordRecoveryApi } from './password-recovery-api';
 import { LandingCash, landingNeedsCash, landingRoute } from '../../core/landing';
 import { CashApi } from '../cash/cash-api';
 
@@ -19,6 +21,7 @@ import { CashApi } from '../cash/cash-api';
   template: `
     <main class="cp-login">
       <section class="cp-login__form-area">
+        @if (view() === 'login') {
         <form class="cp-login__form" [formGroup]="form" (ngSubmit)="submit()">
           <img class="cp-login__mark" src="controlplus-icon.png" alt="" width="64" height="64">
           <h1 class="cp-login__title">Punto de venta<br>Baratísimo</h1>
@@ -33,9 +36,41 @@ import { CashApi } from '../cash/cash-api';
             @if (form.controls.password.hasError('required')) { <mat-error>Escribe la contraseña.</mat-error> }
           </mat-form-field>
           <button mat-flat-button type="submit" [disabled]="busy()">{{ busy() ? 'Ingresando…' : 'Iniciar sesión' }}</button>
+          @if (notice()) { <p class="cp-login__notice" role="status">{{ notice() }}</p> }
           @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+          <button class="cp-login__link" type="button" (click)="startRecovery()">¿Olvidaste tu contraseña?</button>
           <p class="cp-login__footer">ControlPlus · sistema local de Baratísimo</p>
         </form>
+        } @else {
+        <form class="cp-login__form" [formGroup]="recovery" (ngSubmit)="view() === 'request' ? sendCode() : confirmCode()">
+          <img class="cp-login__mark" src="controlplus-icon.png" alt="" width="64" height="64">
+          <h1 class="cp-login__title">Recuperar<br>contraseña</h1>
+          <span class="cp-login__accent" aria-hidden="true"></span>
+          @if (view() === 'request') {
+            <p class="cp-login__hint">Te enviaremos un código de 6 números al correo registrado en tu usuario. Necesita Internet.</p>
+            <mat-form-field appearance="outline"><mat-label>Usuario</mat-label>
+              <input matInput formControlName="userName" autocomplete="username" autofocus>
+            </mat-form-field>
+            <button mat-flat-button type="submit" [disabled]="busy()">{{ busy() ? 'Enviando…' : 'Enviar código' }}</button>
+          } @else {
+            <p class="cp-login__hint">{{ notice() }}</p>
+            <mat-form-field appearance="outline"><mat-label>Código del correo</mat-label>
+              <input matInput formControlName="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" autofocus>
+            </mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>Nueva contraseña</mat-label>
+              <input matInput type="password" formControlName="newPassword" autocomplete="new-password">
+            </mat-form-field>
+            <mat-form-field appearance="outline"><mat-label>Repite la nueva contraseña</mat-label>
+              <input matInput type="password" formControlName="confirmPassword" autocomplete="new-password">
+            </mat-form-field>
+            <button mat-flat-button type="submit" [disabled]="busy()">{{ busy() ? 'Cambiando…' : 'Cambiar contraseña' }}</button>
+            <button class="cp-login__link" type="button" (click)="view.set('request'); error.set('')">No me llegó el código</button>
+          }
+          @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+          <button class="cp-login__link" type="button" (click)="backToLogin()">Volver a iniciar sesión</button>
+          <p class="cp-login__footer">Si no tienes correo registrado, pide al Administrador que restablezca tu contraseña.</p>
+        </form>
+        }
       </section>
       <section class="cp-login__brand" aria-label="ControlPlus">
         <div class="cp-login__dots" aria-hidden="true"></div>
@@ -63,6 +98,10 @@ import { CashApi } from '../cash/cash-api';
       background: var(--brand-navy); color: #fff; font-weight: 600; letter-spacing: .02em; }
     .cp-login__form button:not([disabled]):hover { background: var(--brand-navy-light); }
     .cp-login__footer { margin: 28px 0 0; color: #7a8796; font-size: 12px; }
+    .cp-login__form .cp-login__link { width: auto; min-height: 0; margin: 14px auto 0; padding: 4px 8px; border: 0; border-radius: 6px;
+      background: transparent; color: var(--brand-navy); font: inherit; font-size: 14px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+    .cp-login__form .cp-login__link:hover { background: #eef2f7; }
+    .cp-login__notice { margin: 12px 0 0; color: #1d6b3a; font-size: 14px; }
     .cp-login__brand { position: relative; display: grid; place-items: center; padding: 56px; overflow: hidden;
       background: radial-gradient(circle at 70% 30%, var(--brand-navy-light) 0%, var(--brand-navy) 62%); }
     .cp-login__dots { position: absolute; top: 34px; right: 40px; width: 150px; height: 70px; opacity: .35;
@@ -87,19 +126,68 @@ export class Login {
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
   private readonly cashApi = inject(CashApi);
+  private readonly recoveryApi = inject(PasswordRecoveryApi);
   readonly busy = signal(false);
   readonly error = signal('');
+  readonly notice = signal('');
+  readonly view = signal<'login' | 'request' | 'confirm'>('login');
   readonly form = this.fb.nonNullable.group({ userName: ['', Validators.required], password: ['', Validators.required] });
+  readonly recovery = this.fb.nonNullable.group({ userName: [''], code: [''], newPassword: [''], confirmPassword: [''] });
 
   async submit(): Promise<void> {
     if (this.form.invalid || this.busy()) { this.form.markAllAsTouched(); return; }
-    this.busy.set(true); this.error.set('');
+    this.busy.set(true); this.error.set(''); this.notice.set('');
     try {
       const { userName, password } = this.form.getRawValue();
       await this.session.login(userName.trim(), password);
       await this.router.navigateByUrl(landingRoute(this.can, this.isRole, await this.cashForLanding()));
     } catch (e) { this.error.set(errorText(e)); }
     finally { this.busy.set(false); }
+  }
+
+  startRecovery(): void {
+    this.error.set(''); this.notice.set('');
+    this.recovery.reset({ userName: this.form.controls.userName.value.trim(), code: '', newPassword: '', confirmPassword: '' });
+    this.view.set('request');
+  }
+
+  backToLogin(): void {
+    this.error.set(''); this.recovery.reset(); this.view.set('login');
+  }
+
+  async sendCode(): Promise<void> {
+    const userName = this.recovery.controls.userName.value.trim();
+    if (!userName) { this.error.set('Escribe tu usuario.'); return; }
+    if (this.busy()) return;
+    this.busy.set(true); this.error.set('');
+    try {
+      const result = await this.recoveryApi.request(userName);
+      this.notice.set(result.message); this.view.set('confirm');
+    } catch (e) { this.error.set(this.recoveryError(e)); }
+    finally { this.busy.set(false); }
+  }
+
+  async confirmCode(): Promise<void> {
+    const { userName, code, newPassword, confirmPassword } = this.recovery.getRawValue();
+    if (!/^[0-9]{6}$/.test(code.trim())) { this.error.set('El código tiene 6 números.'); return; }
+    if (!newPassword) { this.error.set('Escribe la nueva contraseña.'); return; }
+    if (newPassword !== confirmPassword) { this.error.set('Las contraseñas no coinciden.'); return; }
+    if (this.busy()) return;
+    this.busy.set(true); this.error.set('');
+    try {
+      await this.recoveryApi.confirm(userName.trim(), code.trim(), newPassword);
+      this.form.reset({ userName: userName.trim(), password: '' });
+      this.recovery.reset(); this.view.set('login');
+      this.notice.set('Contraseña cambiada. Ingresa con la nueva.');
+    } catch (e) { this.error.set(this.recoveryError(e)); }
+    finally { this.busy.set(false); }
+  }
+
+  /** 503: correo no configurado o sin conexión (el servidor explica qué hacer); 429: demasiados intentos. */
+  private recoveryError(error: unknown): string {
+    if (error instanceof HttpErrorResponse && error.status === 503 && typeof error.error?.title === 'string') return error.error.title;
+    if (error instanceof HttpErrorResponse && error.status === 429) return 'Demasiados intentos. Espera un minuto y vuelve a intentarlo.';
+    return errorText(error);
   }
 
   private readonly can = (permission: string): boolean => this.session.has(permission);

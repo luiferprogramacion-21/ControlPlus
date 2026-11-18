@@ -5,6 +5,8 @@ export const AUDIT_ACTION_GROUPS: AuditActionGroup[] = [
   { module: 'Seguridad', actions: {
     LoginSucceeded: 'Inicio de sesión', LoginFailed: 'Inicio de sesión fallido', UserLocked: 'Usuario bloqueado',
     UserReactivated: 'Acceso reactivado', PasswordChanged: 'Contraseña cambiada', InitialAdministratorRecovered: 'Recuperación del Administrador inicial',
+    PasswordRecoveryRequested: 'Código de recuperación enviado por correo', PasswordRecoveryFailed: 'Código de recuperación incorrecto',
+    PasswordRecovered: 'Contraseña recuperada por correo',
     UserCreated: 'Usuario creado', UserUpdated: 'Usuario modificado', UserActivated: 'Usuario activado', UserDeactivated: 'Usuario inactivado',
     RoleAssigned: 'Rol asignado', RoleRemoved: 'Rol retirado', RoleCreated: 'Rol creado', RoleUpdated: 'Rol modificado',
     RoleActivated: 'Rol activado', RoleDeactivated: 'Rol inactivado', PermissionCreated: 'Permiso creado', PermissionUpdated: 'Permiso modificado',

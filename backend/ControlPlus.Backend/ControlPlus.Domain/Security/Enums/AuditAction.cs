@@ -119,5 +119,9 @@ public enum AuditAction
     CreditPaymentCancelled = 111,
     CreditPaymentCancellationAuthorizationRejected = 112,
     CreditForgiven = 113,
-    EstablishmentUpdated = 114
+    EstablishmentUpdated = 114,
+    // Recuperación de contraseña por correo (decisión del 18 de noviembre de 2026).
+    PasswordRecoveryRequested = 120,
+    PasswordRecoveryFailed = 121,
+    PasswordRecovered = 122
 }

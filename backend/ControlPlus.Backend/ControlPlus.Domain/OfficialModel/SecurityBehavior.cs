@@ -71,6 +71,19 @@ public partial class Usuario
         RotateSecurityStamp();
     }
 
+    /// <summary>
+    /// Recuperación por correo con un código válido: nueva contraseña, intentos en cero y sesiones cerradas. Un usuario
+    /// inactivo o bloqueado no la usa; lo reactiva el Administrador.
+    /// </summary>
+    public void RecoverPassword(string passwordHash, DateTimeOffset changedAtUtc)
+    {
+        if (!IsActive) throw new DomainRuleViolationException("Only active users can recover their password.");
+        PasswordHash = DomainGuard.RequiredText(passwordHash, nameof(passwordHash));
+        IntentosFallidos = 0;
+        Touch(changedAtUtc);
+        RotateSecurityStamp();
+    }
+
     public void RecoverInitialAdministrator(string passwordHash, DateTimeOffset changedAtUtc)
     {
         PasswordHash = DomainGuard.RequiredText(passwordHash, nameof(passwordHash));

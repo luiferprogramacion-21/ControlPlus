@@ -14,6 +14,7 @@ namespace ControlPlus.Api.Controllers;
 public sealed class AuthenticationController(
     CurrentActorContextResolver actorContextResolver,
     IAuthenticationService authenticationService,
+    IPasswordRecoveryService passwordRecoveryService,
     IUserRepository userRepository,
     BootstrapAccessValidator bootstrapAccessValidator,
     SecurityCatalogSeeder securityCatalogSeeder,
@@ -136,6 +137,37 @@ public sealed class AuthenticationController(
 
         return FromResult(result);
     }
+
+    /// <summary>
+    /// «¿Olvidaste tu contraseña?»: envía un código de 6 dígitos al correo del usuario. Responde siempre lo mismo, exista
+    /// o no el usuario o su correo. 503 si el correo saliente no está configurado o no se pudo enviar.
+    /// </summary>
+    [HttpPost("password-recovery")]
+    [AllowAnonymous]
+    [EnableRateLimiting("password-recovery")]
+    [ProducesResponseType<PasswordRecoveryRequestedDto>(StatusCodes.Status202Accepted)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> RequestPasswordRecovery(
+        [FromBody] PasswordRecoveryRequest request,
+        CancellationToken cancellationToken) =>
+        FromResult(await passwordRecoveryService.RequestAsync(request, cancellationToken), dto => Accepted(dto));
+
+    /// <summary>
+    /// Cambia la contraseña con el código recibido por correo. Un código equivocado cuenta como intento fallido de inicio
+    /// de sesión; el correcto cierra todas las sesiones del usuario.
+    /// </summary>
+    [HttpPost("password-recovery/confirm")]
+    [AllowAnonymous]
+    [EnableRateLimiting("password-recovery")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ConfirmPasswordRecovery(
+        [FromBody] PasswordRecoveryConfirmRequest request,
+        CancellationToken cancellationToken) =>
+        FromResult(await passwordRecoveryService.ConfirmAsync(request, cancellationToken));
 
     /// <summary>
     /// Renueva la sesión vigente: devuelve un token nuevo con la duración configurada. La pantalla la llama mientras
