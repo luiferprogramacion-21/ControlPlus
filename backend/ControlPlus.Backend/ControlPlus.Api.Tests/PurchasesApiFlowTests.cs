@@ -579,6 +579,86 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
+    public async Task RetailPriceChange_RequiresAdministratorAndSensitivePermission_AndIsAudited()
+    {
+        using var client = Client();
+        var users = await BootstrapAsync(client);
+        Bearer(client, users.Admin.Token.AccessToken);
+        var supplier = await SupplierAsync(client, "Proveedor con cambio de precio");
+        var product = await ProductAsync(client, supplier.Id, "PUR-RETAIL-PRICE", null);
+        var sensitivePermission = await PermissionIdAsync(client, PermissionCodes.ProductsSensitiveUpdate);
+        await SetPermissionAsync(client, users.Supervisor.User.Id, sensitivePermission, true);
+        var supervisor = await LoginAsync(client, SupervisorName, _supervisorPassword);
+
+        Bearer(client, supervisor.AccessToken);
+        await ProblemAsync(await client.PostAsJsonAsync("/api/purchases", Body(supplier.Id,
+            "PRICE-DENIED", "NO_DISCRIMINADO", new Line(product.Id, 1, 10m, null, 1200m))),
+            HttpStatusCode.Forbidden);
+
+        Bearer(client, users.Admin.Token.AccessToken);
+        var draft = await CreateDraftAsync(client, Body(supplier.Id, "PRICE-ADMIN", "NO_DISCRIMINADO",
+            new Line(product.Id, 2, 10m, null, 1200m)));
+        var draftLine = Assert.Single(draft.GetProperty("lines").EnumerateArray());
+        Assert.Equal(1000m, draftLine.GetProperty("previousRetailPrice").GetDecimal());
+        Assert.Equal(1200m, draftLine.GetProperty("newRetailPrice").GetDecimal());
+
+        Bearer(client, supervisor.AccessToken);
+        await ProblemAsync(await ConfirmAsync(client, draft.GetProperty("id").GetGuid(),
+            "price-supervisor-confirm", draft.GetProperty("version").GetInt64()), HttpStatusCode.Forbidden);
+
+        Bearer(client, users.Admin.Token.AccessToken);
+        var confirmed = await ReadJsonAsync(await ConfirmAsync(client, draft.GetProperty("id").GetGuid(),
+            "price-admin-confirm", draft.GetProperty("version").GetInt64()), HttpStatusCode.OK);
+        var confirmedLine = Assert.Single(confirmed.GetProperty("lines").EnumerateArray());
+        Assert.Equal(1000m, confirmedLine.GetProperty("previousRetailPrice").GetDecimal());
+        Assert.Equal(1200m, confirmedLine.GetProperty("newRetailPrice").GetDecimal());
+        Assert.Equal(1200m, (await ReadAsync<ProductDto>(await client.GetAsync($"/api/products/{product.Id}"),
+            HttpStatusCode.OK)).RetailPrice);
+
+        var order = await ReadJsonAsync(await client.PostAsJsonAsync("/api/purchase-orders", new
+        {
+            supplierId = supplier.Id,
+            lines = new[] { new { productId = product.Id, requestedQuantity = 1, estimatedUnitCost = 11m } }
+        }), HttpStatusCode.Created);
+        var sent = await ReadJsonAsync(await client.PostAsJsonAsync($"/api/purchase-orders/{order.GetProperty("id").GetGuid()}/send",
+            new { expectedVersion = order.GetProperty("version").GetInt64() }), HttpStatusCode.OK);
+        var orderLineId = Assert.Single(sent.GetProperty("lines").EnumerateArray()).GetProperty("id").GetGuid();
+        var receipt = new
+        {
+            expectedOrderVersion = sent.GetProperty("version").GetInt64(),
+            invoiceDate = "2026-11-18",
+            vatMode = "NO_DISCRIMINADO",
+            lines = new[] { new { orderLineId, productId = product.Id, quantity = 1, unitCost = 11m,
+                newRetailPrice = 1400m } }
+        };
+
+        Bearer(client, supervisor.AccessToken);
+        await ProblemAsync(await ReceiveOrderAsync(client, order.GetProperty("id").GetGuid(),
+            "price-supervisor-receipt", receipt), HttpStatusCode.Forbidden);
+
+        Bearer(client, users.Admin.Token.AccessToken);
+        var received = await ReadJsonAsync(await ReceiveOrderAsync(client, order.GetProperty("id").GetGuid(),
+            "price-admin-receipt", receipt), HttpStatusCode.Created);
+        var receiptLine = Assert.Single(received.GetProperty("purchase").GetProperty("lines").EnumerateArray());
+        Assert.Equal(1200m, receiptLine.GetProperty("previousRetailPrice").GetDecimal());
+        Assert.Equal(1400m, receiptLine.GetProperty("newRetailPrice").GetDecimal());
+        Assert.Equal(1400m, (await ReadAsync<ProductDto>(await client.GetAsync($"/api/products/{product.Id}"),
+            HttpStatusCode.OK)).RetailPrice);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var audits = await db.EventoAuditoria.AsNoTracking().Where(x =>
+            x.EntidadId == product.Id && x.Accion == "PRODUCTUPDATED" &&
+            x.DatosNuevos!.Contains("PURCHASE_RECEIPT")).ToArrayAsync();
+        Assert.Equal(2, audits.Length);
+        Assert.All(audits, audit =>
+            Assert.Contains("retailPrice", audit.DatosNuevos!, StringComparison.Ordinal));
+        Assert.Contains(audits, audit => audit.DatosNuevos!.Contains(
+            order.GetProperty("id").GetGuid().ToString(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
     public async Task ConcurrentConfirmAndDeferredCommitFailure_PreserveSingleReceiptAndGaplessNumbering()
     {
         using var firstClient = Client();
@@ -1823,7 +1903,8 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
 
     private static string Secret(int bytes) => Convert.ToBase64String(RandomNumberGenerator.GetBytes(bytes));
 
-    private sealed record Line(Guid ProductId, int Quantity, decimal UnitCost, decimal? VatPercentage = null);
+    private sealed record Line(Guid ProductId, int Quantity, decimal UnitCost, decimal? VatPercentage = null,
+        decimal? NewRetailPrice = null);
     private sealed record CreateBody(Guid SupplierId, string? SupplierDocumentNumber, DateOnly InvoiceDate,
         string VatMode, Line[] Lines);
     private sealed record UpdateBody(Guid SupplierId, string? SupplierDocumentNumber, DateOnly InvoiceDate,

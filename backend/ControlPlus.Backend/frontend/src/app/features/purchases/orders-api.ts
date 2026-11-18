@@ -11,7 +11,7 @@ export interface OrderReason { id: string; code: string; name: string; displayOr
 export interface OrderTransitionInput { reasonId: string; observation: string | null; authorization?: AuthorizationBody; }
 export interface OrderDraftLine { productId: string; requestedQuantity: number; estimatedUnitCost?: number | null; observation?: string | null; }
 export interface OrderDraftInput { supplierId: string; lines: OrderDraftLine[]; }
-export interface ReceiptLine { orderLineId: string; productId: string; quantity: number; unitCost: number; vatPercentage: number | null; }
+export interface ReceiptLine { orderLineId: string; productId: string; quantity: number; unitCost: number; vatPercentage: number | null; newRetailPrice: number | null; }
 export interface ReceiptInput { expectedOrderVersion: number; supplierDocumentNumber: string | null; invoiceDate: string; vatMode: string; lines: ReceiptLine[]; authorization?: AuthorizationBody; }
 @Injectable({ providedIn: 'root' })
 export class OrdersApi {

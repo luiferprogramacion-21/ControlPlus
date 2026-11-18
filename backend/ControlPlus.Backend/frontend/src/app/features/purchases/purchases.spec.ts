@@ -3,7 +3,7 @@ import { currentColombiaDate, Purchases } from './purchases';
 import { PurchasesApi } from './purchases-api';
 import { OrdersApi } from './orders-api';
 import { SuppliersApi } from '../suppliers/suppliers-api';
-import { CatalogApi } from '../catalog/catalog-api';
+import { CatalogApi, Product } from '../catalog/catalog-api';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationDialog } from '../../shared/authorization-dialog';
 
@@ -27,6 +27,7 @@ describe('Purchases', () => {
       { provide: SessionService, useValue: { has: (permission: string) => permission === 'PURCHASES.RECEIVE' || permission === 'PURCHASE_ORDERS.MANAGE', hasRole: (...codes: string[]) => codes.includes('SUPERVISOR'), user: () => ({ roles: ['SUPERVISOR'] }) } },
     ] });
     component = TestBed.runInInjectionContext(() => new Purchases());
+    component.products.set([{ id: productId, retailPrice: 1000 } as Product]);
     component.selectedOrder.set({ id: orderId, version: 5, supplierId, status: 'RECIBIDO_PARCIAL', visibleNumber: 'PED-1', createdAt: '2026-10-24T12:00:00Z', sentAt: '2026-10-24T12:10:00Z', closedAt: null, lines: [
       { id: lineId, productId, productCode: 'P1', productName: 'Producto', requestedQuantity: 10, receivedQuantity: 6, pendingQuantity: 4, excessQuantity: 0, suggestedQuantity: 10, estimatedUnitCost: 100, observation: null },
     ] });
@@ -34,6 +35,7 @@ describe('Purchases', () => {
   });
   it('rechaza cantidad mayor que la pendiente sin enviar HTTP', async () => { component.receipt.lines[0].quantity = 5; expect(component.receiptValidation()).toContain('pendiente'); await component.receive(); expect(receive).not.toHaveBeenCalled(); });
   it('rechaza cantidades fraccionarias y costo inválido', () => { component.receipt.lines[0].quantity = 1.5; expect(component.receiptValidation()).toContain('entera'); component.receipt.lines[0].quantity = 2; component.receipt.lines[0].unitCost = 0; expect(component.receiptValidation()).toContain('costo'); });
+  it('muestra el precio anterior y restringe el precio nuevo al Administrador', () => { expect(component.productRetailPrice(productId)).toBe(1000); expect(component.receipt.lines[0].newRetailPrice).toBeNull(); expect(component.canChangeRetailPrice).toBe(false); component.receipt.lines[0].quantity = 2; component.receipt.lines[0].newRetailPrice = 1000.5; expect(component.receiptValidation()).toContain('precio nuevo'); });
   it('impide doble envío mientras la recepción está pendiente', async () => {
     component.receipt.lines[0].quantity = 2;
     expect(component.receiptValidation()).toBe('');
@@ -46,7 +48,7 @@ describe('Purchases', () => {
     const [submittedOrder, idempotencyKey, payload] = receive.mock.calls[0];
     expect(submittedOrder).toMatchObject({ id: orderId, status: 'RECIBIDO_PARCIAL', version: 5 });
     expect(idempotencyKey).toMatch(/^[0-9a-f-]{36}$/i);
-    expect(payload).toMatchObject({ invoiceDate: '2026-10-24', vatMode: 'NO_DISCRIMINADO', lines: [{ orderLineId: lineId, productId, quantity: 2, unitCost: 100, vatPercentage: null }] });
+    expect(payload).toMatchObject({ invoiceDate: '2026-10-24', vatMode: 'NO_DISCRIMINADO', lines: [{ orderLineId: lineId, productId, quantity: 2, unitCost: 100, vatPercentage: null, newRetailPrice: null }] });
 
     await component.receive();
     expect(receive).toHaveBeenCalledTimes(1);

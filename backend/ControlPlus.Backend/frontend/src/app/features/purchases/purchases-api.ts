@@ -2,10 +2,10 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { Page, authorizationContext } from '../../core/api';
-export interface PurchaseLineInput { productId: string; quantity: number; unitCost: number; vatPercentage: number | null; }
+export interface PurchaseLineInput { productId: string; quantity: number; unitCost: number; vatPercentage: number | null; newRetailPrice: number | null; }
 export interface PurchaseInput { supplierId: string; supplierDocumentNumber: string | null; invoiceDate: string; vatMode: string; lines: PurchaseLineInput[]; }
 export interface PurchaseSummary { id: string; supplierId: string; supplierDocumentNumber: string | null; invoiceDate: string; status: string; visibleNumber: string | null; total: number; version: number; }
-export interface PurchaseLine extends PurchaseLineInput { id: string; grossSubtotal: number; taxBase: number | null; vatAmount: number | null; total: number; previousAverageCost: number | null; resultingAverageCost: number; }
+export interface PurchaseLine extends PurchaseLineInput { id: string; grossSubtotal: number; taxBase: number | null; vatAmount: number | null; total: number; previousAverageCost: number | null; resultingAverageCost: number; previousRetailPrice: number; }
 export interface Purchase extends PurchaseSummary { vatMode: string; grossSubtotal: number; vatTotal: number | null; lines: PurchaseLine[]; orderId: string | null; }
 export interface CancellationReason { id: string; code: string; name: string; description: string | null; displayOrder: number; }
 @Injectable({ providedIn: 'root' })

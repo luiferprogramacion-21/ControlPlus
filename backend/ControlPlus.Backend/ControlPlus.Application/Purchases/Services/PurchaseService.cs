@@ -345,6 +345,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             return Result.Failure<PurchaseDto>(ApplicationError.NotFound("uno o más productos activos"));
         var prepared = Prepare(input.Lines, input.VatMode!, products);
         if (prepared.Error is not null) return Result.Failure<PurchaseDto>(prepared.Error);
+        if (RequestsRetailPriceChange(prepared.Lines!) && !await CanChangeRetailPriceAsync(actor.UserId, ct))
+            return Denied<PurchaseDto>();
         var now = clock.UtcNow.UtcDateTime;
         var purchase = new Compra
         {
@@ -394,6 +396,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             return Result.Failure<PurchaseDto>(ApplicationError.NotFound("uno o más productos activos"));
         var prepared = Prepare(input.Lines, input.VatMode!, products);
         if (prepared.Error is not null) return Result.Failure<PurchaseDto>(prepared.Error);
+        if (RequestsRetailPriceChange(prepared.Lines!) && !await CanChangeRetailPriceAsync(actor.UserId, ct))
+            return Denied<PurchaseDto>();
         purchase.ProveedorId = supplier.Id;
         purchase.NumeroDocumentoProveedor = input.Document;
         purchase.FechaDocumento = request.InvoiceDate;
@@ -459,7 +463,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         if (products.Count != lineIds.Length || products.Any(x => !x.Activo))
             return Result.Failure<PurchaseDto>(ApplicationError.NotFound("uno o más productos activos"));
         var lines = purchase.DetalleCompra.Select(x => new PurchaseLineRequest(x.ProductoId, x.Cantidad,
-            x.CostoUnitarioDocumento, x.PorcentajeIva)).ToArray();
+            x.CostoUnitarioDocumento, x.PorcentajeIva,
+            x.PrecioVentaNuevo == x.PrecioVentaAnterior ? null : x.PrecioVentaNuevo)).ToArray();
         if (Validate(purchase.ProveedorId, purchase.NumeroDocumentoProveedor, purchase.FechaDocumento,
                 purchase.ModoIva, lines).Error is not null ||
             purchase.DetalleCompra.Any(x => x.ModoIva != purchase.ModoIva))
@@ -470,6 +475,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             purchase.DetalleCompra.Any(d => prepared.Lines.All(x => x.Product.Id != d.ProductoId ||
                 x.Gross != d.SubtotalBruto || x.TaxBase != d.BaseGravable || x.Vat != d.ValorIva || x.Total != d.TotalLinea)))
             return Result.Failure<PurchaseDto>(ApplicationError.Conflict("El borrador ya no cumple el costo o IVA oficial."));
+        if (RequestsRetailPriceChange(prepared.Lines) && !await CanChangeRetailPriceAsync(actor.UserId, ct))
+            return Denied<PurchaseDto>();
         var number = checked(sequence.UltimoNumero + 1);
         var externalDocument = NormalizeDocument(purchase.NumeroDocumentoProveedor);
         var document = externalDocument ?? $"{InternalDocumentPrefix}{installation.Id:N}-{sequence.Prefijo}-{sequence.Serie}-{number}";
@@ -481,6 +488,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         var correlationId = Guid.CreateVersion7();
         var byId = prepared.Lines.ToDictionary(x => x.Product.Id);
         var movements = new List<MovimientoInventario>(lineIds.Length);
+        var retailPriceChanges = new List<RetailPriceChange>();
         try
         {
             foreach (var detail in purchase.DetalleCompra.OrderBy(x => x.ProductoId))
@@ -495,10 +503,19 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                 var average = PurchaseCostPolicy.Average(previousAverage, previousStock, detail.Cantidad, effective);
                 detail.CostoPromedioAnterior = previousAverage;
                 detail.CostoPromedioResultante = average;
-                detail.PrecioVentaAnterior = product.PrecioMinorista;
-                detail.PrecioVentaNuevo = product.PrecioMinorista;
+                var previousRetailPrice = product.PrecioMinorista;
+                var newRetailPrice = line.NewRetailPrice ?? previousRetailPrice;
+                detail.PrecioVentaAnterior = previousRetailPrice;
+                detail.PrecioVentaNuevo = newRetailPrice;
                 product.StockActual = nextStock;
                 product.CostoPromedio = average;
+                if (newRetailPrice != previousRetailPrice)
+                {
+                    product.PrecioMinorista = newRetailPrice;
+                    product.UsuarioModificacionId = actor.UserId;
+                    product.FechaModificacion = now;
+                    retailPriceChanges.Add(new RetailPriceChange(product.Id, previousRetailPrice, newRetailPrice));
+                }
                 movements.Add(new MovimientoInventario
                 {
                     Id = Guid.CreateVersion7(), ProductoId = product.Id, UsuarioId = actor.UserId,
@@ -514,6 +531,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         {
             return Result.Failure<PurchaseDto>(ApplicationError.Conflict("El stock o costo resultante excede el rango oficial."));
         }
+        await WriteRetailPriceAuditsAsync(actor.UserId, purchase.Id, null, retailPriceChanges,
+            correlationId, terminal.Id, ct);
         // El trigger oficial de detalle_compra permite actualizar los costos solo mientras
         // la cabecera sigue en BORRADOR. Este flush permanece dentro de la misma transaccion.
         await unitOfWork.SaveChangesAsync(ct);
@@ -565,12 +584,12 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         }
         var input = Validate(orderId, request!.SupplierDocumentNumber, request.InvoiceDate,
             request.VatMode, request.Lines.Select(x => new PurchaseLineRequest(x.ProductId, x.Quantity,
-                x.UnitCost, x.VatPercentage)).ToArray());
+                x.UnitCost, x.VatPercentage, x.NewRetailPrice)).ToArray());
         if (input.Error is not null) return Result.Failure<PurchaseReceiptDto>(input.Error);
         var normalized = new { OrderId = orderId, request.ExpectedOrderVersion,
             Document = input.Document, request.InvoiceDate, VatMode = input.VatMode,
             Lines = request.Lines.OrderBy(x => x.OrderLineId).Select(x => new
-            { x.OrderLineId, x.ProductId, x.Quantity, x.UnitCost, x.VatPercentage }).ToArray(), Actor = actor.UserId };
+            { x.OrderLineId, x.ProductId, x.Quantity, x.UnitCost, x.VatPercentage, x.NewRetailPrice }).ToArray(), Actor = actor.UserId };
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(normalized))));
         var lockKey = string.IsNullOrWhiteSpace(request.Authorization?.UserName)
             ? $"PURCHASE-RECEIPT:{actor.UserId:N}" : request.Authorization.UserName!.Trim().ToUpperInvariant();
@@ -627,6 +646,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             return Result.Failure<PurchaseReceiptDto>(ApplicationError.NotFound("uno o más productos activos"));
         var prepared = Prepare(input.Lines!, input.VatMode!, products);
         if (prepared.Error is not null) return Result.Failure<PurchaseReceiptDto>(prepared.Error);
+        if (RequestsRetailPriceChange(prepared.Lines!) && !await CanChangeRetailPriceAsync(actor.UserId, ct))
+            return Denied<PurchaseReceiptDto>();
         var number = checked(sequence.UltimoNumero + 1);
         var document = input.Document ?? $"{InternalDocumentPrefix}{installation.Id:N}-{sequence.Prefijo}-{sequence.Serie}-{number}";
         if (document.Length > 100 || await repository.DocumentExistsAsync(supplier.Id, document, null, ct))
@@ -696,6 +717,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             Total = prepared.Total, Estado = "BORRADOR", Version = 1 };
         var requestsByProduct = request.Lines.ToDictionary(x => x.ProductId);
         var movements = new List<MovimientoInventario>();
+        var retailPriceChanges = new List<RetailPriceChange>();
         try
         {
             foreach (var line in prepared.Lines!.OrderBy(x => x.Product.Id))
@@ -714,6 +736,11 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                 detail.AutorizacionExcepcionId = substitute ? authorization?.Id : null;
                 detail.CostoPromedioAnterior = oldAverage;
                 detail.CostoPromedioResultante = average;
+                var newRetailPrice = line.NewRetailPrice ?? line.Product.PrecioMinorista;
+                detail.PrecioVentaNuevo = newRetailPrice;
+                if (newRetailPrice != line.Product.PrecioMinorista)
+                    retailPriceChanges.Add(new RetailPriceChange(line.Product.Id,
+                        line.Product.PrecioMinorista, newRetailPrice));
                 purchase.DetalleCompra.Add(detail);
                 movements.Add(new MovimientoInventario { Id = Guid.CreateVersion7(), ProductoId = line.Product.Id,
                     UsuarioId = actor.UserId, CompraId = purchase.Id, TipoMovimiento = "COMPRA",
@@ -735,6 +762,13 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             var product = products.Single(x => x.Id == movement.ProductoId);
             product.StockActual = movement.StockPosterior;
             product.CostoPromedio = movement.CostoPromedioPosterior;
+            var priceChange = retailPriceChanges.SingleOrDefault(x => x.ProductId == product.Id);
+            if (priceChange is not null)
+            {
+                product.PrecioMinorista = priceChange.NewRetailPrice;
+                product.UsuarioModificacionId = actor.UserId;
+                product.FechaModificacion = now;
+            }
         }
         foreach (var receiptLine in request.Lines)
         {
@@ -772,6 +806,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                 AuthorizationMode = authorization is null ? "NONE" :
                     administratorSelfAuthorized ? "ADMINISTRATOR_SELF" : "OTHER_USER" }, correlation,
             authorization?.UsuarioAutorizadorId, null, terminal.Id, null, ct);
+        await WriteRetailPriceAuditsAsync(actor.UserId, purchase.Id, order.Id, retailPriceChanges,
+            correlation, terminal.Id, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return Result.Success(response);
     }
@@ -799,6 +835,31 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             snapshot.PermissionCodes.Contains(PermissionCodes.PurchasesReceive, StringComparer.OrdinalIgnoreCase);
     }
 
+    private async Task<bool> CanChangeRetailPriceAsync(Guid userId, CancellationToken ct)
+    {
+        var snapshot = await users.GetAuthorizationSnapshotAsync(userId, ct);
+        return snapshot is not null && snapshot.HighestRoleLevel == RoleLevel.Administrador &&
+            snapshot.PermissionCodes.Contains(PermissionCodes.ProductsSensitiveUpdate, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static bool RequestsRetailPriceChange(IEnumerable<PreparedLine> lines) =>
+        lines.Any(x => x.NewRetailPrice is decimal price && price != x.Product.PrecioMinorista);
+
+    private async Task WriteRetailPriceAuditsAsync(Guid actorId, Guid purchaseId, Guid? orderId,
+        IEnumerable<RetailPriceChange> changes, Guid correlationId, Guid terminalId, CancellationToken ct)
+    {
+        foreach (var change in changes)
+        {
+            await AuditWriter.WriteAsync(audit, clock, actorId, AuditAction.ProductUpdated,
+                nameof(Producto), change.ProductId,
+                new { PurchaseId = purchaseId, OrderId = orderId, ProductId = change.ProductId,
+                    PreviousRetailPrice = change.PreviousRetailPrice, NewRetailPrice = change.NewRetailPrice,
+                    ChangeSource = "PURCHASE_RECEIPT", ModifiedFields = new[] { "retailPrice" },
+                    CorrelationId = correlationId },
+                ct, correlationId, terminalId);
+        }
+    }
+
     private static ValidatedInput Validate(Guid supplierId, string? document, DateOnly date,
         string? vatMode, IReadOnlyCollection<PurchaseLineRequest>? lines)
     {
@@ -822,6 +883,9 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                 (line.VatPercentage is decimal rate &&
                  (rate is < 0m or > 100m || decimal.Round(rate, 2) != rate)))
                 return ValidatedInput.Fail("Cada línea requiere producto, cantidad entera positiva y costo/IVA dentro de la precisión oficial.");
+            if (line.NewRetailPrice is decimal newRetailPrice &&
+                (newRetailPrice < 0m || decimal.Truncate(newRetailPrice) != newRetailPrice))
+                return ValidatedInput.Fail("El precio de venta nuevo debe ser un valor entero mayor o igual a cero.");
             if (vatMode == "NO_DISCRIMINADO" && line.VatPercentage is not null)
                 return ValidatedInput.Fail("NO_DISCRIMINADO no admite vatPercentage.");
         }
@@ -861,7 +925,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                     baseAmount = PurchaseCostPolicy.CheckedFour(PurchaseCostPolicy.Round4(gross * 100m / (100m + rate!.Value)));
                     tax = gross - baseAmount.Value;
                 }
-                lines.Add(new PreparedLine(product, request.Quantity, request.UnitCost, mode, rate,
+                lines.Add(new PreparedLine(product, request.Quantity, request.UnitCost, request.NewRetailPrice, mode, rate,
                     gross, baseAmount, tax, total));
             }
             var grossHeader = PurchaseCostPolicy.CheckedTwo(PurchaseCostPolicy.Round2(lines.Sum(x => x.Gross)));
@@ -885,7 +949,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         ValorIva = line.Vat, TotalLinea = line.Total,
         CostoPromedioAnterior = line.Product.CostoPromedio,
         CostoPromedioResultante = line.Product.CostoPromedio ?? 0m,
-        PrecioVentaAnterior = line.Product.PrecioMinorista, PrecioVentaNuevo = line.Product.PrecioMinorista,
+        PrecioVentaAnterior = line.Product.PrecioMinorista,
+        PrecioVentaNuevo = line.NewRetailPrice ?? line.Product.PrecioMinorista,
         EsSustituto = false
     };
 
@@ -895,7 +960,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         purchase.SubtotalBruto, purchase.ImpuestoTotal, purchase.Total, purchase.Version,
         purchase.DetalleCompra.OrderBy(x => x.ProductoId).Select(x => new PurchaseLineDto(x.Id, x.ProductoId,
             x.Cantidad, x.CostoUnitarioDocumento, x.ModoIva, x.PorcentajeIva, x.SubtotalBruto,
-            x.BaseGravable, x.ValorIva, x.TotalLinea, x.CostoPromedioAnterior, x.CostoPromedioResultante)).ToArray(),
+            x.BaseGravable, x.ValorIva, x.TotalLinea, x.CostoPromedioAnterior, x.CostoPromedioResultante,
+            x.PrecioVentaAnterior, x.PrecioVentaNuevo)).ToArray(),
         purchase.PedidoCompraId);
 
     private static PurchaseSummaryDto MapSummary(Compra purchase) => new(purchase.Id, purchase.ProveedorId,
@@ -921,8 +987,10 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         public static ValidatedInput Fail(string message) => new(null, null, null, ApplicationError.Validation(message));
     }
 
-    private sealed record PreparedLine(Producto Product, int Quantity, decimal UnitCost, string Mode,
+    private sealed record PreparedLine(Producto Product, int Quantity, decimal UnitCost, decimal? NewRetailPrice, string Mode,
         decimal? Rate, decimal Gross, decimal? TaxBase, decimal? Vat, decimal Total);
+
+    private sealed record RetailPriceChange(Guid ProductId, decimal PreviousRetailPrice, decimal NewRetailPrice);
 
     private sealed record PreparedPurchase(IReadOnlyCollection<PreparedLine>? Lines, decimal Gross,
         decimal? Vat, decimal Total, ApplicationError? Error)

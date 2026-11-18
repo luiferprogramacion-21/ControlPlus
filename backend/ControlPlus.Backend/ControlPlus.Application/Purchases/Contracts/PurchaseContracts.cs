@@ -13,7 +13,8 @@ public sealed record PurchaseLineRequest(
     [property: JsonRequired] Guid ProductId,
     [property: JsonRequired] int Quantity,
     [property: JsonRequired] decimal UnitCost,
-    decimal? VatPercentage = null);
+    decimal? VatPercentage = null,
+    decimal? NewRetailPrice = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CreatePurchaseRequest(
@@ -41,7 +42,8 @@ public sealed record PurchaseReceiptLineRequest(
     [property: JsonRequired] Guid ProductId,
     [property: JsonRequired] int Quantity,
     [property: JsonRequired] decimal UnitCost,
-    decimal? VatPercentage = null);
+    decimal? VatPercentage = null,
+    decimal? NewRetailPrice = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ReceivePurchaseOrderRequest(
@@ -73,7 +75,8 @@ public sealed record PurchaseCancellationReasonDto(Guid Id, string Code, string 
 
 public sealed record PurchaseLineDto(Guid Id, Guid ProductId, int Quantity, decimal UnitCost,
     string VatMode, decimal? VatPercentage, decimal GrossSubtotal, decimal? TaxBase,
-    decimal? VatAmount, decimal Total, decimal? PreviousAverageCost, decimal ResultingAverageCost);
+    decimal? VatAmount, decimal Total, decimal? PreviousAverageCost, decimal ResultingAverageCost,
+    decimal PreviousRetailPrice, decimal NewRetailPrice);
 
 public sealed record PurchaseDto(Guid Id, Guid SupplierId, string? SupplierDocumentNumber,
     DateOnly InvoiceDate, string VatMode, string Status, string? Prefix, string? Series,
