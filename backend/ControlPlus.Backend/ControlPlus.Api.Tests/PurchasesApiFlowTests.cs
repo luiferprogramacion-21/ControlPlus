@@ -647,9 +647,11 @@ public sealed class PurchasesApiFlowTests : IAsyncLifetime
 
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
-        var audits = await db.EventoAuditoria.AsNoTracking().Where(x =>
-            x.EntidadId == product.Id && x.Accion == "PRODUCTUPDATED" &&
-            x.DatosNuevos!.Contains("PURCHASE_RECEIPT")).ToArrayAsync();
+        // DatosNuevos es jsonb: PostgreSQL no admite LIKE sobre jsonb, así que el texto se busca en memoria.
+        var audits = (await db.EventoAuditoria.AsNoTracking()
+                .Where(x => x.EntidadId == product.Id && x.Accion == "PRODUCTUPDATED").ToArrayAsync())
+            .Where(x => x.DatosNuevos != null && x.DatosNuevos.Contains("PURCHASE_RECEIPT", StringComparison.Ordinal))
+            .ToArray();
         Assert.Equal(2, audits.Length);
         Assert.All(audits, audit =>
             Assert.Contains("retailPrice", audit.DatosNuevos!, StringComparison.Ordinal));
