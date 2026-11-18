@@ -333,6 +333,28 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
+    public async Task OpeningShift_ChoosesItsModeAtOpening_WithoutChangingTheBusinessDefault()
+    {
+        using var client = CreateClient();
+        await SetupAsync(client);
+        var administrator = await LoginAsync(client, AdministratorUserName, AdministratorPassword);
+        SetBearer(client, administrator.AccessToken);
+        await ReadSuccessAsync<CashRegisterDto>(await client.PostAsJsonAsync(
+            "/api/cash/register", new ConfigureCashRegisterRequest("MODE-CASH", "Caja por modalidad")), HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/cash/shifts",
+            new OpenCashShiftRequest(0m, null, null, "MIXTO"))).StatusCode);
+
+        var shift = await ReadSuccessAsync<CashShiftDto>(await client.PostAsJsonAsync(
+            "/api/cash/shifts", new OpenCashShiftRequest(10_000m, "Hoy se turnan", null, "compartido")), HttpStatusCode.Created);
+        Assert.Equal(CashConstants.SharedMode, shift.Mode);
+        Assert.Null(shift.ResponsibleUserId);
+        var state = await ReadSuccessAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
+        Assert.Equal(CashConstants.IndividualMode, state.DefaultShiftMode);
+        Assert.True(state.RequiresOperatorSession);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
     public async Task SharedShift_UsesCode128HashedCredentialActiveSessionAndHybridMovementPermission()
     {
         using var client = CreateClient();

@@ -246,7 +246,10 @@ public sealed class CashService(
         var terminal = await repository.GetActiveTerminalAsync(cash.InstalacionId, cancellationToken);
         if (terminal is null) return Result.Failure<CashShiftDto>(ApplicationError.NotFound("la terminal activa"));
         var now = clock.UtcNow;
-        var shift = TurnoCaja.Open(cash.Id, terminal.Id, actor.UserId, establishment.ModoTurnoPredeterminado,
+        // Quien abre elige la modalidad del turno; sin elección se usa la predeterminada del negocio.
+        var mode = request.Mode is null ? establishment.ModoTurnoPredeterminado : NormalizeMode(request.Mode);
+        if (mode is null) return Result.Failure<CashShiftDto>(Validation("La modalidad debe ser INDIVIDUAL o COMPARTIDO."));
+        var shift = TurnoCaja.Open(cash.Id, terminal.Id, actor.UserId, mode,
             ToOperatingDate(now, establishment.ZonaHoraria), request.InitialAmount, request.Observations, now);
         await repository.AddShiftAsync(shift, cancellationToken);
 

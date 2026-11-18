@@ -23,8 +23,9 @@ export class CashApi {
   private readonly http = inject(HttpClient);
   state(): Promise<CashState> { return firstValueFrom(this.http.get<CashState>('/api/cash/state')); }
   /** A Cajero opens the cash with the authorization of a Supervisor or Administrador. */
-  open(initialAmount: number, observations: string | null, authorization?: AuthorizationBody): Promise<CashShift> {
-    return firstValueFrom(this.http.post<CashShift>('/api/cash/shifts', authorization ? { initialAmount, observations, authorization } : { initialAmount, observations }, { context: authorization ? authorizationContext() : undefined }));
+  open(initialAmount: number, observations: string | null, authorization?: AuthorizationBody, mode?: 'INDIVIDUAL' | 'COMPARTIDO'): Promise<CashShift> {
+    const body = { initialAmount, observations, ...(authorization ? { authorization } : {}), ...(mode ? { mode } : {}) };
+    return firstValueFrom(this.http.post<CashShift>('/api/cash/shifts', body, { context: authorization ? authorizationContext() : undefined }));
   }
   movements(): Promise<Page<CashMovement>> { return firstValueFrom(this.http.get<Page<CashMovement>>('/api/cash/movements', { params: { page: 1, pageSize: 50 } })); }
   movement(kind: 'incomes' | 'expenses' | 'cash-drops', amount: number, concept: string, operatorSessionId: string | null): Promise<CashMovement> {

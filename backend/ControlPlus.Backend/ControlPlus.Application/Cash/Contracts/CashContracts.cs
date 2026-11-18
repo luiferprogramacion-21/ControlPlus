@@ -56,7 +56,8 @@ public sealed record CashOpenAuthorizationRequest(string? UserName, string? Pass
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record OpenCashShiftRequest(decimal InitialAmount, string? Observations, CashOpenAuthorizationRequest? Authorization = null);
+/// <param name="Mode">INDIVIDUAL o COMPARTIDO para este turno; nulo usa el modo predeterminado del negocio (decisión del 18 de noviembre de 2026).</param>
+public sealed record OpenCashShiftRequest(decimal InitialAmount, string? Observations, CashOpenAuthorizationRequest? Authorization = null, string? Mode = null);
 
 public sealed record CashMovementDto(
     Guid Id,

@@ -144,7 +144,7 @@ describe('Cierre de caja', () => {
     const prompt = dialog.open.mock.calls[0][0] as AuthorizationPrompt;
     expect(prompt.title).toBe('Autorizar apertura de caja');
     expect(prompt.allowCredential).toBe(true);
-    expect(open).toHaveBeenCalledWith(50000, null, { userName: 'supervisor', password: 'clave' });
+    expect(open).toHaveBeenCalledWith(50000, null, { userName: 'supervisor', password: 'clave' }, 'INDIVIDUAL');
   });
 
   it('un Supervisor o Administrador abre la caja sin ventana de autorización', async () => {
@@ -153,6 +153,16 @@ describe('Cierre de caja', () => {
     dialog.open.mockClear(); screen.initialAmount = 20000;
     await screen.open();
     expect(dialog.open).not.toHaveBeenCalled();
-    expect(open).toHaveBeenCalledWith(20000, null);
+    expect(open).toHaveBeenCalledWith(20000, null, undefined, 'INDIVIDUAL');
+  });
+
+  it('quien abre elige la modalidad del turno; por defecto es individual', async () => {
+    const open = vi.fn().mockResolvedValue({});
+    (api as unknown as { open: typeof open }).open = open;
+    expect(screen.openModeFor(null)).toBe('INDIVIDUAL');
+    screen.openMode = 'COMPARTIDO'; screen.initialAmount = 10000;
+    await screen.open();
+    expect(open).toHaveBeenCalledWith(10000, null, undefined, 'COMPARTIDO');
+    expect(screen.openMode).toBeNull();
   });
 });

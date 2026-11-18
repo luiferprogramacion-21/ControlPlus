@@ -11,6 +11,14 @@ Pestaña para quien tiene `CASH.SHIFT_MODE_MANAGE` (Administrador). Muestra dos 
 
 Solo se puede cambiar **sin turno abierto**. La pantalla lo explica y la API responde 409 si se intenta. El cambio aplica desde el próximo turno y queda en la auditoría (`CashShiftModeUpdated`). Usa `PUT /api/cash/shift-mode` con la versión de configuración leída en `GET /api/cash/state`.
 
+## Elegir el modo al abrir la caja
+
+Decisión posterior del 18 de noviembre de 2026: **quien abre la caja elige la modalidad de ese turno**. En la pantalla de Caja, junto al fondo inicial, el campo «Modalidad» ofrece Turno individual o Turno compartido. Viene marcado con el modo predeterminado del negocio (Configuración → «Caja y turnos»), que es **individual** salvo que el Administrador lo cambie.
+
+- `POST /api/cash/shifts` acepta `mode` (`INDIVIDUAL` o `COMPARTIDO`, sin distinguir mayúsculas). Si se omite, usa el modo predeterminado; otro valor responde 400.
+- Elegir el modo al abrir no cambia el predeterminado del negocio.
+- El Cajero que abre con autorización también elige el modo.
+
 ## Desbloquear el punto de venta con el carné (maqueta 06b)
 
 En turno compartido, si el usuario no tiene una sesión de operador activa, el punto de venta muestra **«Escanee el carné del empleado»** en lugar del carrito:
@@ -27,6 +35,8 @@ Diferencias con la maqueta 06b:
 
 ## Verificación
 
+- `cash.spec.ts`: el modo elegido se envía al abrir, por defecto individual.
+- `CashApiFlowTests.OpeningShift_ChoosesItsModeAtOpening_WithoutChangingTheBusinessDefault`: modo compartido al abrir, 400 con un modo inválido y el predeterminado sigue en individual.
 - `shift-mode-panel.spec.ts`: modo activo, cambio a compartido con la versión, bloqueo con turno abierto y error del servidor.
 - `sales-operator-unlock.spec.ts`: bloqueo sin sesión, desbloqueo con carné válido, carné inválido y turno individual sin carné.
 - Las reglas del servidor (sesión por venta, carné propio, cambio solo sin turno) ya tenían pruebas de API en Caja y Ventas.

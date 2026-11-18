@@ -34,6 +34,8 @@ export class Cash implements OnInit {
   readonly reasonsError = signal('');
   initialAmount = 0;
   openObservations = '';
+  /** Modalidad elegida al abrir; nula usa la predeterminada del negocio (individual si no hay otra). */
+  openMode: 'INDIVIDUAL' | 'COMPARTIDO' | null = null;
   kind: 'incomes' | 'expenses' | 'cash-drops' = 'incomes';
   amount = 0;
   concept = '';
@@ -103,13 +105,16 @@ export class Cash implements OnInit {
     } catch (error) { this.reasons.set(null); this.reasonsError.set(errorText(error)); }
     finally { this.reasonsLoading.set(false); }
   }
+  openModeFor(cash: CashState | null = this.state()): 'INDIVIDUAL' | 'COMPARTIDO' {
+    return this.openMode ?? (cash?.defaultShiftMode === 'COMPARTIDO' ? 'COMPARTIDO' : 'INDIVIDUAL');
+  }
   /** The Administrator closes with a difference without choosing a reason (the server records the generic one). */
   get isAdministrator(): boolean { return typeof this.session.hasRole === 'function' && this.session.hasRole('ADMINISTRADOR'); }
   private resetReasons(): void { this.reasons.set(null); this.reasonsError.set(''); this.reasonId = ''; }
   async open(): Promise<void> {
     if (!this.validMoney(this.initialAmount, true) || this.busy()) return;
     if (this.session.has('CASH.SHIFT_MANAGE')) {
-      await this.run(async () => { await this.api.open(this.initialAmount, this.openObservations.trim() || null); this.notice.set('Turno abierto.'); await this.refresh(); });
+      await this.run(async () => { await this.api.open(this.initialAmount, this.openObservations.trim() || null, undefined, this.openModeFor()); this.openMode = null; this.notice.set('Turno abierto.'); await this.refresh(); });
       return;
     }
     // A Cajero opens the cash only with the authorization of a Supervisor or Administrador.
@@ -123,7 +128,8 @@ export class Cash implements OnInit {
   private async submitOpen(credentials: AuthorizationCredentials | null): Promise<void> {
     if (!credentials) return;
     await this.run(async () => {
-      await this.api.open(this.initialAmount, this.openObservations.trim() || null, authorizationBody(credentials));
+      await this.api.open(this.initialAmount, this.openObservations.trim() || null, authorizationBody(credentials), this.openModeFor());
+      this.openMode = null;
       this.notice.set('Turno abierto.'); await this.refresh();
     }, true);
   }
