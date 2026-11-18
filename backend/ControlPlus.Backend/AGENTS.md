@@ -509,7 +509,7 @@ El 17 de noviembre de 2026 el usuario pidió guardar esta revisión y repartir l
 | D | Etiquetas con código de barras (maqueta 12c) | Media | Codex |
 | E | Precio de venta nuevo en la recepción de compras (maqueta 18), solo Administrador y auditado | Media | Codex |
 | F | Datos del establecimiento editables (maqueta 21) y su uso en ticket, carné, pedido, barra superior y Caja | Media | Codex |
-| G | Elegir turno individual o compartido desde la pantalla (21b) y desbloqueo con carné en el POS (06b) | **Aprobada para la V1 el 18 de noviembre de 2026** (el usuario quiere poder usar ambos modos) | Claude, después de H |
+| G | Elegir turno individual o compartido desde la pantalla (21b) y desbloqueo con carné en el POS (06b) (`docs/shift-modes.md`) | **Aprobada el 18 de noviembre de 2026; implementada**; falta probar con lector y carné físicos | Claude |
 | H | Venta recuperable: el carrito se guarda solo y se ofrece recuperarlo (`docs/sale-drafts.md`, tablas oficiales `borrador_venta`, sin migración) | **Aprobada el 18 de noviembre de 2026; implementada** | Claude |
 | I | Arranque de una instalación nueva (script guiado de primer Administrador y caja) | Media | Claude |
 | J | Soporte con el estado real de impresora y cola (maqueta 22) | Baja | Claude |

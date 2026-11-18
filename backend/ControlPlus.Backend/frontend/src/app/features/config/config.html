@@ -1,9 +1,10 @@
 <section class="module-page directory-page">
   <div class="module-heading">
-    <div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="settings" /></span><div><h2>Configuración</h2><p>Establecimiento, numeración, plazos, impresora, IVA y motivos</p></div></div>
+    <div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="settings" /></span><div><h2>Configuración</h2><p>Establecimiento, caja y turnos, numeración, plazos, impresora, IVA y motivos</p></div></div>
     <div class="tabs">
       @if (canNumber) { <button mat-button type="button" [class.active]="tab() === 'numbering'" (click)="switchTab('numbering')">Numeración</button> }
       @if (canConfigure) { <button mat-button type="button" [class.active]="tab() === 'establishment'" (click)="switchTab('establishment')">Establecimiento</button> }
+      @if (canShiftMode) { <button mat-button type="button" [class.active]="tab() === 'shift-mode'" (click)="switchTab('shift-mode')">Caja y turnos</button> }
       @if (canConfigure) { <button mat-button type="button" [class.active]="tab() === 'settings'" (click)="switchTab('settings')">Cambios, apartados y créditos</button> }
       @if (canConfigure) { <button mat-button type="button" [class.active]="tab() === 'printing'" (click)="switchTab('printing')">Impresión</button> }
       @if (canVat) { <button mat-button type="button" [class.active]="tab() === 'vat'" (click)="switchTab('vat')">IVA</button> }
@@ -14,6 +15,7 @@
   @switch (tab()) {
     @case ('numbering') { @if (canNumber) { <cp-numbering-panel /> } }
     @case ('establishment') { @if (canConfigure) { <cp-establishment-panel /> } }
+    @case ('shift-mode') { @if (canShiftMode) { <cp-shift-mode-panel /> } }
     @case ('settings') { @if (canConfigure) { <cp-settings-panel /> } }
     @case ('printing') { @if (canConfigure) { <cp-print-settings /> } }
     @case ('vat') { @if (canVat) { <cp-vat-panel /> } }

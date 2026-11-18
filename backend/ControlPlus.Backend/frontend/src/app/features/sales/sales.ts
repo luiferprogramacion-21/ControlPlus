@@ -268,6 +268,31 @@ export class Sales implements OnInit, OnDestroy {
   }
   get selectedCustomer(): Customer | undefined { return this.customers().find(customer => customer.id === this.customerId); }
   startCashSale(): void { if (this.locked) return; this.saleType.set('CONTADO'); this.checkoutMode.set(false); }
+  /** Turno compartido sin sesión de operador: el punto de venta se desbloquea con el carné (maqueta 06b). */
+  get needsOperatorUnlock(): boolean {
+    const state = this.cashState();
+    return !!state && state.hasOpenShift && !state.requiresPreviousShiftClosure && state.requiresOperatorSession && !state.ownOperatorSession;
+  }
+  operatorCredential = '';
+  readonly unlocking = signal(false);
+  readonly unlockError = signal('');
+  async unlock(): Promise<void> {
+    const token = this.operatorCredential.trim();
+    if (!token || this.unlocking()) return;
+    this.unlocking.set(true); this.unlockError.set('');
+    try {
+      await this.cash.startSession(token);
+      this.operatorCredential = '';
+      await this.refreshCash();
+      this.focusSearch();
+    } catch (error) {
+      this.operatorCredential = '';
+      this.unlockError.set(error instanceof HttpErrorResponse && error.status === 401
+        ? 'El carné no es válido, no es suyo o venció. Escanee de nuevo o pida uno nuevo al Administrador.' : errorText(error));
+      this.focusField('operator-credential');
+    } finally { this.unlocking.set(false); }
+  }
+
   get canSell(): boolean {
     const state = this.cashState();
     return !!state?.hasOpenShift && !state.requiresPreviousShiftClosure && (state.requiresOperatorSession ? !!state.ownOperatorSession : state.currentShift?.responsibleUserId === this.session.user()?.id);
@@ -487,7 +512,10 @@ export class Sales implements OnInit, OnDestroy {
     if (this.discountScope()) this.closeDiscount();
   }
   validAmount(value: number): boolean { return Number.isSafeInteger(Number(value)) && Number(value) >= 0; }
-  async refreshCash(): Promise<void> { try { this.cashState.set(await this.cash.state()); } catch (error) { this.error.set(errorText(error)); } }
+  async refreshCash(): Promise<void> {
+    try { this.cashState.set(await this.cash.state()); } catch (error) { this.error.set(errorText(error)); return; }
+    if (this.needsOperatorUnlock && !this.sale()) this.focusField('operator-credential');
+  }
   // --- product search with suggestions ---------------------------------------------------------
   /** Called on every keystroke: suggestions appear after two characters, without waiting for Enter. */
   onSearchInput(value: string): void {

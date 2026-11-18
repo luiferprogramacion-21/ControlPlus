@@ -1,6 +1,6 @@
 <section class="prototype-operation">
   @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert"><span>!</span>{{ error() }}</div> }
-  @if (blockReason && !sale()) { <div class="inline-feedback inline-feedback--error" role="status"><span>!</span>{{ blockReason }} <a class="link-button" routerLink="/operacion/caja">Ir a Caja</a></div> }
+  @if (blockReason && !sale() && !needsOperatorUnlock) { <div class="inline-feedback inline-feedback--error" role="status"><span>!</span>{{ blockReason }} <a class="link-button" routerLink="/operacion/caja">Ir a Caja</a></div> }
 
   @if (pendingDraft(); as draft) { @if (!sale()) {
     <div class="inline-feedback inline-feedback--warning draft-banner" role="status"><span>!</span>
@@ -63,6 +63,24 @@
         </section>
       </div>
     }
+  } @else if (needsOperatorUnlock) {
+    <div class="operator-lock">
+      <section class="panel panel--padded operator-lock__main" aria-labelledby="operator-lock-title">
+        <span class="operator-lock__icon" aria-hidden="true"></span>
+        <h2 id="operator-lock-title">Escanee el carné del empleado</h2>
+        <p class="muted">El lector acepta credenciales Code 128 activas. Sesión de {{ session.user()?.displayName }}.</p>
+        <form class="operator-lock__form" (submit)="$event.preventDefault(); unlock()">
+          <label class="sr-only" for="operator-credential">Carné de operador</label>
+          <input id="operator-credential" class="text-field" type="password" name="operatorCredential" autocomplete="off" placeholder="Esperando código de barras…" [(ngModel)]="operatorCredential" [disabled]="unlocking()">
+          <button class="button button--primary" type="submit" [disabled]="unlocking() || !operatorCredential.trim()">{{ unlocking() ? 'Desbloqueando…' : 'Desbloquear' }}</button>
+        </form>
+        @if (unlockError()) { <p class="field-error" role="alert">{{ unlockError() }}</p> }
+      </section>
+      <aside class="panel panel--padded operator-lock__side">
+        <h3>Turno compartido</h3>
+        <div class="operator-lock__note"><strong>Sesión por una venta</strong><span>Al confirmar la venta, el punto de venta vuelve a bloquearse para el siguiente operador.</span></div>
+      </aside>
+    </div>
   } @else if (!checkoutMode()) {
     <div class="pos-grid">
       <section class="panel pos-main">
