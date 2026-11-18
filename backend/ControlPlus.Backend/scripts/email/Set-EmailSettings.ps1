@@ -96,6 +96,36 @@ function Show-EmailSettingsWindow([string]$Account, [string]$TestTo) {
     finally { $passwordBox.Text = ''; $form.Dispose() }
 }
 
+# Comprueba usuario y contraseña directamente con el servidor (EHLO, STARTTLS, AUTH LOGIN), sin enviar nada.
+# Devuelve la respuesta del servidor a la contraseña: «235 …» si la aceptó, «535 …» si la rechazó.
+# Sirve porque el envío de .NET solo dice «Error al enviar correo» cuando Gmail rechaza las credenciales y cierra.
+function Test-SmtpLogin([string]$Server, [int]$Port, [string]$Account, [string]$Secret) {
+    $tcp = New-Object Net.Sockets.TcpClient
+    try {
+        if (-not $tcp.ConnectAsync($Server, $Port).Wait(10000)) { return 'SIN_CONEXION' }
+        $stream = $tcp.GetStream(); $stream.ReadTimeout = 15000; $stream.WriteTimeout = 15000
+        $reader = New-Object IO.StreamReader($stream); $writer = New-Object IO.StreamWriter($stream)
+        $writer.AutoFlush = $true; $writer.NewLine = "`r`n"
+        $readReply = { param($r) $lines = @(); do { $line = $r.ReadLine(); $lines += $line } while ($line -and $line.Length -gt 3 -and $line[3] -eq '-'); $lines -join ' ' }
+        [void](& $readReply $reader)
+        $writer.WriteLine('EHLO controlplus'); [void](& $readReply $reader)
+        $writer.WriteLine('STARTTLS'); $start = & $readReply $reader
+        if ($start -notmatch '^220') { return "SIN_STARTTLS $start" }
+        $ssl = New-Object Net.Security.SslStream($stream, $false)
+        $ssl.AuthenticateAsClient($Server, $null, [Security.Authentication.SslProtocols]::Tls12, $true)
+        $sr = New-Object IO.StreamReader($ssl); $sw = New-Object IO.StreamWriter($ssl); $sw.AutoFlush = $true; $sw.NewLine = "`r`n"
+        $sw.WriteLine('EHLO controlplus'); [void](& $readReply $sr)
+        $sw.WriteLine('AUTH LOGIN'); [void](& $readReply $sr)
+        $sw.WriteLine([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Account))); [void](& $readReply $sr)
+        $sw.WriteLine([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Secret)))
+        $answer = & $readReply $sr
+        try { $sw.WriteLine('QUIT') } catch { }
+        return $answer
+    }
+    catch { return "ERROR $($_.Exception.Message)" }
+    finally { $tcp.Dispose() }
+}
+
 $password = $null
 try {
     if ($NoWindow) {
@@ -115,7 +145,20 @@ try {
     # Las contraseñas de aplicación de Google se muestran con espacios; se guardan sin ellos.
     if ($SmtpHost -ieq 'smtp.gmail.com') { $password = $password -replace '\s', '' }
 
+    Write-Host "Comprobando la cuenta con $($SmtpHost)..."
+    $login = Test-SmtpLogin -Server $SmtpHost -Port $SmtpPort -Account $UserName -Secret $password
+    if ($login -match '^235') { Write-Host 'Gmail aceptó la cuenta y la contraseña de aplicación.' }
+    elseif ($login -match '^535|^534') {
+        throw ("El servidor de correo rechazó el usuario o la contraseña de aplicación ($($login.Substring(0, [Math]::Min(60, $login.Length)))…). " +
+            'Revise: 1) que la verificación en dos pasos de la cuenta esté activa; 2) que la contraseña de aplicación sea la vigente ' +
+            '(créela de nuevo en https://myaccount.google.com/apppasswords si la eliminó) y esté bien copiada. No se guardó nada.')
+    }
+    elseif ($login -eq 'SIN_CONEXION') { throw "El equipo no llega a $($SmtpHost):$($SmtpPort): revise Internet, el firewall o el antivirus. No se guardó nada." }
+    else { Write-Host "No se pudo comprobar la cuenta por adelantado ($login); se intentará el envío de prueba." -ForegroundColor Yellow }
+
     if ($SendTestTo) {
+        # PowerShell 5.1 (.NET Framework) puede no usar TLS 1.2 por defecto y Gmail lo exige.
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
         $client = New-Object System.Net.Mail.SmtpClient($SmtpHost, $SmtpPort)
         $client.EnableSsl = $true
         $client.Credentials = New-Object System.Net.NetworkCredential($UserName, $password)
@@ -128,8 +171,27 @@ try {
         $mail.SubjectEncoding = [Text.Encoding]::UTF8; $mail.BodyEncoding = [Text.Encoding]::UTF8
         try { $client.Send($mail); Write-Host "Correo de prueba enviado a $SendTestTo." }
         catch {
-            $reason = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $_.Exception.Message }
-            throw "No se pudo enviar el correo de prueba: $reason No se guardó nada."
+            # Toda la cadena de errores: el mensaje útil suele estar en el error más interno.
+            $details = @(); $current = $_.Exception
+            while ($current) {
+                $line = $current.Message
+                if ($current -is [Net.Mail.SmtpException]) { $line += " (código SMTP: $($current.StatusCode))" }
+                $details += $line; $current = $current.InnerException
+            }
+            Write-Host 'Detalle del error:' -ForegroundColor Yellow
+            $details | Select-Object -Unique | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+            $port = $null
+            try {
+                $tcp = New-Object Net.Sockets.TcpClient
+                $port = $tcp.ConnectAsync($SmtpHost, $SmtpPort).Wait(5000) -and $tcp.Connected
+                $tcp.Dispose()
+            } catch { $port = $false }
+            if ($port) { Write-Host "  - El equipo sí llega a $($SmtpHost):$($SmtpPort) (no es un bloqueo de red)." -ForegroundColor Yellow }
+            else { Write-Host "  - El equipo NO llega a $($SmtpHost):$($SmtpPort): revise Internet, el firewall o el antivirus." -ForegroundColor Yellow }
+            $hint = if (($details -join ' ') -match '5\.7\.|Authentication|autentic|Username and Password') {
+                ' Gmail rechazó el usuario o la contraseña de aplicación: revise que sea una contraseña de aplicación vigente de esa cuenta.'
+            } else { '' }
+            throw "No se pudo enviar el correo de prueba.$hint No se guardó nada."
         }
         finally { $mail.Dispose(); $client.Dispose() }
     }
