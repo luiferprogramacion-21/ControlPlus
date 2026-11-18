@@ -151,11 +151,21 @@ public sealed partial class SalesApiFlowTests
         public bool Fail { get; set; }
 
         public System.Collections.Concurrent.ConcurrentBag<string> Submissions { get; } = [];
+        public System.Collections.Concurrent.ConcurrentBag<(string Queue, int Labels)> LabelSubmissions { get; } = [];
 
         public Task SubmitAsync(string queueName, byte[] utf8Text, string documentName,
             CancellationToken cancellationToken = default)
         {
             Submissions.Add(queueName);
+            if (Fail) throw new PrintSubmissionException(false, new InvalidOperationException("Falla simulada de cola"));
+            return Task.CompletedTask;
+        }
+
+        public Task SubmitProductLabelsAsync(string queueName, ProductLabelPrintPayload payload,
+            ProductLabelPrintLayout layout, string documentName,
+            CancellationToken cancellationToken = default)
+        {
+            LabelSubmissions.Add((queueName, payload.Items.Sum(item => item.Quantity)));
             if (Fail) throw new PrintSubmissionException(false, new InvalidOperationException("Falla simulada de cola"));
             return Task.CompletedTask;
         }

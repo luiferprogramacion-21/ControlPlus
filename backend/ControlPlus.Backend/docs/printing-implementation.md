@@ -1,6 +1,8 @@
-# Impresión local de comprobantes
+# Impresión local de comprobantes y etiquetas
 
 **Estado (6 de noviembre de 2026): integración de perfil, consulta de estado y ruta de reintento preparada; la prueba física sigue pendiente.** No se ha enviado ningún trabajo físico desde este entorno.
+
+**Actualización del 18 de noviembre de 2026:** la maqueta 12c quedó implementada con perfiles `ETIQUETAS`/`HIBRIDA`, selección y cantidades por producto, vista previa Code 128 y lote idempotente en la misma cola local. La prueba física de etiquetas también sigue pendiente.
 
 ## Base existente
 
@@ -16,6 +18,14 @@
 4. `EndDoc` exitoso deja el trabajo `IMPRESO` con `queueAcceptedAtUtc`. Un rechazo conocido deja `FALLIDO`, con error sanitizado; `POST /api/printing/jobs/{jobId}/retry` permite reintento explícito solo de `FALLIDO`. `GET /api/printing/jobs?page=1&pageSize=20` devuelve una página de trabajos de la terminal y requiere `CONFIGURATION.MANAGE`. La venta, pagos, Caja e inventario no cambian por un fallo de impresión.
 5. `POST /api/sales/{saleId}/reprint-requests` mantiene la respuesta idempotente `SOLICITADA` y prepara un trabajo `REIMPRESION` aparte cuando hay perfil. Si no existe perfil, repetir la misma solicitud con la misma clave después de configurarlo puede preparar el trabajo. `GET /api/sales/{saleId}/print-jobs?page=1&pageSize=20` devuelve una página de copias y estados con el mismo alcance de lectura que el comprobante. La reimpresión usa el snapshot histórico; no recalcula importes.
 6. Si el envío pudo llegar a Windows pero no se confirmó, queda `IMPRIMIENDO` con aviso de resultado incierto. El procesador nunca reclama ese estado automáticamente; requiere revisión del operador antes de solicitar otra copia.
+
+## Etiquetas de producto (maqueta 12c)
+
+- `GET /api/product-labels/profiles`, `GET /api/product-labels/products` y `POST /api/product-labels/jobs` requieren `PRODUCTS.LABELS_MANAGE`. El listado de productos conserva ceros y permite búsqueda por referencia, barras, alias o nombre.
+- Un perfil de tipo `ETIQUETAS` crea la plantilla oficial «Etiqueta mostrador»; `HIBRIDA` crea esa plantilla y la de recibos. Ancho, alto y DPI son opcionales: si no se indican, manda el tamaño configurado en el controlador de Windows.
+- Cada solicitud guarda un `documento_emitido` `ETIQUETA_PRODUCTO` y un solo `trabajo_impresion` con snapshot/hash, perfil y contenido renderizable. `Idempotency-Key` devuelve el mismo lote aunque después cambie el nombre o precio del producto; reutilizarla con otras líneas responde 409.
+- El adaptador GDI imprime una página del controlador por etiqueta: nombre, precio minorista, Code 128 y valor legible. La pantalla admite hasta 100 productos distintos y 500 etiquetas por lote.
+- Como en los comprobantes, `IMPRESO` significa únicamente que Windows aceptó el trabajo. La impresión física, el tamaño real y la lectura con escáner deben verificarse con el equipo de la tienda.
 
 `GET /api/printing/status` exige JWT y `SALES.CREATE` efectivo. Devuelve `{ "hasActiveProfile": true, "profileName": "Recibos caja", "columns": 32 }` para la terminal activa; sin perfil utilizable devuelve `false` y ambos campos nulos. Nunca expone `systemQueueName`. `GET /api/sales/{saleId}/print-jobs` conserva el alcance de `/receipt` (`SALES.ALL_READ` o `SALES.OWN_READ` para venta propia). Sus trabajos incluyen tipo `ORIGINAL`/`REIMPRESION`, estado público `PENDIENTE`/`IMPRIMIENDO`/`IMPRESO`/`ERROR`, intentos y error sanitizado. `POST /api/sales/{saleId}/print-jobs/{jobId}/retry` exige además `SALES.REPRINT`: solo cambia `ERROR` a `PENDIENTE`, audita el cambio y repetirlo sobre pendiente/aceptado no crea otra copia. `IMPRIMIENDO` requiere revisión manual.
 

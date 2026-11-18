@@ -6,10 +6,12 @@ namespace ControlPlus.Application.Printing;
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CreatePrintProfileRequest(string Name, string SystemQueueName,
-    int Columns, bool MakeDefault = true);
+    int Columns, bool MakeDefault = true, string PrinterType = "RECIBOS",
+    decimal? LabelWidthMm = null, decimal? LabelHeightMm = null, int? ResolutionDpi = null);
 
 public sealed record PrintProfileDto(Guid Id, string Name, string SystemQueueName,
-    int Columns, bool IsDefault, bool Active, long Version);
+    int Columns, bool IsDefault, bool Active, long Version, string PrinterType,
+    decimal? LabelWidthMm, decimal? LabelHeightMm, int? ResolutionDpi);
 
 public sealed record PrintStatusDto(bool HasActiveProfile, string? ProfileName, int? Columns);
 

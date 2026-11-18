@@ -5,6 +5,9 @@ public interface IPrintSpooler
 {
     Task SubmitAsync(string queueName, byte[] utf8Text, string documentName,
         CancellationToken cancellationToken = default);
+    Task SubmitProductLabelsAsync(string queueName, ProductLabelPrintPayload payload,
+        ProductLabelPrintLayout layout, string documentName,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class PrintSubmissionException(bool mayHaveBeenAccepted, Exception innerException)

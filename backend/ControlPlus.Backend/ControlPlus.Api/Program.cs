@@ -163,6 +163,7 @@ builder.Services.AddScoped<IAuthorizerCredentialResolver, AuthorizerCredentialRe
 builder.Services.AddScoped<ISalesService, SalesService>();
 builder.Services.AddScoped<ISaleDraftService, SaleDraftService>();
 builder.Services.AddScoped<IReceiptPrintingService, ReceiptPrintingService>();
+builder.Services.AddScoped<IProductLabelPrintingService, ProductLabelPrintingService>();
 builder.Services.AddSingleton<IPrintSpooler, WindowsGdiPrintSpooler>();
 builder.Services.AddHostedService<PrintQueueWorker>();
 // Respaldos de Fase 4: apagados salvo Backup:Enabled=true y ConnectionStrings:ControlPlusBackup configurados.
