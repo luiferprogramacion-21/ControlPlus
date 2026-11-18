@@ -26,6 +26,7 @@ En turno compartido, si el usuario no tiene una sesión de operador activa, el p
 - **Quién desbloquea:** cada operador entra con **su usuario** y escanea **su carné** (Code 128, emitido en Administración → credencial de operador). La API exige que el carné sea del usuario que inició sesión.
 - **Lector:** escribe el código y pulsa Enter, lo que desbloquea el punto de venta. El campo está oculto como una contraseña.
 - **Cada venta confirmada consume la sesión:** el punto de venta vuelve a bloquearse para el siguiente operador. El carrito en curso no se pierde.
+- **También el Administrador y el Supervisor:** en turno compartido desbloquean con su carné como cualquier operador. Corrección del 18 de noviembre de 2026: antes la pantalla no les mostraba el bloqueo y la venta fallaba al cobrar.
 - **Carné inválido, ajeno o vencido:** la pantalla lo explica y **no cierra la sesión del usuario**. Antes, ese 401 cerraba la sesión, también en Caja; ahora la solicitud va marcada como intento de credencial.
 
 Diferencias con la maqueta 06b:

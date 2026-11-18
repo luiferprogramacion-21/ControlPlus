@@ -102,16 +102,22 @@ public sealed class CashService(
             (authorization.PermissionCodes.Contains(PermissionCodes.CashShiftManage) ||
              authorization.PermissionCodes.Contains(PermissionCodes.CashMovementsManage) ||
              authorization.PermissionCodes.Contains(PermissionCodes.CashShiftModeManage));
-        if (canManage || (shift?.ModoOperacion == CashConstants.IndividualMode && shift.UsuarioResponsableId == actor.UserId))
-            return Result.Success(MapState(cash, shift, establishment));
-
+        // En turno compartido todos, también quien administra la caja, venden con su sesión de operador:
+        // RequiresOperatorSession indica que el turno la exige; OwnOperatorSession, si ya está activa.
         var shared = shift?.ModoOperacion == CashConstants.SharedMode;
         var ownSession = shared
             ? (await repository.ListActiveOperatorSessionsAsync(shift!.Id, cancellationToken))
                 .FirstOrDefault(session => session.UsuarioId == actor.UserId)
             : null;
+        if (canManage || (shift?.ModoOperacion == CashConstants.IndividualMode && shift.UsuarioResponsableId == actor.UserId))
+            return Result.Success(MapState(cash, shift, establishment) with
+            {
+                RequiresOperatorSession = shared,
+                OwnOperatorSession = ownSession is null ? null : Map(ownSession),
+            });
+
         return Result.Success(new CashStateDto(null, null, null, null, false, null,
-            cash is not null, shift is not null, shared && ownSession is null,
+            cash is not null, shift is not null, shared,
             ownSession is null ? null : Map(ownSession)));
     }
 

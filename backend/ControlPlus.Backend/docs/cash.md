@@ -16,6 +16,8 @@ Ingresos, gastos y sangrías requieren `CASH.MOVEMENTS_MANAGE`, un concepto y un
 
 `CASH.OWN_READ` por sí solo no permite conocer un turno individual ajeno, aunque el rol base sea Supervisor o Administrador. `/state` devuelve únicamente `isConfigured`, `hasOpenShift`, `requiresOperatorSession` y, en modalidad compartida, `ownOperatorSession` del usuario autenticado. Los campos de configuración y `currentShift` quedan nulos. El responsable individual conserva acceso a su turno propio. El estado completo requiere al menos uno de los permisos efectivos `CASH.SHIFT_MANAGE`, `CASH.MOVEMENTS_MANAGE` o `CASH.SHIFT_MODE_MANAGE`. Los identificadores de consulta enviados por el cliente no determinan la pertenencia.
 
+Desde el 18 de noviembre de 2026, `requiresOperatorSession` es verdadero siempre que el turno abierto sea compartido, también cuando la sesión propia ya está activa y también para quien administra la caja. `ownOperatorSession` indica si esa sesión existe. Antes, quien administraba la caja recibía siempre `false`: no veía el bloqueo con carné y la venta fallaba en el servidor.
+
 ## Credenciales de operador compartido
 
 Las credenciales rápidas son tokens aleatorios para etiqueta Code128. La API entrega el token únicamente al emitirlo, con encabezados `Cache-Control: no-store` y `Pragma: no-cache`; PostgreSQL conserva solo el hash y un fragmento visible. Reemitir una credencial revoca la anterior. El token no se escribe en auditoría ni logs.

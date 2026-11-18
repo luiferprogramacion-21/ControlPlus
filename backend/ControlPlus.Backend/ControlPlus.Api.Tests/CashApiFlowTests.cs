@@ -351,6 +351,7 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         var state = await ReadSuccessAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
         Assert.Equal(CashConstants.IndividualMode, state.DefaultShiftMode);
         Assert.True(state.RequiresOperatorSession);
+        Assert.Null(state.OwnOperatorSession);
     }
 
     [Fact]

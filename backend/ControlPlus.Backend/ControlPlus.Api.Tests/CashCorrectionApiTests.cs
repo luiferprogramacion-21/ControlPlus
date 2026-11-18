@@ -223,7 +223,8 @@ public sealed partial class CashApiFlowTests
             Assert.Null(state.CurrentShift);
             Assert.Equal(sessions.OwnId, state.OwnOperatorSession!.Id);
             Assert.Equal(scenario.Users.Cashier.Id, state.OwnOperatorSession.UserId);
-            Assert.False(state.RequiresOperatorSession);
+            // El turno compartido exige sesión de operador aunque ya esté activa.
+            Assert.True(state.RequiresOperatorSession);
         }
         using var administrator = AuthenticatedClient(scenario.Administrator.AccessToken);
         var permission = await GetPermissionIdAsync(administrator, PermissionCodes.CashMovementsManage);
