@@ -1,0 +1,53 @@
+<section class="module-page labels-page">
+  <div class="module-heading">
+    <div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="catalog" /></span><div><h2>Etiquetas de productos</h2><p>Catálogo / Productos / Imprimir etiquetas</p></div></div>
+    <a class="button button--secondary" routerLink="/operacion/catalogo">Volver al catálogo</a>
+  </div>
+
+  @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
+  @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
+
+  <section class="panel labels-shell" aria-labelledby="labels-title">
+    <h3 id="labels-title">Imprimir etiquetas</h3>
+    <div class="labels-layout">
+      <section class="labels-selection" aria-labelledby="selected-products-title">
+        <div class="labels-section-heading"><h3 id="selected-products-title">Productos seleccionados</h3><p>Ajusta la cantidad de etiquetas antes de imprimir.</p></div>
+        <form (submit)="$event.preventDefault(); find()">
+          <label class="field-label" for="label-product-search">Buscar o escanear producto</label>
+          <div class="label-search-row"><input #productSearch id="label-product-search" class="text-field" name="search" [(ngModel)]="search" placeholder="Código, nombre o código de barras" autocomplete="off" autofocus><button class="button button--secondary" type="submit" [disabled]="loading()">{{ loading() ? 'Buscando…' : 'Agregar' }}</button></div>
+        </form>
+        @if (results().length) {
+          <div class="label-results" role="listbox" aria-label="Productos encontrados">
+            @for (product of results(); track product.id) {
+              <button type="button" role="option" [disabled]="!product.barcode" (click)="add(product)"><span><strong>{{ product.name }}</strong><small>{{ product.internalCode }} · {{ product.barcode || 'Sin código de barras' }}</small></span><b>{{ product.retailPrice | currency:'COP':'symbol':'1.0-0' }}</b></button>
+            }
+          </div>
+        }
+        <div class="labels-table-wrap"><table><thead><tr><th>Producto</th><th>Código</th><th class="align-right">Etiquetas</th><th class="align-right">Acción</th></tr></thead><tbody>
+          @for (item of selected(); track item.product.id) {
+            <tr><td><strong>{{ item.product.name }}</strong></td><td class="numeric">{{ item.product.barcode }}</td><td class="align-right"><input class="label-quantity" type="number" min="1" max="500" step="1" [ngModel]="item.quantity" (ngModelChange)="changeQuantity(item.product.id, $event)" [attr.aria-label]="'Etiquetas de ' + item.product.name"></td><td class="align-right"><button class="table-action" type="button" (click)="remove(item.product.id)">Quitar</button></td></tr>
+          } @empty { <tr class="empty-row"><td colspan="4"><strong>Sin productos</strong><small>Busca o escanea el primer producto para preparar el lote.</small></td></tr> }
+        </tbody></table></div>
+        <div class="labels-selection-footer"><strong>{{ totalLabels() }} etiqueta{{ totalLabels() === 1 ? '' : 's' }} en total</strong><button class="button button--secondary" type="button" (click)="showProducts()">Agregar otro producto</button></div>
+      </section>
+
+      <aside class="labels-preview" aria-labelledby="preview-title">
+        <div class="labels-section-heading"><h3 id="preview-title">Vista previa</h3><p>Perfil: {{ selectedProfile()?.labelTemplateName || 'Sin configurar' }}</p></div>
+        <label class="field-label" for="label-profile">Impresora</label>
+        <select id="label-profile" class="text-field" [ngModel]="selectedProfileId()" (ngModelChange)="chooseProfile($event)" [disabled]="loading() || !profiles().length">
+          @for (profile of profiles(); track profile.id) { <option [value]="profile.id">{{ profile.name }}</option> }
+          @empty { <option value="">Sin perfiles de etiquetas</option> }
+        </select>
+        @if (preview(); as product) {
+          <div class="product-label-preview" [style.aspect-ratio]="selectedProfile()?.widthMm && selectedProfile()?.heightMm ? selectedProfile()!.widthMm + ' / ' + selectedProfile()!.heightMm : '5 / 3'">
+            <span>{{ product.name }}</span><strong>{{ product.retailPrice | currency:'COP':'symbol':'1.0-0' }}</strong>
+            @if (previewBarcode()) { <div class="barcode" [innerHTML]="previewBarcode()"></div><small>{{ product.barcode }}</small> }
+          </div>
+        } @else { <div class="product-label-preview product-label-preview--empty">La primera etiqueta aparecerá aquí.</div> }
+        <p class="active-profile"><strong>Perfil activo:</strong> {{ selectedProfile()?.labelTemplateName || 'Ninguno' }}</p>
+        @if (!profiles().length && !loading()) { <p class="profile-help">El Administrador debe crear en Configuración un perfil de tipo Etiquetas o Híbrida.</p> }
+        <button class="button button--primary print-labels" type="button" (click)="print()" [disabled]="printing() || !selected().length || !selectedProfileId()">{{ printing() ? 'Enviando…' : 'Imprimir ' + totalLabels() + ' etiqueta' + (totalLabels() === 1 ? '' : 's') }}</button>
+      </aside>
+    </div>
+  </section>
+</section>

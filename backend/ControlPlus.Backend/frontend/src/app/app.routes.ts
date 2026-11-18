@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { catalogGuard, cashGuard, salesGuard, salesHistoryGuard, inventoryGuard, customersGuard, creditsGuard, suppliersGuard, purchasesGuard, purchaseReceiptsGuard, reportsGuard, dashboardGuard, adminGuard, supportGuard, configGuard, layawaysGuard, sessionGuard } from './core/guards';
+import { catalogGuard, cashGuard, salesGuard, salesHistoryGuard, inventoryGuard, customersGuard, creditsGuard, suppliersGuard, purchasesGuard, purchaseReceiptsGuard, reportsGuard, dashboardGuard, adminGuard, supportGuard, configGuard, layawaysGuard, productLabelsGuard, sessionGuard } from './core/guards';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'operacion/catalogo' },
@@ -11,6 +11,7 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'catalogo' },
       { path: 'dashboard', canActivate: [dashboardGuard], loadComponent: () => import('./features/dashboard/dashboard').then(m => m.Dashboard), title: 'Dashboard | ControlPlus' },
+      { path: 'catalogo/etiquetas', canActivate: [productLabelsGuard], loadComponent: () => import('./features/catalog/product-labels').then(m => m.ProductLabels), title: 'Etiquetas de productos | ControlPlus' },
       { path: 'catalogo', canActivate: [catalogGuard], loadComponent: () => import('./features/catalog/catalog').then(m => m.Catalog), title: 'Catálogo | ControlPlus' },
       { path: 'caja', canActivate: [cashGuard], loadComponent: () => import('./features/cash/cash').then(m => m.Cash), title: 'Caja | ControlPlus' },
       { path: 'inventario', canActivate: [inventoryGuard], loadComponent: () => import('./features/inventory/inventory').then(m => m.Inventory), title: 'Inventario | ControlPlus' },

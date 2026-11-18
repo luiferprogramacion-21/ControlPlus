@@ -38,8 +38,9 @@ describe('SalesApi: impresión', () => {
     expect((await task).status).toBe('SOLICITADA');
   });
   it('crea perfiles, reintenta trabajos y lista la cola', async () => {
-    const create = api.createPrintProfile({ name: 'Recibos', systemQueueName: 'COLA', columns: 32 });
-    const post = http.expectOne('/api/printing/profiles'); expect(post.request.method).toBe('POST'); expect(post.request.body).toEqual({ name: 'Recibos', systemQueueName: 'COLA', columns: 32 });
+    const createInput = { name: 'Recibos', systemQueueName: 'COLA', columns: 32, printerType: 'RECIBOS' as const, labelWidthMm: null, labelHeightMm: null, resolutionDpi: null };
+    const create = api.createPrintProfile(createInput);
+    const post = http.expectOne('/api/printing/profiles'); expect(post.request.method).toBe('POST'); expect(post.request.body).toEqual(createInput);
     post.flush({ id: 'p', name: 'Recibos', systemQueueName: 'COLA', columns: 32, isDefault: true, active: true, version: 1 }); await create;
     const retry = api.retryPrintJob('s1', 'j1'); http.expectOne('/api/sales/s1/print-jobs/j1/retry').flush({ id: 'j1' }); await retry;
     const queue = api.printQueue(); http.expectOne(r => r.url === '/api/printing/jobs').flush({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 }); await queue;

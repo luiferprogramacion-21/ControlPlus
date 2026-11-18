@@ -2,6 +2,7 @@
   <header class="catalog__header">
     <div><h2>Catálogo</h2></div>
     <div class="tabs">
+      @if (session.has('PRODUCTS.LABELS_MANAGE')) { <a mat-stroked-button routerLink="/operacion/catalogo/etiquetas">Imprimir etiquetas</a> }
       @if (session.has('PRODUCTS.READ')) { <button mat-button type="button" [class.active]="tab() === 'products'" (click)="switchTab('products')">Productos</button> }
       @if (session.has('CATEGORIES.READ')) { <button mat-button type="button" [class.active]="tab() === 'categories'" (click)="switchTab('categories')">Categorías</button> }
     </div>

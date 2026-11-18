@@ -29,7 +29,7 @@ de permisos (src/app/app.routes.ts, src/app/core/guards.ts):
 ## Todavía sin pantalla
 
 Consulta de auditoría (la API /api/audit-records existe), respaldos y
-restauración, etiquetas de producto, alertas de reposición y los bloques
+restauración, alertas de reposición y los bloques
 pendientes del dashboard. Dependen de contratos de backend o de aprobación del
 diseño.
 

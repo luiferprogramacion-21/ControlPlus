@@ -15,14 +15,19 @@ describe('PrintSettings', () => {
     api.createPrintProfile.mockResolvedValue({}); api.retryAdminPrintJob.mockResolvedValue({});
     TestBed.configureTestingModule({ providers: [{ provide: SalesApi, useValue: api }, { provide: SessionService, useValue: { has: (c: string) => permissions.includes(c) } }] });
   });
+  const base = { printerType: 'RECIBOS' as const, labelWidthMm: null, labelHeightMm: null, resolutionDpi: null };
   it('carga perfiles y cola', async () => { await create(); expect(api.printProfiles).toHaveBeenCalled(); expect(api.printQueue).toHaveBeenCalledWith(1, 20); });
   it.each([[{ name: '', systemQueueName: 'Q', columns: 32 }], [{ name: 'N', systemQueueName: '', columns: 32 }], [{ name: 'N', systemQueueName: 'Q', columns: 23 }], [{ name: 'N', systemQueueName: 'Q', columns: 81 }], [{ name: 'N', systemQueueName: 'Q', columns: 30.5 }]])('rechaza datos inválidos %j', async form => {
-    const c = await create(); c.form = { ...form, makeDefault: true }; await c.save(); expect(api.createPrintProfile).not.toHaveBeenCalled(); expect(c.formError()).not.toBe('');
+    const c = await create(); c.form = { ...base, ...form, makeDefault: true }; await c.save(); expect(api.createPrintProfile).not.toHaveBeenCalled(); expect(c.formError()).not.toBe('');
   });
   it('crea el perfil con los límites del contrato y avisa que la cola no se verifica', async () => {
-    const c = await create(); c.form = { name: ' Recibos caja ', systemQueueName: ' COLA ', columns: 24, makeDefault: false }; await c.save();
-    expect(api.createPrintProfile).toHaveBeenCalledWith({ name: 'Recibos caja', systemQueueName: 'COLA', columns: 24, makeDefault: false });
+    const c = await create(); c.form = { ...base, name: ' Recibos caja ', systemQueueName: ' COLA ', columns: 24, makeDefault: false }; await c.save();
+    expect(api.createPrintProfile).toHaveBeenCalledWith({ ...base, name: 'Recibos caja', systemQueueName: 'COLA', columns: 24, makeDefault: false });
     expect(c.notice()).toContain('No se comprobó');
+  });
+  it('crea un perfil híbrido con tamaño de etiqueta', async () => {
+    const c = await create(); c.form = { name: 'Híbrida', systemQueueName: 'COLA', columns: 32, makeDefault: true, printerType: 'HIBRIDA', labelWidthMm: 50, labelHeightMm: 30, resolutionDpi: 203 };
+    await c.save(); expect(api.createPrintProfile).toHaveBeenCalledWith(expect.objectContaining({ printerType: 'HIBRIDA', labelWidthMm: 50, labelHeightMm: 30, resolutionDpi: 203 }));
   });
   it('reintenta solo trabajos fallidos con permiso', async () => {
     const c = await create(); const job = { id: 'j', status: 'ERROR' } as never;

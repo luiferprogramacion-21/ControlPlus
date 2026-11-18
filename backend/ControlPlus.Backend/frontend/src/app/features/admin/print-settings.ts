@@ -22,7 +22,10 @@ export class PrintSettings implements OnInit {
   readonly error = signal('');
   readonly formError = signal('');
   readonly notice = signal('');
-  form = { name: '', systemQueueName: '', columns: 32, makeDefault: true };
+  form: { name: string; systemQueueName: string; columns: number; makeDefault: boolean; printerType: 'RECIBOS' | 'ETIQUETAS' | 'HIBRIDA'; labelWidthMm: number | null; labelHeightMm: number | null; resolutionDpi: number | null } = {
+    name: '', systemQueueName: '', columns: 32, makeDefault: true,
+    printerType: 'RECIBOS', labelWidthMm: null, labelHeightMm: null, resolutionDpi: null,
+  };
 
   ngOnInit(): void { void this.reload(); }
   jobText(job: PrintJob): string { return printJobStatusText(job); }
@@ -38,13 +41,20 @@ export class PrintSettings implements OnInit {
     finally { this.loading.set(false); }
   }
 
-  startCreate(): void { this.form = { name: '', systemQueueName: '', columns: 32, makeDefault: true }; this.formError.set(''); this.creating.set(true); }
+  startCreate(): void {
+    this.form = { name: '', systemQueueName: '', columns: 32, makeDefault: true, printerType: 'RECIBOS', labelWidthMm: null, labelHeightMm: null, resolutionDpi: null };
+    this.formError.set(''); this.creating.set(true);
+  }
 
   validation(): string {
     const name = this.form.name.trim(), queue = this.form.systemQueueName.trim();
     if (!name || name.length > 150) return 'El nombre es obligatorio y admite hasta 150 caracteres.';
     if (!queue || queue.length > 300) return 'El nombre de la cola de Windows es obligatorio y admite hasta 300 caracteres.';
-    if (!Number.isInteger(this.form.columns) || this.form.columns < 24 || this.form.columns > 80) return 'Las columnas deben ser un entero entre 24 y 80.';
+    if (this.form.printerType !== 'ETIQUETAS' && (!Number.isInteger(this.form.columns) || this.form.columns < 24 || this.form.columns > 80)) return 'Las columnas deben ser un entero entre 24 y 80.';
+    const dimensions = [this.form.labelWidthMm, this.form.labelHeightMm];
+    if ((dimensions[0] == null) !== (dimensions[1] == null)) return 'Indica juntos el ancho y el alto de la etiqueta.';
+    if (dimensions.some(value => value != null && (!Number.isFinite(value) || value <= 0 || value > 500))) return 'Las dimensiones deben estar entre 0 y 500 mm.';
+    if (this.form.resolutionDpi != null && (!Number.isInteger(this.form.resolutionDpi) || this.form.resolutionDpi <= 0 || this.form.resolutionDpi > 2400)) return 'La resolución debe ser un entero entre 1 y 2400 DPI.';
     return '';
   }
 
@@ -53,7 +63,13 @@ export class PrintSettings implements OnInit {
     const issue = this.validation(); if (issue) { this.formError.set(issue); return; }
     this.saving.set(true); this.formError.set('');
     try {
-      await this.api.createPrintProfile({ name: this.form.name.trim(), systemQueueName: this.form.systemQueueName.trim(), columns: this.form.columns, makeDefault: this.form.makeDefault });
+      await this.api.createPrintProfile({
+        name: this.form.name.trim(), systemQueueName: this.form.systemQueueName.trim(), columns: this.form.columns,
+        makeDefault: this.form.makeDefault, printerType: this.form.printerType,
+        labelWidthMm: this.form.printerType === 'RECIBOS' ? null : this.form.labelWidthMm,
+        labelHeightMm: this.form.printerType === 'RECIBOS' ? null : this.form.labelHeightMm,
+        resolutionDpi: this.form.resolutionDpi,
+      });
       this.creating.set(false);
       this.notice.set('Perfil creado. No se comprobó que la cola exista en Windows; verifica el nombre antes de imprimir.');
       await this.reload();

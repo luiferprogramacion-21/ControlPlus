@@ -51,9 +51,15 @@ export interface ConfirmChangeInput {
 }
 export interface ConfirmedChange { id: string; saleId: string; visibleNumber: string; totalReturned: number; totalDelivered: number; difference: number; treatment: string; creditAdjustment: number; paidOrRefunded: number; }
 
-export interface PrintProfile { id: string; name: string; systemQueueName: string; columns: number; isDefault: boolean; active: boolean; version: number; }
+export interface PrintProfile {
+  id: string; name: string; systemQueueName: string; columns: number; isDefault: boolean; active: boolean; version: number;
+  printerType: 'RECIBOS' | 'ETIQUETAS' | 'HIBRIDA'; labelWidthMm: number | null; labelHeightMm: number | null; resolutionDpi: number | null;
+}
 export interface PrintStatus { hasActiveProfile: boolean; profileName: string | null; columns: number | null; }
-export interface CreatePrintProfileInput { name: string; systemQueueName: string; columns: number; makeDefault?: boolean; }
+export interface CreatePrintProfileInput {
+  name: string; systemQueueName: string; columns: number; makeDefault?: boolean;
+  printerType: 'RECIBOS' | 'ETIQUETAS' | 'HIBRIDA'; labelWidthMm: number | null; labelHeightMm: number | null; resolutionDpi: number | null;
+}
 export type PrintJobStatus = 'PENDIENTE' | 'IMPRIMIENDO' | 'IMPRESO' | 'ERROR';
 export interface PrintJob { id: string; saleId: string; copyType: 'ORIGINAL' | 'REIMPRESION'; copyNumber: number; status: PrintJobStatus; attempts: number; requestedAtUtc: string; queueAcceptedAtUtc: string | null; error: string | null; }
 export interface SaleReprintRequest { requestId: string; saleId: string; requestedAtUtc: string; status: string; }

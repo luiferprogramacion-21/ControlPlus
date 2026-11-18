@@ -1,13 +1,13 @@
 @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="reload()">Actualizar</button></div> }
 @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
 <section class="panel module-panel">
-  <div class="module-toolbar"><div><h3>Perfiles de impresora</h3><p class="muted">Cada perfil apunta al nombre de una cola de Windows. No hay impresora predeterminada.</p></div><button class="button button--primary" type="button" (click)="startCreate()">Nuevo perfil</button></div>
+  <div class="module-toolbar"><div><h3>Perfiles de impresión</h3><p class="muted">Admite impresoras de recibos, etiquetas o equipos térmicos híbridos.</p></div><button class="button button--primary" type="button" (click)="startCreate()">Agregar perfil</button></div>
   @if (loading()) { <p class="muted" role="status">Cargando…</p> }
-  <div class="table-wrap module-table-wrap"><table><thead><tr><th>Nombre</th><th>Cola de Windows</th><th class="align-right">Columnas</th><th>Estado</th></tr></thead><tbody>
+  <div class="table-wrap module-table-wrap"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Cola de Windows</th><th>Configuración</th><th>Estado</th></tr></thead><tbody>
     @for (profile of profiles(); track profile.id) {
-      <tr><td><strong>{{ profile.name }}</strong></td><td>{{ profile.systemQueueName }}</td><td class="align-right numeric">{{ profile.columns }}</td>
+      <tr><td><strong>{{ profile.name }}</strong></td><td>{{ profile.printerType === 'HIBRIDA' ? 'Híbrida' : profile.printerType === 'ETIQUETAS' ? 'Etiquetas' : 'Recibos' }}</td><td>{{ profile.systemQueueName }}</td><td>{{ profile.columns ? profile.columns + ' columnas' : '' }}{{ profile.labelWidthMm && profile.labelHeightMm ? (profile.columns ? ' · ' : '') + profile.labelWidthMm + ' × ' + profile.labelHeightMm + ' mm' : '' }}{{ profile.resolutionDpi ? ' · ' + profile.resolutionDpi + ' DPI' : '' }}</td>
         <td><span class="status-pill" [class.status-pill--warning]="!profile.active">{{ profile.active ? 'Activo' : 'Inactivo' }}</span>@if (profile.isDefault) { <span class="status-pill"> Predeterminado</span> }</td></tr>
-    } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="4">No hay perfiles. Sin un perfil no se generan trabajos de impresión.</td></tr> } }
+    } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="5">No hay perfiles. Sin un perfil no se generan trabajos de impresión.</td></tr> } }
   </tbody></table></div>
 </section>
 <section class="panel module-panel">
@@ -28,9 +28,14 @@
       <div class="panel-heading"><h2 id="print-profile-title">Nuevo perfil de impresora</h2></div>
       <label class="field-label" for="pp-name">Nombre</label><input id="pp-name" class="text-field" name="name" maxlength="150" [(ngModel)]="form.name" autocomplete="off" autofocus>
       <label class="field-label field-label--spaced" for="pp-queue">Nombre exacto de la cola en Windows</label><input id="pp-queue" class="text-field" name="queue" maxlength="300" [(ngModel)]="form.systemQueueName" autocomplete="off">
-      <label class="field-label field-label--spaced" for="pp-columns">Columnas (24 a 80)</label><input id="pp-columns" class="text-field" type="number" min="24" max="80" step="1" name="columns" [(ngModel)]="form.columns">
+      <label class="field-label field-label--spaced" for="pp-type">Tipo</label><select id="pp-type" class="text-field" name="type" [(ngModel)]="form.printerType"><option value="RECIBOS">Recibos</option><option value="ETIQUETAS">Etiquetas</option><option value="HIBRIDA">Híbrida</option></select>
+      @if (form.printerType !== 'ETIQUETAS') { <label class="field-label field-label--spaced" for="pp-columns">Columnas del recibo (24 a 80)</label><input id="pp-columns" class="text-field" type="number" min="24" max="80" step="1" name="columns" [(ngModel)]="form.columns"> }
+      @if (form.printerType !== 'RECIBOS') {
+        <div class="form-grid form-grid--two"><div><label class="field-label field-label--spaced" for="pp-width">Ancho de etiqueta en mm (opcional)</label><input id="pp-width" class="text-field" type="number" min="0.01" max="500" step="0.01" name="width" [(ngModel)]="form.labelWidthMm"></div><div><label class="field-label field-label--spaced" for="pp-height">Alto de etiqueta en mm (opcional)</label><input id="pp-height" class="text-field" type="number" min="0.01" max="500" step="0.01" name="height" [(ngModel)]="form.labelHeightMm"></div></div>
+      }
+      <label class="field-label field-label--spaced" for="pp-dpi">Resolución DPI (opcional)</label><input id="pp-dpi" class="text-field" type="number" min="1" max="2400" step="1" name="dpi" [(ngModel)]="form.resolutionDpi">
       <label class="field-label field-label--spaced"><input type="checkbox" name="makeDefault" [(ngModel)]="form.makeDefault"> Usar como predeterminado</label>
-      <p class="form-hint">Crear el perfil no comprueba que la cola esté instalada.</p>
+      <p class="form-hint">Las dimensiones pueden quedar vacías para usar el tamaño configurado en el controlador. Crear el perfil no comprueba que la cola esté instalada.</p>
       @if (formError()) { <p class="field-error" role="alert">{{ formError() }}</p> }
       <div class="form-actions"><button class="button button--secondary" type="button" (click)="creating.set(false)" [disabled]="saving()">Cancelar</button><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button></div>
     </form>

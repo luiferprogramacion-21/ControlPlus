@@ -10,8 +10,9 @@ export const sessionGuard: CanActivateFn = async () => {
 
 export const catalogGuard: CanActivateFn = () => {
   const session = inject(SessionService);
-  return session.has('PRODUCTS.READ') || session.has('CATEGORIES.READ');
+  return session.has('PRODUCTS.READ') || session.has('CATEGORIES.READ') || session.has('PRODUCTS.LABELS_MANAGE');
 };
+export const productLabelsGuard: CanActivateFn = () => inject(SessionService).has('PRODUCTS.LABELS_MANAGE');
 export const cashGuard: CanActivateFn = () => inject(SessionService).has('CASH.OWN_READ');
 export const salesGuard: CanActivateFn = () => inject(SessionService).has('SALES.CREATE');
 export const salesHistoryGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('SALES.OWN_READ') || session.has('SALES.ALL_READ'); };

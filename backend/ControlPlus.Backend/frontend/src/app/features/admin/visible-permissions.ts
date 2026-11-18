@@ -3,7 +3,6 @@
  * They remain in the server catalogue and keep protecting any implemented endpoint.
  */
 export const HIDDEN_ADMIN_PERMISSION_CODES = new Set([
-  'PRODUCTS.LABELS_MANAGE',
   'INVENTORY.REPLENISHMENT_ALERTS_READ',
   'REPORTS.OPERATIONAL_READ',
   'CREDIT.FUTURE_BLOCK',
