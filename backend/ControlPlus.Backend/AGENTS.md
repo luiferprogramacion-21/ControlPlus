@@ -537,6 +537,17 @@ Aprobado por el usuario:
 - La recuperación necesita Internet solo en el momento de enviar el código. Sin conexión, el Administrador sigue restableciendo la contraseña.
 - **Puesta en marcha (18 de noviembre de 2026):** el operador configuró la cuenta con `scripts/email/Set-EmailSettings.ps1` (Gmail aceptó la cuenta, correo de prueba recibido, `EMAIL_SETTINGS_OK`) y reinstaló el servicio. Confirmó una recuperación real de punta a punta: código recibido, contraseña cambiada e ingreso con la nueva. Tareas M (descartada) y S (hecha) cerradas.
 
+### Decisión del 18 de noviembre de 2026: eliminar usuarios
+
+Aprobado por el usuario: **solo el Administrador** vigente (rol Administrador y `USERS.MANAGE`) puede eliminar un usuario, y **solo si no tiene historial**, como con los productos.
+
+- `DELETE /api/users/{id}` borra el usuario con sus datos propios: rol, permisos individuales, carné, tokens, inicios de sesión externos y claims.
+- Si cualquier otra tabla lo referencia (ventas, caja, autorizaciones, sus propios inicios de sesión en la auditoría…), responde 409 sin cambios y la pantalla indica inactivarlo, como hasta ahora.
+- No se puede eliminar a sí mismo.
+- El borrado queda en la auditoría (`UserDeleted`, con nombre y rol) en la misma transacción.
+
+Botón «Eliminar» en Administración → Usuarios.
+
 ### Reglas del reparto
 
 - Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:

@@ -192,6 +192,28 @@ public sealed class UserManagementService : IUserManagementService
         return Result.Success(SecurityMappings.ToDto(user));
     }
 
+    public async Task<Result> DeleteAsync(ActorContext actor, Guid userId, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        var roleError = RequireAdministrator(actor);
+        if (roleError is not null) return Result.Failure(roleError);
+        var authorizationError = await RequireUsersManageAsync(actor, cancellationToken);
+        if (authorizationError is not null) return Result.Failure(authorizationError);
+        if (actor.UserId == userId)
+            return Result.Failure(ApplicationError.Conflict("No puede eliminar su propio usuario."));
+
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
+        if (user is null) return Result.Failure(ApplicationError.NotFound("el usuario"));
+
+        // La auditoría del borrado se guarda en la misma transacción; si el usuario tiene historial no queda nada.
+        await AuditWriter.WriteAsync(_auditRepository, _clock, actor.UserId, AuditAction.UserDeleted, nameof(User), user.Id,
+            new { user.UserName, user.DisplayName, Role = user.UserRoles.FirstOrDefault()?.Role?.Code }, cancellationToken);
+        return await _userRepository.DeleteWithoutHistoryAsync(user.Id, cancellationToken)
+            ? Result.Success()
+            : Result.Failure(ApplicationError.Conflict(
+                "El usuario ya tiene historial (ventas, caja, autorizaciones o inicios de sesión) y no se puede eliminar. Inactívelo para que no pueda entrar."));
+    }
+
     public async Task<Result<UserDto>> ActivateAsync(
         ActorContext actor,
         Guid userId,

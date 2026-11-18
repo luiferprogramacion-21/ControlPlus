@@ -14,6 +14,48 @@ namespace ControlPlus.Infrastructure.Persistence.Repositories;
 
 public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : IUserRepository
 {
+    public async Task<bool> DeleteWithoutHistoryAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            // Datos propios del usuario; cualquier otra referencia (ventas, caja, auditoría…) hace fallar el borrado.
+            await dbContext.UsuarioRol.Where(x => x.UsuarioId == userId).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.UsuarioPermiso.Where(x => x.UsuarioId == userId).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.CredencialUsuario.Where(x => x.UsuarioId == userId).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.UsuarioToken.Where(x => x.UsuarioId == userId).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.UsuarioLogin.Where(x => x.UsuarioId == userId).ExecuteDeleteAsync(cancellationToken);
+            await dbContext.UsuarioClaim.Where(x => x.UsuarioId == userId).ExecuteDeleteAsync(cancellationToken);
+            var deleted = await dbContext.Usuario.Where(x => x.Id == userId).ExecuteDeleteAsync(cancellationToken);
+            if (deleted != 1) { await transaction.RollbackAsync(cancellationToken); DiscardPendingChanges(); return false; }
+            // El usuario rastreado ya no existe: se suelta para que SaveChanges guarde solo la auditoría.
+            foreach (var entry in dbContext.ChangeTracker.Entries().Where(x => x.Entity is User or UsuarioRol or UsuarioPermiso).ToArray())
+                entry.State = EntityState.Detached;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        }
+        catch (Exception exception) when (IsForeignKeyViolation(exception))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            DiscardPendingChanges();
+            return false;
+        }
+    }
+
+    private static bool IsForeignKeyViolation(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+            if (current is Npgsql.PostgresException { SqlState: "23503" }) return true;
+        return false;
+    }
+
+    private void DiscardPendingChanges()
+    {
+        foreach (var entry in dbContext.ChangeTracker.Entries().Where(x => x.State is EntityState.Added or EntityState.Modified or EntityState.Deleted).ToArray())
+            entry.State = entry.State == EntityState.Added ? EntityState.Detached : EntityState.Unchanged;
+    }
+
     private IQueryable<User> DetailedUsers => dbContext.Usuario
         .Include(user => user.UsuarioRolUsuario)
         .ThenInclude(userRole => userRole!.Rol)

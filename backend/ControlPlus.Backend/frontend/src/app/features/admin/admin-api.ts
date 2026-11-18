@@ -35,6 +35,8 @@ export class AdminApi {
   issueCredential(userId: string): Promise<IssuedCredential> { return firstValueFrom(this.http.post<IssuedCredential>(`/api/cash/operator-credentials/${userId}`, { expiresAtUtc: null })); }
   createUser(input: CreateUserInput): Promise<AdminUser> { return firstValueFrom(this.http.post<AdminUser>('/api/users', input)); }
   updateUser(id: string, displayName: string, email: string | null): Promise<AdminUser> { return firstValueFrom(this.http.put<AdminUser>(`/api/users/${id}`, { displayName, email })); }
+  /** Solo Administrador y solo usuarios sin historial; 409 si tiene historial (se inactiva en su lugar). */
+  deleteUser(id: string): Promise<unknown> { return firstValueFrom(this.http.delete(`/api/users/${id}`)); }
   setUserActive(user: AdminUser): Promise<AdminUser> {
     return firstValueFrom(this.http.put<AdminUser>(`/api/users/${user.id}/${user.isActive ? 'deactivate' : 'activate'}`, {}));
   }

@@ -157,6 +157,13 @@ export class Admin implements OnInit {
     if (!this.canManageUsers || this.saving() || !confirm(`${user.isActive ? 'Inactivar' : 'Activar'} a ${user.displayName}?`)) return;
     await this.run(() => this.api.setUserActive(user), 'Estado actualizado.');
   }
+  /** Decisión del 18 de noviembre de 2026: solo el Administrador, y solo usuarios que nunca operaron. */
+  get canDeleteUsers(): boolean { return this.canManageUsers && this.session.hasRole('ADMINISTRADOR'); }
+  async remove(user: AdminUser): Promise<void> {
+    if (!this.canDeleteUsers || this.saving() || this.isSelf(user) ||
+      !confirm(`¿Eliminar definitivamente a ${user.displayName}? Solo es posible si nunca ha trabajado en el sistema; si ya tiene historial, inactívelo.`)) return;
+    await this.run(() => this.api.deleteUser(user.id), 'Usuario eliminado.');
+  }
   async unlock(user: AdminUser): Promise<void> {
     if (!this.canManageUsers || this.saving() || !confirm(`Reactivar el acceso de ${user.displayName}?`)) return;
     await this.run(() => this.api.reactivateUser(user.id), 'Acceso reactivado.');

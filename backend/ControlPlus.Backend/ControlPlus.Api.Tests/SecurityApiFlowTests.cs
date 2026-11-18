@@ -1204,6 +1204,61 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         Assert.Equal(administrator.User.Id, (await LoginAsync(client, "initial.admin.test", "Initial-Changed-Password-2026!")).User.Id);
     }
 
+    [Fact]
+    public async Task UserDeletion_OnlyByAdministrator_OnlyWithoutHistory_AndAudited()
+    {
+        using var client = _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        var cashierRoleId = await GetRoleIdAsync(client, RoleCodes.Cashier);
+        var supervisorRoleId = await GetRoleIdAsync(client, RoleCodes.Supervisor);
+        async Task<UserDto> CreateAsync(string userName, Guid roleId) => (await (await client.PostAsJsonAsync("/api/users",
+            new CreateUserRequest(userName, "Usuario " + userName, "User-Test-Password-2026!", [roleId], "x@example.com")))
+            .Content.ReadFromJsonAsync<UserDto>())!;
+
+        // Creado por error y nunca usado: se borra con su rol, su permiso individual y su carné.
+        var unused = await CreateAsync("delete.unused.test", cashierRoleId);
+        var productsReadId = await GetPermissionIdAsync(client, administrator.AccessToken, PermissionCodes.ProductsRead);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{unused.Id}/permissions/{productsReadId}", new SetUserPermissionRequest(false))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
+            $"/api/cash/operator-credentials/{unused.Id}", new { expiresAtUtc = (DateTimeOffset?)null })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/users/{unused.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/users/{unused.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync($"/api/users/{unused.Id}")).StatusCode);
+
+        // Con historial (ya inició sesión): 409 y nada cambia; se puede inactivar.
+        var used = await CreateAsync("delete.used.test", cashierRoleId);
+        await LoginAsync(client, "delete.used.test", "User-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        var conflict = await client.DeleteAsync($"/api/users/{used.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        Assert.Contains("historial", await conflict.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/users/{used.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsync($"/api/users/{used.Id}/deactivate", null)).StatusCode);
+
+        // El Administrador no se borra a sí mismo; un Supervisor no borra a nadie.
+        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"/api/users/{administrator.User.Id}")).StatusCode);
+        var supervisor = await CreateAsync("delete.supervisor.test", supervisorRoleId);
+        var victim = await CreateAsync("delete.victim.test", cashierRoleId);
+        var usersManageId = await GetPermissionIdAsync(client, administrator.AccessToken, PermissionCodes.UsersManage);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/users/{supervisor.Id}/permissions/{usersManageId}", new SetUserPermissionRequest(true))).StatusCode);
+        var supervisorSession = await LoginAsync(client, "delete.supervisor.test", "User-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", supervisorSession.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.DeleteAsync($"/api/users/{victim.Id}")).StatusCode);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.False(await context.Usuario.AnyAsync(x => x.Id == unused.Id));
+        Assert.False(await context.UsuarioRol.AnyAsync(x => x.UsuarioId == unused.Id));
+        Assert.False(await context.CredencialUsuario.AnyAsync(x => x.UsuarioId == unused.Id));
+        Assert.Equal(1, await context.EventoAuditoria.CountAsync(x => x.Accion == "USERDELETED" && x.EntidadId == unused.Id));
+        Assert.Equal(0, await context.EventoAuditoria.CountAsync(x => x.Accion == "USERDELETED" && x.EntidadId == used.Id));
+        Assert.True(await context.Usuario.AnyAsync(x => x.Id == victim.Id));
+    }
+
     private async Task SetupInitialAdministratorAsync(HttpClient client, string password)
     {
         var setup = new SetupFirstAdministratorRequest(

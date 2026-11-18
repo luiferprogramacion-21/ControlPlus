@@ -123,5 +123,7 @@ public enum AuditAction
     // Recuperación de contraseña por correo (decisión del 18 de noviembre de 2026).
     PasswordRecoveryRequested = 120,
     PasswordRecoveryFailed = 121,
-    PasswordRecovered = 122
+    PasswordRecovered = 122,
+    // Borrado de un usuario sin historial (decisión del 18 de noviembre de 2026).
+    UserDeleted = 123
 }

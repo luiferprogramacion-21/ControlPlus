@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Admin } from './admin';
 import { AdminApi, AdminRole, AdminUser } from './admin-api';
@@ -6,9 +7,9 @@ import { adminGuard } from '../../core/guards';
 
 describe('Admin: usuarios, roles y permisos', () => {
   const api = { users: vi.fn(), roles: vi.fn(), createUser: vi.fn(), updateUser: vi.fn(), setUserActive: vi.fn(),
-    reactivateUser: vi.fn(), assignRole: vi.fn(), changePassword: vi.fn() };
-  const state = { id: 'admin-1', permissions: ['USERS.READ', 'USERS.MANAGE', 'ROLES.READ'] };
-  const session = { has: (code: string) => state.permissions.includes(code), user: () => ({ id: state.id }) };
+    reactivateUser: vi.fn(), assignRole: vi.fn(), changePassword: vi.fn(), deleteUser: vi.fn() };
+  const state = { id: 'admin-1', role: 'ADMINISTRADOR', permissions: ['USERS.READ', 'USERS.MANAGE', 'ROLES.READ'] };
+  const session = { has: (code: string) => state.permissions.includes(code), hasRole: (...codes: string[]) => codes.includes(state.role), user: () => ({ id: state.id }) };
   const role = (id: string, name: string, level: number, isActive = true): AdminRole => ({ id, code: name.toUpperCase(), name, level, isActive,
     permissions: [{ id: `${id}-p`, code: 'PRODUCTS.READ', name: 'Consultar productos', description: null, module: 'PRODUCTS', isActive: true }] });
   const roles = [role('r-admin', 'Administrador', 3), role('r-cash', 'Cajero', 1), role('r-old', 'Antiguo', 2, false)];
@@ -18,7 +19,7 @@ describe('Admin: usuarios, roles y permisos', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    state.id = 'admin-1'; state.permissions = ['USERS.READ', 'USERS.MANAGE', 'ROLES.READ'];
+    state.id = 'admin-1'; state.role = 'ADMINISTRADOR'; state.permissions = ['USERS.READ', 'USERS.MANAGE', 'ROLES.READ'];
     api.users.mockResolvedValue({ items: [user('ana'), user('bloqueado', { isLocked: true })], page: 1, pageSize: 20, totalCount: 2, totalPages: 1 });
     api.roles.mockResolvedValue({ items: roles, page: 1, pageSize: 50, totalCount: 3, totalPages: 1 });
     TestBed.configureTestingModule({ providers: [{ provide: AdminApi, useValue: api }, { provide: SessionService, useValue: session }] });
@@ -120,6 +121,25 @@ describe('Admin: usuarios, roles y permisos', () => {
     component.form.email = '';
     await component.save();
     expect(api.updateUser).toHaveBeenCalledWith('ana', expect.any(String), null);
+  });
+
+  it('solo el Administrador elimina usuarios, nunca a sí mismo, y el historial lo impide con un mensaje', async () => {
+    await component.ngOnInit();
+    api.deleteUser.mockResolvedValueOnce(undefined);
+    await component.remove(user('nuevo'));
+    expect(api.deleteUser).toHaveBeenCalledWith('nuevo');
+    expect(component.notice()).toBe('Usuario eliminado.');
+
+    api.deleteUser.mockRejectedValueOnce(new HttpErrorResponse({ status: 409, error: { title: 'El usuario ya tiene historial y no se puede eliminar.' } }));
+    await component.remove(user('ana'));
+    expect(component.error()).toContain('historial');
+
+    await component.remove(user('admin-1'));
+    expect(api.deleteUser).toHaveBeenCalledTimes(2);
+    state.role = 'SUPERVISOR';
+    expect(component.canDeleteUsers).toBe(false);
+    await component.remove(user('otro'));
+    expect(api.deleteUser).toHaveBeenCalledTimes(2);
   });
 
   it('muestra el error de la API sin cerrar el formulario', async () => {

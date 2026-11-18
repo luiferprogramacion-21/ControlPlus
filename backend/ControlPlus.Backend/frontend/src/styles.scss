@@ -593,6 +593,8 @@ app-root, app-login { display: block; min-height: 100vh; }
 .status-pill--warning { background: var(--cp-warning-soft); color: var(--cp-warning); }
 .table-action { min-height: 36px; padding: 0 10px; border: 1px solid var(--cp-control-border); border-radius: 7px; background: var(--cp-surface); color: var(--cp-primary); font-size: 12px; font-weight: 700; }
 .table-action:hover { border-color: var(--cp-primary); background: var(--cp-primary-soft); }
+.table-action--danger { color: var(--cp-error); }
+.table-action--danger:hover { border-color: var(--cp-error); background: #fdecec; }
 .plain-list { display: grid; gap: 0; margin: 14px 0 0; padding: 0; list-style: none; }
 .plain-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--cp-border); }
 .plain-list li:last-child { border-bottom: 0; }

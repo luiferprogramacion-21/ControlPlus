@@ -33,6 +33,13 @@ public interface IUserRepository
 
     Task UpdateAsync(User user, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Borra físicamente el usuario y sus datos propios (rol, permisos individuales, carné, tokens) si nada más lo
+    /// referencia, junto con los cambios pendientes (la auditoría del borrado) en una sola transacción. Devuelve false, sin
+    /// cambios, si tiene historial (cualquier otra referencia en la base).
+    /// </summary>
+    Task<bool> DeleteWithoutHistoryAsync(Guid userId, CancellationToken cancellationToken = default);
+
     Task SetPermissionOverrideAsync(
         User user,
         Guid permissionId,

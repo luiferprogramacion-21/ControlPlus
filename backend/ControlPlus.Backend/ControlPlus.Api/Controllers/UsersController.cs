@@ -107,6 +107,25 @@ public sealed class UsersController(
         return FromResult(result, Ok);
     }
 
+    /// <summary>Borra un usuario sin historial (solo Administrador). 409 si tiene historial: se inactiva en su lugar.</summary>
+    [HttpDelete("{userId:guid}")]
+    [PermissionAuthorize(PermissionCodes.UsersManage)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid userId, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        if (actor is null)
+        {
+            return MissingActor();
+        }
+
+        return FromResult(await userManagementService.DeleteAsync(actor, userId, cancellationToken));
+    }
+
     [HttpPost("{userId:guid}/reactivate")]
     [PermissionAuthorize(PermissionCodes.UsersManage)]
     [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]

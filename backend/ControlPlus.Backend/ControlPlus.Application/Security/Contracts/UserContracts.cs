@@ -59,6 +59,9 @@ public interface IUserManagementService
 
     Task<Result<UserDto>> DeactivateAsync(ActorContext actor, Guid userId, CancellationToken cancellationToken = default);
 
+    /// <summary>Decisión del 18 de noviembre de 2026: solo el Administrador borra un usuario, y solo si no tiene historial.</summary>
+    Task<Result> DeleteAsync(ActorContext actor, Guid userId, CancellationToken cancellationToken = default);
+
     Task<Result<UserDto>> ReactivateAsync(ActorContext actor, Guid userId, CancellationToken cancellationToken = default);
 
     Task<Result> ChangePasswordAsync(ActorContext actor, Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default);

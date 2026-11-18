@@ -40,6 +40,7 @@
                 <button class="table-action" type="button" (click)="openCredential(user)">Carné</button>
                 @if (user.isLocked) { <button class="table-action" type="button" [disabled]="saving()" (click)="unlock(user)">Reactivar acceso</button> }
                 <button class="table-action" type="button" [disabled]="saving() || isSelf(user)" (click)="toggle(user)">{{ user.isActive ? 'Inactivar' : 'Activar' }}</button>
+                @if (canDeleteUsers && !isSelf(user)) { <button class="table-action table-action--danger" type="button" [disabled]="saving()" (click)="remove(user)">Eliminar</button> }
               }</td>
             </tr>
           } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="6"><span aria-hidden="true">◇</span><strong>Sin usuarios</strong><small>No hay usuarios para esta búsqueda.</small></td></tr> } }
