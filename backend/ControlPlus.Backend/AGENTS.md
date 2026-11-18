@@ -510,7 +510,7 @@ El 17 de noviembre de 2026 el usuario pidió guardar esta revisión y repartir l
 | E | Precio de venta nuevo en la recepción de compras (maqueta 18), solo Administrador y auditado | Media | Codex |
 | F | Datos del establecimiento editables (maqueta 21) y su uso en ticket, carné, pedido, barra superior y Caja | Media | Codex |
 | G | Activar el turno compartido desde la pantalla (21b) y desbloqueo en el POS (06b) | **Pendiente de decisión** | — |
-| H | Venta recuperable o «bloquear sesión» conservando el carrito | **Pendiente de decisión** | — |
+| H | Venta recuperable o «bloquear sesión» conservando el carrito | **Aprobada para la V1 el 18 de noviembre de 2026** | Claude |
 | I | Arranque de una instalación nueva (script guiado de primer Administrador y caja) | Media | Claude |
 | J | Soporte con el estado real de impresora y cola (maqueta 22) | Baja | Claude |
 | K | Ocultar en Administración los 9 permisos sin función (sin borrarlos del catálogo) | Baja | Codex |
@@ -522,7 +522,7 @@ El 17 de noviembre de 2026 el usuario pidió guardar esta revisión y repartir l
 | P | Actualizar herramientas de desarrollo con avisos de seguridad, al final y con regresión completa | Baja | Claude |
 | Q | Ampliar las pruebas de navegador | Baja | Claude |
 | R | Medir el objetivo de 1 segundo | Baja | Claude |
-| — | Manual de uso y guía de instalación y operación | Entrega | Claude (público pendiente) |
+| — | Manual de uso y guía de instalación y operación | Entrega | Claude — **un manual con una parte para cada rol** (Administrador/dueño, Supervisor y Cajero), aprobado el 18 de noviembre de 2026 |
 
 ### Decisión del 18 de noviembre de 2026: contraseñas y correo del usuario
 
