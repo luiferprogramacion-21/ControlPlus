@@ -12,7 +12,7 @@ import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, autho
 import { CancelSaleInput, ConfirmedChange, printJobStatusText, SaleCancellationReason, SaleDetail, SalesApi, SaleSummary } from './sales-api';
 import { SaleChange } from './sale-change';
 import { SalePrinting } from './sale-printing';
-import { toastSignal } from '../../core/toast';
+import { statusKind, toastSignal } from '../../core/toast';
 
 const STATE_LABELS: Record<string, string> = { CONFIRMADA: 'Confirmada', ANULADA: 'Anulada' };
 interface Pending { key: string; fingerprint: string; authorizerUserName: string | null; }
@@ -40,13 +40,13 @@ export class SalesHistory implements OnInit {
   readonly saving = signal(false);
   readonly cancelling = signal(false);
   readonly changing = signal(false);
-  readonly printMessage = signal('');
+  readonly printMessage = toastSignal(statusKind);
   readonly printStatus = signal<string | null>(null);
   readonly reprinting = signal(false);
   readonly printingId = signal<string | null>(null);
   private printKey: { saleId: string; key: string } | null = null;
   readonly error = toastSignal('error');
-  readonly formError = signal('');
+  readonly formError = toastSignal('error');
   readonly notice = toastSignal('success');
   page = 1; pageSize = 20;
   reasonId = ''; observation = '';

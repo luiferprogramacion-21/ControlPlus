@@ -6,6 +6,7 @@ import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angu
 import { firstValueFrom } from 'rxjs';
 import { AuthorizationBody, errorText } from '../core/api';
 import { SessionService } from '../core/session.service';
+import { toastSignal } from '../core/toast';
 
 /** User name and password, or (userName/password empty) the Code 128 credential scanned from the authorizer's card. */
 export interface AuthorizationCredentials { userName: string; password: string; credentialToken?: string; }
@@ -75,7 +76,7 @@ export class AuthorizationDialogComponent implements OnDestroy {
   readonly data = inject<AuthorizationPrompt>(MAT_DIALOG_DATA);
   private readonly ref = inject(MatDialogRef<AuthorizationDialogComponent>);
   readonly busy = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
   userName = '';
   password = '';
   scanToken = '';

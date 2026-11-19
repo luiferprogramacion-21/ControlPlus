@@ -34,15 +34,19 @@ export class ToastService {
  * Señal de aviso de una pantalla: guarda el texto como siempre y, cada vez que cambia a un texto
  * no vacío, lo muestra como mensaje emergente.
  */
-export function toastSignal(kind: ToastKind = 'success'): WritableSignal<string> {
+export function toastSignal(kind: ToastKind | ((message: string) => ToastKind) = 'success'): WritableSignal<string> {
   const toasts = inject(ToastService);
   const value = signal('');
   effect(() => {
     const message = value();
-    if (message) untracked(() => toasts.show(message, kind));
+    if (message) untracked(() => toasts.show(message, typeof kind === 'function' ? kind(message) : kind));
   });
   return value;
 }
+
+/** Para avisos de estado (impresión, reimpresión): son error si hablan de un fallo o de un resultado incierto. */
+export const statusKind = (message: string): ToastKind =>
+  /error|no se pud|no se puede|incierto|falló|fallo|sin conexión|no tienes|rechaz/i.test(message) ? 'error' : 'success';
 
 @Component({
   selector: 'cp-toast-host',

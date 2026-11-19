@@ -55,7 +55,7 @@ export class NumberingPanel implements OnInit {
   readonly saving = signal(false);
   readonly error = toastSignal('error');
   readonly notice = toastSignal('success');
-  readonly formError = signal('');
+  readonly formError = toastSignal('error');
   readonly editing = signal<Row | null>(null);
   prefix = '';
   first = 1;

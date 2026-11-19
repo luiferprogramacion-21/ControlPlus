@@ -8,6 +8,7 @@ import { TicketPrinter } from '../sales/ticket';
 import { AdminApi, AdminUser, IssuedCredential, OperatorCredential } from './admin-api';
 import { buildCredentialCardHtml, CredentialCard } from './credential-card';
 import { CredentialCardExporter } from './credential-card-export';
+import { toastSignal } from '../../core/toast';
 
 /**
  * Shows the current operator card to its Administrator; old hash-only cards need to be reissued once.
@@ -31,7 +32,6 @@ import { CredentialCardExporter } from './credential-card-export';
           } @else if (!loading()) { <p class="form-hint">Esta persona no tiene carné vigente.</p> }
           <p class="form-hint">Emitir uno nuevo <strong>revoca el anterior</strong>. Los nuevos carnés podrán consultarse aquí después.</p>
           @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-          @if (notice()) { <p role="status">{{ notice() }}</p> }
           <div class="form-actions"><button class="button button--secondary" type="button" (click)="close()">Cerrar</button>
             @if (current()) { <button class="button button--secondary" type="button" [disabled]="busy() || loading()" (click)="remove()">Eliminar carné</button> }
             <button class="button button--primary" type="button" [disabled]="busy() || loading() || !user().isActive" (click)="issue()">{{ busy() ? 'Emitiendo…' : 'Emitir carné' }}</button></div>
@@ -46,7 +46,6 @@ import { CredentialCardExporter } from './credential-card-export';
           <p class="form-hint">Emitido el {{ issued()!.issuedAtUtc | date:'dd/MM/yyyy HH:mm' }}. Puedes volver a consultarlo desde Usuarios → Carné.</p>
           @if (current()?.state === 'VENCIDA') { <p class="field-error">Este carné venció y ya no sirve para operar.</p> }
           @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-          @if (notice()) { <p role="status">{{ notice() }}</p> }
           <div class="form-actions"><button class="button button--secondary" type="button" (click)="close()">Cerrar</button>
             <button class="button button--secondary" type="button" [disabled]="busy()" (click)="remove()">Eliminar carné</button>
             <button class="button button--secondary" type="button" (click)="download('jpg')">Descargar JPG</button>
@@ -69,8 +68,8 @@ export class UserCredential implements OnInit, OnDestroy {
   readonly current = signal<OperatorCredential | null>(null);
   readonly loading = signal(false);
   readonly busy = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   readonly roleName = computed(() => this.user().roles[0]?.name ?? 'Sin rol');
   /** The SVG is generated here from the token (digits only), so it is trusted; Angular would strip the <svg> otherwise. */
   readonly barcode = computed(() => { const value = this.issued(); return this.sanitizer.bypassSecurityTrustHtml(value ? code128Svg(value.credentialToken, 1.6, 70) : ''); });

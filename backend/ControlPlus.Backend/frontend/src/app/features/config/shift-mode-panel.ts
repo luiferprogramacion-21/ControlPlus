@@ -55,7 +55,7 @@ type Mode = 'INDIVIDUAL' | 'COMPARTIDO';
 export class ShiftModePanel implements OnInit {
   private readonly cash = inject(CashApi);
   readonly state = signal<CashState | null>(null);
-  readonly loadError = signal('');
+  readonly loadError = toastSignal('error');
   readonly saving = signal(false);
   readonly error = toastSignal('error');
   readonly notice = toastSignal('success');

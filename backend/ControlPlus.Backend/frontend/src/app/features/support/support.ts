@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { errorText } from '../../core/api';
 import { BackupDestination, BackupDestinationType, BackupStatus, ComponentDiagnosis, diagnosePrinter, diagnoseQueue, SupportApi } from './support-api';
-import { toastSignal } from '../../core/toast';
+import { toastSignal, ToastService } from '../../core/toast';
 
 interface DestinationDraft { path: string; active: boolean; }
 
@@ -26,6 +26,7 @@ export class Support implements OnInit {
   readonly error = toastSignal('error');
   readonly notice = toastSignal('success');
   /** Error or confirmation shown inside the destination card, where the Administrator is looking. */
+  private readonly toasts = inject(ToastService);
   readonly destinationMessage = signal<{ type: BackupDestinationType; text: string; ok: boolean } | null>(null);
   drafts: Record<BackupDestinationType, DestinationDraft> = {
     LOCAL_FISICO_SEPARADO: { path: '', active: true },
@@ -73,7 +74,8 @@ export class Support implements OnInit {
       this.saving.set(null);
       await this.refresh();
       this.destinationMessage.set({ type: destination.type, text: 'Carpeta guardada. Se usará desde el próximo respaldo.', ok: true });
-    } catch (e) { this.destinationMessage.set({ type: destination.type, text: errorText(e), ok: false }); this.saving.set(null); }
+      this.toasts.show('Carpeta guardada. Se usará desde el próximo respaldo.');
+    } catch (e) { this.destinationMessage.set({ type: destination.type, text: errorText(e), ok: false }); this.toasts.show(errorText(e), 'error'); this.saving.set(null); }
   }
 
   time(iso: string | null | undefined): string {

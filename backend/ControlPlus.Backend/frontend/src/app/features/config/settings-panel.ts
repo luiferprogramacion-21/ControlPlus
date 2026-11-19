@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
 import { ChangePolicy, ConfigApi, CreditSettings, LayawaySettings, SalesSettings } from './config-api';
+import { toastSignal } from '../../core/toast';
 
 /** Time limit for product changes and the parameters of layaways. Both only affect documents created afterwards. */
 @Component({
@@ -79,18 +80,18 @@ export class SettingsPanel implements OnInit {
   readonly Number = Number;
   readonly policy = signal<ChangePolicy | null>(null);
   readonly layaway = signal<LayawaySettings | null>(null);
-  readonly loadError = signal('');
+  readonly loadError = toastSignal('error');
   readonly credit = signal<CreditSettings | null>(null);
-  readonly creditLoadError = signal('');
+  readonly creditLoadError = toastSignal('error');
   readonly savingCredit = signal(false);
-  readonly creditError = signal(''); readonly creditNotice = signal('');
+  readonly creditError = toastSignal('error'); readonly creditNotice = toastSignal('success');
   creditDays: number | null = 30;
   creditChooseEachTime = false;
   creditBlock = false;
   readonly savingPolicy = signal(false);
   readonly savingLayaway = signal(false);
-  readonly policyError = signal(''); readonly policyNotice = signal('');
-  readonly layawayError = signal(''); readonly layawayNotice = signal('');
+  readonly policyError = toastSignal('error'); readonly policyNotice = toastSignal('success');
+  readonly layawayError = toastSignal('error'); readonly layawayNotice = toastSignal('success');
   days = 15;
   percentage = 20;
   requireMinimum = true;
@@ -98,9 +99,9 @@ export class SettingsPanel implements OnInit {
   chooseEachDate = false;
 
   readonly sales = signal<SalesSettings | null>(null);
-  readonly salesLoadError = signal('');
+  readonly salesLoadError = toastSignal('error');
   readonly savingSales = signal(false);
-  readonly salesError = signal(''); readonly salesNotice = signal('');
+  readonly salesError = toastSignal('error'); readonly salesNotice = toastSignal('success');
   wholesaleMinimum: number | null = 12;
   ngOnInit(): void { void this.load(); void this.loadCredit(); void this.loadSales(); }
   async loadSales(): Promise<void> {

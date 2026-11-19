@@ -22,7 +22,7 @@ export class PrintSettings implements OnInit {
   readonly creating = signal(false);
   readonly deleting = signal(false);
   readonly error = toastSignal('error');
-  readonly formError = signal('');
+  readonly formError = toastSignal('error');
   readonly notice = toastSignal('success');
   form: { name: string; systemQueueName: string; columns: number; makeDefault: boolean; printerType: 'RECIBOS' | 'ETIQUETAS' | 'HIBRIDA'; labelWidthMm: number | null; labelHeightMm: number | null; resolutionDpi: number | null } = {
     name: '', systemQueueName: '', columns: 32, makeDefault: true,

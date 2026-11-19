@@ -16,7 +16,7 @@ import { buildTicketHtml, TicketPrinter } from './ticket';
 import { describeDiscount, Discount, discountAmount, maxDiscountPercent, validateDiscount, WHOLESALE_MIN_QUANTITY } from './sale-discount';
 import { DiscountApplied, DiscountDialog } from './discount-dialog';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
-import { toastSignal } from '../../core/toast';
+import { statusKind, toastSignal } from '../../core/toast';
 
 interface CartLine { product: Product; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; discount: Discount | null; }
 interface ReceiptMeta { customer: string; operator: string; items: number; units: number; }
@@ -44,7 +44,7 @@ export class Sales implements OnInit, OnDestroy {
   readonly sale = signal<Sale | null>(null);
   readonly receipt = signal<ReceiptMeta | null>(null);
   readonly showDetail = signal(false);
-  readonly reprintMessage = signal('');
+  readonly reprintMessage = toastSignal(statusKind);
   readonly lastJobStatus = signal<PrintJobStatus | null>(null);
   /** Whether the ticket was already sent to the printer; later prints are recorded as reprints. */
   readonly printed = signal(false);
@@ -282,7 +282,7 @@ export class Sales implements OnInit, OnDestroy {
   }
   operatorCredential = '';
   readonly unlocking = signal(false);
-  readonly unlockError = signal('');
+  readonly unlockError = toastSignal('error');
   async unlock(): Promise<void> {
     const token = this.operatorCredential.trim();
     if (!token || this.unlocking()) return;

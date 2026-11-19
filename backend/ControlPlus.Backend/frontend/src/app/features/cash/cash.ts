@@ -32,7 +32,7 @@ export class Cash implements OnInit {
   readonly notice = toastSignal('success');
   readonly reasons = signal<ClosureDifferenceReason[] | null>(null);
   readonly reasonsLoading = signal(false);
-  readonly reasonsError = signal('');
+  readonly reasonsError = toastSignal('error');
   initialAmount = 0;
   openObservations = '';
   /** Modalidad elegida al abrir; nula usa la predeterminada del negocio (individual si no hay otra). */

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { ERROR_TOAST_MS, toastDuration, toastSignal, ToastService } from './toast';
+import { ERROR_TOAST_MS, statusKind, toastDuration, toastSignal, ToastService } from './toast';
 
 describe('mensajes emergentes', () => {
   beforeEach(() => { vi.useFakeTimers(); TestBed.configureTestingModule({}); });
@@ -36,5 +36,11 @@ describe('mensajes emergentes', () => {
     notice.set('Cliente guardado.'); TestBed.tick();
     expect(toasts.toasts().map(t => t.message)).toEqual(['Cliente guardado.']);
     expect(notice()).toBe('Cliente guardado.');
+  });
+
+  it('los avisos de impresión son error solo si hablan de un fallo', () => {
+    expect(statusKind('Ticket: IMPRESO. Aceptado por la cola de Windows.')).toBe('success');
+    expect(statusKind('Resultado incierto: revisa la cola de Windows antes de solicitar otra copia.')).toBe('error');
+    expect(statusKind('No se pudo completar la operación.')).toBe('error');
   });
 });

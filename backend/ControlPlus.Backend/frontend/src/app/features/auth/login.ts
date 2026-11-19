@@ -10,6 +10,7 @@ import { errorText } from '../../core/api';
 import { PasswordRecoveryApi } from './password-recovery-api';
 import { LandingCash, landingNeedsCash, landingRoute } from '../../core/landing';
 import { CashApi } from '../cash/cash-api';
+import { toastSignal } from '../../core/toast';
 
 /**
  * Inicio de sesión en dos paneles (aprobado por el usuario el 15 de noviembre de 2026, en lugar de la maqueta 02):
@@ -36,7 +37,6 @@ import { CashApi } from '../cash/cash-api';
             @if (form.controls.password.hasError('required')) { <mat-error>Escribe la contraseña.</mat-error> }
           </mat-form-field>
           <button mat-flat-button type="submit" [disabled]="busy()">{{ busy() ? 'Ingresando…' : 'Iniciar sesión' }}</button>
-          @if (notice()) { <p class="cp-login__notice" role="status">{{ notice() }}</p> }
           @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
           <button class="cp-login__link" type="button" (click)="startRecovery()">¿Olvidaste tu contraseña?</button>
           <p class="cp-login__footer">ControlPlus · sistema local de Baratísimo</p>
@@ -128,8 +128,8 @@ export class Login {
   private readonly cashApi = inject(CashApi);
   private readonly recoveryApi = inject(PasswordRecoveryApi);
   readonly busy = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   readonly view = signal<'login' | 'request' | 'confirm'>('login');
   readonly form = this.fb.nonNullable.group({ userName: ['', Validators.required], password: ['', Validators.required] });
   readonly recovery = this.fb.nonNullable.group({ userName: [''], code: [''], newPassword: [''], confirmPassword: [''] });

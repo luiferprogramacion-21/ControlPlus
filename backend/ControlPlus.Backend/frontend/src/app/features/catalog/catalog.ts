@@ -91,7 +91,7 @@ export class Catalog implements OnInit {
 
   // --- calculadora de precio (decisión del 18 de noviembre de 2026) -------------------------------
   readonly profitPercent = signal<number | null>(null);
-  readonly priceHint = signal('');
+  readonly priceHint = toastSignal('error');
   setProfitPercent(value: string): void { this.profitPercent.set(value === '' || !Number.isFinite(Number(value)) ? null : Number(value)); this.priceHint.set(''); }
   /** Costo con el que se calcula: el de compra que se escribe al crear, o el promedio actual si se puede ver. */
   referenceCost(product: Product): number | null {
