@@ -50,6 +50,15 @@ export interface CreatedLayaway extends CashDrawerDispatch {
   change: number; state: string; version: number; lines: CreatedLayawayLine[]; payments: unknown[];
 }
 export interface RefundInput { methodCode: LayawayPaymentInput['methodCode']; amount: number; reference: string | null; }
+/** Corrección de productos de un apartado sin entregar: las líneas finales; 0 o ausente quita el producto. */
+export interface LayawayProductCorrectionInput {
+  expectedVersion: number; reason: string; lines: { productId: string; quantity: number }[]; refunds: RefundInput[];
+  authorization?: LayawayAuthorization;
+}
+export interface LayawayProductCorrection {
+  id: string; layawayId: string; version: number; previousTotal: number; total: number; previousBalance: number;
+  balance: number; refunded: number; reason: string; occurredAtUtc: string; correlationId: string;
+}
 export interface CancelLayawayInput {
   expectedVersion: number; refundAmount: number; refunds: RefundInput[]; reasonId: string | null; observation: string | null; authorization?: LayawayAuthorization;
 }
@@ -70,6 +79,11 @@ export class LayawaysApi {
   get(id: string): Promise<LayawayDetail> { return firstValueFrom(this.http.get<LayawayDetail>(`/api/layaways/${id}`)); }
   paymentCancellationReasons(): Promise<LayawayPaymentCancellationReason[]> {
     return firstValueFrom(this.http.get<LayawayPaymentCancellationReason[]>('/api/layaways/payment-cancellation-reasons'));
+  }
+  /** Corrige los productos de un apartado sin entregar (decisión del 19 de noviembre de 2026). */
+  correctProducts(layaway: Layaway, input: LayawayProductCorrectionInput, key: string): Promise<LayawayProductCorrection> {
+    return firstValueFrom(this.http.post<LayawayProductCorrection>(`/api/layaways/${layaway.id}/product-corrections`, input,
+      { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
   }
   cancelPayment(layaway: Layaway, paymentId: string, input: CancelLayawayPaymentInput, key: string): Promise<CancelLayawayPaymentResult> {
     return firstValueFrom(this.http.post<CancelLayawayPaymentResult>(`/api/layaways/${layaway.id}/payments/${paymentId}/cancel`, input,

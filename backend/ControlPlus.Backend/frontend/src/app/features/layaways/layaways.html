@@ -43,6 +43,7 @@
         <button class="table-action" type="button" (click)="refreshDetail()">Actualizar</button>
         <button class="button button--secondary" type="button" [disabled]="!canPay(d.layaway) || saving()" (click)="openPayment(d.layaway)">Abonar</button>
         <button class="button button--primary" type="button" [disabled]="!canDeliver(d.layaway) || saving()" (click)="deliver()">Entregar productos</button>
+        @if (canCorrectProducts(d.layaway)) { <button class="button button--secondary" type="button" [disabled]="saving()" (click)="startCorrectProducts()">Corregir productos</button> }
         @if (canCancel(d.layaway)) { <button class="button button--secondary layaway-cancel-action" type="button" [disabled]="saving()" (click)="startCancel()">Cancelar apartado</button> }
       </div>
       <h3>Productos separados</h3>
@@ -102,4 +103,5 @@
   }
   @if (creating()) { <cp-layaway-create (created)="onCreated($event)" (closed)="creating.set(false)" /> }
   @if (cancelling()) { @if (detail(); as d) { <cp-layaway-cancel [detail]="d" (cancelled)="onCancelled($event)" (closed)="cancelling.set(false)" /> } }
+  @if (correctingProducts()) { @if (detail(); as d) { <cp-layaway-products [detail]="d" (corrected)="onProductsCorrected($event)" (closed)="correctingProducts.set(false)" /> } }
 </section>

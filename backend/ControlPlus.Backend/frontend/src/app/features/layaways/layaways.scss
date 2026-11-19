@@ -29,3 +29,17 @@
 .layaway-cancel-action { color: var(--cp-error); }
 td small { display: block; color: var(--cp-text-muted); }
 .form-hint { margin: 6px 0 12px; color: var(--cp-text-muted); font-size: 13px; }
+
+/* Corregir productos de un apartado (decisión del 19 de noviembre de 2026). */
+.layaway-products { width: min(100%, 820px); }
+.layaway-products__table table { min-width: 0; }
+.layaway-products__removed td { color: var(--cp-text-muted, #6b7280); text-decoration: line-through; }
+.layaway-products__removed td:nth-child(3) { text-decoration: none; }
+.layaway-products .stock-steps { display: inline-flex; align-items: center; gap: 4px; }
+.layaway-products .stock-steps .text-field { width: 64px; text-align: center; }
+.layaway-products .status-pill { margin-left: 6px; }
+.layaway-products__search { display: flex; gap: 8px; }
+.layaway-products__search .text-field { flex: 1; }
+.layaway-products__results { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--cp-border); border-radius: 8px; }
+.layaway-products__results li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--cp-border); }
+.layaway-products__results li:last-child { border-bottom: 0; }

@@ -1,0 +1,40 @@
+<div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="layaway-products-title"><div class="module-form-sheet__backdrop" (click)="closed.emit()"></div>
+  <form class="panel panel--padded module-form layaway-products" (submit)="$event.preventDefault(); confirm()">
+    <div class="panel-heading"><h2 id="layaway-products-title">Corregir productos</h2><p>{{ detail().layaway.number }} · {{ detail().layaway.customerName }}</p></div>
+    <p class="muted">Cambia las cantidades, pon 0 para quitar un producto o agrega otro. Las reservas, el saldo y la devolución se calculan solos. Para quitarlo todo usa «Cancelar apartado».</p>
+    <div class="table-wrap layaway-products__table"><table><thead><tr><th>Producto</th><th class="align-right">Precio</th><th>Cantidad</th><th class="align-right">Subtotal</th></tr></thead><tbody>
+      @for (row of rows(); track row.productId) {
+        <tr [class.layaway-products__removed]="!row.quantity">
+          <td><strong>{{ row.name }}</strong> <small class="muted">{{ row.code }}</small>@if (row.original === 0) { <span class="status-pill">Nuevo</span> }@if (!row.quantity) { <span class="status-pill status-pill--warning">Se quita</span> }</td>
+          <td class="align-right numeric">{{ money(row.unitPrice) }}</td>
+          <td><div class="stock-steps"><button class="table-action" type="button" (click)="step(row, -1)" [disabled]="!row.quantity || saving()" [attr.aria-label]="'Una unidad menos de ' + row.name">−</button><input class="text-field" type="text" cpNumberInput min="0" step="1" [name]="'quantity-' + row.productId" [(ngModel)]="row.quantity" (ngModelChange)="sync()" [attr.aria-label]="'Cantidad de ' + row.name"><button class="table-action" type="button" (click)="step(row, 1)" [disabled]="saving()" [attr.aria-label]="'Una unidad más de ' + row.name">+</button></div></td>
+          <td class="align-right numeric">{{ money(row.unitPrice * (row.quantity || 0)) }}</td>
+        </tr>
+      }
+    </tbody></table></div>
+    <label class="field-label field-label--spaced" for="layaway-products-search">Agregar producto</label>
+    <div class="layaway-products__search"><input id="layaway-products-search" class="text-field" name="productSearch" [(ngModel)]="search" (keydown.enter)="$event.preventDefault(); searchProducts()" placeholder="Nombre, código o barras" autocomplete="off"><button class="button button--secondary" type="button" (click)="searchProducts()" [disabled]="searching() || !search.trim()">Buscar</button></div>
+    @if (results().length) {
+      <ul class="layaway-products__results">
+        @for (product of results(); track product.id) {
+          <li><span><strong>{{ product.name }}</strong> <small class="muted">{{ product.internalCode }} · {{ money(product.retailPrice) }} · {{ product.availableStock }} disponibles</small></span><button class="table-action" type="button" (click)="add(product)" [disabled]="!product.isActive || product.availableStock < 1">Agregar</button></li>
+        }
+      </ul>
+    }
+    <div class="layaway-summary">
+      <div><span>Total actual</span><strong>{{ money(detail().layaway.total) }}</strong></div>
+      <div><span>Total corregido</span><strong>{{ money(newTotal) }}</strong></div>
+      <div><span>Abonado</span><strong>{{ money(paid) }}</strong></div>
+      <div><span>{{ refund > 0 ? 'A devolver' : 'Nuevo saldo' }}</span><strong>{{ money(refund > 0 ? refund : newBalance) }}</strong></div>
+    </div>
+    @if (refund > 0) {
+      <h3>Devolución por medio</h3>
+      <cp-payment-methods [drafts]="drafts" mode="refund" idPrefix="products" />
+      <p class="form-hint">Suma de medios: {{ money(refundTotal) }} de {{ money(refund) }}.</p>
+    }
+    <label class="field-label field-label--spaced" for="layaway-products-reason">Motivo</label>
+    <input id="layaway-products-reason" class="text-field" name="reason" maxlength="500" [(ngModel)]="reason" placeholder="Ej.: el cliente cambió de talla" autocomplete="off">
+    @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+    <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">Continuar a la autorización</button><button class="button button--secondary" type="button" (click)="closed.emit()" [disabled]="saving()">Cancelar</button></div>
+  </form>
+</div>

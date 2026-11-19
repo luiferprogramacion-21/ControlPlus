@@ -7,9 +7,10 @@ import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
 import { Customer, CustomersApi } from '../customers/customers-api';
-import { CreatedLayaway, Layaway, LayawayCancellation, LayawayDetail, LayawayPayment, LayawayPaymentCancellationReason, LayawayPaymentInput, LayawaysApi } from './layaways-api';
+import { CreatedLayaway, Layaway, LayawayCancellation, LayawayDetail, LayawayPayment, LayawayPaymentCancellationReason, LayawayPaymentInput, LayawayProductCorrection, LayawaysApi } from './layaways-api';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { LayawayCancel } from './layaway-cancel';
+import { LayawayProducts } from './layaway-products';
 import { LayawayCreate } from './layaway-create';
 import { appliedTotal, cashChange, emptyDraft, PaymentDraft, PaymentMethods, toPayments, validateDrafts } from './payment-methods';
 import { statusKind, toastSignal } from '../../core/toast';
@@ -22,7 +23,7 @@ const STATE_LABELS: Record<string, string> = { ACTIVO: 'Activo', PAGADO: 'Pagado
 
 @Component({
   selector: 'cp-layaways',
-  imports: [WindowSheet, DatePipe, FormsModule, MatPaginatorModule, Icon, PaymentMethods, LayawayCreate, LayawayCancel],
+  imports: [WindowSheet, DatePipe, FormsModule, MatPaginatorModule, Icon, PaymentMethods, LayawayCreate, LayawayCancel, LayawayProducts],
   templateUrl: './layaways.html',
   styleUrls: ['../directory.scss', './layaways.scss'],
 })
@@ -44,6 +45,8 @@ export class Layaways implements OnInit {
   readonly paymentDialog = signal(false);
   readonly creating = signal(false);
   readonly cancelling = signal(false);
+  /** Corregir productos de un apartado sin entregar (decisión del 19 de noviembre de 2026). */
+  readonly correctingProducts = signal(false);
   readonly customerMatches = signal<Customer[]>([]);
   readonly customerLabel = signal('');
   readonly correctingPayment = signal<LayawayPayment | null>(null);
@@ -214,6 +217,16 @@ export class Layaways implements OnInit {
     await this.loadDetail(created.id); await this.reload();
   }
   startCancel(): void { const layaway = this.detail()?.layaway; if (layaway && this.canCancel(layaway)) { this.error.set(''); this.notice.set(''); this.cancelling.set(true); } }
+  canCorrectProducts(layaway: Layaway): boolean {
+    return (layaway.state === 'ACTIVO' || layaway.state === 'PAGADO') && this.session.has('LAYAWAY.MANAGE') && this.session.hasRole('ADMINISTRADOR', 'SUPERVISOR');
+  }
+  startCorrectProducts(): void { const layaway = this.detail()?.layaway; if (layaway && this.canCorrectProducts(layaway) && !this.saving()) { this.error.set(''); this.notice.set(''); this.correctingProducts.set(true); } }
+  async onProductsCorrected(result: LayawayProductCorrection): Promise<void> {
+    this.correctingProducts.set(false);
+    this.notice.set(`Productos corregidos. Total ${this.money(result.previousTotal)} → ${this.money(result.total)}; saldo ${this.money(result.balance)}` +
+      (result.refunded > 0 ? `; devuelto ${this.money(result.refunded)}.` : '.'));
+    await this.refreshDetail(); await this.reload();
+  }
   async onCancelled(result: LayawayCancellation): Promise<void> {
     this.cancelling.set(false);
     this.notice.set(`Apartado ${result.number} cancelado. Devuelto ${this.money(result.refunded)}; retenido ${this.money(result.retained)}.`);
