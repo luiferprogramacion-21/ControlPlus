@@ -43,8 +43,9 @@ public sealed class OfficialSchemaIntegrationTests
         await context.Database.OpenConnectionAsync();
 
         // 62 de la base aprobada más ventas.cuota_credito y ventas.aplicacion_pago_cuota (20261116020000_CreditInstallmentsV1)
-        // y caja.apertura_cajon (20261119010000_CashDrawerV1).
-        Assert.Equal(65L, await ScalarAsync(context.Database.GetDbConnection(),
+        // caja.apertura_cajon (20261119010000_CashDrawerV1) y las 5 tablas de correcciones operativas: correccion_apartado,
+        // reembolso_correccion_apartado, correccion_movimiento_inventario, revision_cierre y correccion_recepcion.
+        Assert.Equal(70L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*)
             FROM information_schema.tables
@@ -52,7 +53,7 @@ public sealed class OfficialSchemaIntegrationTests
               AND table_schema IN ('seguridad','configuracion','catalogo','caja','ventas','compras','auditoria')
             """));
 
-        Assert.Equal(65L, await ScalarAsync(context.Database.GetDbConnection(),
+        Assert.Equal(70L, await ScalarAsync(context.Database.GetDbConnection(),
             """
             SELECT count(*)
             FROM information_schema.table_constraints

@@ -70,15 +70,30 @@ public sealed class LayawayCorrectionsV1 : Migration
         CREATE TRIGGER tg_apartado_proteger_original BEFORE INSERT OR UPDATE ON ventas.apartado
           FOR EACH ROW EXECUTE FUNCTION ventas.proteger_original_apartado();
 
-        -- Keep every existing totals check; change only the paid balance and initial-payment guards.
+        -- A product correction keeps the replaced lines as history (vigente = false) and appends the new ones.
+        ALTER TABLE ventas.detalle_apartado ADD COLUMN vigente boolean NOT NULL DEFAULT true;
+        COMMENT ON COLUMN ventas.detalle_apartado.vigente IS
+          'False cuando una correccion reemplazo la linea; los totales, la entrega y la cancelacion usan solo las vigentes.';
+
+        -- Keep every existing totals check; change only the paid balance and initial-payment guards and count
+        -- only the lines in force.
         DO $patch$
         DECLARE definition text; old_balance text := 'v_pagos <> v_cabecera.total - v_cabecera.saldo_pendiente';
           old_initial text := 'v_pagos < v_cabecera.abono_inicial';
+          lines_pattern text := 'FROM ventas\.detalle_apartado\s+WHERE apartado_id = v_apartado_id;';
+          patched text;
         BEGIN
           definition := pg_get_functiondef('ventas.validar_totales_apartado()'::regprocedure);
-          IF strpos(definition,old_balance)=0 OR strpos(definition,old_initial)=0 THEN
+          IF strpos(definition,old_balance)=0 OR strpos(definition,old_initial)=0
+            OR (SELECT count(*) FROM regexp_matches(definition,lines_pattern,'g'))<>1 THEN
             RAISE EXCEPTION 'El validador de apartados no coincide con el contrato esperado.';
           END IF;
+          patched := regexp_replace(definition,lines_pattern,
+            'FROM ventas.detalle_apartado WHERE apartado_id = v_apartado_id AND vigente;');
+          IF patched = definition THEN
+            RAISE EXCEPTION 'No se pudo limitar el validador de apartados a las lineas vigentes.';
+          END IF;
+          definition := patched;
           definition := replace(definition,old_balance,
             'v_pagos - COALESCE((SELECT sum(r.valor) FROM ventas.reembolso_correccion_apartado r JOIN ventas.correccion_apartado c ON c.id=r.correccion_id WHERE c.apartado_id=v_apartado_id),0) <> v_cabecera.total - v_cabecera.saldo_pendiente');
           definition := replace(definition,old_initial,
@@ -132,6 +147,7 @@ public sealed class LayawayCorrectionsV1 : Migration
         DO $grants$ BEGIN
           IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='controlplus_app') THEN
             GRANT SELECT,INSERT ON ventas.correccion_apartado,ventas.reembolso_correccion_apartado TO controlplus_app;
+            GRANT SELECT,INSERT,UPDATE ON ventas.detalle_apartado TO controlplus_app;
           END IF;
         END $grants$;
         """);

@@ -302,12 +302,21 @@ public sealed partial class SalesService(
             return Result.Failure<SaleDto>(ApplicationError.Conflict(
                 "El plazo de cambio configurado excede el rango de fechas de la venta."));
 
+        // «Olvidé cobrar un producto» (decisión del 19 de noviembre de 2026): esta venta se enlaza a la de origen, que no cambia.
+        if (request.SourceSaleId is Guid sourceSaleId)
+        {
+            var origin = await repository.GetSaleAsync(sourceSaleId, cancellationToken);
+            if (origin is null || origin.InstalacionId != installation.Id || origin.Estado != "CONFIRMADA")
+                return Result.Failure<SaleDto>(Validation("La venta de origen no existe o ya no está confirmada."));
+        }
+
         var now = clock.UtcNow;
         var correlationId = Guid.CreateVersion7();
         sequence.UltimoNumero++;
         var sale = new Venta
         {
             Id = Guid.CreateVersion7(),
+            VentaOrigenId = request.SourceSaleId,
             InstalacionId = installation.Id,
             TurnoCajaId = shift.Id,
             UsuarioId = actor.UserId,
@@ -495,7 +504,7 @@ public sealed partial class SalesService(
             details.GroupBy(x => x.ProductoId).Select(x => (x.Key, x.Sum(y => y.Cantidad))).ToArray(),
             now.UtcDateTime, cancellationToken);
 
-        var response = Map(sale, details, payments, methodsByCode) with { CreditId = credit?.Id };
+        var response = Map(sale, details, payments, methodsByCode) with { CreditId = credit?.Id, SourceSaleId = sale.VentaOrigenId };
         var receiptVatPercentage = ReceiptVatPercentage(sale, details);
         var (snapshotData, snapshotHash) = SaleReceiptSnapshotCodec.Encode(
             ToReceipt(response, sale.TipoVenta) with
@@ -1061,7 +1070,8 @@ public sealed partial class SalesService(
             x.PorcentajeDescuento, x.ValorDescuento, x.SubtotalBruto, x.SubtotalNeto)).ToArray(),
         sale.PagoVenta.OrderBy(x => x.MetodoPago.OrdenVisual).Select(x => new SalePaymentDto(
             x.Id, x.MetodoPago.Codigo, x.MetodoPago.Nombre, x.ValorAplicado, x.ValorRecibido, x.Cambio, x.Referencia)).ToArray(),
-        sale.Credito?.Id);
+        sale.Credito?.Id,
+        sale.VentaOrigenId);
 
     private static SaleDto Map(
         Venta sale,

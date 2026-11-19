@@ -1,6 +1,13 @@
 <section class="prototype-operation">
   @if (blockReason && !sale() && !needsOperatorUnlock) { <div class="inline-feedback inline-feedback--error" role="status"><span>!</span>{{ blockReason }} <a class="link-button" routerLink="/operacion/caja">Ir a Caja</a></div> }
 
+  @if (sourceSale(); as source) { @if (!sale()) {
+    <div class="inline-feedback inline-feedback--warning draft-banner" role="status"><span>+</span>
+      <p>Venta adicional de <strong>{{ source.number || 'la venta anterior' }}</strong>: agrega el producto que se olvidó cobrar. Queda enlazada a esa venta, que no cambia.</p>
+      <button class="button button--secondary" type="button" (click)="sourceSale.set(null)" [disabled]="locked">Quitar el enlace</button>
+    </div>
+  } }
+
   @if (heldNotice() && !sale() && heldSales().length) {
     <div class="inline-feedback inline-feedback--warning draft-banner" role="status"><span>!</span>
       @if (heldSales().length === 1) {

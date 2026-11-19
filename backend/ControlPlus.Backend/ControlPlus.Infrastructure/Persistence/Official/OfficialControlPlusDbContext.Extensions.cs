@@ -102,6 +102,10 @@ public partial class OfficialControlPlusDbContext
         });
 
         ConfigureCashDrawerModel(modelBuilder);
+        // Correcciones operativas (decisión del 19 de noviembre de 2026).
+        ConfigureCashInventoryCorrectionsModel(modelBuilder);
+        ConfigureLayawayCorrections(modelBuilder);
+        ConfigurePurchaseCorrectionsModel(modelBuilder);
         OfficialConcurrencyConfiguration.Apply(modelBuilder);
     }
 

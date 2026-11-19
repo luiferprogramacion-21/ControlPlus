@@ -131,7 +131,14 @@ export class Sales implements OnInit, OnDestroy {
   private static loadAutoPrint(): boolean { try { return localStorage.getItem(Sales.AUTO_PRINT_KEY) !== '0'; } catch { return true; } }
   setAutoPrint(value: boolean): void { this.autoPrint.set(value); try { localStorage.setItem(Sales.AUTO_PRINT_KEY, value ? '1' : '0'); } catch { /* sin almacenamiento: queda solo en esta sesión */ } }
 
-  ngOnInit(): void { if (this.route.snapshot.queryParamMap.get('modalidad') === 'credito' && this.canRequestCredit) this.saleType.set('CREDITO'); void this.refreshCash(); if (this.canRequestCredit) void this.loadCreditRules(); void this.loadPricingRules(); void this.loadHeldSales(true); }
+  /** «Olvidé cobrar un producto» (decisión del 19 de noviembre de 2026): venta de origen a la que se enlaza esta venta. */
+  readonly sourceSale = signal<{ id: string; number: string } | null>(null);
+
+  ngOnInit(): void {
+    const params = this.route.snapshot.queryParamMap;
+    const origin = params.get('ventaOrigen');
+    if (origin) this.sourceSale.set({ id: origin, number: params.get('numeroOrigen') ?? '' });
+    if (params.get('modalidad') === 'credito' && this.canRequestCredit) this.saleType.set('CREDITO'); void this.refreshCash(); if (this.canRequestCredit) void this.loadCreditRules(); void this.loadPricingRules(); void this.loadHeldSales(true); }
   private async loadPricingRules(): Promise<void> {
     try { this.wholesaleMin.set((await this.api.pricingRules()).wholesaleMinimumQuantity); }
     catch { /* The server still enforces the minimum; the screen keeps the default. */ }
@@ -270,6 +277,8 @@ export class Sales implements OnInit, OnDestroy {
     this.cart.set([]); this.results.set([]); this.selectedProductId.set(null);
     this.generalDiscount = null; this.discountReason = ''; this.customerId = ''; this.customers.set([]); this.dueDate = '';
     this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.saleType.set('CONTADO');
+    // El enlace a una venta de origen es de esta venta: no pasa a la siguiente ni a una retomada.
+    this.sourceSale.set(null);
   }
 
   /** Vuelve a armar una venta guardada. Los productos inactivos o agotados se quitan; el resto se valida al cobrar. */
@@ -731,7 +740,7 @@ export class Sales implements OnInit, OnDestroy {
   cancelSale(): void {
     if (this.locked) return;
     this.cart.set([]); this.results.set([]); this.selectedProductId.set(null); this.generalDiscount = null; this.discountReason = '';
-    this.concessionAuthorization = null; this.concessionAuthorizedBy.set('');
+    this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.sourceSale.set(null);
     this.showCancel.set(false); this.feedbackKind.set('info'); this.feedback.set('Venta cancelada. No se registró ningún cobro.'); this.focusSearch();
   }
 
@@ -869,8 +878,9 @@ export class Sales implements OnInit, OnDestroy {
       const meta: ReceiptMeta = { customer: this.selectedCustomerName, operator: this.session.user()?.displayName ?? '', items: this.cart().length, units: this.units };
       // Solo se cierra el borrador de esta venta; las ventas en espera siguen abiertas.
       const result = await this.api.confirm({ ...this.pending.input, draftId: this.draftId ?? NO_SALE_DRAFT,
+        sourceSaleId: this.sourceSale()?.id,
         authorization: credentials ? authorizationBody(credentials) : null }, this.pending.key);
-      this.draftId = null;
+      this.draftId = null; this.sourceSale.set(null);
       this.drawerStatus.set(result.drawerStatus ?? null);
       this.receipt.set(meta); this.showDetail.set(false); this.reprintMessage.set(''); this.printed.set(false); this.lastJobStatus.set(null); this.sale.set(result);
       this.pending = null; this.cart.set([]); this.results.set([]); this.selectedProductId.set(null); this.cashApplied = this.cashReceived = this.transferApplied = this.nequiApplied = 0; this.generalDiscount = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.activePayments.set(['EFECTIVO']); this.checkoutMode.set(false);
