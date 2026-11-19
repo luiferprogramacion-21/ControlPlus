@@ -17,4 +17,4 @@ td small { display: block; color: var(--cp-text-muted); }
 .change-return { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .change-return__check { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .change-return__qty { display: inline-flex; align-items: center; gap: 8px; color: var(--cp-text-muted); font-size: 13px; white-space: nowrap; }
-.change-return__qty .text-field { width: 72px; min-height: 36px; padding: 6px 8px; }
+.change-return__qty .text-field { width: 52px; min-height: 30px; padding: 3px 6px; font-size: 14px; text-align: center; }
