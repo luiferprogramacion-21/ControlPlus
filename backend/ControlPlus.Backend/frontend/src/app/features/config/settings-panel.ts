@@ -4,76 +4,88 @@ import { errorText } from '../../core/api';
 import { ChangePolicy, ConfigApi, CreditSettings, LayawaySettings, SalesSettings } from './config-api';
 import { toastSignal } from '../../core/toast';
 
-/** Time limit for product changes and the parameters of layaways. Both only affect documents created afterwards. */
+/** Reglas de cambios, apartados, créditos y mayorista, en tarjetas (rediseño aprobado el 19 de noviembre de 2026). Solo afectan lo que se registre después. */
 @Component({
   selector: 'cp-settings-panel',
   imports: [FormsModule],
   template: `
     @if (loadError()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ loadError() }} <button class="link-button" type="button" (click)="load()">Reintentar</button></div> }
 
-    <section class="panel module-panel">
-      <div class="module-toolbar"><div><h3>Cambios de productos</h3><p class="muted">Días que el cliente tiene para cambiar productos de una venta. Cada venta conserva el plazo con el que se registró.</p></div></div>
-      @if (policy(); as current) {
-        <form class="settings-form" (submit)="$event.preventDefault(); savePolicy()">
-          <label class="field-label" for="change-days">Días límite para cambios</label>
-          <input id="change-days" class="text-field" name="changeDays" type="number" min="1" step="1" [(ngModel)]="days">
-          @if (policyError()) { <p class="field-error" role="alert">{{ policyError() }}</p> }
-          @if (policyNotice()) { <p class="field-hint" role="status">{{ policyNotice() }}</p> }
-          <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="savingPolicy() || Number(days) === current.days">{{ savingPolicy() ? 'Guardando…' : 'Guardar plazo' }}</button></div>
-        </form>
-      } @else if (!loadError()) { <p class="muted" role="status">Cargando…</p> }
-    </section>
+    <div class="rules-grid">
+      <section class="rule-card" aria-labelledby="rule-change-title">
+        <header class="rule-card__head"><span class="rule-card__icon rule-card__icon--blue" aria-hidden="true">⇄</span>
+          <div><h3 id="rule-change-title">Cambios de productos</h3><p>Tiempo que tiene el cliente para cambiar lo que compró.</p></div></header>
+        @if (policy(); as current) {
+          <form class="rule-card__body" (submit)="$event.preventDefault(); savePolicy()">
+            <label class="rule-field"><span class="rule-field__label">Plazo para cambios</span>
+              <span class="rule-input"><input id="change-days" name="changeDays" type="number" min="1" step="1" [(ngModel)]="days"><b>días</b></span></label>
+            <p class="rule-note">Cada venta conserva el plazo con el que se registró.</p>
+            @if (policyError()) { <p class="field-error" role="alert">{{ policyError() }}</p> }
+            <div class="rule-card__foot"><button class="button button--primary" type="submit" [disabled]="savingPolicy() || Number(days) === current.days">{{ savingPolicy() ? 'Guardando…' : 'Guardar' }}</button></div>
+          </form>
+        } @else if (!loadError()) { <p class="muted rule-card__loading" role="status">Cargando…</p> }
+      </section>
 
-    <section class="panel module-panel">
-      <div class="module-toolbar"><div><h3>Apartados</h3><p class="muted">Pago inicial mínimo y plazo para retirar los productos. Los apartados existentes conservan lo que tenían al crearse.</p></div></div>
-      @if (layaway(); as current) {
-        <form class="settings-form" (submit)="$event.preventDefault(); saveLayaway()">
-          <label class="settings-check"><input id="layaway-require-minimum" type="checkbox" role="switch" name="requireMinimum" [(ngModel)]="requireMinimum"> Exigir un pago inicial mínimo al crear el apartado</label>
-          <p class="field-hint">{{ requireMinimum ? 'Quien crea el apartado debe cobrar al menos este porcentaje del total.' : 'Sin exigencia: el pago inicial puede ser cualquier valor mayor que cero.' }}</p>
-          <label class="field-label field-label--spaced" for="layaway-percentage">Porcentaje mínimo del pago inicial</label>
-          <div class="money-field"><span>%</span><input id="layaway-percentage" name="layawayPercentage" type="number" min="0.01" max="100" step="0.01" [(ngModel)]="percentage" [disabled]="!requireMinimum"><b>del total</b></div>
-          <label class="field-label field-label--spaced" for="layaway-days">Plazo por defecto</label>
-          <div class="money-field"><span>#</span><input id="layaway-days" name="layawayDays" type="number" min="1" max="365" step="1" [(ngModel)]="layawayDays" [disabled]="chooseEachDate"><b>días</b></div>
-          <label class="settings-check"><input type="checkbox" name="chooseEachDate" [(ngModel)]="chooseEachDate"> Elegir la fecha límite en cada apartado</label>
-          @if (layawayError()) { <p class="field-error" role="alert">{{ layawayError() }}</p> }
-          @if (layawayNotice()) { <p class="field-hint" role="status">{{ layawayNotice() }}</p> }
-          <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="savingLayaway() || !layawayChanged(current)">{{ savingLayaway() ? 'Guardando…' : 'Guardar apartados' }}</button></div>
-        </form>
-      } @else if (!loadError()) { <p class="muted" role="status">Cargando…</p> }
-    </section>
+      <section class="rule-card" aria-labelledby="rule-layaway-title">
+        <header class="rule-card__head"><span class="rule-card__icon rule-card__icon--orange" aria-hidden="true">◷</span>
+          <div><h3 id="rule-layaway-title">Apartados</h3><p>Pago inicial y tiempo para retirar los productos.</p></div></header>
+        @if (layaway(); as current) {
+          <form class="rule-card__body" (submit)="$event.preventDefault(); saveLayaway()">
+            <label class="rule-switch"><input id="layaway-require-minimum" type="checkbox" role="switch" name="requireMinimum" [(ngModel)]="requireMinimum"><span class="rule-switch__track" aria-hidden="true"></span><span>Exigir un pago inicial mínimo</span></label>
+            @if (requireMinimum) {
+              <label class="rule-field rule-field--nested"><span class="rule-field__label">Pago inicial mínimo</span>
+                <span class="rule-input"><input id="layaway-percentage" name="layawayPercentage" type="number" min="0.01" max="100" step="0.01" [(ngModel)]="percentage"><b>% del total</b></span></label>
+            } @else { <p class="rule-note rule-note--nested">El pago inicial puede ser cualquier valor desde $1.</p> }
+            <div class="rule-divider"></div>
+            <label class="rule-switch"><input type="checkbox" role="switch" name="chooseEachDate" [(ngModel)]="chooseEachDate"><span class="rule-switch__track" aria-hidden="true"></span><span>Elegir la fecha límite en cada apartado</span></label>
+            @if (!chooseEachDate) {
+              <label class="rule-field rule-field--nested"><span class="rule-field__label">Plazo para retirar</span>
+                <span class="rule-input"><input id="layaway-days" name="layawayDays" type="number" min="1" max="365" step="1" [(ngModel)]="layawayDays"><b>días</b></span></label>
+            }
+            <p class="rule-note">Los apartados existentes conservan lo que tenían al crearse.</p>
+            @if (layawayError()) { <p class="field-error" role="alert">{{ layawayError() }}</p> }
+            <div class="rule-card__foot"><button class="button button--primary" type="submit" [disabled]="savingLayaway() || !layawayChanged(current)">{{ savingLayaway() ? 'Guardando…' : 'Guardar' }}</button></div>
+          </form>
+        } @else if (!loadError()) { <p class="muted rule-card__loading" role="status">Cargando…</p> }
+      </section>
 
-    <section class="panel module-panel">
-      <div class="module-toolbar"><div><h3>Créditos</h3><p class="muted">Plazo predeterminado del vencimiento al vender a crédito. Quien vende puede cambiar la fecha entre mañana y 90 días. Los créditos existentes conservan su vencimiento.</p></div></div>
-      @if (credit(); as current) {
-        <form class="settings-form" (submit)="$event.preventDefault(); saveCredit()">
-          <label class="field-label" for="credit-days">Plazo predeterminado</label>
-          <div class="money-field"><span>#</span><input id="credit-days" name="creditDays" type="number" min="1" max="90" step="1" [(ngModel)]="creditDays" [disabled]="creditChooseEachTime"><b>días</b></div>
-          <label class="settings-check"><input type="checkbox" name="creditChooseEachTime" [(ngModel)]="creditChooseEachTime"> Elegir el vencimiento en cada crédito (sin plazo predeterminado)</label>
-          <p class="field-label settings-subtitle">Clientes morosos y cupo</p>
-          <p class="muted">Al vender a crédito a un cliente con saldo vencido o que supera su cupo siempre aparece un aviso.</p>
-          <label class="settings-check"><input type="checkbox" name="creditBlock" [(ngModel)]="creditBlock"> Bloquear esas ventas: solo un Administrador puede autorizarlas</label>
-          @if (creditError()) { <p class="field-error" role="alert">{{ creditError() }}</p> }
-          @if (creditNotice()) { <p class="field-hint" role="status">{{ creditNotice() }}</p> }
-          <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="savingCredit() || !creditChanged(current)">{{ savingCredit() ? 'Guardando…' : 'Guardar créditos' }}</button></div>
-        </form>
-      } @else if (creditLoadError()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ creditLoadError() }} <button class="link-button" type="button" (click)="loadCredit()">Reintentar</button></div>
-      } @else { <p class="muted" role="status">Cargando…</p> }
-    </section>
+      <section class="rule-card" aria-labelledby="rule-credit-title">
+        <header class="rule-card__head"><span class="rule-card__icon rule-card__icon--green" aria-hidden="true">$</span>
+          <div><h3 id="rule-credit-title">Créditos</h3><p>Vencimiento sugerido y control de clientes morosos.</p></div></header>
+        @if (credit(); as current) {
+          <form class="rule-card__body" (submit)="$event.preventDefault(); saveCredit()">
+            <label class="rule-switch"><input type="checkbox" role="switch" name="creditChooseEachTime" [(ngModel)]="creditChooseEachTime"><span class="rule-switch__track" aria-hidden="true"></span><span>Elegir el vencimiento en cada venta</span></label>
+            @if (!creditChooseEachTime) {
+              <label class="rule-field rule-field--nested"><span class="rule-field__label">Vencimiento sugerido</span>
+                <span class="rule-input"><input id="credit-days" name="creditDays" type="number" min="1" max="90" step="1" [(ngModel)]="creditDays"><b>días</b></span></label>
+            }
+            <p class="rule-note">Quien vende puede cambiar la fecha entre mañana y 90 días.</p>
+            <div class="rule-divider"></div>
+            <label class="rule-switch"><input type="checkbox" role="switch" name="creditBlock" [(ngModel)]="creditBlock"><span class="rule-switch__track" aria-hidden="true"></span><span>Bloquear créditos a morosos o por encima del cupo</span></label>
+            <p class="rule-note rule-note--nested">{{ creditBlock ? 'Solo el Administrador puede autorizar esas ventas.' : 'Se avisa, pero se puede vender.' }}</p>
+            @if (creditError()) { <p class="field-error" role="alert">{{ creditError() }}</p> }
+            <div class="rule-card__foot"><button class="button button--primary" type="submit" [disabled]="savingCredit() || !creditChanged(current)">{{ savingCredit() ? 'Guardando…' : 'Guardar' }}</button></div>
+          </form>
+        } @else if (creditLoadError()) { <div class="inline-feedback inline-feedback--error rule-card__loading" role="alert">{{ creditLoadError() }} <button class="link-button" type="button" (click)="loadCredit()">Reintentar</button></div>
+        } @else { <p class="muted rule-card__loading" role="status">Cargando…</p> }
+      </section>
 
-    <section class="panel module-panel">
-      <div class="module-toolbar"><div><h3>Precio mayorista</h3><p class="muted">Unidades de un mismo producto desde las que se puede vender, apartar o entregar en un cambio a precio mayorista. Los documentos ya registrados no cambian.</p></div></div>
-      @if (sales(); as current) {
-        <form class="settings-form" (submit)="$event.preventDefault(); saveSales()">
-          <label class="field-label" for="wholesale-minimum">Mínimo de unidades</label>
-          <div class="money-field"><span>#</span><input id="wholesale-minimum" name="wholesaleMinimum" type="number" min="1" max="999" step="1" [(ngModel)]="wholesaleMinimum"><b>unidades</b></div>
-          @if (salesError()) { <p class="field-error" role="alert">{{ salesError() }}</p> }
-          @if (salesNotice()) { <p class="field-hint" role="status">{{ salesNotice() }}</p> }
-          <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="savingSales() || Number(wholesaleMinimum) === current.wholesaleMinimumQuantity">{{ savingSales() ? 'Guardando…' : 'Guardar mínimo' }}</button></div>
-        </form>
-      } @else if (salesLoadError()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ salesLoadError() }} <button class="link-button" type="button" (click)="loadSales()">Reintentar</button></div>
-      } @else { <p class="muted" role="status">Cargando…</p> }
-    </section>`,
-  styles: ['.settings-form { max-width: 460px; } .settings-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; } .settings-subtitle { margin-top: 18px; }'],
+      <section class="rule-card" aria-labelledby="rule-wholesale-title">
+        <header class="rule-card__head"><span class="rule-card__icon rule-card__icon--navy" aria-hidden="true">≡</span>
+          <div><h3 id="rule-wholesale-title">Precio mayorista</h3><p>Desde cuántas unidades de un mismo producto aplica.</p></div></header>
+        @if (sales(); as current) {
+          <form class="rule-card__body" (submit)="$event.preventDefault(); saveSales()">
+            <label class="rule-field"><span class="rule-field__label">Mínimo para mayorista</span>
+              <span class="rule-input"><input id="wholesale-minimum" name="wholesaleMinimum" type="number" min="1" max="999" step="1" [(ngModel)]="wholesaleMinimum"><b>unidades</b></span></label>
+            <p class="rule-note">Aplica en ventas, apartados y cambios. Lo ya registrado no cambia.</p>
+            @if (salesError()) { <p class="field-error" role="alert">{{ salesError() }}</p> }
+            <div class="rule-card__foot"><button class="button button--primary" type="submit" [disabled]="savingSales() || Number(wholesaleMinimum) === current.wholesaleMinimumQuantity">{{ savingSales() ? 'Guardando…' : 'Guardar' }}</button></div>
+          </form>
+        } @else if (salesLoadError()) { <div class="inline-feedback inline-feedback--error rule-card__loading" role="alert">{{ salesLoadError() }} <button class="link-button" type="button" (click)="loadSales()">Reintentar</button></div>
+        } @else { <p class="muted rule-card__loading" role="status">Cargando…</p> }
+      </section>
+    </div>`,
+  styleUrl: './settings-panel.scss',
 })
 export class SettingsPanel implements OnInit {
   private readonly api = inject(ConfigApi);

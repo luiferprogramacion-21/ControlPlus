@@ -565,6 +565,10 @@ El usuario decidió quitar el IVA de ControlPlus «de todo el sistema». Desapar
 - El usuario aclaró que el **correo de recuperación** solo debe mejorar su presentación: logo real de ControlPlus, colores azul marino/naranja, tipografía del sistema y código grande, claro y seleccionable. Se envía HTML con logo embebido y alternativa de texto. No se añade un flujo de cambio de correo ni se modifican los códigos o su validez.
 - El aviso de reemplazo al **emitir un carné nuevo** usa una modal de ControlPlus, solicitada por el usuario, en lugar de la confirmación nativa del navegador. Informa que el carné anterior dejará de servir y ofrece «Cancelar» y «Emitir carné»; cancelar, Escape o cerrar la ventana no emiten ni reemplazan el carné.
 
+### Decisión del 19 de noviembre de 2026: Configuración sin Numeración ni Motivos
+
+El usuario pidió quitar las pestañas **Numeración** y **Motivos** de Configuración: los consecutivos y los catálogos de motivos se crean solos (decisión del 13 de noviembre de 2026) y no requieren intervención. Se eliminaron `numbering-panel.ts` y `reasons-panel.ts`; las rutas de la API (`/api/document-numbering/*`, inicialización de motivos) siguen existiendo para reparación por API o script. `NUMBERING.MANAGE` ya no abre Configuración. Quedan cuatro pestañas: Establecimiento, Caja y turnos, Cambios/apartados/créditos e Impresión. La pestaña «Cambios, apartados y créditos» se rediseñó en cuatro tarjetas (Cambios de productos, Apartados, Créditos y Precio mayorista) con interruptores, campos con su unidad y un botón Guardar por tarjeta; la lógica y las rutas no cambiaron.
+
 ### Reglas del reparto
 
 - Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:

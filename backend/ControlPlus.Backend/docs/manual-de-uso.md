@@ -376,15 +376,13 @@ Menú **Inventario**: existencias, **Movimientos** (kardex de cada cambio) y ale
 
 ## 4.6 Configuración
 
-Menú **Configuración**, con seis pestañas (ControlPlus no maneja IVA):
+Menú **Configuración**, con cuatro pestañas. La numeración de documentos y los motivos de anulación se crean solos y no necesitan configuración; ControlPlus no maneja IVA.
 
 | Pestaña | Para qué sirve |
 | --- | --- |
 | **Establecimiento** | Nombre comercial, NIT o documento, teléfono, dirección y los textos de encabezado y pie del ticket. |
 | **Caja y turnos** | Modalidad predeterminada: individual o compartido (solo sin turno abierto). |
 | **Cambios, apartados y créditos** | Plazo de cambios de producto (15 días), pago inicial mínimo de apartados (20 %, se puede apagar; siempre al menos $1), plazo límite de apartados (15 días), plazo sugerido de los créditos (1 a 90 días) y **mínimo mayorista** (12 unidades). También el **bloqueo de créditos a morosos y de cupo excedido**: si lo activas, solo tú puedes autorizar una excepción. |
-| **Numeración** | Muestra la numeración de ventas, abonos, apartados, compras, cambios y pedidos. Se crea sola al primer uso: aquí solo se consulta y, antes del primer documento, se ajusta. |
-| **Motivos** | Catálogos de motivos de anulación y cierre (ventas, compras, pedidos). Si falta alguno, **Completar faltantes**. |
 | **Impresión** | Perfiles de impresora y cola de impresión (ver 4.7). |
 
 ## 4.7 Impresora

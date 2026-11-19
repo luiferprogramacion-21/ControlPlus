@@ -4,8 +4,6 @@ import { vi } from 'vitest';
 import { SessionService } from '../../core/session.service';
 import { Config } from './config';
 import { ConfigApi, NUMBERING_KINDS, Numbering } from './config-api';
-import { NumberingPanel } from './numbering-panel';
-import { ReasonsPanel } from './reasons-panel';
 import { SettingsPanel } from './settings-panel';
 
 const numbering = (over: Partial<Numbering> = {}): Numbering => ({ documentType: 'VENTA', series: '001', prefix: 'VTA', lastNumber: 0, nextNumber: 1, version: 1, ...over });
@@ -27,100 +25,6 @@ describe('Configuración', () => {
     TestBed.configureTestingModule({ providers: [{ provide: ConfigApi, useValue: api }, { provide: SessionService, useValue: { has: (p: string) => permissions.includes(p) } }] });
   });
 
-  describe('NumberingPanel', () => {
-    async function open() { const f = TestBed.createComponent(NumberingPanel); f.detectChanges(); await f.whenStable(); await f.componentInstance.load(); return f.componentInstance; }
-
-    it('lista los siete documentos y distingue configurados de sin configurar', async () => {
-      api.numbering.mockImplementation(async (k: { key: string }) => k.key === 'sales' ? numbering({ lastNumber: 9, nextNumber: 10 }) : null);
-      const c = await open();
-      expect(c.rows()).toHaveLength(NUMBERING_KINDS.length);
-      expect(c.rows().filter(r => r.numbering).map(r => r.kind.key)).toEqual(['sales']);
-    });
-
-    it('muestra el próximo número real y no ofrece ajustes cuando el servidor los bloquea', async () => {
-      api.numbering.mockImplementation(async (k: { key: string }) => k.key === 'sales'
-        ? numbering({ series: 'CP-2026-01', lastNumber: 13, nextNumber: 14, canCorrect: false }) : null);
-      const fixture = TestBed.createComponent(NumberingPanel);
-      fixture.detectChanges(); await fixture.whenStable(); await fixture.componentInstance.load(); fixture.detectChanges();
-      const salesRow = fixture.nativeElement.querySelector('tbody tr') as HTMLElement;
-      expect(salesRow.textContent).toContain('Próximo: VTA-CP-2026-01-14');
-      expect(salesRow.textContent).toContain('Ya no editable');
-      expect(salesRow.textContent).not.toContain('VTA-001-000001');
-      expect(salesRow.querySelector('button')).toBeNull();
-    });
-
-    it('un error al consultar un tipo no tumba a los demás', async () => {
-      api.numbering.mockImplementation(async (k: { key: string }) => { if (k.key === 'layaways') throw new HttpErrorResponse({ status: 500 }); return null; });
-      const c = await open();
-      expect(c.rows().find(r => r.kind.key === 'layaways')?.error).not.toBe(''); expect(c.rows().find(r => r.kind.key === 'sales')?.error).toBe('');
-    });
-
-    it('configura ventas con prefijo editable y crea el consecutivo', async () => {
-      const c = await open(); api.createNumbering.mockResolvedValue(numbering());
-      c.open(c.rows().find(r => r.kind.key === 'sales')!); c.prefix = ' vta '; c.first = 1;
-      await c.save();
-      expect(api.createNumbering).toHaveBeenCalledWith(expect.objectContaining({ key: 'sales' }), 'VTA', 1);
-      expect(c.editing()).toBeNull(); expect(c.notice()).toContain('ventas');
-    });
-
-    it('los documentos de prefijo fijo rechazan otro prefijo y un primer número distinto de 1', async () => {
-      const c = await open(); const row = c.rows().find(r => r.kind.key === 'sale-changes')!;
-      c.open(row); expect([c.prefix, c.first]).toEqual(['CAM', 1]);
-      c.prefix = 'XYZ'; expect(c.validation(row)).toContain('CAM');
-      c.prefix = 'CAM'; c.first = 5; expect(c.validation(row)).toContain('empieza en 1');
-      c.first = 1; expect(c.validation(row)).toBe('');
-    });
-
-    it('configura PED con el prefijo y primer número fijos', async () => {
-      const c = await open(); const row = c.rows().find(r => r.kind.key === 'purchase-orders')!;
-      c.open(row); expect([c.prefix, c.first]).toEqual(['PED', 1]);
-      expect(c.preview(row)).toBe('PED-[serie]-1');
-      api.createNumbering.mockResolvedValue(numbering({ documentType: 'PEDIDO_COMPRA', prefix: 'PED' }));
-      await c.save();
-      expect(api.createNumbering).toHaveBeenCalledWith(row.kind, 'PED', 1);
-      expect(c.notice()).toContain('pedidos de compra');
-    });
-
-    it('corrige un consecutivo existente con su versión y muestra el error del servidor', async () => {
-      api.numbering.mockImplementation(async (k: { key: string }) => k.key === 'sales' ? numbering({ version: 7, canCorrect: true }) : null);
-      const c = await open(); const row = c.rows().find(r => r.kind.key === 'sales')!;
-      c.open(row); c.first = 100; api.updateNumbering.mockRejectedValueOnce(new HttpErrorResponse({ status: 409, error: { title: 'No puede modificarse después de la primera venta.' } }));
-      await c.save();
-      expect(api.updateNumbering).toHaveBeenCalledWith(row.kind, 'VTA', 100, 7); expect(c.formError()).toContain('primera venta'); expect(c.editing()).not.toBeNull();
-    });
-
-    it('no envía una corrección si no se cambió ningún valor', async () => {
-      api.numbering.mockImplementation(async (k: { key: string }) => k.key === 'credit-payments'
-        ? numbering({ prefix: 'ABO', canCorrect: true }) : null);
-      const c = await open(); const row = c.rows().find(r => r.kind.key === 'credit-payments')!;
-      c.open(row); await c.save();
-      expect(api.updateNumbering).not.toHaveBeenCalled();
-      expect(c.formError()).toContain('No hay cambios');
-      expect(c.editing()).not.toBeNull();
-    });
-
-    it('un ajuste permitido actualiza el próximo número visible', async () => {
-      let nextNumber = 1;
-      api.numbering.mockImplementation(async (k: { key: string }) => k.key === 'purchases'
-        ? numbering({ prefix: 'CMP', series: 'CP-2026-01', lastNumber: nextNumber - 1, nextNumber, canCorrect: true }) : null);
-      const c = await open(); const row = c.rows().find(r => r.kind.key === 'purchases')!;
-      c.open(row); c.first = 5;
-      api.updateNumbering.mockImplementation(async () => { nextNumber = 5; return numbering({ prefix: 'CMP', nextNumber: 5 }); });
-      await c.save();
-      expect(api.updateNumbering).toHaveBeenCalledWith(row.kind, 'CMP', 5, row.numbering!.version);
-      const updated = c.rows().find(r => r.kind.key === 'purchases')!;
-      expect(updated.numbering?.nextNumber).toBe(5);
-      expect(c.visibleNumber(updated.numbering!)).toBe('CMP-CP-2026-01-5');
-    });
-
-    it('valida prefijo vacío o largo y primer número no entero', async () => {
-      const c = await open(); const row = c.rows().find(r => r.kind.key === 'sales')!; c.open(row);
-      c.prefix = ''; expect(c.validation(row)).toContain('obligatorio');
-      c.prefix = 'ABCDEFGHIJK'; expect(c.validation(row)).toContain('10');
-      c.prefix = 'VTA'; c.first = 0; expect(c.validation(row)).toContain('mayor que cero');
-      c.first = 1.5; expect(c.validation(row)).toContain('entero');
-    });
-  });
 
   describe('SettingsPanel', () => {
     async function open() { const f = TestBed.createComponent(SettingsPanel); f.detectChanges(); await f.whenStable(); return f.componentInstance; }
@@ -241,38 +145,14 @@ describe('Configuración', () => {
     });
   });
 
-  describe('ReasonsPanel', () => {
-    async function open() { const f = TestBed.createComponent(ReasonsPanel); f.detectChanges(); await f.whenStable(); return f.componentInstance; }
-
-    it('muestra qué grupos están sin inicializar y cuáles tienen motivos', async () => {
-      api.reasons.mockImplementation(async (g: { key: string }) => g.key === 'sale' ? [{ id: '1', code: 'OTRO', name: 'Otro' }] : []);
-      const c = await open();
-      expect(c.states().find(s => s.group.key === 'sale')?.reasons).toHaveLength(1); expect(c.states().find(s => s.group.key === 'purchase')?.reasons).toEqual([]);
-    });
-
-    it('inicializar crea los faltantes y actualiza el grupo', async () => {
-      const c = await open(); api.initializeReasons.mockResolvedValue([{ id: '1', code: 'A', name: 'A' }, { id: '2', code: 'B', name: 'B' }]);
-      await c.initialize(c.states().find(s => s.group.key === 'purchase')!);
-      expect(c.states().find(s => s.group.key === 'purchase')?.reasons).toHaveLength(2); expect(c.notice()).toContain('(2)');
-    });
-
-    it('un error al inicializar queda en el grupo sin afectar a los demás', async () => {
-      const c = await open(); api.initializeReasons.mockRejectedValue(new HttpErrorResponse({ status: 409 }));
-      await c.initialize(c.states().find(s => s.group.key === 'sale')!);
-      expect(c.states().find(s => s.group.key === 'sale')?.error).not.toBe(''); expect(c.states().find(s => s.group.key === 'order-close')?.error).toBe('');
-    });
-  });
 
   describe('Config', () => {
-    it('la pestaña inicial y las visibles dependen de los permisos', () => {
+    it('la pestaña inicial depende de los permisos; ya no hay Numeración ni Motivos', () => {
       const all = TestBed.createComponent(Config).componentInstance;
-      expect([all.tab(), all.canNumber, all.canConfigure]).toEqual(['numbering', true, true]);
-      permissions = ['CONFIGURATION.MANAGE'];
-      const onlyConfig = TestBed.createComponent(Config).componentInstance;
-      expect([onlyConfig.tab(), onlyConfig.canNumber, onlyConfig.canConfigure]).toEqual(['establishment', false, true]);
-      permissions = ['NUMBERING.MANAGE'];
-      const onlyNumbering = TestBed.createComponent(Config).componentInstance;
-      expect([onlyNumbering.tab(), onlyNumbering.canNumber, onlyNumbering.canConfigure]).toEqual(['numbering', true, false]);
+      expect([all.tab(), all.canConfigure]).toEqual(['establishment', true]);
+      permissions = ['CASH.SHIFT_MODE_MANAGE'];
+      const onlyShift = TestBed.createComponent(Config).componentInstance;
+      expect([onlyShift.tab(), onlyShift.canConfigure]).toEqual(['shift-mode', false]);
     });
   });
 });
