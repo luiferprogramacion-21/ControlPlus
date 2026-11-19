@@ -13,6 +13,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { RouterLink } from '@angular/router';
 import { SessionService } from '../../core/session.service';
 import { errorText, Page } from '../../core/api';
+import { profitPercentOf, suggestedPrice } from '../../shared/price-calculator';
 import { CatalogApi, Category, CostHistory, CreateProductInput, Product, ProductInput, Supplier, Unit } from './catalog-api';
 
 interface ProductCreateAttempt {
@@ -86,6 +87,31 @@ export class Catalog implements OnInit {
     initialQuantity: [0, [Validators.required, Validators.min(0), Validators.max(2147483647), Validators.pattern(/^\d+$/)]],
     initialUnitCost: ['', Validators.pattern(/^\d{1,14}(?:\.\d{1,4})?$/)],
   });
+
+  // --- calculadora de precio (decisión del 18 de noviembre de 2026) -------------------------------
+  readonly profitPercent = signal<number | null>(null);
+  readonly priceHint = signal('');
+  setProfitPercent(value: string): void { this.profitPercent.set(value === '' || !Number.isFinite(Number(value)) ? null : Number(value)); this.priceHint.set(''); }
+  /** Costo con el que se calcula: el de compra que se escribe al crear, o el promedio actual si se puede ver. */
+  referenceCost(product: Product): number | null {
+    if (!product.id) { const value = Number(this.productForm.controls.initialUnitCost.value); return Number.isFinite(value) && value > 0 ? value : null; }
+    return product.canViewCost && product.averageCost != null && product.averageCost > 0 ? product.averageCost : null;
+  }
+  costLabel(product: Product): string { return product.id ? 'Costo promedio' : 'Costo de compra'; }
+  /** Pone en el precio elegido el costo más la ganancia indicada, redondeado hacia arriba de 50 en 50. */
+  applyProfitTo(target: 'retailPrice' | 'wholesalePrice', product: Product): void {
+    const price = suggestedPrice(this.referenceCost(product), this.profitPercent());
+    if (price === null) { this.priceHint.set('Indica el costo del producto y el % de ganancia para calcular el precio.'); return; }
+    this.priceHint.set('');
+    if (target === 'retailPrice') this.productForm.controls.retailPrice.setValue(price); else this.productForm.controls.wholesalePrice.setValue(String(price));
+    this.productForm.controls[target].markAsDirty();
+  }
+  /** Cuánto se gana sobre el costo con el precio minorista que está escrito. */
+  priceNote(product: Product): { text: string; low: boolean } | null {
+    const percent = profitPercentOf(Number(this.productForm.controls.retailPrice.value), this.referenceCost(product));
+    if (percent === null) return null;
+    return percent < 0 ? { text: 'El precio minorista está por debajo del costo.', low: true } : { text: `Con el precio minorista ganas ${percent} % sobre el costo.`, low: false };
+  }
 
   setHasTax(enabled: boolean): void {
     const control = this.productForm.controls.taxPercentage;

@@ -78,6 +78,34 @@ describe('Catalog: existencias iniciales', () => {
     expect(component.notice()).toBe('');
   });
 
+  describe('calculadora de precio', () => {
+    const product = (overrides: object = {}) => ({ id: '', version: 0, canViewCost: false, averageCost: null, ...overrides }) as never;
+    it('al crear usa el costo de compra escrito y pone el precio minorista o el mayorista', () => {
+      const p = product();
+      expect(component.referenceCost(p)).toBeNull();
+      component.productForm.patchValue({ initialUnitCost: '1234' });
+      expect(component.referenceCost(p)).toBe(1234);
+      component.setProfitPercent('25');
+      component.applyProfitTo('retailPrice', p);
+      expect(component.productForm.controls.retailPrice.value).toBe(1550);
+      component.applyProfitTo('wholesalePrice', p);
+      expect(component.productForm.controls.wholesalePrice.value).toBe('1550');
+      expect(component.priceNote(p)?.text).toContain('ganas 25.6 %');
+    });
+    it('sin costo o sin porcentaje no cambia el precio y lo explica', () => {
+      const p = product();
+      component.setProfitPercent('30'); component.applyProfitTo('retailPrice', p);
+      expect(component.productForm.controls.retailPrice.value).toBe(1000);
+      expect(component.priceHint()).toContain('% de ganancia');
+    });
+    it('al editar usa el costo promedio solo si se puede ver', () => {
+      expect(component.referenceCost(product({ id: 'p1', canViewCost: false, averageCost: 900 }))).toBeNull();
+      expect(component.referenceCost(product({ id: 'p1', canViewCost: true, averageCost: 900 }))).toBe(900);
+      component.productForm.patchValue({ retailPrice: 800 });
+      expect(component.priceNote(product({ id: 'p1', canViewCost: true, averageCost: 900 }))?.low).toBe(true);
+    });
+  });
+
   describe('IVA del producto (interruptor Sin IVA / Con IVA)', () => {
     const existing = (taxPercentage: number | null) => ({
       id: 'p1', version: 1, name: 'Producto', internalCode: 'P-000001', categoryId: 'category', measurementUnitId: 'unit', barcode: null,

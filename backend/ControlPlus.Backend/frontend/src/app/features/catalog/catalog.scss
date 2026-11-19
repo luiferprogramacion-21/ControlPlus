@@ -31,6 +31,10 @@ mat-paginator { display:block; min-width:0; overflow:visible; font-size:14px; }
 .editor { min-width:0; }
 .editor form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .editor form mat-form-field { width:100%; min-width:0; }
+.price-calculator { grid-column: 1 / -1; display: grid; gap: 8px; padding: 12px 14px; border-radius: 9px; background: var(--cp-primary-soft); }
+.price-calculator__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.price-calculator small { color: var(--cp-success); }
+.price-calculator .price-calculator__low { color: var(--cp-error); }
 .editor h3 { margin-top:0; }
 .editor .actions { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:12px; }
 .editor .form-error { position:fixed; bottom:20px; right:20px; z-index:60; width:min(520px, calc(100vw - 40px)); margin:0; box-shadow:var(--cp-shadow); }

@@ -9,11 +9,13 @@
         <p class="muted">Un cambio no es una anulación: la venta original se conserva y el cambio tiene su propio número. Requiere un turno de Caja abierto.</p>
 
         <h3>Productos que devuelve el cliente</h3>
-        <div class="table-wrap module-table-wrap"><table><thead><tr><th>Producto</th><th class="align-right">Vendidos</th><th class="align-right">Disponibles</th><th class="align-right">Devuelve</th><th>Revendible</th><th class="align-right">Valor</th></tr></thead><tbody>
+        <p class="form-hint">Solo se puede devolver lo que se compró en esta venta. Marca los productos que el cliente devuelve.</p>
+        <div class="table-wrap module-table-wrap"><table><thead><tr><th>Producto</th><th class="align-right">Vendidos</th><th class="align-right">Disponibles</th><th>Devolver</th><th>Revendible</th><th class="align-right">Valor</th></tr></thead><tbody>
           @for (line of returning(); track line.saleLineId) {
             <tr><td><strong>{{ line.name }}</strong><small>{{ line.code }}</small></td><td class="align-right numeric">{{ line.sold }}</td><td class="align-right numeric">{{ line.remaining }}</td>
-              <td class="align-right"><input class="text-field change-qty" type="number" min="0" [max]="line.remaining" step="1" [name]="'ret-' + line.saleLineId" [(ngModel)]="line.quantity" [attr.aria-label]="'Cantidad devuelta de ' + line.name"></td>
-              <td><label><input type="checkbox" [name]="'res-' + line.saleLineId" [(ngModel)]="line.resellable"> Sí, en buen estado</label></td>
+              <td><label class="change-return"><input type="checkbox" [name]="'sel-' + line.saleLineId" [ngModel]="line.quantity > 0" (ngModelChange)="toggleReturn(line, $event)" [attr.aria-label]="'Devolver ' + line.name"> Devolver</label>
+                @if (line.quantity > 0 && line.remaining > 1) { <input class="text-field change-qty" type="number" min="1" [max]="line.remaining" step="1" [name]="'ret-' + line.saleLineId" [ngModel]="line.quantity" (ngModelChange)="setReturnQuantity(line, $event)" [attr.aria-label]="'Cantidad devuelta de ' + line.name"> <small>de {{ line.remaining }}</small> }</td>
+              <td><label><input type="checkbox" [name]="'res-' + line.saleLineId" [(ngModel)]="line.resellable" [disabled]="line.quantity <= 0"> Sí, en buen estado</label></td>
               <td class="align-right numeric">{{ returnedValue(line) | currency:'COP':'symbol':'1.0-0' }}</td></tr>
           } @empty { <tr class="empty-row"><td colspan="6">Esta venta no tiene productos disponibles para devolver.</td></tr> }
         </tbody></table></div>
@@ -46,7 +48,7 @@
         }
         @if (settlement.mode !== 'none') {
           <h3>{{ settlement.mode === 'payment' ? 'Cobro de la diferencia' : 'Devolución al cliente' }}</h3>
-          <p class="form-hint">{{ settlement.mode === 'refund' && p.saleType === 'CONTADO' ? 'La devolución solo puede salir por los medios con los que se pagó la venta.' : '' }} Suma de medios: {{ money(appliedTotal) }} de {{ money(settlement.cashAmount) }}.</p>
+          <p class="form-hint">{{ settlement.mode === 'refund' && p.saleType === 'CONTADO' ? 'La devolución solo puede salir por los medios con los que se pagó la venta (' + originalPayments + ') y la caja debe tener efectivo suficiente si se devuelve en efectivo.' : '' }} Suma de medios: {{ money(appliedTotal) }} de {{ money(settlement.cashAmount) }}.</p>
           <cp-payment-methods [drafts]="drafts" [mode]="settlement.mode === 'payment' ? 'payment' : 'refund'" idPrefix="change" />
         }
       }

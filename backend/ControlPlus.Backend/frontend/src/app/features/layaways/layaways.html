@@ -76,7 +76,8 @@
     @if (detail(); as d) {
       <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="layaway-payment-title"><div class="module-form-sheet__backdrop" (click)="closePayment()"></div>
         <form class="panel panel--padded module-form" (submit)="$event.preventDefault(); savePayment()">
-          <div class="panel-heading"><h2 id="layaway-payment-title">Registrar abono</h2><p>{{ d.layaway.number }} · {{ d.layaway.customerName }} · saldo {{ money(d.layaway.balance) }}</p></div>
+          <div class="panel-heading"><h2 id="layaway-payment-title">Registrar abono</h2><p>{{ d.layaway.number }} · {{ d.layaway.customerName }}</p></div>
+          <div class="payment-balance" aria-live="polite"><div><span>Total a pagar</span><strong>{{ money(d.layaway.balance) }}</strong></div><div><span>Abono</span><strong>{{ money(appliedTotal) }}</strong></div><div class="payment-balance__remaining" [class.payment-balance__remaining--over]="appliedTotal > d.layaway.balance" [class.payment-balance__remaining--done]="appliedTotal > 0 && appliedTotal === d.layaway.balance"><span>Queda pendiente</span><strong>{{ appliedTotal > d.layaway.balance ? 'Supera el saldo' : money(d.layaway.balance - appliedTotal) }}</strong></div></div>
           <p class="muted">El abono requiere un turno de Caja abierto.</p>
           <cp-payment-methods [drafts]="drafts" mode="payment" idPrefix="layaway" />
           <div class="layaway-totals"><span>Total aplicado <strong>{{ money(appliedTotal) }}</strong></span><span class="layaway-change">Cambio <strong>{{ money(change) }}</strong></span></div>

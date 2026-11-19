@@ -36,6 +36,25 @@ describe('Purchases', () => {
   it('rechaza cantidad mayor que la pendiente sin enviar HTTP', async () => { component.receipt.lines[0].quantity = 5; expect(component.receiptValidation()).toContain('pendiente'); await component.receive(); expect(receive).not.toHaveBeenCalled(); });
   it('rechaza cantidades fraccionarias y costo inválido', () => { component.receipt.lines[0].quantity = 1.5; expect(component.receiptValidation()).toContain('entera'); component.receipt.lines[0].quantity = 2; component.receipt.lines[0].unitCost = 0; expect(component.receiptValidation()).toContain('costo'); });
   it('muestra el precio anterior y restringe el precio nuevo al Administrador', () => { expect(component.productRetailPrice(productId)).toBe(1000); expect(component.receipt.lines[0].newRetailPrice).toBeNull(); expect(component.canChangeRetailPrice).toBe(false); component.receipt.lines[0].quantity = 2; component.receipt.lines[0].newRetailPrice = 1000.5; expect(component.receiptValidation()).toContain('precio nuevo'); });
+  it('el precio nuevo es opcional: la recepción arranca en blanco y se puede enviar sin precio', () => {
+    expect(component.receipt.lines[0].newRetailPrice).toBeNull();
+    component.receipt.lines[0].quantity = 2;
+    expect(component.receiptValidation()).toBe('');
+  });
+  it('la calculadora pone en «precio nuevo» el costo más la ganancia, redondeado de 50 en 50', () => {
+    const line = component.receipt.lines[0]; line.unitCost = 1234;
+    component.profit[line.orderLineId] = 25; component.applyProfit(line.orderLineId, line);
+    expect(line.newRetailPrice).toBe(1550);
+    component.profit[line.orderLineId] = null; line.newRetailPrice = null; component.applyProfit(line.orderLineId, line);
+    expect(line.newRetailPrice).toBeNull(); expect(component.error()).toContain('% de ganancia');
+  });
+  it('avisa cuánto se gana, o que el precio queda por debajo del costo', () => {
+    const line = component.receipt.lines[0]; line.unitCost = 800;
+    expect(component.profitNote(line)?.text).toBe('Con el precio actual ganas 25 %');
+    line.newRetailPrice = 1200; expect(component.profitNote(line)?.text).toBe('Ganas 50 % sobre el costo');
+    line.newRetailPrice = 700; expect(component.profitNote(line)).toEqual({ text: 'Por debajo del costo', low: true });
+    line.unitCost = 0; expect(component.profitNote(line)).toBeNull();
+  });
   it('impide doble envío mientras la recepción está pendiente', async () => {
     component.receipt.lines[0].quantity = 2;
     expect(component.receiptValidation()).toBe('');

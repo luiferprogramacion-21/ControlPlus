@@ -117,6 +117,38 @@ describe('SaleChange: cambio de productos', () => {
     expect((dialogError as Error).message).toContain('rol superior');
   });
 
+  it('solo se devuelve lo comprado: marcar toma todo lo disponible y la cantidad nunca lo supera', async () => {
+    const c = await open(); const line = c.returning()[0];
+    expect(line.quantity).toBe(0);
+    c.toggleReturn(line, true); expect(line.quantity).toBe(3);
+    c.setReturnQuantity(line, 9); expect(line.quantity).toBe(3);
+    c.setReturnQuantity(line, 0); expect(line.quantity).toBe(1);
+    c.setReturnQuantity(line, 'abc'); expect(line.quantity).toBe(1);
+    c.setReturnQuantity(line, 2); expect(line.quantity).toBe(2);
+    c.toggleReturn(line, false); expect(line.quantity).toBe(0);
+  });
+
+  it('un 409 por regla de negocio (efectivo de la caja) conserva el formulario y muestra el motivo', async () => {
+    api.confirmChange.mockRejectedValueOnce(new HttpErrorResponse({ status: 409, error: { code: 'resource.conflict', title: 'El efectivo esperado no cubre la devolución.' } }));
+    const c = await open(); c.returning()[0].quantity = 2; c.addDelivered({ ...pants, retailPrice: 5000 }); c.drafts[0].appliedAmount = 15000;
+    const loads = api.changePreparation.mock.calls.length;
+    await c.confirm();
+    expect(api.changePreparation.mock.calls.length).toBe(loads);
+    expect(c.returning()[0].quantity).toBe(2);
+    expect(c.delivering()).toHaveLength(1);
+    expect(dialogError).toBeInstanceOf(HttpErrorResponse);
+  });
+
+  it('un conflicto de versión refresca los datos pero conserva lo que el usuario marcó', async () => {
+    api.confirmChange.mockRejectedValueOnce(new HttpErrorResponse({ status: 409, error: { code: 'concurrency.conflict', title: 'La venta fue modificada.' } }));
+    const c = await open(); c.returning()[0].quantity = 2; c.addDelivered(pants); c.drafts[0].appliedAmount = 5000; c.drafts[0].receivedAmount = 5000;
+    const loads = api.changePreparation.mock.calls.length;
+    await c.confirm(); await new Promise(resolve => setTimeout(resolve));
+    expect(api.changePreparation.mock.calls.length).toBe(loads + 1);
+    expect(c.returning()[0].quantity).toBe(2);
+    expect(c.error()).toContain('revisa los valores');
+  });
+
   it('reintentar el mismo cambio conserva la clave de idempotencia', async () => {
     api.confirmChange.mockRejectedValueOnce(new HttpErrorResponse({ status: 500 }));
     const c = await open(); c.returning()[0].quantity = 1; c.addDelivered(pants); c.drafts[0].appliedAmount = 15000; c.drafts[0].receivedAmount = 15000;

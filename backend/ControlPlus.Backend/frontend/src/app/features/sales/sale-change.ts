@@ -57,18 +57,36 @@ export class SaleChange implements OnInit {
     catch { /* The server still enforces the minimum. */ }
   }
 
-  async load(): Promise<void> {
+  /** `keep` conserva lo que el usuario ya marcó (ajustado a lo que sigue disponible) al refrescar por un conflicto de versión. */
+  async load(keep = false): Promise<void> {
+    const previous = keep ? new Map(this.returning().map(line => [line.saleLineId, line])) : null;
     this.loading.set(true); this.error.set('');
     try {
       const prep = await this.api.changePreparation(this.sale().id);
       this.prep.set(prep);
       this.returning.set(prep.lines.filter(line => line.remainingQuantity > 0).map(line => {
         const original = this.sale().lines.find(l => l.id === line.saleLineId);
+        const before = previous?.get(line.saleLineId);
         return { saleLineId: line.saleLineId, productId: line.productId, code: line.productCode, name: line.productName, sold: line.soldQuantity,
-          remaining: line.remainingQuantity, net: original?.netAmount ?? 0, quantity: 0, resellable: true };
+          remaining: line.remainingQuantity, net: original?.netAmount ?? 0,
+          quantity: before ? Math.min(Number(before.quantity) || 0, line.remainingQuantity) : 0, resellable: before?.resellable ?? true };
       }));
+      if (keep) this.error.set('La venta cambió mientras preparabas el cambio. Se actualizaron los datos; revisa los valores y confirma de nuevo.');
     } catch (e) { this.error.set(errorText(e)); }
     finally { this.loading.set(false); }
+  }
+
+  // --- productos que devuelve el cliente: solo se devuelve lo que se compró -------------------
+  /** Marca o desmarca una línea; al marcarla se toma todo lo disponible de esa línea. */
+  toggleReturn(line: Returning, selected: boolean): void { line.quantity = selected ? line.remaining : 0; }
+  /** Cantidad de una línea con varias unidades: entero entre 1 y lo disponible, nunca más de lo comprado. */
+  setReturnQuantity(line: Returning, value: unknown): void {
+    const parsed = Math.trunc(Number(value));
+    line.quantity = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), line.remaining) : 1;
+  }
+  /** Medios y valores con los que se pagó la venta original (una devolución solo sale por ellos). */
+  get originalPayments(): string {
+    return this.sale().payments.map(payment => `${payment.methodName} ${money(payment.appliedAmount)}`).join(' · ');
   }
 
   // --- amounts -------------------------------------------------------------------------------
@@ -170,7 +188,12 @@ export class SaleChange implements OnInit {
         this.pending = null;
         throw new Error(credentials ? 'No se autorizó el cambio. El autorizador debe tener un rol superior al tuyo y el permiso de autorizar cambios.' : 'No tienes permiso para autorizar cambios de productos.');
       }
-      if (error instanceof HttpErrorResponse && error.status === 409) { this.pending = null; void this.load(); }
+      if (error instanceof HttpErrorResponse && error.status === 409) {
+        this.pending = null;
+        // Solo un conflicto de versión justifica refrescar; las demás reglas (por ejemplo, el efectivo de la caja) se explican
+        // y el formulario se conserva para corregir y volver a intentar.
+        if (error.error?.code === 'concurrency.conflict') void this.load(true);
+      }
       throw error;
     } finally { this.saving.set(false); }
   }
