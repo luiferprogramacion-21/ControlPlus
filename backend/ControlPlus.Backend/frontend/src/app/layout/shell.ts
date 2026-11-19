@@ -7,6 +7,7 @@ import { EstablishmentService } from '../core/establishment';
 import { DisplayScaleService } from '../core/display-scale';
 import { WindowsShortcuts } from '../core/windows-shortcuts';
 import { RowActions } from '../core/row-actions';
+import { ListHelpers } from '../core/list-helpers';
 import { WindowSheet } from '../shared/window-sheet';
 import { Icon } from './icon';
 import { paginatorIntlProvider } from './paginator-intl';
@@ -149,6 +150,7 @@ export class Shell {
   constructor() {
     inject(WindowsShortcuts).start();
     inject(RowActions).start();
+    inject(ListHelpers).start();
     void this.establishment.load().catch(() => undefined);
     this.syncHeader(this.router.url);
     this.router.events.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd), takeUntilDestroyed())

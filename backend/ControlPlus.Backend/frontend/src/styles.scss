@@ -788,3 +788,10 @@ kbd { display: inline-block; min-width: 28px; padding: 2px 7px; border: 1px soli
 .row-menu__item--danger { color: var(--cp-error); }
 .row-menu__item--danger:hover:not(:disabled), .row-menu__item--danger:focus-visible { background: var(--cp-error-soft); }
 .row-menu__item:disabled { color: var(--cp-text-muted); cursor: default; }
+/* Listas más simples (core/list-helpers.ts): búsqueda al escribir, título una sola vez y crear desde la lista vacía. */
+.list-auto-search { display: none !important; }
+.list-empty-create { display: flex; margin: 12px auto 0; }
+/* El título de la pantalla ya está en la barra superior: dentro de la página solo quedan sus botones, a la derecha. */
+.module-heading { justify-content: flex-end; }
+.module-heading > .module-heading__title, .module-heading > div:first-child:has(> h2), .catalog__header > div:first-child:has(> h2) { display: none; }
+.module-heading:not(:has(button, a)) { display: none; }

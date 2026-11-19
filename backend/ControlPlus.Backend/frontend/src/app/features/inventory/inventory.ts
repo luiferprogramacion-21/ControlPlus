@@ -66,6 +66,11 @@ export class Inventory implements OnInit {
   private applyStockSelection(stock: Stock | null): void { this.selected.set(stock); this.movements.set(null); this.historyLoading.set(false); ++this.movementRequestId; this.movementPage = 1; this.pending = null; this.conflict.set(false); this.resetForm(); }
   async openHistory(stock: Stock): Promise<void> { if (await this.select(stock) && this.selected()?.productId === stock.productId) this.historyOpen.set(true); }
   async openAdjustment(stock?: Stock): Promise<void> { if (this.pending || this.saving() || !await this.selectStock(stock ?? null) || this.saving() || this.selected() !== (stock ?? null)) return; this.adjustmentProductId.set(stock?.productId ?? ''); this.adjustmentOpen.set(true); this.error.set(''); }
+  /** + y − de la fila (decisión del 19 de noviembre de 2026): abren el ajuste con una unidad ya escrita. */
+  async quickAdjust(stock: Stock, delta: 1 | -1): Promise<void> {
+    await this.openAdjustment(stock);
+    if (this.adjustmentOpen() && this.selected()?.productId === stock.productId && !this.hasPending) this.quantityDelta = delta;
+  }
   async closeAdjustment(): Promise<void> {
     if (this.saving()) return;
     const pending = this.pending; const selected = this.selected();
