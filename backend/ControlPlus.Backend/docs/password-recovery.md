@@ -31,6 +31,10 @@ Decisión del 18 de noviembre de 2026 (AGENTS.md, «Decisión del 18 de noviembr
 
 **Internet:** se necesita solo para enviar el código. Sin conexión, o sin correo configurado, la pantalla le pide al usuario que el Administrador restablezca su contraseña.
 
+## Presentación del correo (18 de noviembre de 2026)
+
+El correo de recuperación incluye logo blanco de ControlPlus embebido en el mensaje (CID), fondo azul marino `#0F2C4D`, acento naranja `#FD6D32`, tipografía Segoe UI y código de seis dígitos grande y seleccionable. Tiene alternativa de texto para clientes sin HTML y no descarga imágenes externas. Esta mejora no añade un proceso de cambio de correo ni altera los códigos, límites o vencimientos. La vista previa y las pruebas de presentación usan datos ficticios; el correo real se comprobará tras actualizar el servicio.
+
 ## API
 
 - `POST /api/auth/password-recovery` `{ userName }` → 202 `{ message }`. Responde 503 si el correo saliente no está configurado o no se pudo enviar; el mensaje explica qué hacer.

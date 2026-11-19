@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Mail;
-using System.Text;
 using ControlPlus.Application.Security.Ports;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -54,16 +53,7 @@ public sealed class SmtpEmailSender(IOptions<EmailOptions> options, ILogger<Smtp
                 Credentials = new NetworkCredential(value.UserName!.Trim(), value.Password),
                 Timeout = Math.Clamp(value.TimeoutSeconds, 5, 120) * 1000
             };
-            using var mail = new MailMessage(
-                new MailAddress(value.FromAddress!.Trim(), value.FromName, Encoding.UTF8),
-                new MailAddress(message.To))
-            {
-                Subject = message.Subject,
-                Body = message.Body,
-                IsBodyHtml = false,
-                SubjectEncoding = Encoding.UTF8,
-                BodyEncoding = Encoding.UTF8
-            };
+            using var mail = SecurityEmailPresentation.Create(message, value);
             await client.SendMailAsync(mail, cancellationToken);
         }
         catch (Exception exception) when (exception is SmtpException or InvalidOperationException or FormatException)

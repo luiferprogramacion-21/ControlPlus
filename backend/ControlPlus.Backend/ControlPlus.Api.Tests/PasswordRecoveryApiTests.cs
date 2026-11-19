@@ -85,6 +85,10 @@ public sealed class PasswordRecoveryApiTests : IAsyncLifetime
         Assert.Equal(CashierEmail, mail.To);
         Assert.DoesNotContain(_cashierPassword, mail.Body);
         var code = Regex.Match(mail.Body, @"\b\d{6}\b").Value;
+        Assert.NotNull(mail.VerificationCode);
+        Assert.Equal(code, mail.VerificationCode.Code);
+        Assert.Equal(CashierName, mail.VerificationCode.UserName);
+        Assert.Equal(10, mail.VerificationCode.ValidForMinutes);
         var wrong = code == "000000" ? "111111" : "000000";
 
         Assert.Equal(HttpStatusCode.BadRequest, (await ConfirmAsync(client, CashierName, wrong, "Nueva-" + Secret(8))).StatusCode);

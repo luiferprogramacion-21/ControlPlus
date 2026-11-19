@@ -64,7 +64,10 @@ public sealed partial class PasswordRecoveryService(
                 Escríbalo en la pantalla de ingreso, en «¿Olvidaste tu contraseña?». Vale {minutes} minutos y sirve una sola vez.
 
                 Si usted no lo pidió, ignore este correo: su contraseña no cambia.
-                """), cancellationToken);
+                """,
+                new EmailVerificationCode("Cambia tu contraseña", user.DisplayName, user.UserName, code, minutes,
+                    "Vuelve a la pantalla de ingreso y escribe este código en «¿Olvidaste tu contraseña?» para elegir tu nueva contraseña.")),
+                cancellationToken);
         }
         catch (EmailDeliveryException)
         {

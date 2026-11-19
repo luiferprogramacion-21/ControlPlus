@@ -22,6 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="..\frontend\public\controlplus-logo-white.png"
+                      LogicalName="ControlPlus.Email.LogoWhite.png" />
     <EmbeddedResource Include="..\..\..\docs\ControlPlus_Fase4_Documento_y_Complementos.zip"
                       LogicalName="ControlPlus.Infrastructure.Database.ControlPlus_Fase4_Documento_y_Complementos.zip" />
   </ItemGroup>

@@ -1,7 +1,11 @@
 namespace ControlPlus.Application.Security.Ports;
 
-/// <summary>Mensaje de texto simple para un correo.</summary>
-public sealed record EmailMessage(string To, string Subject, string Body);
+/// <summary>Correo con alternativa de texto y, si incluye un código, presentación de seguridad de ControlPlus.</summary>
+public sealed record EmailMessage(string To, string Subject, string Body, EmailVerificationCode? VerificationCode = null);
+
+/// <summary>Contenido del código; el adaptador de correo se encarga del logo y la presentación HTML.</summary>
+public sealed record EmailVerificationCode(
+    string Heading, string RecipientName, string UserName, string Code, int ValidForMinutes, string Instructions);
 
 /// <summary>Envío de correo saliente (SMTP). Solo se usa para la recuperación de contraseña.</summary>
 public interface IEmailSender
