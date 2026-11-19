@@ -18,7 +18,6 @@
   </div>
 
   @if (error() && !editing() && !editingOrder() && !receiving() && !cancelling() && !orderTransition() && !choosingReceipt()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
-  @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
 
   @if (view === 'orders') {
     @if (lowStockGroups().length) {

@@ -5,6 +5,7 @@ import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
 import { CashFlowReport, ReportsApi, SalesOverview, saveFile } from './reports-api';
 import { aggregateCashFlow, barHeights, defaultRange, methodLabel, originLabel, validateRange } from './reports-math';
+import { toastSignal } from '../../core/toast';
 
 export type ReportKind = 'sales' | 'cash';
 const NOT_AVAILABLE = 'No disponible';
@@ -26,8 +27,8 @@ export class Reports implements OnInit {
   readonly shown = signal<ReportKind | null>(null);
   readonly loading = signal(false);
   readonly downloading = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   from = defaultRange().from;
   to = defaultRange().to;
   kind: ReportKind = 'sales';

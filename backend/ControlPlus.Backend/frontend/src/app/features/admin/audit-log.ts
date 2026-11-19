@@ -8,6 +8,7 @@ import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { AdminApi, AdminUser } from './admin-api';
 import { AUDIT_ACTION_GROUPS, auditActionLabel, auditActionModule } from './audit-actions';
+import { toastSignal } from '../../core/toast';
 
 /** One audit event as GET /api/audit-records returns it (only sanitized data, never secrets). */
 export interface AuditRecord {
@@ -72,7 +73,7 @@ export class AuditLog implements OnInit {
   readonly users = signal<AdminUser[]>([]);
   readonly expanded = signal<string | null>(null);
   readonly loading = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
   filter: AuditFilter = { from: today(), to: today(), userId: '', action: '', page: 1, pageSize: 50 };
   private requestId = 0;
 

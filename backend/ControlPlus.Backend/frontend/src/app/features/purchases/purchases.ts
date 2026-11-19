@@ -13,6 +13,7 @@ import { AuthorizationCredentials, AuthorizationDialog, authorizationBody } from
 import { ActivatedRoute } from '@angular/router';
 import { PurchaseOrderDocumentPrinter } from './purchase-order-document';
 import { profitPercentOf, suggestedPrice } from '../../shared/price-calculator';
+import { toastSignal } from '../../core/toast';
 
 export function currentColombiaDate(now = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -28,7 +29,7 @@ export class Purchases implements OnInit {
   private readonly orderDocument = inject(PurchaseOrderDocumentPrinter);
   private readonly route = inject(ActivatedRoute, { optional: true });
   readonly session = inject(SessionService); readonly purchases = signal<Page<PurchaseSummary> | null>(null); readonly orders = signal<Page<OrderSummary> | null>(null); readonly selectedPurchase = signal<Purchase | null>(null); readonly selectedOrder = signal<Order | null>(null); readonly suppliers = signal<Supplier[]>([]); readonly products = signal<Product[]>([]); readonly reasons = signal<CancellationReason[]>([]);
-  readonly loading = signal(false); readonly saving = signal(false); readonly error = signal(''); readonly notice = signal(''); readonly editing = signal(false); readonly receiving = signal(false); readonly cancelling = signal(false);
+  readonly loading = signal(false); readonly saving = signal(false); readonly error = toastSignal('error'); readonly notice = toastSignal('success'); readonly editing = signal(false); readonly receiving = signal(false); readonly cancelling = signal(false);
   readonly choosingReceipt = signal(false);
   readonly printingOrder = signal(false);
   readonly editingOrder = signal(false);

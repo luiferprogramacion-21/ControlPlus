@@ -8,6 +8,7 @@ import { SessionService } from '../../core/session.service';
 import { Customer, CustomerInput, CustomersApi } from './customers-api';
 import { CustomerHistory } from './customer-history';
 import { Icon } from '../../layout/icon';
+import { toastSignal } from '../../core/toast';
 @Component({ selector: 'cp-customers', imports: [A11yModule, FormsModule, MatPaginatorModule, Icon, CustomerHistory], templateUrl: './customers.html', styleUrls: ['../directory.scss', './customers.scss'] })
 export class Customers implements OnInit {
   private readonly api = inject(CustomersApi);
@@ -21,8 +22,8 @@ export class Customers implements OnInit {
   get canReadHistory(): boolean { return this.session.has('CUSTOMERS.HISTORY_READ'); }
   readonly loading = signal(false);
   readonly saving = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   search = ''; status: 'active' | 'inactive' | 'all' = 'active'; page = 1; pageSize = 20;
   form: CustomerInput = this.empty();
   private requestId = 0;

@@ -10,6 +10,7 @@ import { SessionService } from '../../core/session.service';
 import { Adjustment, InventoryApi, Movement, Reason, Stock, StockStatusFilter } from './inventory-api';
 import { Icon } from '../../layout/icon';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
+import { toastSignal } from '../../core/toast';
 @Component({ selector: 'cp-inventory', imports: [A11yModule, FormsModule, MatPaginatorModule, DatePipe, Icon], templateUrl: './inventory.html', styleUrls: ['../directory.scss', './inventory.scss'] })
 export class Inventory implements OnInit {
   private readonly api = inject(InventoryApi);
@@ -23,7 +24,7 @@ export class Inventory implements OnInit {
   readonly adjustmentOpen = signal(false);
   readonly adjustmentProductId = signal('');
   readonly loading = signal(false); readonly historyLoading = signal(false); readonly saving = signal(false);
-  readonly error = signal(''); readonly notice = signal(''); readonly conflict = signal(false);
+  readonly error = toastSignal('error'); readonly notice = toastSignal('success'); readonly conflict = signal(false);
   readonly movementTypes = ['COMPRA', 'ANULACION_COMPRA', 'VENTA', 'ANULACION_VENTA', 'RESERVA_APARTADO', 'LIBERACION_APARTADO', 'ENTREGA_APARTADO', 'CAMBIO_DEVOLUCION', 'CAMBIO_ENTREGA', 'AJUSTE_ENTRADA', 'AJUSTE_SALIDA', 'REVERSO'];
   search = ''; status: StockStatusFilter = ''; page = 1; pageSize = 20; movementPage = 1; movementType = ''; from = ''; to = '';
   quantityDelta = 0; reasonId = ''; observation = '';

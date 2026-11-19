@@ -6,8 +6,6 @@
     </div>
   </div>
 
-  @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
-  @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
   @if (loading() && !status()) { <p class="support-message" role="status">Cargando diagnóstico…</p> }
 
   @if (status(); as data) {

@@ -712,3 +712,15 @@ app-root, app-login { display: block; min-height: 100vh; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* Mensajes emergentes (decisión del 18 de noviembre de 2026): arriba a la derecha, sobre las ventanas. */
+.toast-host { position: fixed; z-index: 60; top: 72px; right: 16px; display: flex; flex-direction: column; gap: 8px; width: min(420px, calc(100vw - 32px)); pointer-events: none; }
+.toast { display: flex; align-items: flex-start; gap: 10px; padding: 12px 12px 12px 14px; border: 1px solid var(--cp-success); border-radius: 10px; background: var(--cp-success-soft); color: var(--cp-text); box-shadow: var(--cp-shadow); pointer-events: auto; animation: toast-in 160ms ease-out; }
+.toast--error { border-color: var(--cp-error); background: var(--cp-error-soft); }
+.toast__icon { display: grid; place-items: center; flex: 0 0 22px; height: 22px; border-radius: 50%; background: var(--cp-success); color: white; font-weight: 700; font-size: 13px; }
+.toast--error .toast__icon { background: var(--cp-error); }
+.toast__text { flex: 1; line-height: 1.4; }
+.toast__close { flex: 0 0 auto; border: 0; background: transparent; color: var(--cp-text-muted); font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.toast__close:focus-visible { outline: 2px solid var(--cp-focus); border-radius: 4px; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }

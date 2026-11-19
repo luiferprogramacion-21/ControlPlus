@@ -1,6 +1,7 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { errorText } from '../../core/api';
 import { AdminApi, AdminPermission, AdminRole } from './admin-api';
+import { toastSignal } from '../../core/toast';
 
 @Component({
   selector: 'cp-role-template',
@@ -32,7 +33,7 @@ export class RoleTemplate {
   readonly catalog = input.required<AdminPermission[]>();
   readonly updated = output<AdminRole>();
   readonly saving = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
   readonly granted = computed(() => new Set(this.role().permissions.map(permission => permission.id)));
   readonly groups = computed(() => {
     const map = new Map<string, AdminPermission[]>();

@@ -8,6 +8,7 @@ import { errorText } from '../../core/api';
 import { code128Svg } from '../../core/code128';
 import { Icon } from '../../layout/icon';
 import { ProductLabelJobInput, ProductLabelProduct, ProductLabelProfile, ProductLabelsApi } from './product-labels-api';
+import { toastSignal } from '../../core/toast';
 
 interface SelectedProduct {
   product: ProductLabelProduct;
@@ -36,8 +37,8 @@ export class ProductLabels implements OnInit {
   readonly selectedProfileId = signal('');
   readonly loading = signal(false);
   readonly printing = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   readonly totalLabels = computed(() => this.selected().reduce((total, item) => total + item.quantity, 0));
   readonly preview = computed(() => this.selected()[0]?.product ?? null);
   readonly selectedProfile = computed(() => this.profiles().find(profile => profile.id === this.selectedProfileId()) ?? null);

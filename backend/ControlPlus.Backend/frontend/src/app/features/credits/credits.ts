@@ -10,6 +10,7 @@ import { CustomersApi, Customer } from '../customers/customers-api';
 import { Icon } from '../../layout/icon';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { Credit, CreditPayment, CreditPaymentCancellationReason, CreditsApi, PaymentMethodInput } from './credits-api';
+import { toastSignal } from '../../core/toast';
 
 type Method = PaymentMethodInput['methodCode'];
 type Draft = { methodCode: Method; appliedAmount: number; receivedAmount: number | null; reference: string; };
@@ -26,8 +27,8 @@ export class Credits implements OnInit {
   readonly history = signal<Page<CreditPayment> | null>(null);
   readonly loading = signal(false);
   readonly saving = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   readonly dialog = signal(false);
   readonly cancellingPayment = signal(false);
   readonly forgiving = signal(false);

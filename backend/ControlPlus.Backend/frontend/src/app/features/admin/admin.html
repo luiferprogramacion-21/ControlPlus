@@ -9,7 +9,6 @@
     </div>
   </div>
   @if (error() && !mode()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
-  @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
 
   @if (tab() === 'audit' && canReadAudit) { <cp-audit-log /> }
 

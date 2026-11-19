@@ -15,7 +15,6 @@
     </form>
     @if (rangeIssue) { <p class="field-error" role="alert">{{ rangeIssue }}</p> }
     @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }} @if (!rangeIssue) { <button class="link-button" type="button" (click)="apply()">Reintentar</button> }</div> }
-    @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
     @if (loading()) { <p class="muted" role="status">Cargando reporte…</p> }
 
     @if (!kinds.length) {

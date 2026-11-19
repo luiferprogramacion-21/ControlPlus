@@ -13,6 +13,7 @@ import { RoleTemplate } from './role-template';
 import { UserCredential } from './user-credential';
 import { UserPermissions } from './user-permissions';
 import { isVisibleAdminPermission } from './visible-permissions';
+import { toastSignal } from '../../core/toast';
 
 type Mode = 'create' | 'edit' | 'role' | 'password';
 type Tab = 'users' | 'roles' | 'audit';
@@ -37,8 +38,8 @@ export class Admin implements OnInit {
   readonly mode = signal<Mode | null>(null);
   readonly loading = signal(false);
   readonly saving = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   search = ''; status: 'all' | 'active' | 'inactive' | 'locked' = 'all'; page = 1; pageSize = 20;
   form = { userName: '', displayName: '', email: '', password: '', confirmPassword: '', currentPassword: '', roleId: '' };
   private requestId = 0;

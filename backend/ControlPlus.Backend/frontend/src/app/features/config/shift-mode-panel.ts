@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { errorText } from '../../core/api';
 import { CashApi, CashState } from '../cash/cash-api';
+import { toastSignal } from '../../core/toast';
 
 type Mode = 'INDIVIDUAL' | 'COMPARTIDO';
 
@@ -30,7 +31,6 @@ type Mode = 'INDIVIDUAL' | 'COMPARTIDO';
         </div>
         @if (cash.hasOpenShift) { <p class="field-hint" role="status">Hay un turno abierto: para cambiar el modo, ciérrelo primero en Caja. El cambio aplica desde el próximo turno.</p> }
         @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-        @if (notice()) { <p class="field-hint" role="status">{{ notice() }}</p> }
         <div class="form-actions">
           <button class="button button--secondary" type="button" (click)="selected = currentMode(cash)" [disabled]="saving() || selected === currentMode(cash)">Cancelar</button>
           <button class="button button--primary" type="button" (click)="save()" [disabled]="saving() || cash.hasOpenShift || selected === currentMode(cash)">{{ saving() ? 'Guardando…' : 'Guardar' }}</button>
@@ -57,8 +57,8 @@ export class ShiftModePanel implements OnInit {
   readonly state = signal<CashState | null>(null);
   readonly loadError = signal('');
   readonly saving = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   selected: Mode = 'INDIVIDUAL';
   readonly options: { mode: Mode; title: string; subtitle: string; points: string[]; noteTitle: string; note: string }[] = [
     { mode: 'INDIVIDUAL', title: 'Turno individual', subtitle: 'Seleccionado inicialmente',

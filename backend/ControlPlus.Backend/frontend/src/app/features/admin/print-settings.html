@@ -1,5 +1,4 @@
 @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="reload()">Actualizar</button></div> }
-@if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
 <section class="panel module-panel">
   <div class="module-toolbar"><div><h3>Perfiles de impresión</h3><p class="muted">Admite impresoras de recibos, etiquetas o equipos térmicos híbridos.</p></div><button class="button button--primary" type="button" (click)="startCreate()">Agregar perfil</button></div>
   @if (loading()) { <p class="muted" role="status">Cargando…</p> }

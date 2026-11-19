@@ -1,8 +1,6 @@
 <section class="prototype-operation cash-page">
   <div class="module-heading"><div><h2>{{ closingMode() ? 'Arqueo y cierre' : 'Caja' }}</h2><p>{{ closingMode() ? 'Recuento por medio de pago' : state()?.currentShift ? (state()?.requiresPreviousShiftClosure ? 'Turno anterior pendiente de cierre' : 'Turno abierto') : 'Apertura de turno' }}</p></div><div class="cash-heading-actions">@if (state()?.hasOpenShift && session.has('CASH.SHIFT_MANAGE')) { <button class="button button--secondary" type="button" (click)="closingMode.set(!closingMode())">{{ closingMode() ? 'Volver al turno' : 'Arqueo y cierre' }}</button> }<button class="button button--secondary" type="button" (click)="refresh()" [disabled]="loading() || busy()">Actualizar</button></div></div>
   @if (loading()) { <p class="field-hint" role="status">Cargando información de caja…</p> }
-  @if (error()) { <p class="inline-feedback inline-feedback--error" role="alert"><span>!</span>{{ error() }}</p> }
-  @if (notice()) { <p class="inline-feedback inline-feedback--success" role="status"><span>✓</span>{{ notice() }}</p> }
   @if (state(); as cash) {
     @if (!cash.isConfigured) {
       <section class="panel panel--padded cash-message"><span class="badge badge--warning">Caja sin configurar</span><p>Un administrador debe configurar la caja antes de abrir un turno.</p></section>

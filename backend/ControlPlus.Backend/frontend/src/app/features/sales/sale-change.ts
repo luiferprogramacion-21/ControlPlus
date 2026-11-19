@@ -10,6 +10,7 @@ import { appliedTotal, emptyDraft, money, PaymentDraft, PaymentMethods, validate
 import { ChangePaymentInput, ChangePreparation, ConfirmChangeInput, ConfirmedChange, SaleDetail, SalesApi } from './sales-api';
 import { ChangeTreatment, returnValue, settle } from './sale-change-math';
 import { WHOLESALE_MIN_QUANTITY } from './sale-discount';
+import { toastSignal } from '../../core/toast';
 
 interface Returning { saleLineId: string; productId: string; code: string; name: string; sold: number; remaining: number; net: number; quantity: number; resellable: boolean; }
 interface Delivering { product: Product; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; }
@@ -36,7 +37,7 @@ export class SaleChange implements OnInit {
   readonly loading = signal(true);
   readonly searching = signal(false);
   readonly saving = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
   readonly money = money;
   search = '';
   choice: ChangeTreatment | '' = '';

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Customer, CustomersApi } from './customers-api';
+import { toastSignal } from '../../core/toast';
 
 const SEARCH_DELAY_MS = 250;
 const DOCUMENT_TYPES = ['CC', 'CE', 'NIT', 'PASAPORTE', 'PPT', 'OTRO'];
@@ -22,7 +23,7 @@ export class CustomerPicker implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly creating = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
   readonly documentTypes = DOCUMENT_TYPES;
   search = '';
   form = { documentType: '', documentNumber: '', fullName: '', phone: '', address: '' };

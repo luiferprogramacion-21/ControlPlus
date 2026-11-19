@@ -1,5 +1,4 @@
 <section class="prototype-operation">
-  @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert"><span>!</span>{{ error() }}</div> }
   @if (blockReason && !sale() && !needsOperatorUnlock) { <div class="inline-feedback inline-feedback--error" role="status"><span>!</span>{{ blockReason }} <a class="link-button" routerLink="/operacion/caja">Ir a Caja</a></div> }
 
   @if (pendingDraft(); as draft) { @if (!sale()) {

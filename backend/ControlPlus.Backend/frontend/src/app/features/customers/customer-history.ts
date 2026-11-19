@@ -3,6 +3,7 @@ import { Component, inject, input, OnInit, output, signal } from '@angular/core'
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Page, errorText } from '../../core/api';
 import { Customer, CustomerHistoryItem, CustomersApi } from './customers-api';
+import { toastSignal } from '../../core/toast';
 
 const TYPE_LABELS: Record<string, string> = {
   SALE: 'Venta', CREDIT: 'Crédito', CREDIT_PAYMENT: 'Abono de crédito', LAYAWAY: 'Apartado', LAYAWAY_PAYMENT: 'Abono de apartado',
@@ -25,7 +26,7 @@ export class CustomerHistory implements OnInit {
   readonly closed = output<void>();
   readonly result = signal<Page<CustomerHistoryItem> | null>(null);
   readonly loading = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
   page = 1; pageSize = 20;
   private requestId = 0;
 

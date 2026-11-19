@@ -5,6 +5,7 @@ import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
 import { Supplier, SupplierInput, SuppliersApi } from './suppliers-api';
+import { toastSignal } from '../../core/toast';
 @Component({ selector: 'cp-suppliers', imports: [FormsModule, MatPaginatorModule, Icon], templateUrl: './suppliers.html', styleUrl: '../directory.scss' })
 export class Suppliers implements OnInit {
   private readonly api = inject(SuppliersApi);
@@ -14,8 +15,8 @@ export class Suppliers implements OnInit {
   readonly editing = signal(false);
   readonly loading = signal(false);
   readonly saving = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   name = ''; documentType = ''; documentNumber = ''; status: 'active' | 'inactive' | 'all' = 'active'; page = 1; pageSize = 20;
   form: SupplierInput = this.empty();
   private requestId = 0;

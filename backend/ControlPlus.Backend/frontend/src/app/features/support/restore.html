@@ -6,7 +6,6 @@
     </div>
   </div>
 
-  @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
   @if (loading() && !overview()) { <p class="support-message" role="status">Cargando copias…</p> }
 
   @if (overview(); as data) {

@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { errorText } from '../../core/api';
 import { ConfigApi, ReasonGroup, ReasonItem, REASON_GROUPS } from './config-api';
+import { toastSignal } from '../../core/toast';
 
 interface GroupState { group: ReasonGroup; reasons: ReasonItem[] | null; error: string; busy: boolean; }
 
@@ -10,7 +11,6 @@ interface GroupState { group: ReasonGroup; reasons: ReasonItem[] | null; error: 
   template: `
     <section class="panel module-panel">
       <div class="module-toolbar"><div><h3>Motivos</h3><p class="muted">Los motivos aprobados para anular ventas y compras y para cerrar o cancelar pedidos se crean solos al instalar y al consultarlos. Aquí se ven; «Completar faltantes» repara un grupo al que le falte alguno.</p></div><button class="table-action" type="button" (click)="load()">Actualizar</button></div>
-      @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
       <div class="table-wrap module-table-wrap"><table><thead><tr><th>Uso</th><th>Motivos</th><th>Estado</th><th class="align-right">Acciones</th></tr></thead><tbody>
         @for (state of states(); track state.group.key) {
           <tr>
@@ -26,7 +26,7 @@ interface GroupState { group: ReasonGroup; reasons: ReasonItem[] | null; error: 
 export class ReasonsPanel implements OnInit {
   private readonly api = inject(ConfigApi);
   readonly states = signal<GroupState[]>(REASON_GROUPS.map(group => ({ group, reasons: null, error: '', busy: false })));
-  readonly notice = signal('');
+  readonly notice = toastSignal('success');
 
   ngOnInit(): void { void this.load(); }
 

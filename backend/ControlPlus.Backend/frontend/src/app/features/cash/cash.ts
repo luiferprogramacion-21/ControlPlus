@@ -7,6 +7,7 @@ import { EstablishmentService } from '../../core/establishment';
 import { SessionService } from '../../core/session.service';
 import { CashApi, CashMovement, CashState, ClosureDifferenceReason, Reconciliation } from './cash-api';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody } from '../../shared/authorization-dialog';
+import { toastSignal } from '../../core/toast';
 
 @Component({
   selector: 'cp-cash',
@@ -27,8 +28,8 @@ export class Cash implements OnInit {
   readonly stateLoading = signal(true);
   readonly stateReadError = signal(false);
   readonly busy = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   readonly reasons = signal<ClosureDifferenceReason[] | null>(null);
   readonly reasonsLoading = signal(false);
   readonly reasonsError = signal('');

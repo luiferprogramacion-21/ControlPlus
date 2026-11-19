@@ -9,6 +9,7 @@ import { Customer, CustomersApi } from '../customers/customers-api';
 import { CreateLayawayInput, CreatedLayaway, LayawayCreationRules, LayawayPriceType, LayawaysApi } from './layaways-api';
 import { appliedTotal, cashChange, emptyDraft, money, PaymentDraft, PaymentMethods, toPayments, validateDrafts } from './payment-methods';
 import { WHOLESALE_MIN_QUANTITY } from '../sales/sale-discount';
+import { toastSignal } from '../../core/toast';
 
 export interface CreateLine { product: Product; quantity: number; priceType: LayawayPriceType; }
 
@@ -47,7 +48,7 @@ export class LayawayCreate {
   readonly results = signal<Product[]>([]);
   readonly lines = signal<CreateLine[]>([]);
   readonly saving = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
   /** Minimum initial payment rule and default term; null until loaded or if the server could not be read. */
   readonly rules = signal<LayawayCreationRules | null>(null);
   readonly total = computed(() => this.lines().reduce((sum, line) => sum + this.unitPrice(line) * Number(line.quantity || 0), 0));

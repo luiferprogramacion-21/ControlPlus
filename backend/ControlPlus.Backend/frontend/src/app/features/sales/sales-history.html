@@ -1,7 +1,6 @@
 <section class="module-page directory-page">
   <div class="module-heading"><div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="catalog" /></span><div><h2>Historial de ventas</h2><p>{{ listsAll ? 'Todas las ventas' : 'Tus ventas' }}</p></div></div><a class="button button--secondary" routerLink="/operacion/ventas">Volver a Ventas</a></div>
   @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="reload()">Actualizar</button></div> }
-  @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
   <section class="panel module-panel">
     <div class="module-toolbar"><div><h3>Ventas registradas</h3><p class="muted">Consulta una venta para ver su detalle{{ session.has('SALES.VOID') ? ' o anularla' : '' }}.</p></div><button class="table-action" type="button" (click)="reload()">Actualizar</button></div>
     @if (loading()) { <p class="muted" role="status">Cargando ventas…</p> }

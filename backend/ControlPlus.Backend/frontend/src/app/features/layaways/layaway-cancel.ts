@@ -5,6 +5,7 @@ import { SessionService } from '../../core/session.service';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { LayawayCancellation, LayawayDetail, LayawaysApi } from './layaways-api';
 import { appliedTotal, emptyDraft, money, PaymentDraft, PaymentMethods, toRefunds, validateDrafts } from './payment-methods';
+import { toastSignal } from '../../core/toast';
 
 interface Pending { key: string; fingerprint: string; authorizerUserName: string | null; }
 
@@ -22,7 +23,7 @@ export class LayawayCancel {
   readonly cancelled = output<LayawayCancellation>();
   readonly closed = output<void>();
   readonly saving = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
   readonly money = money;
   refundAmount = 0;
   observation = '';

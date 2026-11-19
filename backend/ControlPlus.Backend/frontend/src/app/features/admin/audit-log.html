@@ -22,7 +22,6 @@
       <button class="button button--primary" type="submit" [disabled]="loading()">Buscar</button>
     </form>
   </div>
-  @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
   @if (loading()) { <p class="muted" role="status">Cargando auditoría…</p> }
   <div class="table-wrap module-table-wrap"><table>
     <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Sobre</th><th>Autorizó</th><th>Motivo</th><th>Resultado</th><th class="align-right">Detalle</th></tr></thead>

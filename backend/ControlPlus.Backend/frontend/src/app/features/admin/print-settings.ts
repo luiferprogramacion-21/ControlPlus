@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { PrintJob, printJobStatusText, PrintProfile, SalesApi } from '../sales/sales-api';
+import { toastSignal } from '../../core/toast';
 
 /** Perfiles de impresora (cola de Windows) y cola de impresión. Crear un perfil no comprueba que la cola exista. */
 @Component({
@@ -20,9 +21,9 @@ export class PrintSettings implements OnInit {
   readonly saving = signal(false);
   readonly creating = signal(false);
   readonly deleting = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
   readonly formError = signal('');
-  readonly notice = signal('');
+  readonly notice = toastSignal('success');
   form: { name: string; systemQueueName: string; columns: number; makeDefault: boolean; printerType: 'RECIBOS' | 'ETIQUETAS' | 'HIBRIDA'; labelWidthMm: number | null; labelHeightMm: number | null; resolutionDpi: number | null } = {
     name: '', systemQueueName: '', columns: 32, makeDefault: true,
     printerType: 'RECIBOS', labelWidthMm: null, labelHeightMm: null, resolutionDpi: null,

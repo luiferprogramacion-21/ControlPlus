@@ -15,6 +15,7 @@ import { SessionService } from '../../core/session.service';
 import { errorText, Page } from '../../core/api';
 import { profitPercentOf, suggestedPrice } from '../../shared/price-calculator';
 import { CatalogApi, Category, CostHistory, CreateProductInput, Product, ProductInput, Supplier, Unit } from './catalog-api';
+import { toastSignal } from '../../core/toast';
 
 interface ProductCreateAttempt {
   actorId: string;
@@ -37,8 +38,8 @@ export class Catalog implements OnInit {
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly checkingCreate = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   readonly createErrorKind = signal<'validation' | 'unique' | 'idempotency' | 'conflict' | 'uncertain' | null>(null);
   readonly createOutcomeUncertain = signal(false);
   readonly reconcilingCreate = signal(false);

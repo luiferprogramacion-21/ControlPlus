@@ -2,6 +2,7 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { errorText } from '../../core/api';
 import { RestorableCopy, RestoreOverview, RestoreTest, SupportApi } from './support-api';
+import { toastSignal } from '../../core/toast';
 
 /** Restauración y continuidad (maqueta 22c). Only the restore test is available; the real restore is a separate procedure. */
 @Component({
@@ -16,7 +17,7 @@ export class Restore implements OnInit {
   readonly selectedId = signal<string | null>(null);
   readonly loading = signal(false);
   readonly testing = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
   readonly result = signal<RestoreTest | null>(null);
   readonly selected = computed(() => this.overview()?.copies.find(x => x.copyId === this.selectedId()) ?? null);
 

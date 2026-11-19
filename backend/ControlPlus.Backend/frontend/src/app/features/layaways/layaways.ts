@@ -10,6 +10,7 @@ import { CreatedLayaway, Layaway, LayawayCancellation, LayawayDetail, LayawayPay
 import { LayawayCancel } from './layaway-cancel';
 import { LayawayCreate } from './layaway-create';
 import { appliedTotal, cashChange, emptyDraft, PaymentDraft, PaymentMethods, toPayments, validateDrafts } from './payment-methods';
+import { toastSignal } from '../../core/toast';
 
 const STATE_LABELS: Record<string, string> = { ACTIVO: 'Activo', PAGADO: 'Pagado', ENTREGADO: 'Entregado', ANULADO: 'Anulado' };
 
@@ -27,8 +28,8 @@ export class Layaways implements OnInit {
   readonly detail = signal<LayawayDetail | null>(null);
   readonly loading = signal(false);
   readonly saving = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   readonly paymentDialog = signal(false);
   readonly creating = signal(false);
   readonly cancelling = signal(false);

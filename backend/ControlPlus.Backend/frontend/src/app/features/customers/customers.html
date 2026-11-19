@@ -1,7 +1,6 @@
 <section class="module-page directory-page">
   <div class="module-heading"><div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="customers" /></span><div><h2>Clientes</h2></div></div><button class="button button--primary" type="button" (click)="newCustomer()">Nuevo cliente</button></div>
   @if (error() && !editing() && !statusTarget()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="reload()">Actualizar</button></div> }
-  @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
   <section class="panel module-panel">
     <div class="module-toolbar"><h3>Directorio de clientes</h3><form class="directory-filters" (submit)="$event.preventDefault(); find()"><label class="sr-only" for="customers-search">Nombre, documento o teléfono</label><input id="customers-search" class="text-field" name="search" [(ngModel)]="search" placeholder="Nombre, documento o teléfono"><button class="button button--secondary" type="submit">Buscar</button>@if (full) { <label class="sr-only" for="customers-status">Estado</label><select id="customers-status" class="text-field" name="status" [(ngModel)]="status" (ngModelChange)="find()"><option value="active">Activos</option><option value="inactive">Inactivos</option><option value="all">Todos</option></select> }</form></div>
     @if (loading()) { <p class="muted" role="status">Cargando clientes…</p> }

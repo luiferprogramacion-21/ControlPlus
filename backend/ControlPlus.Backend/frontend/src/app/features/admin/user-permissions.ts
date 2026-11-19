@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
 import { AdminApi, AdminPermission, AdminUser, EffectivePermission } from './admin-api';
 import { isVisibleAdminPermission } from './visible-permissions';
+import { toastSignal } from '../../core/toast';
 
 interface Row extends EffectivePermission { module: string; }
 
@@ -49,7 +50,7 @@ export class UserPermissions implements OnInit {
   readonly filter = signal('');
   readonly loading = signal(false);
   readonly saving = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
 
   readonly rows = computed<Row[]>(() => {
     const modules = new Map(this.catalog().map(permission => [permission.id, permission.module]));

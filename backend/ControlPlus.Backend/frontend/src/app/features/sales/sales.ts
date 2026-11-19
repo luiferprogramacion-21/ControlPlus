@@ -16,6 +16,7 @@ import { buildTicketHtml, TicketPrinter } from './ticket';
 import { describeDiscount, Discount, discountAmount, maxDiscountPercent, validateDiscount, WHOLESALE_MIN_QUANTITY } from './sale-discount';
 import { DiscountApplied, DiscountDialog } from './discount-dialog';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
+import { toastSignal } from '../../core/toast';
 
 interface CartLine { product: Product; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; discount: Discount | null; }
 interface ReceiptMeta { customer: string; operator: string; items: number; units: number; }
@@ -60,7 +61,7 @@ export class Sales implements OnInit, OnDestroy {
   readonly customers = signal<Customer[]>([]);
   readonly loading = signal(false);
   readonly busy = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
   readonly feedback = signal('');
   readonly feedbackKind = signal<'success' | 'info' | 'error'>('info');
   search = '';

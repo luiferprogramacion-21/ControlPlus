@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
 import { Establishment, EstablishmentService } from '../../core/establishment';
+import { toastSignal } from '../../core/toast';
 
 /** General business data from mock-up 21. Email is intentionally absent because V1 has no persisted column. */
 @Component({
@@ -26,7 +27,6 @@ import { Establishment, EstablishmentService } from '../../core/establishment';
           <p class="field-hint">Estos datos se usan en tickets, carnés, pedidos y pantallas operativas. No se solicita correo porque no forma parte del establecimiento en V1.</p>
           @if (validation()) { <p class="field-error" role="alert">{{ validation() }}</p> }
           @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-          @if (notice()) { <p class="field-hint" role="status">{{ notice() }}</p> }
           <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving() || !changed(saved)">{{ saving() ? 'Guardando…' : 'Guardar datos' }}</button></div>
         </form>
       } @else if (!loadError()) { <p class="muted" role="status">Cargando…</p> }
@@ -45,8 +45,8 @@ export class EstablishmentPanel implements OnInit {
   readonly current = signal<Establishment | null>(null);
   readonly loadError = signal('');
   readonly saving = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   commercialName = '';
   identification = '';
   phone = '';

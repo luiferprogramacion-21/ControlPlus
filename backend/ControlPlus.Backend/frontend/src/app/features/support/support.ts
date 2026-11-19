@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { errorText } from '../../core/api';
 import { BackupDestination, BackupDestinationType, BackupStatus, ComponentDiagnosis, diagnosePrinter, diagnoseQueue, SupportApi } from './support-api';
+import { toastSignal } from '../../core/toast';
 
 interface DestinationDraft { path: string; active: boolean; }
 
@@ -22,8 +23,8 @@ export class Support implements OnInit {
   readonly loading = signal(false);
   readonly running = signal(false);
   readonly saving = signal<BackupDestinationType | null>(null);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   /** Error or confirmation shown inside the destination card, where the Administrator is looking. */
   readonly destinationMessage = signal<{ type: BackupDestinationType; text: string; ok: boolean } | null>(null);
   drafts: Record<BackupDestinationType, DestinationDraft> = {

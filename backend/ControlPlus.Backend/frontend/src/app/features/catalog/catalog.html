@@ -8,7 +8,6 @@
     </div>
   </header>
   @if (error() && !selectedProduct()) { <p class="alert alert--error" role="alert">{{ error() }}</p> }
-  @if (notice()) { <p class="alert" role="status">{{ notice() }}</p> }
 
   @if (tab() === 'products' && session.has('PRODUCTS.READ')) {
     <div class="panel">

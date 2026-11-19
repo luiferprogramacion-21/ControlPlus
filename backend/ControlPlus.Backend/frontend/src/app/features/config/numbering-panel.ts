@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
 import { ConfigApi, Numbering, NumberingKind, NUMBERING_KINDS } from './config-api';
+import { toastSignal } from '../../core/toast';
 
 interface Row { kind: NumberingKind; numbering: Numbering | null; error: string; }
 
@@ -12,8 +13,6 @@ interface Row { kind: NumberingKind; numbering: Numbering | null; error: string;
   template: `
     <section class="panel module-panel">
       <div class="module-toolbar"><div><h3>Numeración de documentos</h3><p class="muted">El prefijo identifica el documento (VTA, ABO, CMP…). El sistema agrega la serie y asigna el siguiente número al registrarlo. «Número anterior» es la base del consecutivo: 0 indica que empieza en 1. Los documentos anteriores conservan su número. Los consecutivos se crean solos al instalar y al emitir el primer documento: aquí se consultan y, mientras no se haya emitido ninguno, se pueden ajustar.</p></div><button class="table-action" type="button" (click)="load()" [disabled]="loading()">Actualizar</button></div>
-      @if (notice()) { <div class="inline-feedback inline-feedback--success" role="status">{{ notice() }}</div> }
-      @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
       <div class="table-wrap module-table-wrap"><table><thead><tr><th>Documento</th><th>Prefijo</th><th class="align-right">Número anterior</th><th class="align-right">Siguiente</th><th>Estado</th><th class="align-right">Acciones</th></tr></thead><tbody>
         @for (row of rows(); track row.kind.key) {
           <tr>
@@ -54,8 +53,8 @@ export class NumberingPanel implements OnInit {
   readonly rows = signal<Row[]>([]);
   readonly loading = signal(false);
   readonly saving = signal(false);
-  readonly error = signal('');
-  readonly notice = signal('');
+  readonly error = toastSignal('error');
+  readonly notice = toastSignal('success');
   readonly formError = signal('');
   readonly editing = signal<Row | null>(null);
   prefix = '';

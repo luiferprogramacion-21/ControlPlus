@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { DashboardActivity, DashboardApi, DashboardSummary } from './dashboard-api';
+import { toastSignal } from '../../core/toast';
 
 export interface HourBar {
   label: string;
@@ -37,7 +38,7 @@ export class Dashboard implements OnInit {
   readonly lowStockQuery = { filtro: 'stock-bajo' };
   readonly summary = signal<DashboardSummary | null>(null);
   readonly loading = signal(false);
-  readonly error = signal('');
+  readonly error = toastSignal('error');
 
   readonly bars = computed<HourBar[]>(() => {
     const hours = this.summary()?.hourlySales ?? [];
