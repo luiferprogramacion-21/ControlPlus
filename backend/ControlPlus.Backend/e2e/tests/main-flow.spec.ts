@@ -55,6 +55,7 @@ test('iniciar sesión, abrir caja, vender en efectivo y cerrar la caja cuadrada'
     await page.goto('/operacion/caja');
     await expect(page.getByRole('heading', { name: 'Apertura de caja' })).toBeVisible();
     await page.locator('#initial-amount').fill('100000');
+    await expect(page.locator('#initial-amount')).toHaveValue('100.000');
     await page.getByRole('button', { name: 'Abrir caja' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Turno abierto.' })).toBeVisible();
   });
@@ -69,6 +70,7 @@ test('iniciar sesión, abrir caja, vender en efectivo y cerrar la caja cuadrada'
     await quantity.press('Tab');
     await page.getByRole('button', { name: /^Cobrar/ }).click();
     await page.locator('#cash-received').fill('20000');
+    await expect(page.locator('#cash-received')).toHaveValue('20.000');
     await page.getByRole('button', { name: /^Confirmar venta/ }).click();
     await expect(page.getByRole('heading', { name: 'Venta confirmada' })).toBeVisible();
     const summary = page.locator('.success-summary');
@@ -81,7 +83,9 @@ test('iniciar sesión, abrir caja, vender en efectivo y cerrar la caja cuadrada'
     await page.getByRole('button', { name: 'Arqueo y cierre' }).click();
     await expect(page.locator('.expected-cash-card')).toContainText('110.000');
     const cashRow = page.locator('.cash-count-row', { hasText: 'Efectivo' });
-    await cashRow.getByRole('spinbutton').fill('110000');
+    const countedCash = cashRow.getByRole('textbox');
+    await countedCash.fill('110000');
+    await expect(countedCash).toHaveValue('110.000');
     await expect(page.locator('.cash-total-difference')).toContainText('$');
     await expect(page.locator('.cash-total-difference strong')).toHaveText(/^\$\s?0$/);
     await page.getByRole('button', { name: 'Cerrar caja' }).click();
