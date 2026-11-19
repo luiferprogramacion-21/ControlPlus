@@ -71,6 +71,8 @@ export class Purchases implements OnInit {
     this.view = configuredView === 'receipts' ? 'receipts' : this.canOrders ? 'orders' : 'purchases';
     this.tab = this.view === 'purchases' ? 'purchases' : 'orders';
     void this.initialize();
+    // Desde Inicio, «Recibir mercancía» abre la pregunta de «Registrar compra».
+    if (this.route?.snapshot.queryParamMap?.get('accion') === 'registrar') this.startRegisterPurchase();
   }
   private empty(): PurchaseInput { return { supplierId: '', supplierDocumentNumber: null, invoiceDate: currentColombiaDate(), vatMode: 'NO_DISCRIMINADO', lines: [] }; }
   private async initialize(): Promise<void> {
@@ -83,6 +85,24 @@ export class Purchases implements OnInit {
   productRetailPrice(id: string): number | null { return this.products().find(p => p.id === id)?.retailPrice ?? null; }
   async reload(): Promise<void> { const id = ++this.requestId; this.loading.set(true); this.error.set(''); try { if (this.tab === 'purchases' && this.canReceive) { const result = await this.api.list({ supplierId: this.supplierId, status: this.status, invoiceDate: this.invoiceDate, supplierDocumentNumber: this.supplierDocumentNumber.trim(), page: this.page, pageSize: this.pageSize }); if (id === this.requestId) this.purchases.set(result); } else if (this.tab === 'orders' && this.canOrders) { const result = await this.ordersApi.list({ supplierId: this.supplierId, status: this.status, page: this.page, pageSize: this.pageSize }); const items = await this.hydrateOrderSummaries(result.items); if (id === this.requestId) this.orders.set({ ...result, items }); } } catch (e) { if (id === this.requestId) this.error.set(errorText(e)); } finally { if (id === this.requestId) this.loading.set(false); } }
   private async hydrateOrderSummaries(items: OrderSummary[]): Promise<OrderSummary[]> { return Promise.all(items.map(async item => { if (Array.isArray(item.lines)) return item; const order = await this.ordersApi.get(item.id); return { ...item, lines: order.lines.map(line => ({ productCode: line.productCode, productName: line.productName, requestedQuantity: line.requestedQuantity, receivedQuantity: line.receivedQuantity })) }; })); }
+  /** Compras más claras (decisión del 19 de noviembre de 2026): una sola pantalla con pestañas y un solo «Registrar compra». */
+  readonly askingPurchaseKind = signal(false);
+  showView(view: 'orders' | 'receipts' | 'purchases'): void {
+    if (view === 'purchases') { this.switchTab('purchases'); return; }
+    this.switchTab('orders');
+    this.view = view;
+  }
+  startRegisterPurchase(): void { if (this.canReceive) { this.error.set(''); this.askingPurchaseKind.set(true); } }
+  async registerFromOrder(): Promise<void> {
+    this.askingPurchaseKind.set(false);
+    if (this.view === 'purchases') { this.showView('receipts'); await this.reload(); }
+    this.startReceiptSelection();
+  }
+  async registerWithoutOrder(): Promise<void> {
+    this.askingPurchaseKind.set(false);
+    if (this.view !== 'purchases') this.showView('purchases');
+    await this.newPurchase();
+  }
   switchTab(tab: 'purchases' | 'orders'): void { this.tab = tab; this.view = tab === 'purchases' ? 'purchases' : 'orders'; this.status = ''; this.page = 1; this.selectedOrder.set(null); this.selectedPurchase.set(null); void this.reload(); }
   showDirectPurchases(): void { this.switchTab('purchases'); }
   showOrders(): void { this.switchTab('orders'); }

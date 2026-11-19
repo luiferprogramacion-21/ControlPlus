@@ -70,3 +70,13 @@
   .supplier-card .table-action { justify-self: start; }
   .supplier-products { grid-column: 1; }
 }
+/* Compras más claras (decisión del 19 de noviembre de 2026). */
+.purchase-tabs { display:flex; flex-wrap:wrap; gap:4px; border-bottom:1px solid var(--cp-border); }
+.purchase-tabs__tab { min-height:44px; padding:0 18px; border:0; border-bottom:3px solid transparent; background:transparent; color:var(--cp-text-secondary); font-weight:600; font-size:16px; }
+.purchase-tabs__tab:hover { color:var(--cp-primary); }
+.purchase-tabs__tab.is-active { border-bottom-color:var(--cp-primary); color:var(--cp-primary); }
+.purchase-kind { display:grid; gap:12px; }
+.purchase-kind__option { display:flex; flex-direction:column; gap:4px; padding:16px 18px; border:1px solid var(--cp-border); border-radius:12px; background:var(--cp-surface); color:var(--cp-text); text-align:left; }
+.purchase-kind__option strong { font-size:18px; }
+.purchase-kind__option small { color:var(--cp-text-secondary); font-size:14px; }
+.purchase-kind__option:hover, .purchase-kind__option:focus-visible { border-color:var(--cp-primary); background:var(--cp-primary-soft); }

@@ -43,7 +43,6 @@ const NAVIGATION: NavGroup[] = [
   ] },
   { label: 'Compras', items: [
     { section: 'compras', label: 'Compras', link: '/operacion/compras', icon: 'purchases', visible: s => s.has('PURCHASES.RECEIVE') || s.has('PURCHASE_ORDERS.MANAGE') },
-    { section: 'recepciones', label: 'Recepciones', link: '/operacion/recepciones', icon: 'reception', visible: s => s.has('PURCHASES.RECEIVE') && s.has('PURCHASE_ORDERS.MANAGE') },
     { section: 'proveedores', label: 'Proveedores', link: '/operacion/proveedores', icon: 'supplier', visible: s => s.has('SUPPLIERS.READ') },
   ] },
   { label: 'Sistema', items: [
@@ -194,8 +193,8 @@ export class Shell {
     if (url.includes('/inventario')) { this.activeSection.set('inventario'); this.pageTitle.set('Inventario'); this.pageSubtitle.set('Existencias y movimientos'); return; }
     if (url.includes('/etiquetas')) { this.activeSection.set('etiquetas'); this.pageTitle.set('Etiquetas de productos'); this.pageSubtitle.set('Selección, vista previa e impresión'); return; }
     if (url.includes('/clientes')) { this.activeSection.set('clientes'); this.pageTitle.set('Clientes'); this.pageSubtitle.set('Consulta y gestión'); return; }
-    if (url.includes('/recepciones')) { this.activeSection.set('recepciones'); this.pageTitle.set('Recepción de compras'); this.pageSubtitle.set('Recepciones completas y parciales'); return; }
-    if (url.includes('/compras')) { this.activeSection.set('compras'); this.pageTitle.set('Compras'); this.pageSubtitle.set('Pedidos a proveedores y recepción'); return; }
+    if (url.includes('/recepciones')) { this.activeSection.set('compras'); this.pageTitle.set('Compras'); this.pageSubtitle.set('Mercancía recibida de los pedidos'); return; }
+    if (url.includes('/compras')) { this.activeSection.set('compras'); this.pageTitle.set('Compras'); this.pageSubtitle.set('Pedidos al proveedor, mercancía recibida y compras sin pedido'); return; }
     if (url.includes('/proveedores')) { this.activeSection.set('proveedores'); this.pageTitle.set('Proveedores'); this.pageSubtitle.set('Directorio y gestión'); return; }
     if (url.includes('/reportes')) { this.activeSection.set('reportes'); this.pageTitle.set('Reportes'); this.pageSubtitle.set('Indicadores y análisis operativo'); return; }
     if (url.includes('/apartados')) { this.activeSection.set('apartados'); this.pageTitle.set('Apartados'); this.pageSubtitle.set('Abonos, entregas y saldos'); return; }

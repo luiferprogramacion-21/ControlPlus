@@ -23,7 +23,7 @@ export function homeTasks(can: (permission: string) => boolean, cash: CashState 
   if (can('LAYAWAY.MANAGE')) tasks.push({ id: 'apartado', title: 'Nuevo apartado', description: 'Separar productos con un pago inicial.', icon: 'layaway', link: '/operacion/apartados', queryParams: { accion: 'nuevo' } });
   if (can('PRODUCTS.READ')) tasks.push({ id: 'producto', title: 'Buscar producto', description: 'Precio, código y existencias.', icon: 'catalog', link: '/operacion/catalogo' });
   if (can('CUSTOMERS.BASIC_MANAGE') || can('CUSTOMERS.MANAGE')) tasks.push({ id: 'clientes', title: 'Clientes', description: 'Buscar o registrar un cliente.', icon: 'customers', link: '/operacion/clientes' });
-  if (can('PURCHASES.RECEIVE')) tasks.push({ id: 'mercancia', title: 'Recibir mercancía', description: 'Registrar lo que llegó del proveedor.', icon: 'reception', link: '/operacion/compras' });
+  if (can('PURCHASES.RECEIVE')) tasks.push({ id: 'mercancia', title: 'Recibir mercancía', description: 'Registrar lo que llegó del proveedor.', icon: 'reception', link: '/operacion/compras', queryParams: { accion: 'registrar' } });
   if (can('INVENTORY.READ')) tasks.push({ id: 'inventario', title: 'Inventario', description: 'Existencias y productos por agotarse.', icon: 'inventory', link: '/operacion/inventario' });
   if (manageCash && cashOpen) tasks.push({ id: 'cerrar-caja', title: 'Cerrar caja', description: 'Contar el efectivo y terminar el turno.', icon: 'cash', link: '/operacion/caja' });
   if (can('REPORTS.FINANCIAL_READ')) tasks.push({ id: 'resumen', title: 'Resumen del día', description: 'Ventas, caja y alertas de hoy.', icon: 'dashboard', link: '/operacion/dashboard' });
