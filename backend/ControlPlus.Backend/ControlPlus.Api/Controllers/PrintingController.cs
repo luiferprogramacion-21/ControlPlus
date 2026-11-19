@@ -30,6 +30,19 @@ public sealed class PrintingController(CurrentActorContextResolver actorResolver
         return actor is null ? MissingActor() : FromResult(await printing.ListProfilesAsync(actor, ct), Ok);
     }
 
+    [HttpPut("profiles/{profileId:guid}/drawer")]
+    [PermissionAuthorize(PermissionCodes.ConfigurationManage)]
+    [Consumes("application/json")]
+    [ProducesResponseType<PrintProfileDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> UpdateProfileDrawer(Guid profileId,
+        [FromBody] UpdatePrintProfileDrawerRequest request, CancellationToken ct)
+    {
+        var actor = await GetActorAsync(ct);
+        return actor is null ? MissingActor() : FromResult(
+            await printing.UpdateProfileDrawerAsync(actor, profileId, request, ct), Ok);
+    }
+
     /// <summary>Borra un perfil sin historial de impresión; con historial lo retira y conserva sus trabajos.</summary>
     [HttpDelete("profiles/{profileId:guid}")]
     [PermissionAuthorize(PermissionCodes.ConfigurationManage)]

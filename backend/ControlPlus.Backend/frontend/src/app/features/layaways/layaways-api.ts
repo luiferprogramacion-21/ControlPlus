@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { AuthorizationBody, Page } from '../../core/api';
+import { type CashDrawerDispatch, withCashDrawerStatus } from '../../shared/cash-drawer-feedback';
 
 /** Layaway states: ACTIVO, PAGADO, ENTREGADO, ANULADO. Overdue is a flag, never a state. */
 export interface Layaway {
@@ -21,7 +22,7 @@ export interface LayawayDelivery {
   deliveredByUserId: string; correlationId: string; products: DeliveredProduct[];
 }
 export interface LayawayRefund { id: string; methodCode: string; amount: number; reference: string | null; occurredAtUtc: string; }
-export interface LayawayCancellation {
+export interface LayawayCancellation extends CashDrawerDispatch {
   layawayId: string; number: string; state: string; version: number; totalPaid: number; refunded: number; retained: number;
   cancelledAtUtc: string; cancelledByUserId: string; authorizedByUserId: string; reasonId: string | null;
   observation: string | null; correlationId: string; refunds: LayawayRefund[];
@@ -43,7 +44,7 @@ export interface CreateLayawayInput {
   authorization?: LayawayAuthorization;
 }
 export interface CreatedLayawayLine { productId: string; productCode: string; productName: string; measurementUnit: string; quantity: number; priceType: string; unitPrice: number; total: number; }
-export interface CreatedLayaway {
+export interface CreatedLayaway extends CashDrawerDispatch {
   id: string; visibleNumber: string; customerId: string; shiftId: string; userId: string; operatorSessionId: string | null;
   dueDate: string; minimumPercentage: number; minimumInitialPayment: number; initialPayment: number; total: number; balance: number;
   change: number; state: string; version: number; lines: CreatedLayawayLine[]; payments: unknown[];
@@ -52,7 +53,7 @@ export interface RefundInput { methodCode: LayawayPaymentInput['methodCode']; am
 export interface CancelLayawayInput {
   expectedVersion: number; refundAmount: number; refunds: RefundInput[]; reasonId: string | null; observation: string | null; authorization?: LayawayAuthorization;
 }
-export interface LayawayPaymentResult { layawayId: string; balance: number; state: string; version: number; correlationId: string; change: number; payments: unknown[]; }
+export interface LayawayPaymentResult extends CashDrawerDispatch { layawayId: string; balance: number; state: string; version: number; correlationId: string; change: number; payments: unknown[]; }
 
 @Injectable({ providedIn: 'root' })
 export class LayawaysApi {
@@ -64,19 +65,25 @@ export class LayawaysApi {
     return firstValueFrom(this.http.get<Page<Layaway>>('/api/layaways', { params }));
   }
   get(id: string): Promise<LayawayDetail> { return firstValueFrom(this.http.get<LayawayDetail>(`/api/layaways/${id}`)); }
-  applyPayment(layaway: Layaway, payments: LayawayPaymentInput[], key: string): Promise<LayawayPaymentResult> {
-    return firstValueFrom(this.http.post<LayawayPaymentResult>(`/api/layaways/${layaway.id}/payments`,
-      { expectedVersion: layaway.version, payments }, { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
+  async applyPayment(layaway: Layaway, payments: LayawayPaymentInput[], key: string): Promise<LayawayPaymentResult> {
+    const response = await firstValueFrom(this.http.post<LayawayPaymentResult>(`/api/layaways/${layaway.id}/payments`,
+      { expectedVersion: layaway.version, payments },
+      { headers: new HttpHeaders({ 'Idempotency-Key': key }), observe: 'response' }));
+    return withCashDrawerStatus(response);
   }
   creationRules(): Promise<LayawayCreationRules> { return firstValueFrom(this.http.get<LayawayCreationRules>('/api/layaways/creation-rules')); }
   /** Units of the same product required for the wholesale price (configured by the Administrator). */
   pricingRules(): Promise<{ wholesaleMinimumQuantity: number }> { return firstValueFrom(this.http.get<{ wholesaleMinimumQuantity: number }>('/api/sales/pricing-rules')); }
-  create(input: CreateLayawayInput, key: string): Promise<CreatedLayaway> {
-    return firstValueFrom(this.http.post<CreatedLayaway>('/api/layaways', input, { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
+  async create(input: CreateLayawayInput, key: string): Promise<CreatedLayaway> {
+    const response = await firstValueFrom(this.http.post<CreatedLayaway>('/api/layaways', input,
+      { headers: new HttpHeaders({ 'Idempotency-Key': key }), observe: 'response' }));
+    return withCashDrawerStatus(response);
   }
-  cancel(layaway: Layaway, input: Omit<CancelLayawayInput, 'expectedVersion'>, key: string): Promise<LayawayCancellation> {
-    return firstValueFrom(this.http.post<LayawayCancellation>(`/api/layaways/${layaway.id}/cancellation`,
-      { expectedVersion: layaway.version, ...input }, { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
+  async cancel(layaway: Layaway, input: Omit<CancelLayawayInput, 'expectedVersion'>, key: string): Promise<LayawayCancellation> {
+    const response = await firstValueFrom(this.http.post<LayawayCancellation>(`/api/layaways/${layaway.id}/cancellation`,
+      { expectedVersion: layaway.version, ...input },
+      { headers: new HttpHeaders({ 'Idempotency-Key': key }), observe: 'response' }));
+    return withCashDrawerStatus(response);
   }
   deliver(layaway: Layaway, key: string): Promise<LayawayDelivery> {
     return firstValueFrom(this.http.post<LayawayDelivery>(`/api/layaways/${layaway.id}/delivery`,

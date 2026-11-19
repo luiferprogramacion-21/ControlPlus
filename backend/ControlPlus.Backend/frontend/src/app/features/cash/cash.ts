@@ -1,14 +1,16 @@
 import { groupedNumber, NumberInput } from '../../shared/number-input';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { errorText } from '../../core/api';
 import { EstablishmentService } from '../../core/establishment';
 import { SessionService } from '../../core/session.service';
-import { CashApi, CashMovement, CashState, ClosureDifferenceReason, Reconciliation } from './cash-api';
+import { CashApi, CashDrawerStatus, CashMovement, CashState, ClosureDifferenceReason, Reconciliation } from './cash-api';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody } from '../../shared/authorization-dialog';
-import { toastSignal } from '../../core/toast';
+import { statusKind, toastSignal } from '../../core/toast';
+import { cashDrawerNotice } from '../../shared/cash-drawer-feedback';
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 
 @Component({
   selector: 'cp-cash',
@@ -19,6 +21,8 @@ import { toastSignal } from '../../core/toast';
 export class Cash implements OnInit {
   readonly api = inject(CashApi);
   private readonly authorization = inject(AuthorizationDialog);
+  private readonly confirmations = inject(ConfirmationDialog);
+  private readonly destroyRef = inject(DestroyRef);
   readonly session = inject(SessionService);
   readonly establishment = inject(EstablishmentService);
   readonly state = signal<CashState | null>(null);
@@ -37,6 +41,13 @@ export class Cash implements OnInit {
   readonly reasons = signal<ClosureDifferenceReason[] | null>(null);
   readonly reasonsLoading = signal(false);
   readonly reasonsError = toastSignal('error');
+  readonly drawer = signal<CashDrawerStatus | null>(null);
+  readonly drawerLoading = signal(false);
+  readonly drawerError = signal('');
+  readonly drawerUncertain = signal(false);
+  /** Resultado de la orden al cajón después de un movimiento de efectivo; el movimiento ya quedó registrado. */
+  readonly drawerNotice = toastSignal(statusKind);
+  drawerReason = '';
   initialAmount = 0;
   openObservations = '';
   /** Modalidad elegida al abrir; nula usa la predeterminada del negocio (individual si no hay otra). */
@@ -79,12 +90,51 @@ export class Cash implements OnInit {
       if (state.hasOpenShift) {
         this.movements.set((await this.api.movements()).items);
         if (this.session.has('CASH.SHIFT_MANAGE') && state.currentShift) {
+          await this.loadDrawerStatus();
           if (this.reconciliation()?.shiftId !== state.currentShift.id) { this.reconciliation.set(null); this.resetReasons(); }
           await this.loadReconciliation();
         }
-      } else { this.closingMode.set(false); this.movements.set([]); this.reconciliation.set(null); this.resetReasons(); }
+      } else { this.closingMode.set(false); this.movements.set([]); this.reconciliation.set(null); this.drawer.set(null); this.drawerUncertain.set(false); this.resetReasons(); }
     } catch (error) { if (!stateLoaded) this.stateReadError.set(true); this.error.set(errorText(error)); }
     finally { this.loading.set(false); this.stateLoading.set(false); }
+  }
+  async loadDrawerStatus(): Promise<void> {
+    this.drawerLoading.set(true); this.drawerError.set('');
+    try { this.drawer.set(await this.api.drawerStatus()); }
+    catch (error) { this.drawer.set(null); this.drawerError.set(errorText(error)); }
+    finally { this.drawerLoading.set(false); }
+  }
+  async openDrawer(): Promise<void> {
+    const shiftId = this.state()?.currentShift?.id;
+    const reason = this.drawerReason.trim();
+    if (!shiftId || !this.session.has('CASH.SHIFT_MANAGE') || !this.drawer()?.canOpen ||
+      this.drawerUncertain() || this.busy() || !reason || reason.length > 300) return;
+    const approved = await this.confirmations.confirm({
+      title: 'Enviar apertura al cajón',
+      message: `Motivo: ${reason}\n\nLa impresora recibirá una orden de apertura. Comprueba físicamente si el cajón se abrió.`,
+      confirmText: 'Enviar orden',
+    }, this.destroyRef);
+    if (!approved || this.destroyRef.destroyed || this.busy() || !this.drawer()?.canOpen ||
+      this.state()?.currentShift?.id !== shiftId || !this.session.has('CASH.SHIFT_MANAGE') ||
+      this.drawerReason.trim() !== reason) return;
+    this.busy.set(true); this.error.set(''); this.notice.set('');
+    try {
+      const result = await this.api.openDrawer(reason, crypto.randomUUID());
+      if (result.status === 'ENVIADO') {
+        this.notice.set('Orden enviada a la impresora. Comprueba si el cajón se abrió.');
+        this.drawerReason = '';
+      } else {
+        this.drawerUncertain.set(true);
+        this.error.set(result.message || 'No se confirmó la apertura. Comprueba el cajón antes de solicitar otra orden.');
+      }
+    } catch (error) {
+      this.drawerUncertain.set(true);
+      this.error.set(`No se pudo confirmar el resultado: ${errorText(error)} Comprueba el cajón antes de solicitar otra orden.`);
+    } finally { this.busy.set(false); }
+  }
+  prepareNewDrawerOpen(): void {
+    if (this.busy()) return;
+    this.drawerUncertain.set(false); this.drawerReason = ''; this.error.set('');
   }
   async loadReconciliation(): Promise<void> {
     const value = await this.api.reconciliation();
@@ -148,8 +198,10 @@ export class Cash implements OnInit {
   async move(): Promise<void> {
     if (!this.validMoney(this.amount) || !this.concept.trim() || this.busy()) return;
     await this.run(async () => {
-      await this.api.movement(this.kind, this.amount, this.concept.trim(), this.state()?.ownOperatorSession?.id ?? null);
-      this.amount = 0; this.concept = ''; this.notice.set('Movimiento registrado.'); await this.refresh();
+      const movement = await this.api.movement(this.kind, this.amount, this.concept.trim(), this.state()?.ownOperatorSession?.id ?? null);
+      this.amount = 0; this.concept = ''; this.notice.set('Movimiento registrado.');
+      this.drawerNotice.set(cashDrawerNotice(movement.drawerStatus));
+      await this.refresh();
     });
   }
   async startSession(): Promise<void> {

@@ -6,7 +6,7 @@ import { SalesApi } from '../sales/sales-api';
 import { PrintSettings } from './print-settings';
 
 describe('PrintSettings', () => {
-  const api = { printProfiles: vi.fn(), printQueue: vi.fn(), createPrintProfile: vi.fn(), retryAdminPrintJob: vi.fn(), deletePrintProfile: vi.fn() };
+  const api = { printProfiles: vi.fn(), printQueue: vi.fn(), createPrintProfile: vi.fn(), retryAdminPrintJob: vi.fn(), deletePrintProfile: vi.fn(), updatePrintProfileDrawer: vi.fn() };
   let permissions: string[];
   async function create() {
     const fixture = TestBed.createComponent(PrintSettings); fixture.detectChanges(); await fixture.whenStable(); return fixture.componentInstance;
@@ -15,6 +15,7 @@ describe('PrintSettings', () => {
     vi.clearAllMocks(); confirmAction.mockResolvedValue(true); permissions = ['CONFIGURATION.MANAGE'];
     api.printProfiles.mockResolvedValue([]); api.printQueue.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
     api.createPrintProfile.mockResolvedValue({}); api.retryAdminPrintJob.mockResolvedValue({}); api.deletePrintProfile.mockResolvedValue({ physicallyDeleted: true });
+    api.updatePrintProfileDrawer.mockResolvedValue({});
     TestBed.configureTestingModule({ providers: [{ provide: ConfirmationDialog, useValue: { confirm: confirmAction } }, { provide: SalesApi, useValue: api }, { provide: SessionService, useValue: { has: (c: string) => permissions.includes(c) } }] });
   });
   const base = { printerType: 'RECIBOS' as const, labelWidthMm: null, labelHeightMm: null, resolutionDpi: null };
@@ -60,5 +61,46 @@ describe('PrintSettings', () => {
     expect(c.canRetry(job)).toBe(true); expect(c.canRetry({ id: 'j', status: 'IMPRESO' } as never)).toBe(false);
     permissions = []; expect(c.canRetry(job)).toBe(false);
     permissions = ['CONFIGURATION.MANAGE']; await c.retry(job); expect(api.retryAdminPrintJob).toHaveBeenCalledWith('j');
+  });
+
+  describe('cajón de dinero', () => {
+    const receipts = { ...base, id: 'p1', name: 'Recibos caja', systemQueueName: 'JAL821', columns: 48, isDefault: true, active: true, version: 3,
+      drawerEnabled: false, drawerPin: null, drawerPulseOnMs: 100, drawerPulseOffMs: 100 };
+
+    it('habilita el cajón solo después de confirmar y envía la versión del perfil', async () => {
+      api.printProfiles.mockResolvedValue([receipts]);
+      const c = await create();
+      c.startConfigureDrawer(receipts);
+      expect(c.drawerEditing()).toEqual(receipts);
+      c.drawerForm = { enabled: true, pin: 2, pulseOnMs: 100, pulseOffMs: 100 };
+      confirmAction.mockResolvedValue(false); await c.saveDrawer();
+      expect(api.updatePrintProfileDrawer).not.toHaveBeenCalled();
+      confirmAction.mockResolvedValue(true); await c.saveDrawer();
+      expect(api.updatePrintProfileDrawer).toHaveBeenCalledWith('p1', { enabled: true, pin: 2, pulseOnMs: 100, pulseOffMs: 100, expectedVersion: 3 });
+      expect(c.drawerEditing()).toBeNull();
+      expect(c.notice()).toContain('no confirma que el cajón se abrió');
+    });
+
+    it('rechaza tiempos impares o fuera de rango', async () => {
+      api.printProfiles.mockResolvedValue([receipts]);
+      const c = await create();
+      c.startConfigureDrawer(receipts);
+      for (const times of [{ pulseOnMs: 101, pulseOffMs: 100 }, { pulseOnMs: 18, pulseOffMs: 100 }, { pulseOnMs: 100, pulseOffMs: 502 }]) {
+        c.drawerForm = { enabled: true, pin: 2, ...times };
+        await c.saveDrawer();
+      }
+      expect(api.updatePrintProfileDrawer).not.toHaveBeenCalled();
+      expect(c.formError()).toContain('pares');
+    });
+
+    it('no ofrece el cajón en una impresora de etiquetas ni sin permiso', async () => {
+      const c = await create();
+      const labels = { ...receipts, printerType: 'ETIQUETAS' as const };
+      expect(c.canConfigureDrawer(labels)).toBe(false);
+      expect(c.drawerLabel(labels)).toBe('No aplica');
+      expect(c.canConfigureDrawer(receipts)).toBe(true);
+      permissions = [];
+      expect(c.canConfigureDrawer(receipts)).toBe(false);
+    });
   });
 });

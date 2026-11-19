@@ -65,7 +65,7 @@ Para el frontend, desde `C:\ControlPlus\backend\ControlPlus.Backend\frontend` co
 
 ### Ensayo físico en Windows, exclusivamente con una base temporal
 
-1. Detén la API habitual. Obtén el nombre exacto de la cola y comprueba que el controlador esté instalado: `Get-Printer | Select-Object Name,DriverName,PrinterStatus`. Configura papel de 80 mm y, si el controlador lo ofrece, corte y cajón en las preferencias de esa cola. GDI entrega el trabajo al controlador; el corte o apertura explícitos mediante ESC/POS son una mejora separada que exige un adaptador y pruebas para el equipo real.
+1. Detén la API habitual. Obtén el nombre exacto de la cola y comprueba que el controlador esté instalado: `Get-Printer | Select-Object Name,DriverName,PrinterStatus`. Configura papel de 80 mm y, si el controlador lo ofrece, el corte en las preferencias de esa cola. **No actives la apertura del cajón en el controlador**: abriría el cajón con cada ticket, también en reimpresiones y pagos sin efectivo. ControlPlus manda la apertura solo con efectivo, como un trabajo RAW aparte (ver `docs/cash-drawer.md`). GDI entrega el ticket al controlador; el corte explícito mediante ESC/POS sigue siendo una mejora separada.
 2. Arranca una API **de pruebas** apuntando a una base `controlplus_test_*` recién creada con el procedimiento local de pruebas; comprueba con `/api/health/database` y la cadena de pruebas guardada fuera del repositorio que no apunta a `controlplus`. No uses el proceso habitual ni sus User Secrets. En otra consola PowerShell autentícate con el Administrador de esa base, conservando la contraseña solo en memoria:
 
    ```powershell

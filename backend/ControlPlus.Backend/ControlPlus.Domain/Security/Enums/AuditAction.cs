@@ -128,5 +128,11 @@ public enum AuditAction
     UserDeleted = 123,
     // Borrado o retiro de un perfil de impresora (decisión del 18 de noviembre de 2026).
     PrintProfileDeleted = 124,
-    OperatorCredentialRevoked = 125
+    OperatorCredentialRevoked = 125,
+    CashDrawerConfigurationUpdated = 126,
+    CashDrawerOpeningRequested = 127,
+    CashDrawerOpeningAccepted = 128,
+    CashDrawerOpeningFailed = 129,
+    CashDrawerOpeningUncertain = 130,
+    CashDrawerOpeningSkipped = 131
 }

@@ -101,6 +101,7 @@ public partial class OfficialControlPlusDbContext
                 .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_autorizacion_cierre_establecimiento");
         });
 
+        ConfigureCashDrawerModel(modelBuilder);
         OfficialConcurrencyConfiguration.Apply(modelBuilder);
     }
 

@@ -20,6 +20,15 @@
         <div><dt>Cambio</dt><dd class="success-text">{{ result.change | currency:'COP':'symbol':'1.0-0' }}</dd></div>
       </dl>
       <p class="badge print-status" [class.badge--info]="!printed() || (lastJobStatus() && lastJobStatus() !== 'IMPRESO')" [class.badge--success]="printed() && (!lastJobStatus() || lastJobStatus() === 'IMPRESO')" role="status">{{ lastJobStatus() ? 'Ticket: ' + lastJobStatus() : (printed() ? 'Ticket enviado al navegador' : 'Ticket sin imprimir') }}</p>
+      @if (drawerStatus(); as drawer) {
+        <p class="drawer-order-status" [class.drawer-order-status--attention]="drawer !== 'ENVIADO'" role="status">
+          @switch (drawer) {
+            @case ('ENVIADO') { Cajón: Windows aceptó la orden. Comprueba que se haya abierto. }
+            @case ('FALLIDO') { Cajón: no se pudo enviar la orden. Revisa la impresora y pide una apertura manual en Caja. }
+            @case ('INCIERTO') { Cajón: no se pudo confirmar el envío. Comprueba el cajón antes de pedir otra apertura. }
+          }
+        </p>
+      }
       @if (reprintMessage()) { <p class="field-hint" role="status">{{ reprintMessage() }}</p> }
       <div class="success-actions">
         <button class="button button--secondary" type="button" (click)="printSaleTicket()" [disabled]="busy() || (printed() && !session.has('SALES.REPRINT'))">{{ lastJobStatus() === 'ERROR' ? 'Reintentar ticket' : (printed() ? 'Reimprimir' : 'Imprimir ticket') }}</button>

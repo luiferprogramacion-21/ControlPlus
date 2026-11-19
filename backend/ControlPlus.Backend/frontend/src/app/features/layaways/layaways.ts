@@ -11,7 +11,8 @@ import { CreatedLayaway, Layaway, LayawayCancellation, LayawayDetail, LayawayPay
 import { LayawayCancel } from './layaway-cancel';
 import { LayawayCreate } from './layaway-create';
 import { appliedTotal, cashChange, emptyDraft, PaymentDraft, PaymentMethods, toPayments, validateDrafts } from './payment-methods';
-import { toastSignal } from '../../core/toast';
+import { statusKind, toastSignal } from '../../core/toast';
+import { cashDrawerNotice } from '../../shared/cash-drawer-feedback';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 import { WindowSheet } from '../../shared/window-sheet';
 import { ActivatedRoute } from '@angular/router';
@@ -37,6 +38,7 @@ export class Layaways implements OnInit {
   readonly saving = signal(false);
   readonly error = toastSignal('error');
   readonly notice = toastSignal('success');
+  readonly drawerNotice = toastSignal(statusKind);
   readonly paymentDialog = signal(false);
   readonly creating = signal(false);
   readonly cancelling = signal(false);
@@ -138,6 +140,7 @@ export class Layaways implements OnInit {
       const result = await this.api.applyPayment(layaway, payments, this.paymentKey!);
       this.paymentKey = null; this.paymentFingerprint = ''; this.paymentDialog.set(false);
       this.notice.set(result.state === 'PAGADO' ? 'Abono registrado. El apartado quedó pagado y listo para entregar.' : 'Abono registrado.');
+      this.drawerNotice.set(cashDrawerNotice(result.drawerStatus));
       await this.refreshDetail(); await this.reload();
     } catch (e) { this.error.set(errorText(e)); }
     finally { this.saving.set(false); }
@@ -147,12 +150,14 @@ export class Layaways implements OnInit {
   async onCreated(created: CreatedLayaway): Promise<void> {
     this.creating.set(false);
     this.notice.set(`Apartado ${created.visibleNumber} creado por ${this.money(created.total)}; saldo ${this.money(created.balance)}${created.change > 0 ? `; cambio ${this.money(created.change)}` : ''}.`);
+    this.drawerNotice.set(cashDrawerNotice(created.drawerStatus));
     await this.loadDetail(created.id); await this.reload();
   }
   startCancel(): void { const layaway = this.detail()?.layaway; if (layaway && this.canCancel(layaway)) { this.error.set(''); this.notice.set(''); this.cancelling.set(true); } }
   async onCancelled(result: LayawayCancellation): Promise<void> {
     this.cancelling.set(false);
     this.notice.set(`Apartado ${result.number} cancelado. Devuelto ${this.money(result.refunded)}; retenido ${this.money(result.retained)}.`);
+    this.drawerNotice.set(cashDrawerNotice(result.drawerStatus));
     await this.refreshDetail(); await this.reload();
   }
 

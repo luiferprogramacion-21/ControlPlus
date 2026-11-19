@@ -5,6 +5,7 @@ import { CashApi, Reconciliation } from './cash-api';
 import { Cash } from './cash';
 import { AuthorizationDialog, AuthorizationPrompt } from '../../shared/authorization-dialog';
 import { EstablishmentService } from '../../core/establishment';
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 
 describe('Cierre de caja', () => {
   const reconciliation: Reconciliation = {
@@ -164,5 +165,77 @@ describe('Cierre de caja', () => {
     await screen.open();
     expect(open).toHaveBeenCalledWith(10000, null, undefined, 'COMPARTIDO');
     expect(screen.openMode).toBeNull();
+  });
+});
+
+describe('Cajón de dinero en Caja', () => {
+  const shift = { id: 'shift-1', mode: 'INDIVIDUAL', state: 'ABIERTA', operatingDate: '2026-11-19', openedAtUtc: '2026-11-19T13:00:00Z',
+    initialAmount: 0, version: 1, responsibleUserId: null };
+  const openState = { isConfigured: true, hasOpenShift: true, defaultShiftMode: 'INDIVIDUAL', requiresPreviousShiftClosure: false,
+    requiresOperatorSession: false, guidance: null, currentShift: shift, ownOperatorSession: null };
+  const confirm = vi.fn();
+  let api: Record<'openDrawer' | 'movement' | 'state' | 'movements' | 'drawerStatus' | 'reconciliation', ReturnType<typeof vi.fn>>;
+  let screen: Cash;
+
+  beforeEach(() => {
+    confirm.mockReset().mockResolvedValue(true);
+    api = {
+      openDrawer: vi.fn().mockResolvedValue({ status: 'ENVIADO' }),
+      movement: vi.fn().mockResolvedValue({ id: 'm1', type: 'INGRESO', category: 'MANUAL', amount: 5000, concept: 'Base', occurredAtUtc: '', drawerStatus: 'ENVIADO' }),
+      state: vi.fn().mockResolvedValue(openState),
+      movements: vi.fn().mockResolvedValue({ items: [] }),
+      drawerStatus: vi.fn().mockResolvedValue({ enabled: true, profileName: 'Recibos caja', canOpen: true }),
+      reconciliation: vi.fn().mockResolvedValue({ shiftId: 'shift-1', shiftVersion: 1, totalExpected: 0, totalCounted: null, totalDifference: null, cashDifference: null, paymentMethods: [] }),
+    };
+    TestBed.configureTestingModule({ providers: [
+      { provide: CashApi, useValue: api },
+      { provide: SessionService, useValue: { has: (permission: string) => ['CASH.SHIFT_MANAGE', 'CASH.MOVEMENTS_MANAGE'].includes(permission), user: () => ({ userName: 'supervisor' }) } },
+      { provide: AuthorizationDialog, useValue: { open: vi.fn() } },
+      { provide: ConfirmationDialog, useValue: { confirm } },
+      { provide: EstablishmentService, useValue: { name: () => 'Tienda', load: () => Promise.resolve() } },
+    ] });
+    screen = TestBed.runInInjectionContext(() => new Cash());
+    screen.state.set(openState);
+    screen.drawer.set({ enabled: true, profileName: 'Recibos caja', canOpen: true });
+  });
+
+  it('pide confirmación y envía el motivo con una clave nueva', async () => {
+    screen.drawerReason = '  Entregar cambio  ';
+    await screen.openDrawer();
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(api.openDrawer).toHaveBeenCalledWith('Entregar cambio', expect.stringMatching(/^[0-9a-f-]{36}$/));
+    expect(screen.drawerReason).toBe('');
+    expect(screen.notice()).toContain('Comprueba si el cajón se abrió');
+  });
+
+  it('sin motivo, sin confirmar o sin cajón habilitado no envía la orden', async () => {
+    await screen.openDrawer();
+    screen.drawerReason = 'Revisar efectivo'; confirm.mockResolvedValue(false);
+    await screen.openDrawer();
+    confirm.mockResolvedValue(true); screen.drawer.set({ enabled: false, profileName: null, canOpen: false });
+    await screen.openDrawer();
+    expect(api.openDrawer).not.toHaveBeenCalled();
+  });
+
+  it('un resultado incierto bloquea otra orden hasta preparar una nueva solicitud', async () => {
+    api.openDrawer.mockResolvedValue({ status: 'INCIERTO', message: 'No se pudo confirmar el envío.' });
+    screen.drawerReason = 'Revisar efectivo';
+    await screen.openDrawer();
+    expect(screen.drawerUncertain()).toBe(true);
+    expect(screen.error()).toBe('No se pudo confirmar el envío.');
+    await screen.openDrawer();
+    expect(api.openDrawer).toHaveBeenCalledOnce();
+    screen.prepareNewDrawerOpen();
+    expect(screen.drawerUncertain()).toBe(false);
+    expect(screen.drawerReason).toBe('');
+  });
+
+  it('después de un movimiento de efectivo avisa el resultado del cajón', async () => {
+    api.movement.mockResolvedValue({ id: 'm1', type: 'INGRESO', category: 'MANUAL', amount: 5000, concept: 'Base', occurredAtUtc: '', drawerStatus: 'FALLIDO' });
+    screen.kind = 'incomes'; screen.amount = 5000; screen.concept = 'Base';
+    await screen.move();
+    expect(api.movement).toHaveBeenCalledWith('incomes', 5000, 'Base', null);
+    expect(screen.notice()).toBe('Movimiento registrado.');
+    expect(screen.drawerNotice()).toContain('no se pudo enviar la orden');
   });
 });

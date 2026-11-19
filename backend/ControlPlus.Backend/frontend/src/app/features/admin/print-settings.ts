@@ -8,12 +8,14 @@ import { PrintJob, printJobStatusText, PrintProfile, SalesApi } from '../sales/s
 import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 import { WindowSheet } from '../../shared/window-sheet';
+import { HelpTip } from '../../shared/help-tip';
 
 /** Perfiles de impresora (cola de Windows) y cola de impresión. Crear un perfil no comprueba que la cola exista. */
 @Component({
   selector: 'cp-print-settings',
-  imports: [WindowSheet, NumberInput, DatePipe, FormsModule],
+  imports: [WindowSheet, HelpTip, NumberInput, DatePipe, FormsModule],
   templateUrl: './print-settings.html',
+  styleUrl: './print-settings.scss',
 })
 export class PrintSettings implements OnInit {
   private readonly api = inject(SalesApi);
@@ -27,6 +29,8 @@ export class PrintSettings implements OnInit {
   readonly saving = signal(false);
   readonly creating = signal(false);
   readonly deleting = signal(false);
+  readonly drawerEditing = signal<PrintProfile | null>(null);
+  readonly drawerSaving = signal(false);
   readonly error = toastSignal('error');
   readonly formError = toastSignal('error');
   readonly notice = toastSignal('success');
@@ -34,11 +38,66 @@ export class PrintSettings implements OnInit {
     name: '', systemQueueName: '', columns: 32, makeDefault: true,
     printerType: 'RECIBOS', labelWidthMm: null, labelHeightMm: null, resolutionDpi: null,
   };
+  drawerForm: { enabled: boolean; pin: number; pulseOnMs: number; pulseOffMs: number } = {
+    enabled: false, pin: 2, pulseOnMs: 100, pulseOffMs: 100,
+  };
 
   ngOnInit(): void { void this.reload(); }
   jobText(job: PrintJob): string { return printJobStatusText(job); }
   copyLabel(job: PrintJob): string { return job.copyType === 'ORIGINAL' ? 'Original' : `Reimpresión ${job.copyNumber}`; }
   canRetry(job: PrintJob): boolean { return job.status === 'ERROR' && this.session.has('CONFIGURATION.MANAGE'); }
+  canConfigureDrawer(profile: PrintProfile): boolean { return profile.active && profile.printerType !== 'ETIQUETAS' && this.session.has('CONFIGURATION.MANAGE'); }
+  drawerLabel(profile: PrintProfile): string {
+    return profile.printerType === 'ETIQUETAS' ? 'No aplica' : profile.drawerEnabled ? 'Habilitado' : 'Desactivado';
+  }
+
+  startConfigureDrawer(profile: PrintProfile): void {
+    if (!this.canConfigureDrawer(profile) || this.saving() || this.deleting() || this.drawerSaving() || this.confirming) return;
+    this.drawerForm = {
+      enabled: profile.drawerEnabled, pin: profile.drawerPin ?? 2,
+      pulseOnMs: profile.drawerPulseOnMs ?? 100, pulseOffMs: profile.drawerPulseOffMs ?? 100,
+    };
+    this.formError.set(''); this.drawerEditing.set(profile);
+  }
+
+  closeConfigureDrawer(): void {
+    if (this.drawerSaving() || this.confirming) return;
+    this.drawerEditing.set(null); this.formError.set('');
+  }
+
+  async saveDrawer(): Promise<void> {
+    const profile = this.drawerEditing();
+    if (!profile || !this.canConfigureDrawer(profile) || this.drawerSaving() || this.confirming) return;
+    const { enabled, pin, pulseOnMs, pulseOffMs } = this.drawerForm;
+    if (![2, 5].includes(pin)) { this.formError.set('Elige el pin 2 o el pin 5.'); return; }
+    if ([pulseOnMs, pulseOffMs].some(value => !Number.isInteger(value) || value < 20 || value > 500 || value % 2 !== 0)) {
+      this.formError.set('Los tiempos deben ser pares entre 20 y 500 ms.'); return;
+    }
+    if (enabled && !profile.drawerEnabled) {
+      this.confirming = true;
+      let approved: boolean;
+      try {
+        approved = await this.confirmations.confirm({
+          title: 'Habilitar el cajón de dinero',
+          message: 'Al confirmar, las ventas con efectivo enviarán una orden de apertura a esta impresora. Verifica primero que el cajón y el cable sean compatibles con la salida RJ12 y que la cola de Windows corresponda a la impresora correcta.',
+          confirmText: 'Habilitar cajón',
+        }, this.destroyRef);
+      } finally { this.confirming = false; }
+      if (!approved || this.destroyRef.destroyed) return;
+    }
+    const current = this.profiles().find(item => item.id === profile.id);
+    if (!current || current.version !== profile.version || !this.session.has('CONFIGURATION.MANAGE')) {
+      this.formError.set('El perfil cambió. Actualiza la lista antes de guardarlo.'); return;
+    }
+    this.drawerSaving.set(true); this.formError.set(''); this.notice.set('');
+    try {
+      await this.api.updatePrintProfileDrawer(profile.id, { enabled, pin, pulseOnMs, pulseOffMs, expectedVersion: profile.version });
+      this.drawerEditing.set(null);
+      this.notice.set(enabled ? 'Configuración guardada. La orden enviada a Windows no confirma que el cajón se abrió.' : 'Apertura de cajón desactivada para este perfil.');
+      await this.reload();
+    } catch (e) { this.formError.set(errorText(e)); }
+    finally { this.drawerSaving.set(false); }
+  }
 
   async reload(): Promise<void> {
     this.loading.set(true); this.error.set('');

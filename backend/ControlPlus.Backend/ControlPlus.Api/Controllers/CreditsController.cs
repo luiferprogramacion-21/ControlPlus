@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using ControlPlus.Api.Authorization;
+using ControlPlus.Api.Printing;
 using ControlPlus.Api.Security;
+using ControlPlus.Application.Cash.Contracts;
 using ControlPlus.Application.Common;
 using ControlPlus.Application.Credits.Contracts;
 using ControlPlus.Application.Security.Contracts;
@@ -10,7 +12,8 @@ namespace ControlPlus.Api.Controllers;
 
 [Route("api/credits")]
 public sealed class CreditsController(CurrentActorContextResolver actorContextResolver,
-    ICreditsService credits) : ApiControllerBase(actorContextResolver)
+    ICreditsService credits, ICashDrawerService drawer,
+    ILogger<CreditsController> logger) : ApiControllerBase(actorContextResolver)
 {
     [HttpGet]
     [PermissionAuthorize(PermissionCodes.CreditManage)]
@@ -66,6 +69,15 @@ public sealed class CreditsController(CurrentActorContextResolver actorContextRe
         var actor = await GetActorAsync(cancellationToken);
         if (actor is null) return MissingActor();
         var result = await credits.ApplyPaymentAsync(actor, creditId, idempotencyKey, request, cancellationToken);
+        if (result.IsSuccess)
+        {
+            var cashPayment = result.Value!.Payments.FirstOrDefault(x =>
+                x.MethodCode == "EFECTIVO" && x.AppliedAmount > 0);
+            if (cashPayment is not null)
+                await CashDrawerControllerDispatch.TryOpenAsync(drawer, actor,
+                    CashDrawerOperationKind.CreditPayment, cashPayment.Id,
+                    Response, logger, cancellationToken);
+        }
         return FromResult(result, value => StatusCode(StatusCodes.Status201Created, value));
     }
 

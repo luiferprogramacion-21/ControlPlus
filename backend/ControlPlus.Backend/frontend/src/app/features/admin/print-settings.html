@@ -2,12 +2,12 @@
 <section class="panel module-panel">
   <div class="module-toolbar"><div><h3>Perfiles de impresión</h3><p class="muted">Admite impresoras de recibos, etiquetas o equipos térmicos híbridos.</p></div><button class="button button--primary" type="button" (click)="startCreate()">Agregar perfil</button></div>
   @if (loading()) { <p class="muted" role="status">Cargando…</p> }
-  <div class="table-wrap module-table-wrap"><table><thead><tr><th>Nombre</th><th>Tipo</th><th>Cola de Windows</th><th>Configuración</th><th>Estado</th><th></th></tr></thead><tbody>
+  <div class="table-wrap module-table-wrap"><table class="print-profiles-table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Cola de Windows</th><th>Configuración</th><th>Cajón</th><th>Estado</th><th></th></tr></thead><tbody>
     @for (profile of profiles(); track profile.id) {
-      <tr><td><strong>{{ profile.name }}</strong></td><td>{{ profile.printerType === 'HIBRIDA' ? 'Híbrida' : profile.printerType === 'ETIQUETAS' ? 'Etiquetas' : 'Recibos' }}</td><td>{{ profile.systemQueueName }}</td><td>{{ profile.columns ? profile.columns + ' columnas' : '' }}{{ profile.labelWidthMm && profile.labelHeightMm ? (profile.columns ? ' · ' : '') + profile.labelWidthMm + ' × ' + profile.labelHeightMm + ' mm' : '' }}{{ profile.resolutionDpi ? ' · ' + profile.resolutionDpi + ' DPI' : '' }}</td>
+      <tr><td><strong>{{ profile.name }}</strong></td><td>{{ profile.printerType === 'HIBRIDA' ? 'Híbrida' : profile.printerType === 'ETIQUETAS' ? 'Etiquetas' : 'Recibos' }}</td><td>{{ profile.systemQueueName }}</td><td>{{ profile.columns ? profile.columns + ' columnas' : '' }}{{ profile.labelWidthMm && profile.labelHeightMm ? (profile.columns ? ' · ' : '') + profile.labelWidthMm + ' × ' + profile.labelHeightMm + ' mm' : '' }}{{ profile.resolutionDpi ? ' · ' + profile.resolutionDpi + ' DPI' : '' }}</td><td><span class="status-pill" [class.status-pill--warning]="!profile.drawerEnabled">{{ drawerLabel(profile) }}</span></td>
         <td><span class="status-pill" [class.status-pill--warning]="!profile.active">{{ profile.active ? 'Activo' : 'Inactivo' }}</span>@if (profile.isDefault) { <span class="status-pill"> Predeterminado</span> }</td>
-        <td class="align-right">@if (session.has('CONFIGURATION.MANAGE')) { <button class="table-action table-action--danger" type="button" (click)="remove(profile)" [disabled]="deleting()">Eliminar</button> }</td></tr>
-    } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="6">No hay perfiles. Sin un perfil no se generan trabajos de impresión.</td></tr> } }
+        <td class="align-right"><div class="print-profile-actions">@if (canConfigureDrawer(profile)) { <button class="table-action" type="button" (click)="startConfigureDrawer(profile)" [disabled]="drawerSaving() || deleting()">Cajón</button> }@if (session.has('CONFIGURATION.MANAGE')) { <button class="table-action table-action--danger" type="button" (click)="remove(profile)" [disabled]="deleting() || drawerSaving()">Eliminar</button> }</div></td></tr>
+    } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="7">No hay perfiles. Sin un perfil no se generan trabajos de impresión.</td></tr> } }
   </tbody></table></div>
 </section>
 <section class="panel module-panel">
@@ -38,6 +38,25 @@
       <p class="form-hint">Las dimensiones pueden quedar vacías para usar el tamaño configurado en el controlador. Crear el perfil no comprueba que la cola esté instalada.</p>
       @if (formError()) { <p class="field-error" role="alert">{{ formError() }}</p> }
       <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button><button class="button button--secondary" type="button" (click)="creating.set(false)" [disabled]="saving()">Cancelar</button></div>
+    </form>
+  </div>
+}
+
+@if (drawerEditing(); as profile) {
+  <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="print-drawer-title"><div class="module-form-sheet__backdrop" (click)="closeConfigureDrawer()"></div>
+    <form class="panel panel--padded module-form print-drawer-form" (submit)="$event.preventDefault(); saveDrawer()">
+      <div class="panel-heading"><h2 id="print-drawer-title">Cajón de dinero</h2><p>{{ profile.name }} · {{ profile.systemQueueName }}</p></div>
+      <div class="print-drawer-status"><span class="status-pill" [class.status-pill--warning]="!profile.drawerEnabled">{{ profile.drawerEnabled ? 'Habilitado' : 'Desactivado' }}</span><span>La configuración se aplica a esta impresora.</span></div>
+      <label class="print-drawer-toggle"><input type="checkbox" name="drawerEnabled" [(ngModel)]="drawerForm.enabled"> Permitir apertura desde esta impresora</label>
+      <p class="form-hint">La apertura permanece desactivada hasta que guardes esta opción. Las ventas con efectivo solicitan la apertura automáticamente; también puedes solicitarla en Caja con un motivo. Una reimpresión no abre el cajón.</p>
+      <div class="form-grid form-grid--two print-drawer-fields">
+        <div><label class="field-label" for="drawer-pin">Pin de activación<cp-help text="Casi todos los cajones abren con el pin 2. Si no abre, prueba con el pin 5." /></label><select id="drawer-pin" class="text-field" name="drawerPin" [(ngModel)]="drawerForm.pin" [disabled]="!drawerForm.enabled"><option [ngValue]="2">Pin 2</option><option [ngValue]="5">Pin 5</option></select></div>
+        <div><label class="field-label" for="drawer-on">Pulso activo (ms)<cp-help text="Cuánto dura el impulso que abre el cajón. 100 ms sirve para casi todos; súbelo solo si el cajón no alcanza a abrir." /></label><input id="drawer-on" class="text-field" type="text" cpNumberInput min="20" max="500" step="2" name="drawerPulseOnMs" [(ngModel)]="drawerForm.pulseOnMs" [disabled]="!drawerForm.enabled"></div>
+        <div><label class="field-label" for="drawer-off">Pausa (ms)</label><input id="drawer-off" class="text-field" type="text" cpNumberInput min="20" max="500" step="2" name="drawerPulseOffMs" [(ngModel)]="drawerForm.pulseOffMs" [disabled]="!drawerForm.enabled"></div>
+      </div>
+      <div class="notice notice--warning print-drawer-warning">Confirma el modelo y voltaje del cajón y el cable antes de habilitarlo. La impresora puede aceptar la orden sin que el cajón se abra; compruébalo físicamente.</div>
+      @if (formError()) { <p class="field-error" role="alert">{{ formError() }}</p> }
+      <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="drawerSaving()">{{ drawerSaving() ? 'Guardando…' : 'Guardar' }}</button><button class="button button--secondary" type="button" (click)="closeConfigureDrawer()" [disabled]="drawerSaving()">Cancelar</button></div>
     </form>
   </div>
 }

@@ -175,6 +175,13 @@ Se puede pagar con **Efectivo, Transferencia o Nequi**, solos o combinados:
 - **Error:** si el estado dice Error, aparece **Reintentar ticket**. La venta **ya está registrada**: un fallo de impresión nunca borra ni duplica la venta.
 - Si te quedas sin impresora, la venta se cobra igual; después se puede reimprimir desde **Historial de ventas**.
 
+**El cajón de dinero** (si el Administrador lo conectó a la impresora, ver 4.7):
+
+- Se abre solo al confirmar una operación **con efectivo**: venta, abono, apartado, devolución o cambio con efectivo y movimiento de caja. Se abre **una sola vez** por operación.
+- **No** se abre si se paga solo con Transferencia o Nequi, ni al reimprimir un ticket.
+- Debajo del total aparece un aviso del cajón. «Windows aceptó la orden» significa que la impresora recibió la orden; mira que el cajón se haya abierto.
+- Si no se abrió, la venta **ya está registrada**. No la repitas: pide a un Supervisor que lo abra desde **Caja** (ver 3.3).
+
 ## 2.7 Venta sin terminar
 
 Si se cierra la sesión, se va la luz o se apaga el equipo con una venta a medias, **el carrito se conserva** (el sistema lo guarda solo cada vez que cambias algo).
@@ -234,6 +241,7 @@ Menú **Clientes** → **Nuevo cliente**. Lleva nombre, **dirección** (obligato
 | Un descuento mayor a 5 % | Supervisor (hasta 20 %) o Administrador (hasta 80 %) |
 | Corregir un precio, nombre o código de un producto | Administrador |
 | Ajustar el inventario | Administrador |
+| Abrir el cajón sin una venta | Supervisor o Administrador |
 | Reactivar tu usuario bloqueado | Administrador |
 
 ## 2.13 Al terminar tu turno
@@ -271,7 +279,12 @@ Igual que en 2.2, pero sin ventana de autorización. Al abrir eliges **Turno ind
 
 ## 3.3 Movimientos de caja
 
-En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto** o un **Retiro de efectivo** (dinero que se saca de la caja), con su **concepto**, y pulsa **Registrar movimiento**. Quedan en **Movimientos recientes**.
+En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto** o un **Retiro de efectivo** (dinero que se saca de la caja), con su **concepto**, y pulsa **Registrar movimiento**. Quedan en **Movimientos recientes**. Si el cajón está conectado, se abre solo al registrar el movimiento.
+
+**Abrir el cajón sin una venta** (para dar cambio o revisar el efectivo): en **Caja**, bloque **Cajón de dinero**, escribe el **motivo**, pulsa **Abrir cajón** y confirma. Necesita la caja abierta. Queda registrado quién lo abrió, cuándo y por qué.
+
+- Si el aviso dice que **no se pudo confirmar** el envío, mira primero si el cajón se abrió. Solo si sigue cerrado, pulsa **Preparar nueva solicitud** y vuelve a intentarlo con un motivo.
+- Si el bloque dice **Desactivado**, el Administrador debe habilitar el cajón (ver 4.7).
 
 ## 3.4 Cerrar la caja
 
@@ -431,6 +444,16 @@ La tabla **Cola de impresión** muestra cada trabajo y su estado. **Reintentar**
 
 **Eliminar un perfil:** botón **Eliminar** en su fila. Si el perfil nunca imprimió nada, se borra. Si ya imprimió, se **retira**: desaparece de la lista pero se conserva el historial de lo que imprimió. Si era el predeterminado, mientras no haya otro las ventas no se imprimen desde el sistema.
 
+**Cajón de dinero.** El cajón se abre **a través de la impresora**: el sistema le manda una orden y la impresora da el impulso que abre el cajón. Viene **desactivado** hasta que lo habilites.
+
+1. **Conecta el cable del cajón** (parece un cable de teléfono, RJ11 o RJ12) al puerto del cajón de la impresora, que suele decir **DK** o **CASH DRAWER**. No va al computador. Los cajones para impresora suelen ser de **24 V**: revísalo en la etiqueta de abajo del cajón. Si el controlador de Windows de la impresora tiene una opción para abrir el cajón al imprimir, **déjala apagada**: abriría el cajón con cada ticket, también al reimprimir o al cobrar con Nequi.
+2. Configuración → **Impresión** → botón **Cajón** en la fila del perfil **predeterminado de recibos**.
+3. Marca **Permitir apertura desde esta impresora**. Deja **Pin 2**, **Pulso activo 100 ms** y **Pausa 100 ms**. Pulsa **Guardar** y confirma.
+4. **Prueba:** abre la caja y, en Caja → **Cajón de dinero**, escribe «Prueba» como motivo y pulsa **Abrir cajón**. Si no abre, vuelve a la configuración del cajón, cambia a **Pin 5** y prueba de nuevo. Si tampoco abre, revisa el cable y el voltaje del cajón.
+5. Haz una venta pequeña **en efectivo**: el cajón debe abrirse una sola vez. Reimprime el ticket y haz otra con **Nequi**: ninguna de las dos debe abrirlo.
+
+Para dejar de usarlo, desmarca **Permitir apertura** y guarda. Un perfil de etiquetas no puede abrir el cajón.
+
 ## 4.8 Proveedores y compras
 
 - **Proveedores:** solo tú los creas, editas e inactivas. El documento (NIT o cédula) no se puede repetir.
@@ -507,6 +530,8 @@ Estas reglas no se pueden cambiar con permisos:
 | Cancelar un apartado | — | con Administrador | ✔ |
 | Abrir la caja | con autorización | ✔ | ✔ |
 | Movimientos de caja | — | ✔ | ✔ |
+| Abrir el cajón sin una venta | — | ✔ | ✔ |
+| Habilitar el cajón de dinero | — | — | ✔ |
 | Cerrar la caja | — | ✔ (con Administrador si hay diferencia) | ✔ |
 | Anular una venta | — | con Administrador | ✔ |
 | Cambio de productos | — | con Administrador | ✔ |

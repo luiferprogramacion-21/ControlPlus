@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using ControlPlus.Api.Authorization;
+using ControlPlus.Api.Printing;
 using ControlPlus.Api.Security;
+using ControlPlus.Application.Cash.Contracts;
 using ControlPlus.Application.Layaways.Contracts;
 using ControlPlus.Application.Security.Contracts;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +12,8 @@ namespace ControlPlus.Api.Controllers;
 [Route("api/layaways")]
 public sealed class LayawayCreateController(
     CurrentActorContextResolver actorContextResolver,
-    ILayawayCreateService layaways) : ApiControllerBase(actorContextResolver)
+    ILayawayCreateService layaways, ICashDrawerService drawer,
+    ILogger<LayawayCreateController> logger) : ApiControllerBase(actorContextResolver)
 {
     /// <summary>Crea un apartado, reserva existencias y registra el abono inicial en una transacción.</summary>
     [HttpPost]
@@ -28,8 +31,13 @@ public sealed class LayawayCreateController(
         CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
-        return actor is null ? MissingActor() : FromResult(
-            await layaways.CreateAsync(actor, idempotencyKey, request, cancellationToken),
-            created => Created($"/api/layaways/{created.Id}", created));
+        if (actor is null) return MissingActor();
+        var result = await layaways.CreateAsync(actor, idempotencyKey, request, cancellationToken);
+        if (result.IsSuccess && result.Value!.Payments.Any(x =>
+                x.MethodCode == "EFECTIVO" && x.AppliedAmount > 0))
+            await CashDrawerControllerDispatch.TryOpenAsync(drawer, actor,
+                CashDrawerOperationKind.LayawayInitial, result.Value.Id,
+                Response, logger, cancellationToken);
+        return FromResult(result, created => Created($"/api/layaways/{created.Id}", created));
     }
 }

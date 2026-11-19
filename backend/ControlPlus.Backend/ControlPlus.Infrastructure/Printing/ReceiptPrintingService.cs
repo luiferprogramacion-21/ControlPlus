@@ -122,6 +122,54 @@ public sealed class ReceiptPrintingService(
             templates.TryGetValue(ReceiptTemplateCode(p.Id), out var t) ? ReadColumns(t.Configuracion) : 0)).ToArray());
     }
 
+    public async Task<Result<PrintProfileDto>> UpdateProfileDrawerAsync(ActorContext actor, Guid profileId,
+        UpdatePrintProfileDrawerRequest request, CancellationToken ct = default)
+    {
+        var auth = await users.GetAuthorizationSnapshotAsync(actor.UserId, ct);
+        if (auth is null) return Result.Failure<PrintProfileDto>(ApplicationError.Unauthorized());
+        if (auth.HighestRoleLevel != RoleLevel.Administrador ||
+            !auth.PermissionCodes.Contains(PermissionCodes.ConfigurationManage, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<PrintProfileDto>(ApplicationError.Forbidden());
+        if (request is null || request.ExpectedVersion < 1 ||
+            request.Pin is not null and not (2 or 5) ||
+            request.Enabled && request.Pin is null ||
+            !ValidPulseMs(request.PulseOnMs) || !ValidPulseMs(request.PulseOffMs))
+            return Result.Failure<PrintProfileDto>(ApplicationError.Validation(
+                "Indica versión, pin 2 o 5 y tiempos de pulso pares entre 20 y 500 ms."));
+
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var terminal = await GetLockedActiveTerminalAsync(ct);
+        if (terminal is null) return Result.Failure<PrintProfileDto>(ApplicationError.NotFound("la terminal activa"));
+        var profile = await db.PerfilImpresora.AsTracking().SingleOrDefaultAsync(x =>
+            x.Id == profileId && x.TerminalId == terminal.Id && x.Activo, ct);
+        if (profile is null) return Result.Failure<PrintProfileDto>(ApplicationError.NotFound("el perfil de impresora"));
+        if (profile.TipoImpresora is not ("RECIBOS" or "HIBRIDA"))
+            return Result.Failure<PrintProfileDto>(ApplicationError.Validation(
+                "El cajón solo puede conectarse a un perfil que imprime comprobantes."));
+        if (profile.Version != request.ExpectedVersion)
+            return Result.Failure<PrintProfileDto>(ApplicationError.ConcurrencyConflict(
+                "El perfil cambió. Actualiza la lista e inténtalo de nuevo."));
+
+        profile.CajonHabilitado = request.Enabled;
+        profile.CajonPin = (short?)request.Pin;
+        profile.CajonPulsoOnMs = (short)request.PulseOnMs;
+        profile.CajonPulsoOffMs = (short)request.PulseOffMs;
+        profile.FechaModificacion = clock.UtcNow.UtcDateTime;
+        await WriteAuditAsync(actor.UserId, AuditAction.CashDrawerConfigurationUpdated,
+            nameof(PerfilImpresora), profile.Id, new
+            {
+                profile.Id, profile.TerminalId, profile.CajonHabilitado, profile.CajonPin,
+                profile.CajonPulsoOnMs, profile.CajonPulsoOffMs
+            }, ct);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        var template = await db.PlantillaImpresion.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.Codigo == ReceiptTemplateCode(profile.Id), ct);
+        return Result.Success(ToProfile(profile, template is null ? 0 : ReadColumns(template.Configuracion)));
+    }
+
+    private static bool ValidPulseMs(int value) => value is >= 20 and <= 500 && value % 2 == 0;
+
     /// <summary>
     /// Borra un perfil de impresora. Sin trabajos de impresión se elimina con su plantilla; con historial se retira
     /// (inactivo, sin ser predeterminado y con el nombre liberado) para conservar la trazabilidad de las copias.
@@ -148,7 +196,8 @@ public sealed class ReceiptPrintingService(
             return Result.Failure<DeletePrintProfileResultDto>(ApplicationError.Conflict(
                 "El perfil tiene trabajos de impresión pendientes o en curso. Espera a que terminen o revisa la cola antes de eliminarlo."));
 
-        var hasHistory = await db.TrabajoImpresion.AnyAsync(x => x.PerfilImpresoraId == profile.Id, ct);
+        var hasHistory = await db.TrabajoImpresion.AnyAsync(x => x.PerfilImpresoraId == profile.Id, ct) ||
+            await db.AperturaCajon.AnyAsync(x => x.PerfilImpresoraId == profile.Id, ct);
         var details = new { profile.Id, profile.TerminalId, profile.Nombre, profile.NombreSistema, profile.TipoImpresora,
             profile.EsPredeterminada, PhysicallyDeleted = !hasHistory };
         if (hasHistory)
@@ -158,6 +207,7 @@ public sealed class ReceiptPrintingService(
             profile.Nombre = profile.Nombre[..Math.Min(profile.Nombre.Length, 150 - suffix.Length)] + suffix;
             profile.Activo = false;
             profile.EsPredeterminada = false;
+            profile.CajonHabilitado = false;
             profile.FechaModificacion = now;
         }
         else
@@ -497,7 +547,9 @@ public sealed class ReceiptPrintingService(
     private static PrintProfileDto ToProfile(PerfilImpresora profile, int columns) =>
         new(profile.Id, profile.Nombre, profile.NombreSistema, columns,
             profile.EsPredeterminada, profile.Activo, profile.Version, profile.TipoImpresora,
-            profile.AnchoMm, profile.AltoMm, profile.ResolucionDpi);
+            profile.AnchoMm, profile.AltoMm, profile.ResolucionDpi,
+            profile.CajonHabilitado, profile.CajonPin,
+            profile.CajonPulsoOnMs, profile.CajonPulsoOffMs);
 
     private static PrintJobDto ToJob(TrabajoImpresion job) =>
         new(job.Id, job.DocumentoEmitido.EntidadId, job.TipoCopia, job.NumeroReimpresion,

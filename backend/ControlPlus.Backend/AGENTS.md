@@ -648,6 +648,29 @@ Quienes lo probaron dijeron, en general, que era poco usable. El usuario aprobó
 
 Estos cambios son solo de pantalla. No cambian reglas de negocio, permisos, autorizaciones ni la API.
 
+### Decisión del 19 de noviembre de 2026: cajón de dinero por la impresora
+
+El usuario pidió abrir el cajón monedero a través de la impresora de recibos. La impresora es una Jaltech JAL-821, con salida RJ12; el modelo del cajón no se conoce. Codex empezó el trabajo y Claude lo terminó a pedido del usuario. El detalle técnico está en `docs/cash-drawer.md`.
+
+- **Cómo se abre:** el sistema manda `ESC p` como un trabajo RAW de Windows, aparte del ticket. Se configuran el pin (2 o 5) y la duración del pulso y de la pausa (pares, de 20 a 500 ms). «ENVIADO» significa que Windows aceptó la orden, no que el cajón se abrió.
+- **Viene desactivado.** Solo el Administrador con `CONFIGURATION.MANAGE` lo habilita, en Configuración → Impresión → **Cajón**, sobre el perfil predeterminado de recibos o híbrido (`PUT /api/printing/profiles/{id}/drawer`).
+- **Apertura automática:** una sola vez por operación, al confirmar con efectivo:
+  - venta;
+  - abono a crédito;
+  - apartado nuevo y abono a apartado;
+  - devolución de apartado;
+  - cambio de productos;
+  - movimiento de caja.
+- **Nunca abre** con medios electrónicos, reimpresiones, reintentos ni repeticiones de la misma solicitud.
+- **Si el cajón falla:** la operación no se revierte ni se duplica. La pantalla avisa del resultado, que llega en el encabezado `X-Cash-Drawer-Status`.
+- **Apertura manual:** desde Caja, con motivo y turno abierto, solo Supervisor o Administrador con `CASH.SHIFT_MANAGE` (`POST /api/cash/drawer/open`, con `Idempotency-Key`). Si el resultado es incierto, hay que revisar el cajón antes de pedir otra apertura.
+- **Registro:** cada intento queda en `caja.apertura_cajon` y en la auditoría (`CashDrawer*`).
+- **Migración** `20261119010000_CashDrawerV1` (historial 27 → 28):
+  - agrega cuatro columnas a `configuracion.perfil_impresora` y la tabla `caja.apertura_cajon`;
+  - la aplica el operador **antes** de instalar la versión nueva, con `scripts/cash-drawer/Invoke-Activation.ps1 -UsePostgresCredential` (servicio detenido, respaldo, preflight y postflight);
+  - sin ella, la versión nueva no puede leer los perfiles de impresión.
+- **No se activa la apertura del cajón en el controlador de Windows:** abriría el cajón con cada ticket.
+
 ### Reglas del reparto
 
 - Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:

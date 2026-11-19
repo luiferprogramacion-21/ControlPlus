@@ -25,6 +25,18 @@ public partial class PerfilImpresora
 
     public bool Activo { get; set; }
 
+    /// <summary>Solo un perfil de recibos puede activar el pulso ESC/POS del cajon.</summary>
+    public bool CajonHabilitado { get; set; }
+
+    /// <summary>Pin de salida del conector del cajon (2 o 5). Nulo hasta configurarlo.</summary>
+    public short? CajonPin { get; set; }
+
+    /// <summary>Duracion del pulso encendido en milisegundos, en pasos de 2 ms.</summary>
+    public short CajonPulsoOnMs { get; set; } = 100;
+
+    /// <summary>Duracion del pulso apagado en milisegundos, en pasos de 2 ms.</summary>
+    public short CajonPulsoOffMs { get; set; } = 100;
+
     public DateTime FechaCreacion { get; set; }
 
     public DateTime? FechaModificacion { get; set; }

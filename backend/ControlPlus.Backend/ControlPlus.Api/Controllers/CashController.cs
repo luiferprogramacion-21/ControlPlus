@@ -1,4 +1,5 @@
 using ControlPlus.Api.Authorization;
+using ControlPlus.Api.Printing;
 using ControlPlus.Api.Security;
 using ControlPlus.Application.Cash.Contracts;
 using ControlPlus.Application.Common;
@@ -11,7 +12,8 @@ namespace ControlPlus.Api.Controllers;
 [Produces("application/json", "application/problem+json")]
 public sealed class CashController(
     CurrentActorContextResolver actorContextResolver,
-    ICashService cashService) : ApiControllerBase(actorContextResolver)
+    ICashService cashService, ICashDrawerService drawer,
+    ILogger<CashController> logger) : ApiControllerBase(actorContextResolver)
 {
     [HttpGet("closure-difference-reasons")]
     [PermissionAuthorize(PermissionCodes.CashShiftManage)]
@@ -315,6 +317,10 @@ public sealed class CashController(
         }
 
         var result = await operation(actor, request, cancellationToken);
+        if (result.IsSuccess)
+            await CashDrawerControllerDispatch.TryOpenAsync(drawer, actor,
+                CashDrawerOperationKind.CashMovement, result.Value!.Id,
+                Response, logger, cancellationToken);
         return FromResult(result, movement => StatusCode(StatusCodes.Status201Created, movement));
     }
 }

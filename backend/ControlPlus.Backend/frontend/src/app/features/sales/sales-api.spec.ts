@@ -17,6 +17,18 @@ describe('SalesApi: venta a crédito', () => {
     request.flush({ id: 'sale-id', visibleNumber: 'VTA-1', total: 10000, change: 0, state: 'CONFIRMADA', payments: [], creditId: 'credit-id' });
     expect((await task).creditId).toBe('credit-id');
   });
+  it('conserva la venta confirmada y lee por separado un fallo del cajón', async () => {
+    const input: SaleInput = { customerId: null, lines: [], generalDiscount: null, discountReason: null,
+      payments: [{ methodCode: 'EFECTIVO', appliedAmount: 1000, receivedAmount: 1000, reference: null }],
+      saleType: 'CONTADO', dueDate: null, authorization: null };
+    const task = api.confirm(input, 'cash-key');
+    http.expectOne('/api/sales').flush({ id: 'sale-id', visibleNumber: 'VTA-1', total: 1000, change: 0,
+      state: 'CONFIRMADA', payments: input.payments, creditId: null },
+      { headers: { 'X-Cash-Drawer-Status': 'FALLIDO' } });
+    const sale = await task;
+    expect(sale.id).toBe('sale-id');
+    expect(sale.drawerStatus).toBe('FALLIDO');
+  });
 });
 
 describe('SalesApi: impresión', () => {

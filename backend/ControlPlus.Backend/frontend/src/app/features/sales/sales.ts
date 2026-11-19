@@ -47,6 +47,7 @@ export class Sales implements OnInit, OnDestroy {
   readonly receipt = signal<ReceiptMeta | null>(null);
   readonly showDetail = signal(false);
   readonly reprintMessage = toastSignal(statusKind);
+  readonly drawerStatus = signal<'ENVIADO' | 'FALLIDO' | 'INCIERTO' | null>(null);
   readonly lastJobStatus = signal<PrintJobStatus | null>(null);
   /** Whether the ticket was already sent to the printer; later prints are recorded as reprints. */
   readonly printed = signal(false);
@@ -789,6 +790,7 @@ export class Sales implements OnInit, OnDestroy {
       const meta: ReceiptMeta = { customer: this.selectedCustomerName, operator: this.session.user()?.displayName ?? '', items: this.cart().length, units: this.units };
       const result = await this.api.confirm({ ...this.pending.input, authorization: credentials ? authorizationBody(credentials) : null }, this.pending.key);
       this.draftStored = false;
+      this.drawerStatus.set(result.drawerStatus ?? null);
       this.receipt.set(meta); this.showDetail.set(false); this.reprintMessage.set(''); this.printed.set(false); this.lastJobStatus.set(null); this.sale.set(result);
       this.pending = null; this.cart.set([]); this.results.set([]); this.selectedProductId.set(null); this.cashApplied = this.cashReceived = this.transferApplied = this.nequiApplied = 0; this.generalDiscount = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.activePayments.set(['EFECTIVO']); this.checkoutMode.set(false);
       this.focusField('new-sale');
@@ -802,7 +804,7 @@ export class Sales implements OnInit, OnDestroy {
   // --- after the sale -------------------------------------------------------------------------
   /** Clears the finished sale and leaves the screen ready for the next customer. */
   newSale(): void {
-    this.sale.set(null); this.receipt.set(null); this.showDetail.set(false); this.reprintMessage.set(''); this.printed.set(false); this.lastJobStatus.set(null);
+    this.sale.set(null); this.receipt.set(null); this.showDetail.set(false); this.reprintMessage.set(''); this.drawerStatus.set(null); this.printed.set(false); this.lastJobStatus.set(null);
     this.customerId = ''; this.customers.set([]); this.discountReason = ''; this.dueDate = '';
     this.concessionAuthorization = null; this.concessionAuthorizedBy.set('');
     this.saleType.set('CONTADO'); this.checkoutMode.set(false); this.feedback.set(''); this.error.set('');

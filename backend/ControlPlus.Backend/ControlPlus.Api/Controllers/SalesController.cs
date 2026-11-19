@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using ControlPlus.Api.Authorization;
+using ControlPlus.Api.Printing;
 using ControlPlus.Api.Security;
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Cash.Contracts;
 using ControlPlus.Application.Sales.Contracts;
 using ControlPlus.Application.Printing;
 using ControlPlus.Application.Security.Contracts;
@@ -15,6 +17,7 @@ public sealed class SalesController(
     CurrentActorContextResolver actorContextResolver,
     ISalesService salesService,
     IReceiptPrintingService printing,
+    ICashDrawerService drawer,
     ILogger<SalesController> logger) : ApiControllerBase(actorContextResolver)
 {
     /// <summary>Confirma una venta CONTADO o CREDITO idempotente y descuenta su inventario.</summary>
@@ -37,6 +40,9 @@ public sealed class SalesController(
         var result = await salesService.ConfirmAsync(actor, idempotencyKey, request, cancellationToken);
         if (result.IsSuccess)
         {
+            if (result.Value!.Payments.Any(x => x.MethodCode == "EFECTIVO" && x.AppliedAmount > 0))
+                await CashDrawerControllerDispatch.TryOpenAsync(drawer, actor,
+                    CashDrawerOperationKind.Sale, result.Value.Id, Response, logger, cancellationToken);
             try { await printing.QueueOriginalAsync(result.Value!.Id, cancellationToken); }
             catch (Exception exception)
             {
@@ -195,6 +201,11 @@ public sealed class SalesController(
         if (actor is null) return MissingActor();
         var result = await salesService.ConfirmChangeAsync(actor, saleId, idempotencyKey,
             request, cancellationToken);
+        if (result.IsSuccess && result.Value!.Payments.Any(x =>
+                x.MethodCode == "EFECTIVO" && x.Amount > 0))
+            await CashDrawerControllerDispatch.TryOpenAsync(drawer, actor,
+                CashDrawerOperationKind.SaleChange, result.Value.Id,
+                Response, logger, cancellationToken);
         return FromResult(result, change => CreatedAtAction(nameof(ListChanges), new { saleId }, change));
     }
 

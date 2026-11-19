@@ -28,6 +28,25 @@
             @if (cash.ownOperatorSession) { <span class="badge badge--success">Sesión activa</span><button class="button button--secondary" type="button" (click)="endSession()" [disabled]="busy()">Finalizar sesión</button> }
             @else { <label class="field-label" for="operator-token">Carné del operador</label><div class="cash-inline"><input id="operator-token" class="text-field" name="credential" type="password" autocomplete="off" [(ngModel)]="credential" placeholder="Pase su carné por el lector"><button class="button button--primary" type="button" (click)="startSession()" [disabled]="busy() || !credential.trim()">Iniciar turno</button></div> }
           </div> }
+          @if (session.has('CASH.SHIFT_MANAGE') && cash.currentShift) {
+            <section class="cash-drawer" aria-labelledby="cash-drawer-title">
+              <div class="cash-drawer__heading"><div><h3 id="cash-drawer-title">Cajón de dinero</h3><p>La orden se envía por la impresora de recibos.</p></div>
+                @if (drawerLoading()) { <span class="status-pill">Consultando…</span> }
+                @else if (drawer()?.canOpen) { <span class="status-pill">Configurado</span> }
+                @else { <span class="status-pill status-pill--warning">Desactivado</span> }
+              </div>
+              @if (drawerError()) { <p class="field-error" role="alert">No se pudo consultar el cajón: {{ drawerError() }}</p><button class="table-action" type="button" (click)="loadDrawerStatus()" [disabled]="drawerLoading()">Actualizar estado</button> }
+              @else if (drawer()?.canOpen) {
+                <p class="cash-drawer__printer">Impresora: <strong>{{ drawer()?.profileName }}</strong></p>
+                @if (drawerUncertain()) {
+                  <p class="cash-drawer__caution">Comprueba si el cajón se abrió. Si sigue cerrado y necesitas otra apertura, prepara una nueva solicitud con motivo.</p>
+                  <button class="button button--secondary" type="button" (click)="prepareNewDrawerOpen()" [disabled]="busy()">Preparar nueva solicitud</button>
+                } @else {
+                  <div class="cash-drawer__controls"><label class="field-label" for="drawer-reason">Motivo de apertura manual<input id="drawer-reason" class="text-field" name="drawerReason" maxlength="300" [(ngModel)]="drawerReason" placeholder="Ej. entregar cambio o revisar efectivo" autocomplete="off"></label><button class="button button--secondary" type="button" (click)="openDrawer()" [disabled]="busy() || !drawerReason.trim()">Abrir cajón</button></div>
+                }
+              } @else if (!drawerLoading()) { <p class="cash-drawer__caution">Un administrador debe habilitar el cajón en Configuración → Impresión después de verificar el equipo.</p> }
+            </section>
+          }
           @if (session.has('CASH.MOVEMENTS_MANAGE') && cash.currentShift) { <form class="movement-form" (submit)="$event.preventDefault(); move()"><h3>Movimiento de caja</h3><div class="movement-form__fields"><label class="field-label">Tipo<select class="text-field" name="kind" [(ngModel)]="kind"><option value="incomes">Ingreso</option><option value="expenses">Gasto</option><option value="cash-drops">Retiro de efectivo</option></select></label><label class="field-label">Monto<div class="money-field"><span>$</span><input name="amount" type="text" cpNumberInput min="1" step="1" [(ngModel)]="amount"><b>COP</b></div></label><label class="field-label movement-concept">Concepto<input class="text-field" name="concept" maxlength="200" [(ngModel)]="concept"></label><button class="button button--secondary" type="submit" [disabled]="busy() || !validMoney(amount) || !concept.trim() || (cash.requiresOperatorSession && !cash.ownOperatorSession)">Registrar movimiento</button></div></form> }
           <div class="cash-movements"><div class="panel-heading"><h3>Movimientos recientes</h3></div><div class="table-wrap"><table><thead><tr><th>Movimiento</th><th>Concepto</th><th>Fecha</th><th class="align-right">Monto</th></tr></thead><tbody>@for (item of movements(); track item.id) { <tr><td>{{ item.type }}</td><td>{{ item.concept || item.category }}</td><td>{{ item.occurredAtUtc | date:'short' }}</td><td class="align-right numeric">{{ item.amount | currency:'COP':'symbol':'1.0-0' }}</td></tr> } @empty { <tr class="empty-row"><td colspan="4">No hay movimientos manuales recientes.</td></tr> }</tbody></table></div></div>
         </section>

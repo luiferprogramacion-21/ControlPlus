@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using ControlPlus.Api.Authorization;
+using ControlPlus.Api.Printing;
 using ControlPlus.Api.Security;
+using ControlPlus.Application.Cash.Contracts;
 using ControlPlus.Application.Layaways.Contracts;
 using ControlPlus.Application.Security.Contracts;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +11,8 @@ namespace ControlPlus.Api.Controllers;
 
 [Route("api/layaways/{layawayId:guid}/payments")]
 public sealed class LayawayPaymentsController(CurrentActorContextResolver actorContextResolver,
-    ILayawayPaymentService payments) : ApiControllerBase(actorContextResolver)
+    ILayawayPaymentService payments, ICashDrawerService drawer,
+    ILogger<LayawayPaymentsController> logger) : ApiControllerBase(actorContextResolver)
 {
     /// <summary>Abona un apartado ACTIVO con uno a tres medios y numeración PAP.</summary>
     [HttpPost]
@@ -26,7 +29,13 @@ public sealed class LayawayPaymentsController(CurrentActorContextResolver actorC
         [FromBody] ApplyLayawayPaymentRequest request, CancellationToken cancellationToken)
     {
         var actor = await GetActorAsync(cancellationToken);
-        return actor is null ? MissingActor() : FromResult(
-            await payments.ApplyAsync(actor, layawayId, idempotencyKey, request, cancellationToken), Ok);
+        if (actor is null) return MissingActor();
+        var result = await payments.ApplyAsync(actor, layawayId, idempotencyKey, request, cancellationToken);
+        if (result.IsSuccess && result.Value!.Payments.Any(x =>
+                x.MethodCode == "EFECTIVO" && x.AppliedAmount > 0))
+            await CashDrawerControllerDispatch.TryOpenAsync(drawer, actor,
+                CashDrawerOperationKind.LayawayPayment, result.Value.CorrelationId,
+                Response, logger, cancellationToken);
+        return FromResult(result, Ok);
     }
 }

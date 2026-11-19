@@ -13,6 +13,7 @@ import { CancelSaleInput, ConfirmedChange, printJobStatusText, SaleCancellationR
 import { SaleChange } from './sale-change';
 import { SalePrinting } from './sale-printing';
 import { statusKind, toastSignal } from '../../core/toast';
+import { cashDrawerNotice } from '../../shared/cash-drawer-feedback';
 import { WindowSheet } from '../../shared/window-sheet';
 
 const STATE_LABELS: Record<string, string> = { CONFIRMADA: 'Confirmada', ANULADA: 'Anulada' };
@@ -42,6 +43,8 @@ export class SalesHistory implements OnInit {
   readonly cancelling = signal(false);
   readonly changing = signal(false);
   readonly printMessage = toastSignal(statusKind);
+  /** Resultado de la orden al cajón cuando el cambio entregó o recibió efectivo; el cambio ya quedó registrado. */
+  readonly drawerNotice = toastSignal(statusKind);
   readonly printStatus = signal<string | null>(null);
   readonly reprinting = signal(false);
   readonly printingId = signal<string | null>(null);
@@ -90,6 +93,7 @@ export class SalesHistory implements OnInit {
   async changeDone(change: ConfirmedChange): Promise<void> {
     this.changing.set(false);
     this.notice.set(`Cambio ${change.visibleNumber} registrado. Diferencia ${this.money(change.difference)}.`);
+    this.drawerNotice.set(cashDrawerNotice(change.drawerStatus));
     const id = this.detail()?.id;
     try { if (id) this.detail.set(await this.api.detail(id)); } catch { this.detail.set(null); }
     await this.reload();

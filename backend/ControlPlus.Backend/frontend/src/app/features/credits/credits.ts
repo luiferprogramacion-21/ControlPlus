@@ -1,4 +1,5 @@
 import { NumberInput } from '../../shared/number-input';
+import { cashDrawerNotice } from '../../shared/cash-drawer-feedback';
 import { A11yModule } from '@angular/cdk/a11y';
 import { DatePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
@@ -11,7 +12,7 @@ import { CustomersApi, Customer } from '../customers/customers-api';
 import { Icon } from '../../layout/icon';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { Credit, CreditPayment, CreditPaymentCancellationReason, CreditsApi, PaymentMethodInput } from './credits-api';
-import { toastSignal } from '../../core/toast';
+import { statusKind, toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
 
 type Method = PaymentMethodInput['methodCode'];
@@ -31,6 +32,7 @@ export class Credits implements OnInit {
   readonly saving = signal(false);
   readonly error = toastSignal('error');
   readonly notice = toastSignal('success');
+  readonly drawerNotice = toastSignal(statusKind);
   readonly dialog = signal(false);
   readonly cancellingPayment = signal(false);
   readonly forgiving = signal(false);
@@ -121,8 +123,9 @@ export class Credits implements OnInit {
     if (fingerprint !== this.pendingFingerprint) { this.pendingKey = crypto.randomUUID(); this.pendingFingerprint = fingerprint; }
     this.saving.set(true); this.error.set('');
     try {
-      await this.api.applyPayment(credit, payments, this.pendingKey!);
+      const result = await this.api.applyPayment(credit, payments, this.pendingKey!);
       this.pendingKey = null; this.pendingFingerprint = ''; this.dialog.set(false); this.notice.set('Abono registrado.');
+      this.drawerNotice.set(cashDrawerNotice(result.drawerStatus));
       await this.refreshSelected(); await this.reload();
     } catch (e) { this.error.set(errorText(e)); }
     finally { this.saving.set(false); }

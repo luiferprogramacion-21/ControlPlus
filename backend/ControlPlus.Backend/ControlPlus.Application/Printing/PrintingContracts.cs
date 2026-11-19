@@ -11,7 +11,13 @@ public sealed record CreatePrintProfileRequest(string Name, string SystemQueueNa
 
 public sealed record PrintProfileDto(Guid Id, string Name, string SystemQueueName,
     int Columns, bool IsDefault, bool Active, long Version, string PrinterType,
-    decimal? LabelWidthMm, decimal? LabelHeightMm, int? ResolutionDpi);
+    decimal? LabelWidthMm, decimal? LabelHeightMm, int? ResolutionDpi,
+    bool DrawerEnabled = false, int? DrawerPin = null,
+    int DrawerPulseOnMs = 100, int DrawerPulseOffMs = 100);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record UpdatePrintProfileDrawerRequest(bool Enabled, int? Pin,
+    int PulseOnMs, int PulseOffMs, long ExpectedVersion);
 
 public sealed record PrintStatusDto(bool HasActiveProfile, string? ProfileName, int? Columns);
 
@@ -30,6 +36,8 @@ public interface IReceiptPrintingService
         CreatePrintProfileRequest request, CancellationToken ct = default);
     Task<Result<IReadOnlyCollection<PrintProfileDto>>> ListProfilesAsync(ActorContext actor,
         CancellationToken ct = default);
+    Task<Result<PrintProfileDto>> UpdateProfileDrawerAsync(ActorContext actor, Guid profileId,
+        UpdatePrintProfileDrawerRequest request, CancellationToken ct = default);
     Task<Result<DeletePrintProfileResultDto>> DeleteProfileAsync(ActorContext actor, Guid profileId,
         CancellationToken ct = default);
     Task<Result<PrintStatusDto>> GetStatusAsync(ActorContext actor, CancellationToken ct = default);

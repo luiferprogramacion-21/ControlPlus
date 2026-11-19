@@ -159,6 +159,15 @@ describe('Sales: punto de venta de contado', () => {
       expect(component.receipt()).toEqual({ customer: 'Consumidor final', operator: 'Cajero Uno', items: 1, units: 1 });
       expect(component.cart()).toEqual([]); expect(component.checkoutMode()).toBe(false);
     });
+    it('conserva la venta confirmada cuando la orden del cajón falla', async () => {
+      confirm.mockResolvedValue({ ...result, drawerStatus: 'FALLIDO' });
+      await component.confirm();
+      expect(component.sale()?.id).toBe('s1');
+      expect(component.drawerStatus()).toBe('FALLIDO');
+      expect(component.error()).toBe('');
+      component.newSale();
+      expect(component.drawerStatus()).toBeNull();
+    });
     it('Enter en la pantalla de venta confirmada inicia una venta nueva', async () => {
       await component.confirm();
       component.handleShortcut({ key: 'Enter', target: null, preventDefault() { /* sin efecto */ } } as unknown as KeyboardEvent);

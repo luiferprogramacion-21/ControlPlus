@@ -1,0 +1,10 @@
+:host { display: block; min-width: 0; }
+.print-profile-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
+.print-drawer-form { width: min(100%, 600px); }
+.print-drawer-status { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin: 0 0 17px; color: var(--cp-text-secondary); font-size: 13px; }
+.print-drawer-toggle { display: flex; align-items: center; gap: 9px; font-weight: 600; }
+.print-drawer-toggle input { width: 18px; height: 18px; flex: 0 0 auto; }
+.print-drawer-fields { margin-top: 18px; gap: 12px; }
+.print-drawer-fields .field-label { display: block; margin-bottom: 5px; }
+.print-drawer-warning { margin-top: 18px; line-height: 1.5; }
+@container cp (max-width: 700px) { .print-drawer-fields { grid-template-columns: minmax(0, 1fr); } }

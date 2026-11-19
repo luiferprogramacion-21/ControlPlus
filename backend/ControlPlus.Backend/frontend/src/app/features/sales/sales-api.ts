@@ -6,6 +6,7 @@ import { Page } from '../../core/api';
 import { Customer, CustomersApi } from '../customers/customers-api';
 import type { SaleReceipt } from './ticket';
 import type { Product } from '../catalog/catalog-api';
+import { type CashDrawerDispatch, withCashDrawerStatus } from '../../shared/cash-drawer-feedback';
 
 export interface SaleDiscount { type: 'PORCENTAJE' | 'VALOR_FIJO'; value: number; }
 export interface SaleLineInput { productId: string; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; discount: SaleDiscount | null; }
@@ -14,7 +15,7 @@ export interface SaleDraftLine { productId: string; quantity: number; priceType:
 export interface SaleDraftInput { saleType: 'CONTADO' | 'CREDITO'; customerId: string | null; lines: SaleDraftLine[]; generalDiscount: SaleDiscount | null; discountReason: string | null; }
 export interface SaleDraft extends SaleDraftInput { id: string; updatedAtUtc: string; }
 export interface SaleInput { customerId: string | null; lines: SaleLineInput[]; generalDiscount: SaleDiscount | null; discountReason: string | null; payments: SalePaymentInput[]; saleType: 'CONTADO' | 'CREDITO'; dueDate: string | null; authorization: AuthorizationBody | null; }
-export interface Sale {
+export interface Sale extends CashDrawerDispatch {
   id: string; visibleNumber: string; total: number; change: number; state: string; payments: (SalePaymentInput & { methodName?: string })[]; creditId: string | null;
   occurredAtUtc?: string; grossSubtotal?: number; discountTotal?: number; lines?: SaleLine[];
 }
@@ -49,11 +50,12 @@ export interface ConfirmChangeInput {
   delivered: { productId: string; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA' }[];
   treatment: string; payments: ChangePaymentInput[]; authorization?: AuthorizationBody; reason?: string | null;
 }
-export interface ConfirmedChange { id: string; saleId: string; visibleNumber: string; totalReturned: number; totalDelivered: number; difference: number; treatment: string; creditAdjustment: number; paidOrRefunded: number; }
+export interface ConfirmedChange extends CashDrawerDispatch { id: string; saleId: string; visibleNumber: string; totalReturned: number; totalDelivered: number; difference: number; treatment: string; creditAdjustment: number; paidOrRefunded: number; }
 
 export interface PrintProfile {
   id: string; name: string; systemQueueName: string; columns: number; isDefault: boolean; active: boolean; version: number;
   printerType: 'RECIBOS' | 'ETIQUETAS' | 'HIBRIDA'; labelWidthMm: number | null; labelHeightMm: number | null; resolutionDpi: number | null;
+  drawerEnabled: boolean; drawerPin: number | null; drawerPulseOnMs: number | null; drawerPulseOffMs: number | null;
 }
 export interface PrintStatus { hasActiveProfile: boolean; profileName: string | null; columns: number | null; }
 export interface CreatePrintProfileInput {
@@ -88,8 +90,13 @@ export class SalesApi {
   discardDraft(): Promise<unknown> { return firstValueFrom(this.http.delete('/api/sales/drafts/current')); }
   product(id: string): Promise<Product> { return firstValueFrom(this.http.get<Product>(`/api/products/${id}`)); }
   customer(id: string): Promise<Customer> { return this.customersApi.get(id); }
-  confirm(input: SaleInput, key: string): Promise<Sale> {
-    return firstValueFrom(this.http.post<Sale>('/api/sales', input, { headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined }));
+  async confirm(input: SaleInput, key: string): Promise<Sale> {
+    const response = await firstValueFrom(this.http.post<Sale>('/api/sales', input, {
+      headers: new HttpHeaders({ 'Idempotency-Key': key }),
+      context: input.authorization ? authorizationContext() : undefined,
+      observe: 'response',
+    }));
+    return withCashDrawerStatus(response);
   }
   get(id: string): Promise<Sale> { return firstValueFrom(this.http.get<Sale>(`/api/sales/${id}`)); }
   /** Checks the credentials of the Supervisor/Administrador who authorizes a discount or a wholesale price; nothing is stored. */
@@ -108,8 +115,12 @@ export class SalesApi {
   /** Busca por su número la venta a la que se le hará un cambio de productos. */
   findChangeSale(visibleNumber: string): Promise<ChangePreparation> { return firstValueFrom(this.http.get<ChangePreparation>('/api/sales/change-search', { params: { visibleNumber } })); }
   changePreparation(saleId: string): Promise<ChangePreparation> { return firstValueFrom(this.http.get<ChangePreparation>(`/api/sales/${saleId}/change-preparation`)); }
-  confirmChange(saleId: string, input: ConfirmChangeInput, key: string): Promise<ConfirmedChange> {
-    return firstValueFrom(this.http.post<ConfirmedChange>(`/api/sales/${saleId}/changes`, input, { headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined }));
+  async confirmChange(saleId: string, input: ConfirmChangeInput, key: string): Promise<ConfirmedChange> {
+    const response = await firstValueFrom(this.http.post<ConfirmedChange>(`/api/sales/${saleId}/changes`, input, {
+      headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined,
+      observe: 'response',
+    }));
+    return withCashDrawerStatus(response);
   }
   creditRules(): Promise<CreditRules> { return firstValueFrom(this.http.get<CreditRules>('/api/sales/credit-rules')); }
   creditCheck(customerId: string, amount: number): Promise<CustomerCreditRisk> {
@@ -130,5 +141,8 @@ export class SalesApi {
   /** Sin historial de impresión se borra; con historial solo se retira y conserva sus trabajos. */
   deletePrintProfile(id: string): Promise<{ physicallyDeleted: boolean }> { return firstValueFrom(this.http.delete<{ physicallyDeleted: boolean }>(`/api/printing/profiles/${id}`)); }
   createPrintProfile(input: CreatePrintProfileInput): Promise<PrintProfile> { return firstValueFrom(this.http.post<PrintProfile>('/api/printing/profiles', input)); }
+  updatePrintProfileDrawer(id: string, input: { enabled: boolean; pin: number; pulseOnMs: number; pulseOffMs: number; expectedVersion: number }): Promise<PrintProfile> {
+    return firstValueFrom(this.http.put<PrintProfile>(`/api/printing/profiles/${id}/drawer`, input));
+  }
   printQueue(page = 1, pageSize = 20): Promise<Page<PrintJob>> { return firstValueFrom(this.http.get<Page<PrintJob>>('/api/printing/jobs', { params: { page, pageSize } })); }
 }
