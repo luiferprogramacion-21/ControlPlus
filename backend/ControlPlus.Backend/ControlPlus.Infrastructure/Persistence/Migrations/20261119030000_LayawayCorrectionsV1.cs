@@ -21,9 +21,9 @@ public sealed class LayawayCorrectionsV1 : Migration
           AND abono_inicial <= total_original AND saldo_pendiente BETWEEN 0 AND total);
 
         CREATE TABLE ventas.correccion_apartado (
-          id uuid PRIMARY KEY, apartado_id uuid NOT NULL REFERENCES ventas.apartado(id),
-          usuario_id uuid NOT NULL REFERENCES seguridad.usuario(id),
-          autorizacion_id uuid NOT NULL REFERENCES seguridad.autorizacion_operacion(id),
+          id uuid PRIMARY KEY, apartado_id uuid NOT NULL REFERENCES ventas.apartado(id) ON DELETE RESTRICT,
+          usuario_id uuid NOT NULL REFERENCES seguridad.usuario(id) ON DELETE RESTRICT,
+          autorizacion_id uuid NOT NULL REFERENCES seguridad.autorizacion_operacion(id) ON DELETE RESTRICT,
           version_anterior bigint NOT NULL, version_posterior bigint NOT NULL,
           total_anterior numeric(18,0) NOT NULL, total_posterior numeric(18,0) NOT NULL,
           saldo_anterior numeric(18,0) NOT NULL, saldo_posterior numeric(18,0) NOT NULL,
@@ -40,10 +40,10 @@ public sealed class LayawayCorrectionsV1 : Migration
             AND jsonb_array_length(despues)>0 AND btrim(motivo)<>'')
         );
         CREATE TABLE ventas.reembolso_correccion_apartado (
-          id uuid PRIMARY KEY, correccion_id uuid NOT NULL REFERENCES ventas.correccion_apartado(id),
-          turno_caja_id uuid NOT NULL REFERENCES caja.turno_caja(id),
-          metodo_pago_id uuid NOT NULL REFERENCES catalogo.metodo_pago(id),
-          movimiento_caja_id uuid NOT NULL REFERENCES caja.movimiento_caja(id),
+          id uuid PRIMARY KEY, correccion_id uuid NOT NULL REFERENCES ventas.correccion_apartado(id) ON DELETE RESTRICT,
+          turno_caja_id uuid NOT NULL REFERENCES caja.turno_caja(id) ON DELETE RESTRICT,
+          metodo_pago_id uuid NOT NULL REFERENCES catalogo.metodo_pago(id) ON DELETE RESTRICT,
+          movimiento_caja_id uuid NOT NULL REFERENCES caja.movimiento_caja(id) ON DELETE RESTRICT,
           valor numeric(18,0) NOT NULL CHECK(valor>0), referencia varchar(200),
           CONSTRAINT uq_reembolso_correccion_apartado_metodo UNIQUE(correccion_id,metodo_pago_id),
           CONSTRAINT ck_reembolso_correccion_apartado_referencia CHECK(referencia IS NULL OR btrim(referencia)<>'')
