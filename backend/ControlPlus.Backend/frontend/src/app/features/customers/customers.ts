@@ -11,7 +11,8 @@ import { CustomerHistory } from './customer-history';
 import { Icon } from '../../layout/icon';
 import { toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
-@Component({ selector: 'cp-customers', imports: [WindowSheet, NumberInput, A11yModule, FormsModule, MatPaginatorModule, Icon, CustomerHistory], templateUrl: './customers.html', styleUrls: ['../directory.scss', './customers.scss'] })
+import { HelpTip } from '../../shared/help-tip';
+@Component({ selector: 'cp-customers', imports: [WindowSheet, HelpTip, NumberInput, A11yModule, FormsModule, MatPaginatorModule, Icon, CustomerHistory], templateUrl: './customers.html', styleUrls: ['../directory.scss', './customers.scss'] })
 export class Customers implements OnInit {
   private readonly api = inject(CustomersApi);
   readonly session = inject(SessionService);

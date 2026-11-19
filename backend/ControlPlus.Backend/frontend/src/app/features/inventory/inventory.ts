@@ -14,7 +14,8 @@ import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, autho
 import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 import { WindowSheet } from '../../shared/window-sheet';
-@Component({ selector: 'cp-inventory', imports: [WindowSheet, NumberInput, DecimalPipe, A11yModule, FormsModule, MatPaginatorModule, DatePipe, Icon], templateUrl: './inventory.html', styleUrls: ['../directory.scss', './inventory.scss'] })
+import { HelpTip } from '../../shared/help-tip';
+@Component({ selector: 'cp-inventory', imports: [WindowSheet, HelpTip, NumberInput, DecimalPipe, A11yModule, FormsModule, MatPaginatorModule, DatePipe, Icon], templateUrl: './inventory.html', styleUrls: ['../directory.scss', './inventory.scss'] })
 export class Inventory implements OnInit {
   private readonly api = inject(InventoryApi);
   private readonly authorization = inject(AuthorizationDialog);

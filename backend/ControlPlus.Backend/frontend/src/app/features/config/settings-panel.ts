@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
 import { ChangePolicy, ConfigApi, CreditSettings, LayawaySettings, SalesSettings } from './config-api';
 import { toastSignal } from '../../core/toast';
+import { HelpTip } from '../../shared/help-tip';
 
 /** Reglas de cambios, apartados, créditos y mayorista, en tarjetas (rediseño aprobado el 19 de noviembre de 2026). Solo afectan lo que se registre después. */
 @Component({
   selector: 'cp-settings-panel',
-  imports: [NumberInput, FormsModule],
+  imports: [HelpTip, NumberInput, FormsModule],
   template: `
     @if (loadError()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ loadError() }} <button class="link-button" type="button" (click)="load()">Reintentar</button></div> }
 
@@ -18,7 +19,7 @@ import { toastSignal } from '../../core/toast';
           <div><h3 id="rule-change-title">Cambios de productos</h3><p>Tiempo que tiene el cliente para cambiar lo que compró.</p></div></header>
         @if (policy(); as current) {
           <form class="rule-card__body" (submit)="$event.preventDefault(); savePolicy()">
-            <label class="rule-field"><span class="rule-field__label">Plazo para cambios</span>
+            <label class="rule-field"><span class="rule-field__label">Plazo para cambios<cp-help text="Días que tiene el cliente, desde la compra, para cambiar un producto." /></span>
               <span class="rule-input"><input id="change-days" name="changeDays" type="text" cpNumberInput min="1" step="1" [(ngModel)]="days"><b>días</b></span></label>
             <p class="rule-note">Cada venta conserva el plazo con el que se registró.</p>
             @if (policyError()) { <p class="field-error" role="alert">{{ policyError() }}</p> }
@@ -34,7 +35,7 @@ import { toastSignal } from '../../core/toast';
           <form class="rule-card__body" (submit)="$event.preventDefault(); saveLayaway()">
             <label class="rule-switch"><input id="layaway-require-minimum" type="checkbox" role="switch" name="requireMinimum" [(ngModel)]="requireMinimum"><span class="rule-switch__track" aria-hidden="true"></span><span>Exigir un pago inicial mínimo</span></label>
             @if (requireMinimum) {
-              <label class="rule-field rule-field--nested"><span class="rule-field__label">Pago inicial mínimo</span>
+              <label class="rule-field rule-field--nested"><span class="rule-field__label">Pago inicial mínimo<cp-help text="Porcentaje del total que el cliente debe pagar al apartar." /></span>
                 <span class="rule-input"><input id="layaway-percentage" name="layawayPercentage" type="text" cpNumberInput min="0.01" max="100" step="0.01" [(ngModel)]="percentage"><b>% del total</b></span></label>
             } @else { <p class="rule-note rule-note--nested">El pago inicial puede ser cualquier valor desde $1.</p> }
             <div class="rule-divider"></div>
@@ -76,7 +77,7 @@ import { toastSignal } from '../../core/toast';
           <div><h3 id="rule-wholesale-title">Precio mayorista</h3><p>Desde cuántas unidades de un mismo producto aplica.</p></div></header>
         @if (sales(); as current) {
           <form class="rule-card__body" (submit)="$event.preventDefault(); saveSales()">
-            <label class="rule-field"><span class="rule-field__label">Mínimo para mayorista</span>
+            <label class="rule-field"><span class="rule-field__label">Mínimo para mayorista<cp-help text="Unidades de un mismo producto que debe llevar el cliente para cobrarle el precio mayorista." /></span>
               <span class="rule-input"><input id="wholesale-minimum" name="wholesaleMinimum" type="text" cpNumberInput min="1" max="999" step="1" [(ngModel)]="wholesaleMinimum"><b>unidades</b></span></label>
             <p class="rule-note">Aplica en ventas, apartados y cambios. Lo ya registrado no cambia.</p>
             @if (salesError()) { <p class="field-error" role="alert">{{ salesError() }}</p> }

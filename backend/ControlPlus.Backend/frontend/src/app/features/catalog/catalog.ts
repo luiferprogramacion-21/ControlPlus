@@ -19,6 +19,7 @@ import { profitPercentOf, suggestedPrice } from '../../shared/price-calculator';
 import { CatalogApi, Category, CostHistory, CreateProductInput, Product, ProductInput, Supplier, Unit } from './catalog-api';
 import { toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
+import { HelpTip } from '../../shared/help-tip';
 
 interface ProductCreateAttempt {
   actorId: string;
@@ -29,7 +30,7 @@ interface ProductCreateAttempt {
 
 @Component({
   selector: 'cp-catalog',
-  imports: [WindowSheet, NumberInput, DecimalPipe, FormsModule, ReactiveFormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule, MatOptionModule, MatSelectModule, MatSlideToggleModule, MatProgressSpinnerModule, MatPaginatorModule],
+  imports: [WindowSheet, HelpTip, NumberInput, DecimalPipe, FormsModule, ReactiveFormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule, MatOptionModule, MatSelectModule, MatSlideToggleModule, MatProgressSpinnerModule, MatPaginatorModule],
   templateUrl: './catalog.html',
   styleUrl: './catalog.scss',
 })
