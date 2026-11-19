@@ -22,7 +22,7 @@ git pull --ff-only
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\service\Install-ControlPlusService.ps1
 ```
 
-El script compila la pantalla, publica la API en `C:\Program Files\ControlPlus\api` con la pantalla dentro, escribe la configuración protegida, crea o actualiza el servicio, lo inicia, comprueba `/api/health`, `/api/health/database` y la pantalla, y crea el acceso directo. Termina con `CONTROLPLUS_SERVICE_OK`. Para actualizar a una versión nueva del código se ejecuta el mismo comando; `-SkipFrontendBuild` reutiliza la pantalla ya compilada.
+El script compila la pantalla, publica la API en `C:\Program Files\ControlPlus\api` con la pantalla dentro, escribe la configuración protegida, crea o actualiza el servicio, lo inicia, comprueba `/api/health`, `/api/health/database` y la pantalla, y crea el acceso directo. Desde el 19 de noviembre de 2026 (decisión «Abrir como un programa»), si el equipo tiene Microsoft Edge, el acceso directo del escritorio común es `ControlPlus.lnk`: abre `msedge.exe --app=http://localhost:5000/` en su propia ventana, sin pestañas ni barra de direcciones y con el ícono de ControlPlus, y reemplaza el `ControlPlus.url` anterior. Sin Edge se sigue creando `ControlPlus.url`. Termina con `CONTROLPLUS_SERVICE_OK`. Para actualizar a una versión nueva del código se ejecuta el mismo comando; `-SkipFrontendBuild` reutiliza la pantalla ya compilada.
 
 ## Programar con el servicio instalado
 

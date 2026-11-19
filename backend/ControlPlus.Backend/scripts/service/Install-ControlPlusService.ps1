@@ -166,8 +166,33 @@ try {
     $iconFile = Join-Path $dataDir 'controlplus.ico'
     Copy-Item -LiteralPath (Join-Path $installDir 'wwwroot\controlplus.ico') -Destination $iconFile -Force
     $desktop = [Environment]::GetFolderPath('CommonDesktopDirectory')
-    $shortcut = Join-Path $desktop 'ControlPlus.url'
-    [IO.File]::WriteAllText($shortcut, "[InternetShortcut]`r`nURL=$url/`r`nIconFile=$iconFile`r`nIconIndex=0`r`n", (New-Object Text.UTF8Encoding($false)))
+    $urlShortcut = Join-Path $desktop 'ControlPlus.url'
+    # Abrir como un programa (decisión del 19 de noviembre de 2026): con Microsoft Edge el acceso abre ControlPlus
+    # en su propia ventana (modo aplicación), sin pestañas ni barra de direcciones y con su ícono en la barra de
+    # tareas. Sin Edge se conserva el acceso web de siempre.
+    $edge = $null
+    foreach ($key in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe', 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe') {
+        $candidate = (Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue).'(default)'
+        if ($candidate -and (Test-Path -LiteralPath $candidate)) { $edge = $candidate; break }
+    }
+    if (-not $edge) {
+        $candidate = Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'
+        if (Test-Path -LiteralPath $candidate) { $edge = $candidate }
+    }
+    if ($edge) {
+        $linkShortcut = Join-Path $desktop 'ControlPlus.lnk'
+        $link = (New-Object -ComObject WScript.Shell).CreateShortcut($linkShortcut)
+        $link.TargetPath = $edge
+        $link.Arguments = "--app=$url/"
+        $link.WorkingDirectory = Split-Path -Parent $edge
+        $link.IconLocation = "$iconFile,0"
+        $link.Description = 'ControlPlus, punto de venta'
+        $link.Save()
+        if (Test-Path -LiteralPath $urlShortcut) { Remove-Item -LiteralPath $urlShortcut -Force }
+    }
+    else {
+        [IO.File]::WriteAllText($urlShortcut, "[InternetShortcut]`r`nURL=$url/`r`nIconFile=$iconFile`r`nIconIndex=0`r`n", (New-Object Text.UTF8Encoding($false)))
+    }
 
     Write-Host 'CONTROLPLUS_SERVICE_OK'
     Write-Host "ControlPlus corre como servicio y abre en $url (acceso directo en el escritorio)."
