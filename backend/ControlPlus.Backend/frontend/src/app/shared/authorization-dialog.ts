@@ -63,7 +63,7 @@ export interface AuthorizationPrompt {
       </mat-dialog-actions>
     </div>`,
   styles: [`
-    .authorization-dialog { min-width:min(420px, calc(100vw - 48px)); max-width:560px; }
+    .authorization-dialog { min-width:min(420px, calc(calc(100vw / var(--cp-zoom)) - 48px)); max-width:560px; }
     mat-dialog-content { display:grid; gap:10px; }
     mat-dialog-content p { margin:0; line-height:1.5; }
     label { font-weight:600; margin-top:6px; }
@@ -139,7 +139,7 @@ export class AuthorizationDialog {
     this.openDialog = true;
     try {
       const ref = this.dialog.open(AuthorizationDialogComponent, {
-        data: prompt, width: 'min(560px, calc(100vw - 32px))', maxWidth: '100vw', disableClose: true,
+        data: prompt, width: 'min(560px, calc(calc(100vw / var(--cp-zoom)) - 32px))', maxWidth: 'calc(100vw / var(--cp-zoom))', disableClose: true,
       });
       return await firstValueFrom(ref.afterClosed()) === true;
     } finally { this.openDialog = false; }

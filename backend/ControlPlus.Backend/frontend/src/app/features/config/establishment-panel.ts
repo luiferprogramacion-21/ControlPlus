@@ -37,7 +37,7 @@ import { toastSignal } from '../../core/toast';
     .field-label span { color: #718096; font-weight: 400; }
     .receipt-copy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
     .textarea { resize: vertical; min-height: 86px; }
-    @media (max-width: 720px) { .receipt-copy-grid { grid-template-columns: 1fr; } }
+    @container cp (max-width: 720px) { .receipt-copy-grid { grid-template-columns: 1fr; } }
   `],
 })
 export class EstablishmentPanel implements OnInit {

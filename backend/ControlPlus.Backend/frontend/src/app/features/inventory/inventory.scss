@@ -4,7 +4,7 @@
 .inventory-history-heading p { margin: 0; color: var(--cp-text-secondary); }
 .inventory-history-filters { justify-content: flex-start; margin-bottom: 14px; }
 .inventory-history-filters .text-field { width: auto; min-width: 150px; }
-.inventory-movements { max-height: min(50vh, 480px); }
+.inventory-movements { max-height: min(calc(50vh / var(--cp-zoom)), 480px); }
 .inventory-movements table { width: 100%; min-width: 0; table-layout: fixed; }
 .inventory-movements th:nth-child(1) { width: 15%; }
 .inventory-movements th:nth-child(2) { width: 17%; }
@@ -14,9 +14,9 @@
 .inventory-movements td { overflow-wrap: break-word; }
 .inventory-history-dialog mat-paginator { display: block; max-width: 100%; }
 .inventory-history-actions { display: flex; justify-content: flex-end; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--cp-border); }
-@media (max-width: 760px) {
+@container cp (max-width: 760px) {
   .inventory-history-sheet { padding: 10px; }
-  .module-form.inventory-history-dialog { max-height: calc(100dvh - 20px); padding: 16px; }
+  .module-form.inventory-history-dialog { max-height: calc(calc(100dvh / var(--cp-zoom)) - 20px); padding: 16px; }
   .inventory-history-filters .text-field { width: 100%; }
   .inventory-history-filters > .button { flex: 1 1 100%; }
   .inventory-movements { max-height: none; overflow: visible; }
@@ -30,7 +30,7 @@
   .inventory-movements .empty-row td { display: table-cell; }
   .inventory-movements .empty-row td::before { content: none; }
 }
-@media (max-width: 460px) {
+@container cp (max-width: 460px) {
   .inventory-movements tr { grid-template-columns: 1fr; }
   .inventory-movements td:last-child { grid-column: auto; }
   .inventory-history-actions .button { width: 100%; }

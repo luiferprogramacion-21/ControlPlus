@@ -18,7 +18,7 @@
 .layaway-totals span { display: flex; flex-direction: column; }
 .layaway-totals strong { font-size: 22px; }
 .layaway-change strong { font-size: 28px; }
-@media (max-width: 700px) { .layaway-summary { grid-template-columns: repeat(2, 1fr); } }
+@container cp (max-width: 700px) { .layaway-summary { grid-template-columns: repeat(2, 1fr); } }
 
 .layaway-create-sheet { width: min(980px, 100%); }
 .layaway-create-sheet h3 { margin: 18px 0 8px; }

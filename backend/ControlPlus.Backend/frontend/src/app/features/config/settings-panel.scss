@@ -28,6 +28,6 @@
 .rule-switch input:checked + .rule-switch__track { background: var(--cp-primary); }
 .rule-switch input:checked + .rule-switch__track::after { transform: translateX(16px); }
 .rule-switch input:focus-visible + .rule-switch__track { outline: 2px solid var(--cp-focus); outline-offset: 2px; }
-@media (max-width: 900px) { .rules-grid { grid-template-columns: 1fr; } }
-@media (max-width: 480px) { .rule-field { flex-direction: column; align-items: flex-start; } .rule-field--nested, .rule-note--nested { margin-left: 0; } }
+@container cp (max-width: 900px) { .rules-grid { grid-template-columns: 1fr; } }
+@container cp (max-width: 480px) { .rule-field { flex-direction: column; align-items: flex-start; } .rule-field--nested, .rule-note--nested { margin-left: 0; } }
 @media (prefers-reduced-motion: reduce) { .rule-switch__track, .rule-switch__track::after { transition: none; } }

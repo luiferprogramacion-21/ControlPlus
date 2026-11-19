@@ -14,13 +14,13 @@
 .role-permissions li { margin-bottom: 4px; break-inside: avoid; }
 .role-permissions small { color: var(--cp-text-muted); }
 .form-hint { margin: 6px 0 0; color: var(--cp-text-muted); font-size: 13px; }
-@media (max-width: 700px) { .role-permissions ul { columns: 1; } }
+@container cp (max-width: 700px) { .role-permissions ul { columns: 1; } }
 
 .permissions-sheet { width: min(760px, 100%); }
 .permissions-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0; }
 .permissions-toolbar .text-field { flex: 1 1 220px; min-width: 0; }
 .permissions-toolbar h3 { margin: 0; }
-.permissions-list { max-height: min(48vh, 440px); overflow: auto; border: 1px solid var(--cp-border); border-radius: 8px; padding: 4px 12px 8px; }
+.permissions-list { max-height: min(calc(48vh / var(--cp-zoom)), 440px); overflow: auto; border: 1px solid var(--cp-border); border-radius: 8px; padding: 4px 12px 8px; }
 .permissions-list h4 { margin: 12px 0 4px; font-size: 14px; }
 .permissions-list ul { list-style: none; margin: 0; padding: 0; }
 .permissions-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--cp-border); }

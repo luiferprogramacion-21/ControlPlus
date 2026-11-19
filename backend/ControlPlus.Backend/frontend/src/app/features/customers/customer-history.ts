@@ -18,7 +18,7 @@ const STATUS_LABELS: Record<string, string> = {
   selector: 'cp-customer-history',
   imports: [CurrencyPipe, DatePipe, MatPaginatorModule],
   templateUrl: './customer-history.html',
-  styles: ['.customer-history-sheet { width: min(980px, 100%); max-height: 92vh; overflow-y: auto; } .is-payment td { color: var(--cp-text-secondary); font-size: 13px; }'],
+  styles: ['.customer-history-sheet { width: min(980px, 100%); max-height: calc(92vh / var(--cp-zoom)); overflow-y: auto; } .is-payment td { color: var(--cp-text-secondary); font-size: 13px; }'],
 })
 export class CustomerHistory implements OnInit {
   private readonly api = inject(CustomersApi);

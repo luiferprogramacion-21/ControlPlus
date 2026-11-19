@@ -30,13 +30,13 @@
 .credit-totals { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; }
 .credit-totals span { display: flex; flex-direction: column; }
 .credit-totals strong { font-size: 22px; }
-@media (max-width: 700px) {
+@container cp (max-width: 700px) {
   .credit-detail-sheet { padding: 10px; }
-  .module-form.credits-detail-dialog { max-height: calc(100dvh - 20px); padding: 16px; }
+  .module-form.credits-detail-dialog { max-height: calc(calc(100dvh / var(--cp-zoom)) - 20px); padding: 16px; }
   .credit-detail-actions .button { flex: 1 1 calc(50% - 4px); }
   .credit-detail-close { margin-left: 0; }
 }
-@media (max-width: 460px) {
+@container cp (max-width: 460px) {
   .credit-summary { grid-template-columns: 1fr; }
   .credit-history-row { grid-template-columns: 1fr; gap: 8px; }
   .credit-history-row__values { align-items: flex-start; text-align: left; }

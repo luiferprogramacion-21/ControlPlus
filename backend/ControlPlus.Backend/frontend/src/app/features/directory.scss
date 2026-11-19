@@ -5,7 +5,7 @@
 .directory-filters .text-field { width: min(100%, 290px); }
 .directory-filters .field-label { margin: 0; }
 .directory-check { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.directory-page .module-table-wrap { max-height: min(58vh, 560px); }
+.directory-page .module-table-wrap { max-height: min(calc(58vh / var(--cp-zoom)), 560px); }
 .directory-page .module-table-wrap table { min-width: 850px; }
 .directory-page .module-table-wrap th { position: sticky; top: 0; z-index: 1; }
 .directory-page .module-table-wrap td { vertical-align: middle; }
@@ -15,5 +15,5 @@
 .inventory-history { margin-top: 0; }
 .inventory-history .directory-filters { justify-content: flex-start; margin-bottom: 12px; }
 .inventory-history .directory-filters .text-field { width: auto; min-width: 150px; }
-@media (max-width: 900px) { .directory-page .module-toolbar { align-items: stretch; flex-direction: column; } .directory-filters { justify-content: flex-start; } }
-@media (max-width: 560px) { .directory-page .module-heading { align-items: flex-start; } .directory-page .module-heading .button { min-width: 0; } .directory-filters .text-field { width: 100%; } .directory-filters > .button { flex: 1; } }
+@container cp (max-width: 900px) { .directory-page .module-toolbar { align-items: stretch; flex-direction: column; } .directory-filters { justify-content: flex-start; } }
+@container cp (max-width: 560px) { .directory-page .module-heading { align-items: flex-start; } .directory-page .module-heading .button { min-width: 0; } .directory-filters .text-field { width: 100%; } .directory-filters > .button { flex: 1; } }

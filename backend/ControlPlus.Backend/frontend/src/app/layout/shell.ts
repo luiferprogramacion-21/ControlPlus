@@ -1,57 +1,95 @@
-import { Component, ElementRef, HostListener, inject, signal } from '@angular/core';
-import { A11yModule } from '@angular/cdk/a11y';
+import { Component, computed, ElementRef, HostListener, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { SessionService } from '../core/session.service';
 import { EstablishmentService } from '../core/establishment';
+import { DisplayScaleService } from '../core/display-scale';
 import { Icon } from './icon';
 import { paginatorIntlProvider } from './paginator-intl';
 
+type Section = 'caja' | 'ventas' | 'historial-ventas' | 'catalogo' | 'etiquetas' | 'inventario' | 'clientes' | 'creditos' | 'proveedores' | 'compras' | 'recepciones' | 'administracion' | 'configuracion' | 'apartados' | 'reportes' | 'dashboard';
+interface NavItem { section: Section; label: string; link: string; icon: string; visible: (session: SessionService) => boolean; }
+interface NavGroup { label: string; items: NavItem[]; }
+
+/**
+ * Menú siempre visible (decisión del 19 de noviembre de 2026): fijo a la izquierda como el panel de
+ * navegación de Windows, agrupado por secciones, con un ícono propio por pantalla y plegable a solo íconos.
+ * Cada equipo recuerda si lo dejó plegado.
+ */
+const NAVIGATION: NavGroup[] = [
+  { label: 'Resumen', items: [
+    { section: 'dashboard', label: 'Dashboard', link: '/operacion/dashboard', icon: 'dashboard', visible: s => s.has('REPORTS.FINANCIAL_READ') },
+    { section: 'reportes', label: 'Reportes', link: '/operacion/reportes', icon: 'reports', visible: s => s.has('REPORTS.FINANCIAL_READ') },
+  ] },
+  { label: 'Ventas y caja', items: [
+    { section: 'ventas', label: 'Punto de venta', link: '/operacion/ventas', icon: 'sales', visible: s => s.has('SALES.CREATE') },
+    { section: 'historial-ventas', label: 'Historial de ventas', link: '/operacion/ventas/historial', icon: 'history', visible: s => s.has('SALES.OWN_READ') || s.has('SALES.ALL_READ') },
+    { section: 'caja', label: 'Caja', link: '/operacion/caja', icon: 'cash', visible: s => s.has('CASH.OWN_READ') },
+    { section: 'apartados', label: 'Apartados', link: '/operacion/apartados', icon: 'layaway', visible: s => s.has('LAYAWAY.MANAGE') },
+    { section: 'creditos', label: 'Créditos y abonos', link: '/operacion/creditos', icon: 'credit', visible: s => s.has('CREDIT.MANAGE') },
+    { section: 'clientes', label: 'Clientes', link: '/operacion/clientes', icon: 'customers', visible: s => s.has('CUSTOMERS.BASIC_MANAGE') || s.has('CUSTOMERS.MANAGE') },
+  ] },
+  { label: 'Productos', items: [
+    { section: 'catalogo', label: 'Catálogo', link: '/operacion/catalogo', icon: 'catalog', visible: s => s.has('PRODUCTS.READ') || s.has('CATEGORIES.READ') },
+    { section: 'inventario', label: 'Inventario', link: '/operacion/inventario', icon: 'inventory', visible: s => s.has('INVENTORY.READ') },
+    { section: 'etiquetas', label: 'Etiquetas', link: '/operacion/etiquetas', icon: 'labels', visible: s => s.has('PRODUCTS.LABELS_MANAGE') },
+  ] },
+  { label: 'Compras', items: [
+    { section: 'compras', label: 'Compras', link: '/operacion/compras', icon: 'purchases', visible: s => s.has('PURCHASES.RECEIVE') || s.has('PURCHASE_ORDERS.MANAGE') },
+    { section: 'recepciones', label: 'Recepciones', link: '/operacion/recepciones', icon: 'reception', visible: s => s.has('PURCHASES.RECEIVE') && s.has('PURCHASE_ORDERS.MANAGE') },
+    { section: 'proveedores', label: 'Proveedores', link: '/operacion/proveedores', icon: 'supplier', visible: s => s.has('SUPPLIERS.READ') },
+  ] },
+  { label: 'Sistema', items: [
+    { section: 'configuracion', label: 'Configuración', link: '/operacion/configuracion', icon: 'settings', visible: s => s.has('CONFIGURATION.MANAGE') || s.has('CASH.SHIFT_MODE_MANAGE') },
+    { section: 'administracion', label: 'Administración', link: '/operacion/administracion', icon: 'admin', visible: s => s.has('USERS.READ') || s.has('ROLES.READ') || s.has('AUDIT.READ') },
+  ] },
+];
+
+const COLLAPSED_STORAGE_KEY = 'controlplus.sidebarCollapsed';
+function readCollapsed(): boolean { try { return localStorage.getItem(COLLAPSED_STORAGE_KEY) === 'true'; } catch { return false; } }
+
 @Component({
   selector: 'cp-shell',
-  imports: [RouterOutlet, RouterLink, Icon, A11yModule],
+  imports: [RouterOutlet, RouterLink, Icon],
   // La traducción del paginador vive aquí y no en app.config: así el paginador (con sus menús, tooltips y
   // formularios) no entra en el paquete inicial que descarga la pantalla de ingreso.
   providers: [paginatorIntlProvider],
   template: `
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
-    <div class="app-shell app-shell--drawer">
-      @if (menuOpen()) {
-        <div class="drawer-backdrop" (click)="menuOpen.set(false)" aria-hidden="true"></div>
-        <aside id="main-navigation" class="sidebar" role="dialog" aria-modal="true" aria-label="Navegación principal" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (keydown)="onMenuKeydown($event)">
-          <div class="brand brand--sidebar"><img class="brand__mark brand__mark--logo" src="controlplus-icon.png" alt="" width="36" height="36"><span><strong>ControlPlus</strong><small>{{ establishment.name() }}</small></span>
-            <button class="icon-button icon-button--dark drawer-close" type="button" aria-label="Cerrar menú" (click)="menuOpen.set(false)" cdkFocusInitial><cp-icon name="close" /></button>
-          </div>
-          <p class="sidebar__label">NAVEGACIÓN</p>
-          <nav class="sidebar__nav">
-            @if (session.has('REPORTS.FINANCIAL_READ')) { <a routerLink="/operacion/dashboard" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'dashboard'"><span><cp-icon name="dashboard" /></span><b>Dashboard</b></a> }
-            @if (session.has('SALES.CREATE')) { <a routerLink="/operacion/ventas" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'ventas'" aria-label="Punto de venta"><span><cp-icon name="sales" /></span><b>Ventas</b></a> }
-            @if (session.has('SALES.OWN_READ') || session.has('SALES.ALL_READ')) { <a routerLink="/operacion/ventas/historial" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'historial-ventas'"><span><cp-icon name="sales" /></span><b>Historial de ventas</b></a> }
-            @if (session.has('CASH.OWN_READ')) { <a routerLink="/operacion/caja" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'caja'" aria-label="Caja"><span><cp-icon name="cash" /></span><b>Caja</b></a> }
-            @if (session.has('INVENTORY.READ')) { <a routerLink="/operacion/inventario" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'inventario'"><span><cp-icon name="inventory" /></span><b>Inventario</b></a> }
-            @if (session.has('PRODUCTS.LABELS_MANAGE')) { <a routerLink="/operacion/etiquetas" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'etiquetas'"><span><cp-icon name="catalog" /></span><b>Etiquetas</b></a> }
-            @if (session.has('CUSTOMERS.BASIC_MANAGE') || session.has('CUSTOMERS.MANAGE')) { <a routerLink="/operacion/clientes" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'clientes'"><span><cp-icon name="customers" /></span><b>Clientes</b></a> }
-            @if (session.has('CREDIT.MANAGE')) { <a routerLink="/operacion/creditos" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'creditos'"><span><cp-icon name="customers" /></span><b>Créditos y abonos</b></a> }
-            @if (session.has('PURCHASES.RECEIVE') || session.has('PURCHASE_ORDERS.MANAGE')) { <a routerLink="/operacion/compras" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'compras'"><span><cp-icon name="purchases" /></span><b>Compras</b></a> }
-            @if (session.has('PURCHASES.RECEIVE') && session.has('PURCHASE_ORDERS.MANAGE')) { <a routerLink="/operacion/recepciones" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'recepciones'"><span><cp-icon name="purchases" /></span><b>Recepciones</b></a> }
-            @if (session.has('SUPPLIERS.READ')) { <a routerLink="/operacion/proveedores" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'proveedores'"><span><cp-icon name="purchases" /></span><b>Proveedores</b></a> }
-            @if (session.has('REPORTS.FINANCIAL_READ')) { <a routerLink="/operacion/reportes" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'reportes'"><span><cp-icon name="reports" /></span><b>Reportes</b></a> }
-            @if (session.has('LAYAWAY.MANAGE')) { <a routerLink="/operacion/apartados" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'apartados'"><span><cp-icon name="catalog" /></span><b>Apartados</b></a> }
-            @if (session.has('CONFIGURATION.MANAGE') || session.has('CASH.SHIFT_MODE_MANAGE')) { <a routerLink="/operacion/configuracion" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'configuracion'"><span><cp-icon name="settings" /></span><b>Configuración</b></a> }
-            @if (session.has('USERS.READ') || session.has('ROLES.READ') || session.has('AUDIT.READ')) { <a routerLink="/operacion/administracion" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'administracion'"><span><cp-icon name="settings" /></span><b>Administración</b></a> }
-            @if (session.has('PRODUCTS.READ') || session.has('CATEGORIES.READ')) { <a routerLink="/operacion/catalogo" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'catalogo'" aria-label="Catálogo"><span><cp-icon name="catalog" /></span><b>Catálogo</b></a> }
-          </nav>
-          <div class="sidebar__user">
-            @if (userMenuOpen()) { <div class="user-menu" id="user-menu" role="menu" aria-label="Opciones de la cuenta"><button class="user-menu__item" type="button" role="menuitem" (click)="logout()"><cp-icon name="lock" /><span>Cerrar sesión</span></button></div> }
-            <button class="sidebar__user-button" type="button" aria-haspopup="menu" [attr.aria-expanded]="userMenuOpen()" aria-controls="user-menu" [title]="'Cuenta de ' + (session.user()?.displayName ?? '')" (click)="userMenuOpen.update(open => !open)" (keydown.escape)="userMenuOpen.set(false)"><span class="avatar">{{ session.user()?.displayName?.charAt(0) }}</span><span class="sidebar__user-copy"><strong>{{ session.user()?.displayName }}</strong><small>{{ session.user()?.roles?.join(', ') }}</small></span><span class="sidebar__user-caret" aria-hidden="true">⌃</span></button>
-          </div>
-        </aside>
-      }
-      <section class="shell-content" [attr.inert]="menuOpen() ? '' : null">
+    <div class="app-shell app-shell--fixed" [class.app-shell--collapsed]="collapsed()">
+      <aside id="main-navigation" class="sidebar" aria-label="Navegación principal">
+        <div class="brand brand--sidebar"><img class="brand__mark brand__mark--logo" src="controlplus-icon.png" alt="" width="36" height="36"><span class="sidebar__text"><strong>ControlPlus</strong><small>{{ establishment.name() }}</small></span></div>
+        <nav class="sidebar__nav">
+          @for (group of groups(); track group.label) {
+            <p class="sidebar__label">{{ group.label }}</p>
+            @for (item of group.items; track item.section) {
+              <a [routerLink]="item.link" class="nav-item" [class.nav-item--active]="activeSection() === item.section" [attr.aria-current]="activeSection() === item.section ? 'page' : null" [attr.aria-label]="item.label" [title]="item.label"><span><cp-icon [name]="item.icon" /></span><b>{{ item.label }}</b></a>
+            }
+          }
+        </nav>
+        <div class="sidebar__user">
+          @if (userMenuOpen()) {
+            <div class="user-menu" id="user-menu" role="menu" aria-label="Opciones de la cuenta" (keydown.escape)="closeUserMenuAndFocus()">
+              <p class="user-menu__heading" id="display-scale-heading"><cp-icon name="text-size" /><span>Tamaño de la pantalla</span></p>
+              <div role="group" aria-labelledby="display-scale-heading">
+                @for (option of displayScale.options; track option.value) {
+                  <button class="user-menu__option" type="button" role="menuitemradio" [attr.aria-checked]="displayScale.scale() === option.value" (click)="displayScale.set(option.value)">
+                    <span class="user-menu__check">@if (displayScale.scale() === option.value) { <cp-icon name="check" /> }</span><span>{{ option.label }}</span>
+                  </button>
+                }
+              </div>
+              <hr class="user-menu__separator">
+              <button class="user-menu__item" type="button" role="menuitem" (click)="logout()"><cp-icon name="logout" /><span>Cerrar sesión</span></button>
+            </div>
+          }
+          <button class="sidebar__user-button" type="button" aria-haspopup="menu" [attr.aria-expanded]="userMenuOpen()" aria-controls="user-menu" [title]="'Cuenta de ' + (session.user()?.displayName ?? '') + ': tamaño de la pantalla y cerrar sesión'" (click)="userMenuOpen.update(open => !open)" (keydown.escape)="userMenuOpen.set(false)"><span class="avatar">{{ session.user()?.displayName?.charAt(0) }}</span><span class="sidebar__user-copy"><strong>{{ session.user()?.displayName }}</strong><small>{{ session.user()?.roles?.join(', ') }}</small></span><span class="sidebar__user-caret" aria-hidden="true">⌃</span></button>
+        </div>
+      </aside>
+      <section class="shell-content">
         <header class="topbar">
-          <div class="topbar__leading"><button class="icon-button menu-toggle" type="button" aria-label="Abrir menú" [attr.aria-expanded]="menuOpen()" [attr.aria-controls]="menuOpen() ? 'main-navigation' : null" (click)="menuOpen.set(true)"><cp-icon name="menu" /></button><div><h1>{{ pageTitle() }}</h1><p>{{ pageSubtitle() }}</p></div></div>
-          <div class="topbar__status"><strong class="store-name">{{ establishment.name() }}</strong><span>{{ session.user()?.displayName }}</span><button class="icon-button" type="button" (click)="logout()" aria-label="Cerrar sesión" title="Cerrar sesión"><cp-icon name="lock" /></button></div>
+          <div class="topbar__leading"><button class="icon-button menu-toggle" type="button" [attr.aria-label]="collapsed() ? 'Mostrar el menú completo' : 'Plegar el menú'" [title]="collapsed() ? 'Mostrar el menú completo' : 'Plegar el menú'" [attr.aria-expanded]="!collapsed()" aria-controls="main-navigation" (click)="toggleCollapsed()"><cp-icon name="menu" /></button><div><h1>{{ pageTitle() }}</h1><p>{{ pageSubtitle() }}</p></div></div>
+          <div class="topbar__status"><strong class="store-name">{{ establishment.name() }}</strong><span>{{ session.user()?.displayName }}</span><button class="icon-button" type="button" (click)="logout()" aria-label="Cerrar sesión" title="Cerrar sesión"><cp-icon name="logout" /></button></div>
         </header>
         <main id="main-content" class="workspace" [class.workspace--bounded]="boundedWorkspace()" tabindex="-1"><router-outlet /></main>
       </section>
@@ -60,24 +98,40 @@ import { paginatorIntlProvider } from './paginator-intl';
 export class Shell {
   readonly session = inject(SessionService);
   readonly establishment = inject(EstablishmentService);
-  readonly menuOpen = signal(false);
-  /** Menú del perfil de abajo de la barra lateral (decisión del 19 de noviembre de 2026): permite cerrar sesión. */
+  readonly displayScale = inject(DisplayScaleService);
+  readonly collapsed = signal(readCollapsed());
+  /** Menú del perfil de abajo de la barra lateral: tamaño de la pantalla y cerrar sesión. */
   readonly userMenuOpen = signal(false);
   private readonly host = inject(ElementRef<HTMLElement>);
   readonly boundedWorkspace = signal(false);
   readonly pageTitle = signal('Caja');
   readonly pageSubtitle = signal('Apertura de turno');
-  readonly activeSection = signal<'caja' | 'ventas' | 'historial-ventas' | 'catalogo' | 'etiquetas' | 'inventario' | 'clientes' | 'creditos' | 'proveedores' | 'compras' | 'recepciones' | 'administracion' | 'configuracion' | 'apartados' | 'reportes' | 'dashboard'>('caja');
+  readonly activeSection = signal<Section>('caja');
+  /** Solo las secciones con alguna pantalla permitida para el usuario. */
+  readonly groups = computed(() => {
+    this.session.user();
+    return NAVIGATION.map(group => ({ label: group.label, items: group.items.filter(item => item.visible(this.session)) })).filter(group => group.items.length);
+  });
   private readonly router = inject(Router);
 
   constructor() {
     void this.establishment.load().catch(() => undefined);
     this.syncHeader(this.router.url);
     this.router.events.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd), takeUntilDestroyed())
-      .subscribe(event => { this.menuOpen.set(false); this.userMenuOpen.set(false); this.syncHeader(event.urlAfterRedirects); });
+      .subscribe(event => { this.userMenuOpen.set(false); this.syncHeader(event.urlAfterRedirects); });
+  }
+
+  toggleCollapsed(): void {
+    const next = !this.collapsed();
+    this.collapsed.set(next);
+    try { localStorage.setItem(COLLAPSED_STORAGE_KEY, String(next)); } catch { /* Sin almacenamiento: dura hasta recargar. */ }
   }
 
   logout(): void { this.userMenuOpen.set(false); this.session.logout(); void this.router.navigateByUrl('/ingresar'); }
+  closeUserMenuAndFocus(): void {
+    this.userMenuOpen.set(false);
+    ((this.host.nativeElement as HTMLElement).querySelector('.sidebar__user-button') as HTMLElement | null)?.focus();
+  }
   /** Un toque fuera del perfil cierra su menú. */
   @HostListener('document:click', ['$event'])
   closeUserMenu(event: MouseEvent): void {
@@ -85,7 +139,6 @@ export class Shell {
     const profile = (this.host.nativeElement as HTMLElement).querySelector('.sidebar__user');
     if (profile && !profile.contains(event.target as Node)) this.userMenuOpen.set(false);
   }
-  onMenuKeydown(event: KeyboardEvent): void { if (event.key === 'Escape') { event.preventDefault(); this.menuOpen.set(false); } }
   private syncHeader(url: string): void {
     this.boundedWorkspace.set(url.endsWith('/ventas'));
     if (url.includes('/dashboard')) { this.activeSection.set('dashboard'); this.pageTitle.set('Dashboard'); this.pageSubtitle.set('Resumen operativo de hoy'); return; }
@@ -100,7 +153,7 @@ export class Shell {
     if (url.includes('/proveedores')) { this.activeSection.set('proveedores'); this.pageTitle.set('Proveedores'); this.pageSubtitle.set('Directorio y gestión'); return; }
     if (url.includes('/reportes')) { this.activeSection.set('reportes'); this.pageTitle.set('Reportes'); this.pageSubtitle.set('Indicadores y análisis operativo'); return; }
     if (url.includes('/apartados')) { this.activeSection.set('apartados'); this.pageTitle.set('Apartados'); this.pageSubtitle.set('Abonos, entregas y saldos'); return; }
-    if (url.includes('/configuracion')) { this.activeSection.set('configuracion'); this.pageTitle.set('Configuración'); this.pageSubtitle.set('Numeración, plazos, impresora y motivos'); return; }
+    if (url.includes('/configuracion')) { this.activeSection.set('configuracion'); this.pageTitle.set('Configuración'); this.pageSubtitle.set('Establecimiento, caja, plazos e impresión'); return; }
     if (url.includes('/soporte/restauracion')) { this.activeSection.set('administracion'); this.pageTitle.set('Restauración'); this.pageSubtitle.set('Administración / Soporte / Respaldos / Restaurar'); return; }
     if (url.includes('/soporte')) { this.activeSection.set('administracion'); this.pageTitle.set('Soporte y continuidad'); this.pageSubtitle.set('Salud del sistema, respaldos y diagnóstico'); return; }
     if (url.includes('/administracion')) { this.activeSection.set('administracion'); this.pageTitle.set('Administración'); this.pageSubtitle.set('Usuarios, roles, permisos y auditoría'); return; }

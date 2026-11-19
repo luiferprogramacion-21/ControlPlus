@@ -7,7 +7,7 @@
 .customer-status-message { margin: 16px 0 0; color: var(--cp-text-secondary); line-height: 1.5; }
 .customer-status-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--cp-border); }
 .customer-status-confirm--danger { border-color: var(--cp-error); background: var(--cp-error); }
-@media (max-width: 520px) {
+@container cp (max-width: 520px) {
   .module-form.customer-status-dialog { padding: 16px; }
   .customer-status-actions { flex-direction: column-reverse; }
   .customer-status-actions .button { width: 100%; }

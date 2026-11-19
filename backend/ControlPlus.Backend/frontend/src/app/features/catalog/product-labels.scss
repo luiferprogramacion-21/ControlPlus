@@ -43,5 +43,5 @@
 .active-profile, .profile-help { margin: 0 0 12px; color: var(--cp-text-secondary); font-size: 13px; }
 .profile-help { color: var(--cp-warning); }
 .print-labels { width: 100%; margin-top: auto; }
-@media (max-width: 900px) { .labels-layout { grid-template-columns: minmax(0, 1fr); } .labels-preview { min-height: 480px; } }
-@media (max-width: 600px) { .module-heading { align-items: flex-start; } .labels-shell, .labels-selection, .labels-preview { padding: 14px; } .label-search-row, .labels-selection-footer { align-items: stretch; flex-direction: column; } }
+@container cp (max-width: 900px) { .labels-layout { grid-template-columns: minmax(0, 1fr); } .labels-preview { min-height: 480px; } }
+@container cp (max-width: 600px) { .module-heading { align-items: flex-start; } .labels-shell, .labels-selection, .labels-preview { padding: 14px; } .label-search-row, .labels-selection-footer { align-items: stretch; flex-direction: column; } }

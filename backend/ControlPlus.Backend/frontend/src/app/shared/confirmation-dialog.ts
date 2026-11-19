@@ -41,7 +41,7 @@ export class ConfirmationDialog {
   async confirm(prompt: ConfirmationPrompt, owner: DestroyRef): Promise<boolean> {
     if (owner.destroyed || this.active) return false;
     const ref = this.dialog.open<ConfirmationDialogComponent, ConfirmationPrompt, boolean>(ConfirmationDialogComponent, {
-      data: prompt, width: '480px', maxWidth: 'calc(100vw - 32px)',
+      data: prompt, width: '480px', maxWidth: 'calc(calc(100vw / var(--cp-zoom)) - 32px)',
       role: 'alertdialog', ariaModal: true, ariaDescribedBy: 'cp-confirmation-description',
       autoFocus: '#cp-confirmation-cancel', restoreFocus: true,
     });

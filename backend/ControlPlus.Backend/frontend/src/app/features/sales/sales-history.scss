@@ -19,13 +19,13 @@
 .sale-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--cp-border); }
 .sale-detail-close { margin-left: auto; }
 .sale-cancel-action { color: var(--cp-error); }
-@media (max-width: 700px) {
+@container cp (max-width: 700px) {
   .sale-detail-sheet { padding: 10px; }
-  .module-form.sales-history-detail { max-height: calc(100dvh - 20px); padding: 16px; }
+  .module-form.sales-history-detail { max-height: calc(calc(100dvh / var(--cp-zoom)) - 20px); padding: 16px; }
   .sale-detail-actions .button { flex: 1 1 calc(50% - 4px); }
   .sale-detail-close { margin-left: 0; }
 }
-@media (max-width: 460px) {
+@container cp (max-width: 460px) {
   .sale-summary { grid-template-columns: 1fr; }
   .sale-detail-row { grid-template-columns: 1fr; align-items: flex-start; gap: 8px; }
   .sale-detail-row__values { align-items: flex-start; text-align: left; }

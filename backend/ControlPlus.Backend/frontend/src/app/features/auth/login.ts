@@ -85,7 +85,7 @@ import { toastSignal } from '../../core/toast';
     /* Colores de la marca ControlPlus (tomados del logo): azul marino y naranja. */
     :host { --brand-navy: #0F2C4D; --brand-navy-light: #1B4170; --brand-orange: #FD6D32;
       --mat-sys-primary: var(--brand-navy); --mat-sys-on-primary: #fff; display: block; }
-    .cp-login { display: grid; grid-template-columns: minmax(380px, 42%) 1fr; min-height: 100vh; background: #fff; }
+    .cp-login { display: grid; grid-template-columns: minmax(380px, 42%) 1fr; min-height: calc(100vh / var(--cp-zoom)); background: #fff; }
     .cp-login__form-area { display: grid; place-items: center; padding: 40px 28px; background: #fff; }
     .cp-login__form { display: flex; flex-direction: column; align-items: stretch; width: min(100%, 340px); text-align: center; }
     .cp-login__mark { align-self: center; width: 64px; height: 64px; margin-bottom: 14px; }
@@ -111,7 +111,7 @@ import { toastSignal } from '../../core/toast';
     .cp-login__brand-content { width: min(100%, 520px); text-align: center; }
     .cp-login__logo { display: block; width: 100%; height: auto; }
     .cp-login__tagline { margin: 22px 0 0; color: #c9d6e6; font-size: 16px; letter-spacing: .02em; }
-    @media (max-width: 820px) {
+    @container cp (max-width: 820px) {
       .cp-login { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
       .cp-login__brand { order: -1; padding: 32px 24px; }
       .cp-login__dots { display: none; }
