@@ -23,7 +23,8 @@ import { WindowSheet } from '../../shared/window-sheet';
   template: `
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="user-credential-title"><div class="module-form-sheet__backdrop" (click)="close()"></div>
       <div class="panel panel--padded module-form credential-sheet">
-        <div class="panel-heading"><h2 id="user-credential-title">Carné de {{ user().displayName }}</h2></div>
+        <div class="panel-heading"><h2 id="user-credential-title">Usuario: {{ user().displayName }}</h2></div>
+        <ng-content select="[userTabs]" />
         <p class="muted">{{ user().userName }} · {{ roleName() }}</p>
         @if (loading()) { <p role="status">Cargando carné…</p> }
         @if (!issued()) {

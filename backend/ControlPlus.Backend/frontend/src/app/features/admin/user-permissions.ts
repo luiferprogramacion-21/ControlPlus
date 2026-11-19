@@ -17,7 +17,8 @@ interface Row extends EffectivePermission { module: string; }
   template: `
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="user-permissions-title"><div class="module-form-sheet__backdrop" (click)="closed.emit()"></div>
       <div class="panel panel--padded module-form permissions-sheet">
-        <div class="panel-heading"><h2 id="user-permissions-title">Permisos de {{ user().displayName }}</h2></div>
+        <div class="panel-heading"><h2 id="user-permissions-title">Usuario: {{ user().displayName }}</h2></div>
+        <ng-content select="[userTabs]" />
         <p class="muted">{{ user().userName }} · Los permisos parten de la plantilla de su rol; aquí se añaden concesiones o revocaciones individuales. La revocación individual tiene precedencia. Cada cambio cierra las sesiones de este usuario.</p>
         <div class="permissions-toolbar">
           <label class="sr-only" for="permission-filter">Filtrar permisos</label>

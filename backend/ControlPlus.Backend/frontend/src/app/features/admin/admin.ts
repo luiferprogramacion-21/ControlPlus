@@ -17,13 +17,14 @@ import { isVisibleAdminPermission } from './visible-permissions';
 import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog, ConfirmationOptions } from '../../shared/confirmation-dialog';
 import { WindowSheet } from '../../shared/window-sheet';
+import { UserTab, UserTabOption, UserTabs } from './user-tabs';
 
 type Mode = 'create' | 'edit' | 'role' | 'password';
 type Tab = 'users' | 'roles' | 'audit';
 
 @Component({
   selector: 'cp-admin',
-  imports: [WindowSheet, DatePipe, FormsModule, MatButtonModule, MatPaginatorModule, RouterLink, Icon, RoleTemplate, UserPermissions, UserCredential, AuditLog],
+  imports: [WindowSheet, UserTabs, DatePipe, FormsModule, MatButtonModule, MatPaginatorModule, RouterLink, Icon, RoleTemplate, UserPermissions, UserCredential, AuditLog],
   templateUrl: './admin.html',
   styleUrls: ['../directory.scss', './admin.scss'],
 })
@@ -220,6 +221,30 @@ export class Admin implements OnInit {
     this.permissionUser.set(user);
   }
   closePermissions(): void { this.permissionUser.set(null); }
+  /** Pestañas de la ficha de usuario que el Administrador puede usar. */
+  get userTabs(): UserTabOption[] {
+    const tabs: UserTabOption[] = [];
+    if (this.canManageUsers) tabs.push({ id: 'datos', label: 'Datos' });
+    if (this.canChooseRole) tabs.push({ id: 'rol', label: 'Rol' });
+    if (this.canManageUserPermissions) tabs.push({ id: 'permisos', label: 'Permisos' });
+    if (this.canManageUsers) tabs.push({ id: 'contrasena', label: 'Contraseña' }, { id: 'carne', label: 'Carné' });
+    return tabs;
+  }
+  activeUserTab(): UserTab {
+    if (this.permissionUser()) return 'permisos';
+    if (this.credentialUser()) return 'carne';
+    return this.mode() === 'role' ? 'rol' : this.mode() === 'password' ? 'contrasena' : 'datos';
+  }
+  /** Cambia de pestaña dentro de la ficha: cierra la sección actual y abre la elegida del mismo usuario. */
+  async showUserTab(user: AdminUser, tab: UserTab): Promise<void> {
+    if (this.saving()) return;
+    this.mode.set(null); this.permissionUser.set(null); this.credentialUser.set(null);
+    if (tab === 'datos') this.edit(user);
+    else if (tab === 'rol') this.changeRole(user);
+    else if (tab === 'contrasena') this.resetPassword(user);
+    else if (tab === 'permisos') await this.openPermissions(user);
+    else this.openCredential(user);
+  }
   openCredential(user: AdminUser): void { if (this.canManageUsers) { this.error.set(''); this.notice.set(''); this.credentialUser.set(user); } }
   closeCredential(): void { this.credentialUser.set(null); }
 

@@ -32,11 +32,7 @@
               <td><span class="status-pill" [class.status-pill--warning]="!user.isActive || user.isLocked">{{ stateLabel(user) }}</span></td>
               <td>{{ user.lastLoginAtUtc ? (user.lastLoginAtUtc | date:'dd/MM/yyyy HH:mm') : '—' }}</td>
               <td class="align-right">@if (canManageUsers) {
-                <button class="table-action" type="button" (click)="edit(user)">Editar</button>
-                @if (canChooseRole) { <button class="table-action" type="button" (click)="changeRole(user)">Rol</button> }
-                <button class="table-action" type="button" (click)="resetPassword(user)">Contraseña</button>
-                @if (canManageUserPermissions) { <button class="table-action" type="button" (click)="openPermissions(user)">Permisos</button> }
-                <button class="table-action" type="button" (click)="openCredential(user)">Carné</button>
+                <button class="table-action" type="button" (click)="edit(user)" title="Datos, rol, permisos, contraseña y carné">Abrir ficha</button>
                 @if (user.isLocked) { <button class="table-action" type="button" [disabled]="saving()" (click)="unlock(user)">Reactivar acceso</button> }
                 <button class="table-action" type="button" [disabled]="saving() || isSelf(user)" (click)="toggle(user)">{{ user.isActive ? 'Inactivar' : 'Activar' }}</button>
                 @if (canDeleteUsers && !isSelf(user)) { <button class="table-action table-action--danger" type="button" [disabled]="saving()" (click)="remove(user)">Eliminar</button> }
@@ -81,8 +77,9 @@
   @if (mode(); as currentMode) {
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="admin-form-title"><div class="module-form-sheet__backdrop" (click)="close()"></div>
       <form class="panel panel--padded module-form" (submit)="$event.preventDefault(); save()">
-        <div class="panel-heading"><h2 id="admin-form-title">{{ currentMode === 'create' ? 'Nuevo usuario' : currentMode === 'edit' ? 'Editar usuario' : currentMode === 'role' ? 'Cambiar rol' : 'Cambiar contraseña' }}</h2></div>
-        @if (currentMode !== 'create' && selected(); as user) { <p class="muted">{{ user.displayName }} · {{ user.userName }}</p> }
+        <div class="panel-heading"><h2 id="admin-form-title">{{ currentMode === 'create' ? 'Nuevo usuario' : 'Usuario: ' + (selected()?.displayName ?? '') }}</h2></div>
+        @if (currentMode !== 'create' && selected(); as tabUser) { <cp-user-tabs [tabs]="userTabs" [active]="activeUserTab()" (selected)="showUserTab(tabUser, $event)" /> }
+        @if (currentMode !== 'create' && selected(); as user) { <p class="muted">{{ user.userName }}</p> }
         @if (currentMode === 'create') {
           <label class="field-label" for="admin-user-name">Usuario de acceso</label><input id="admin-user-name" class="text-field" name="userName" [(ngModel)]="form.userName" required autocomplete="off" autofocus>
         }
@@ -112,6 +109,6 @@
       </form>
     </div>
   }
-  @if (credentialUser(); as target) { <cp-user-credential [user]="target" (closed)="closeCredential()" /> }
-  @if (permissionUser(); as target) { <cp-user-permissions [user]="target" [catalog]="catalog()" (closed)="closePermissions()" /> }
+  @if (credentialUser(); as target) { <cp-user-credential [user]="target" (closed)="closeCredential()"><cp-user-tabs userTabs [tabs]="userTabs" active="carne" (selected)="showUserTab(target, $event)" /></cp-user-credential> }
+  @if (permissionUser(); as target) { <cp-user-permissions [user]="target" [catalog]="catalog()" (closed)="closePermissions()"><cp-user-tabs userTabs [tabs]="userTabs" active="permisos" (selected)="showUserTab(target, $event)" /></cp-user-permissions> }
 </section>
