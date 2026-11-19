@@ -28,7 +28,15 @@
 .permissions-list small { color: var(--cp-text-muted); }
 .permission--exception { background: var(--cp-warning-soft); margin: 0 -12px; padding-inline: 12px !important; }
 
-.credential-sheet { width: min(520px, 100%); }
+.credential-sheet { width: min(720px, 100%); }
+.credential-sheet .form-actions {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  padding: 18px 4px 4px;
+  border-top: 1px solid var(--cp-border);
+}
+.credential-sheet .form-actions .button { flex: 0 0 auto; max-width: 100%; }
 .credential-preview { border: 1px solid var(--cp-border); border-radius: 10px; padding: 12px 14px; margin: 10px 0; background: #fff; color: #000; }
 .credential-preview__head { display: flex; justify-content: space-between; align-items: baseline; }
 .credential-preview__head span { font-size: 11px; text-transform: uppercase; }
