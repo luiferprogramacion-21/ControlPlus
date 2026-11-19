@@ -25,6 +25,8 @@ const paths: Record<string, string> = {
   'chevron-left': 'M15 6l-6 6 6 6',
   'chevron-right': 'M9 6l6 6-6 6',
   check: 'M5 12l5 5 9-10',
+  home: 'M3 11l9-7 9 7 M5 10v10h5v-6h4v6h5V10',
+  exchange: 'M4 8h13l-3-3 M20 16H7l3 3',
   keyboard: 'M2 6h20v12H2z M6 10h.01 M10 10h.01 M14 10h.01 M18 10h.01 M7 14h10',
 };
 

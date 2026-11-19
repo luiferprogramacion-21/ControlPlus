@@ -8,8 +8,7 @@ import { SessionService } from '../../core/session.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { errorText } from '../../core/api';
 import { PasswordRecoveryApi } from './password-recovery-api';
-import { LandingCash, landingNeedsCash, landingRoute } from '../../core/landing';
-import { CashApi } from '../cash/cash-api';
+import { HOME_ROUTE } from '../../core/landing';
 import { toastSignal } from '../../core/toast';
 
 /**
@@ -125,7 +124,6 @@ export class Login {
   private readonly fb = inject(FormBuilder);
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
-  private readonly cashApi = inject(CashApi);
   private readonly recoveryApi = inject(PasswordRecoveryApi);
   readonly busy = signal(false);
   readonly error = toastSignal('error');
@@ -140,7 +138,7 @@ export class Login {
     try {
       const { userName, password } = this.form.getRawValue();
       await this.session.login(userName.trim(), password);
-      await this.router.navigateByUrl(landingRoute(this.can, this.isRole, await this.cashForLanding()));
+      await this.router.navigateByUrl(HOME_ROUTE);
     } catch (e) { this.error.set(errorText(e)); }
     finally { this.busy.set(false); }
   }
@@ -190,11 +188,4 @@ export class Login {
     return errorText(error);
   }
 
-  private readonly can = (permission: string): boolean => this.session.has(permission);
-  private readonly isRole = (...codes: string[]): boolean => this.session.hasRole(...codes);
-  /** Estado de Caja solo para quien vende; si no se puede consultar, el punto de venta explica qué falta. */
-  private async cashForLanding(): Promise<LandingCash | null> {
-    if (!landingNeedsCash(this.can, this.isRole)) return null;
-    try { return await this.cashApi.state(); } catch { return null; }
-  }
 }

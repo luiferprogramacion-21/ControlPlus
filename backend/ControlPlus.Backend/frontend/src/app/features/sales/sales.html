@@ -23,7 +23,7 @@
       @if (reprintMessage()) { <p class="field-hint" role="status">{{ reprintMessage() }}</p> }
       <div class="success-actions">
         <button class="button button--secondary" type="button" (click)="printSaleTicket()" [disabled]="busy() || (printed() && !session.has('SALES.REPRINT'))">{{ lastJobStatus() === 'ERROR' ? 'Reintentar ticket' : (printed() ? 'Reimprimir' : 'Imprimir ticket') }}</button>
-        <button class="button button--secondary" type="button" (click)="showDetail.set(true)">Ver detalle</button>
+        <button class="button button--secondary" type="button" (click)="showDetail.set(true)">Ver detalle</button>@if (session.has('SALES.OWN_READ') || session.has('SALES.ALL_READ')) { <a class="button button--secondary success-link" routerLink="/operacion/ventas/historial" [queryParams]="{ accion: 'cambio', venta: result.visibleNumber }">Cambiar o devolver</a> }
         <button id="new-sale" class="button button--primary" type="button" (click)="newSale()">Nueva venta · Enter</button>
       </div>
     </section>

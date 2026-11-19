@@ -10,8 +10,8 @@ import { WindowSheet } from '../shared/window-sheet';
 import { Icon } from './icon';
 import { paginatorIntlProvider } from './paginator-intl';
 
-type Section = 'caja' | 'ventas' | 'historial-ventas' | 'catalogo' | 'etiquetas' | 'inventario' | 'clientes' | 'creditos' | 'proveedores' | 'compras' | 'recepciones' | 'administracion' | 'configuracion' | 'apartados' | 'reportes' | 'dashboard';
-interface NavItem { section: Section; label: string; link: string; icon: string; visible: (session: SessionService) => boolean; }
+type Section = 'inicio' | 'cambios' | 'caja' | 'ventas' | 'historial-ventas' | 'catalogo' | 'etiquetas' | 'inventario' | 'clientes' | 'creditos' | 'proveedores' | 'compras' | 'recepciones' | 'administracion' | 'configuracion' | 'apartados' | 'reportes' | 'dashboard';
+interface NavItem { section: Section; label: string; link: string; queryParams?: Record<string, string>; icon: string; visible: (session: SessionService) => boolean; }
 interface NavGroup { label: string; items: NavItem[]; }
 
 /**
@@ -21,12 +21,14 @@ interface NavGroup { label: string; items: NavItem[]; }
  */
 const NAVIGATION: NavGroup[] = [
   { label: 'Resumen', items: [
+    { section: 'inicio', label: 'Inicio', link: '/operacion/inicio', icon: 'home', visible: () => true },
     { section: 'dashboard', label: 'Dashboard', link: '/operacion/dashboard', icon: 'dashboard', visible: s => s.has('REPORTS.FINANCIAL_READ') },
     { section: 'reportes', label: 'Reportes', link: '/operacion/reportes', icon: 'reports', visible: s => s.has('REPORTS.FINANCIAL_READ') },
   ] },
   { label: 'Ventas y caja', items: [
     { section: 'ventas', label: 'Punto de venta', link: '/operacion/ventas', icon: 'sales', visible: s => s.has('SALES.CREATE') },
     { section: 'historial-ventas', label: 'Historial de ventas', link: '/operacion/ventas/historial', icon: 'history', visible: s => s.has('SALES.OWN_READ') || s.has('SALES.ALL_READ') },
+    { section: 'cambios', label: 'Cambios y devoluciones', link: '/operacion/ventas/historial', queryParams: { accion: 'cambio' }, icon: 'exchange', visible: s => s.has('SALES.CREATE') && (s.has('SALES.OWN_READ') || s.has('SALES.ALL_READ')) },
     { section: 'caja', label: 'Caja', link: '/operacion/caja', icon: 'cash', visible: s => s.has('CASH.OWN_READ') },
     { section: 'apartados', label: 'Apartados', link: '/operacion/apartados', icon: 'layaway', visible: s => s.has('LAYAWAY.MANAGE') },
     { section: 'creditos', label: 'Créditos y abonos', link: '/operacion/creditos', icon: 'credit', visible: s => s.has('CREDIT.MANAGE') },
@@ -66,7 +68,7 @@ function readCollapsed(): boolean { try { return localStorage.getItem(COLLAPSED_
           @for (group of groups(); track group.label) {
             <p class="sidebar__label">{{ group.label }}</p>
             @for (item of group.items; track item.section) {
-              <a [routerLink]="item.link" class="nav-item" [class.nav-item--active]="activeSection() === item.section" [attr.aria-current]="activeSection() === item.section ? 'page' : null" [attr.aria-label]="item.label" [title]="item.label"><span><cp-icon [name]="item.icon" /></span><b>{{ item.label }}</b></a>
+              <a [routerLink]="item.link" [queryParams]="item.queryParams ?? null" class="nav-item" [class.nav-item--active]="activeSection() === item.section" [attr.aria-current]="activeSection() === item.section ? 'page' : null" [attr.aria-label]="item.label" [title]="item.label"><span><cp-icon [name]="item.icon" /></span><b>{{ item.label }}</b></a>
             }
           }
         </nav>
@@ -179,7 +181,9 @@ export class Shell {
   }
   private syncHeader(url: string): void {
     this.boundedWorkspace.set(url.endsWith('/ventas'));
+    if (url.includes('/inicio')) { this.activeSection.set('inicio'); this.pageTitle.set('Inicio'); this.pageSubtitle.set('Tareas frecuentes'); return; }
     if (url.includes('/dashboard')) { this.activeSection.set('dashboard'); this.pageTitle.set('Dashboard'); this.pageSubtitle.set('Resumen operativo de hoy'); return; }
+    if (url.includes('/ventas/historial') && url.includes('accion=cambio')) { this.activeSection.set('cambios'); this.pageTitle.set('Cambios y devoluciones'); this.pageSubtitle.set('Busca la venta por su número'); return; }
     if (url.includes('/ventas/historial')) { this.activeSection.set('historial-ventas'); this.pageTitle.set('Historial de ventas'); this.pageSubtitle.set('Consulta, detalle y anulación'); return; }
     if (url.includes('/ventas')) { this.activeSection.set('ventas'); this.pageTitle.set('Punto de venta'); this.pageSubtitle.set('Terminal de ventas · Venta en curso'); return; }
     if (url.includes('/caja')) { this.activeSection.set('caja'); this.pageTitle.set('Caja'); this.pageSubtitle.set(url.includes('cierre') ? 'Cierre y conciliación' : 'Apertura y movimientos'); return; }

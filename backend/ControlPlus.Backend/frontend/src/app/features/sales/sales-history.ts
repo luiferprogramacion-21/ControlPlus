@@ -4,7 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
@@ -53,8 +53,34 @@ export class SalesHistory implements OnInit {
   reasonId = ''; observation = '';
   private requestId = 0;
   private pending: Pending | null = null;
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  /** Cambios y devoluciones (decisión del 19 de noviembre de 2026): se busca la venta por su número y se abre el cambio. */
+  readonly findingChange = signal(false);
+  readonly findingBusy = signal(false);
+  readonly findError = signal('');
+  changeNumber = '';
 
-  ngOnInit(): void { void this.reload(); }
+  ngOnInit(): void {
+    void this.reload();
+    const query = this.route?.snapshot.queryParamMap;
+    if (query?.get('accion') === 'cambio' && this.session.has('SALES.CREATE')) this.startChangeSearch(query.get('venta') ?? '');
+  }
+  startChangeSearch(visibleNumber = ''): void {
+    this.changeNumber = visibleNumber; this.findError.set(''); this.findingChange.set(true);
+  }
+  async findChangeSale(): Promise<void> {
+    const visibleNumber = this.changeNumber.trim();
+    if (!visibleNumber || this.findingBusy()) return;
+    this.findingBusy.set(true); this.findError.set('');
+    try {
+      const preparation = await this.api.findChangeSale(visibleNumber);
+      const detail = await this.api.detail(preparation.saleId);
+      if (!this.canChange(detail)) { this.findError.set(detail.state === 'ANULADA' ? 'Esa venta está anulada; no admite cambios.' : 'Esa venta no admite cambios.'); return; }
+      this.detail.set(detail); this.findingChange.set(false); this.changing.set(true);
+    } catch (e) {
+      this.findError.set(e instanceof HttpErrorResponse && e.status === 404 ? `No se encontró la venta ${visibleNumber}. Revisa el número del ticket.` : errorText(e));
+    } finally { this.findingBusy.set(false); }
+  }
   label(state: string): string { return STATE_LABELS[state] ?? state; }
   get listsAll(): boolean { return this.session.has('SALES.ALL_READ'); }
   /** Annulment is for Supervisor and Administrador with the effective permission; the server remains the authority. */

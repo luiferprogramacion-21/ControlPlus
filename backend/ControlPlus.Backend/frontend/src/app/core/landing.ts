@@ -8,6 +8,12 @@ export interface LandingCash { hasOpenShift: boolean; requiresPreviousShiftClosu
  * - Los demás: Catálogo, como antes.
  * `cash` es null si no se pudo consultar Caja; en ese caso va al punto de venta, que explica qué falta.
  */
+export const HOME_ROUTE = '/operacion/inicio';
+
+/**
+ * Desde el 19 de noviembre de 2026 todos llegan a Inicio, que muestra las tareas del rol y el estado de la caja
+ * (decisión «Pantalla de Inicio»). `landingRoute` se conserva como el destino directo de cada rol.
+ */
 export function landingRoute(
   can: (permission: string) => boolean,
   isRole: (...codes: string[]) => boolean,

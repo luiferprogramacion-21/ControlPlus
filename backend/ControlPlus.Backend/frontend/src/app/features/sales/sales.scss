@@ -115,3 +115,4 @@
 .cash-bills { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .cash-bill { min-height:38px; padding:0 12px; border:1px solid var(--cp-control-border); border-radius:8px; background:var(--cp-surface); color:var(--cp-primary); font-weight:700; }
 .cash-bill:hover { border-color:var(--cp-primary); background:var(--cp-primary-soft); }
+.success-link { display:inline-flex; align-items:center; justify-content:center; text-decoration:none; }

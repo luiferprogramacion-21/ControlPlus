@@ -105,6 +105,8 @@ export class SalesApi {
   cancel(saleId: string, input: CancelSaleInput, key: string): Promise<CancelSaleResult> {
     return firstValueFrom(this.http.post<CancelSaleResult>(`/api/sales/${saleId}/cancel`, input, { headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined }));
   }
+  /** Busca por su número la venta a la que se le hará un cambio de productos. */
+  findChangeSale(visibleNumber: string): Promise<ChangePreparation> { return firstValueFrom(this.http.get<ChangePreparation>('/api/sales/change-search', { params: { visibleNumber } })); }
   changePreparation(saleId: string): Promise<ChangePreparation> { return firstValueFrom(this.http.get<ChangePreparation>(`/api/sales/${saleId}/change-preparation`)); }
   confirmChange(saleId: string, input: ConfirmChangeInput, key: string): Promise<ConfirmedChange> {
     return firstValueFrom(this.http.post<ConfirmedChange>(`/api/sales/${saleId}/changes`, input, { headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined }));

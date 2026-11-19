@@ -14,6 +14,7 @@ import { appliedTotal, cashChange, emptyDraft, PaymentDraft, PaymentMethods, toP
 import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 import { WindowSheet } from '../../shared/window-sheet';
+import { ActivatedRoute } from '@angular/router';
 
 const STATE_LABELS: Record<string, string> = { ACTIVO: 'Activo', PAGADO: 'Pagado', ENTREGADO: 'Entregado', ANULADO: 'Anulado' };
 
@@ -52,7 +53,12 @@ export class Layaways implements OnInit {
   get appliedTotal(): number { return appliedTotal(this.drafts); }
   get change(): number { return cashChange(this.drafts); }
 
-  ngOnInit(): void { void this.reload(); }
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  ngOnInit(): void {
+    void this.reload();
+    // Desde Inicio, «Nuevo apartado» abre directamente la ventana para crearlo.
+    if (this.route?.snapshot.queryParamMap.get('accion') === 'nuevo') this.startCreate();
+  }
   money(value: number): string { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value); }
   label(state: string): string { return STATE_LABELS[state] ?? state; }
   paid(layaway: Layaway): number { return layaway.total - layaway.balance; }

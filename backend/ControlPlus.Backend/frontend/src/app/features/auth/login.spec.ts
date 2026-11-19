@@ -33,29 +33,14 @@ describe('Login: pantalla de llegada', () => {
     ] });
   });
 
-  it('el Cajero sin turno abierto llega a Caja', async () => {
-    role = 'CAJERO'; permissions = ['SALES.CREATE', 'CASH.OWN_READ'];
-    state.mockResolvedValue({ hasOpenShift: false, requiresPreviousShiftClosure: false });
-    await submit();
+  it('todos llegan a Inicio, que muestra las tareas del rol y el estado de la caja', async () => {
+    for (const [code, granted] of [['CAJERO', ['SALES.CREATE', 'CASH.OWN_READ']], ['ADMINISTRADOR', ['REPORTS.FINANCIAL_READ']]] as const) {
+      role = code; permissions = [...granted];
+      await submit();
+      expect(navigateByUrl).toHaveBeenLastCalledWith('/operacion/inicio');
+    }
     expect(session.login).toHaveBeenCalledWith('cajero', 'clave');
-    expect(navigateByUrl).toHaveBeenCalledWith('/operacion/caja');
-  });
-
-  it('el Cajero con turno abierto llega al punto de venta; si Caja no responde, también', async () => {
-    role = 'CAJERO'; permissions = ['SALES.CREATE', 'CASH.OWN_READ'];
-    state.mockResolvedValueOnce({ hasOpenShift: true, requiresPreviousShiftClosure: false });
-    await submit();
-    expect(navigateByUrl).toHaveBeenLastCalledWith('/operacion/ventas');
-    state.mockRejectedValueOnce(new Error('sin respuesta'));
-    await submit();
-    expect(navigateByUrl).toHaveBeenLastCalledWith('/operacion/ventas');
-  });
-
-  it('el Administrador llega al Dashboard sin consultar Caja', async () => {
-    role = 'ADMINISTRADOR'; permissions = ['REPORTS.FINANCIAL_READ', 'SALES.CREATE', 'CASH.OWN_READ'];
-    await submit();
     expect(state).not.toHaveBeenCalled();
-    expect(navigateByUrl).toHaveBeenCalledWith('/operacion/dashboard');
   });
 
   it('si el inicio de sesión falla no navega y muestra el error', async () => {

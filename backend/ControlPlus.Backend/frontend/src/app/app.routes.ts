@@ -2,14 +2,15 @@ import { Routes } from '@angular/router';
 import { catalogGuard, cashGuard, salesGuard, salesHistoryGuard, inventoryGuard, customersGuard, creditsGuard, suppliersGuard, purchasesGuard, purchaseReceiptsGuard, reportsGuard, dashboardGuard, adminGuard, supportGuard, configGuard, layawaysGuard, productLabelsGuard, sessionGuard } from './core/guards';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'operacion/catalogo' },
+  { path: '', pathMatch: 'full', redirectTo: 'operacion/inicio' },
   { path: 'ingresar', loadComponent: () => import('./features/auth/login').then(m => m.Login), title: 'Ingresar | ControlPlus' },
   {
     path: 'operacion',
     loadComponent: () => import('./layout/shell').then(m => m.Shell),
     canActivate: [sessionGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'catalogo' },
+      { path: '', pathMatch: 'full', redirectTo: 'inicio' },
+      { path: 'inicio', loadComponent: () => import('./features/home/home').then(m => m.Home), title: 'Inicio | ControlPlus' },
       { path: 'dashboard', canActivate: [dashboardGuard], loadComponent: () => import('./features/dashboard/dashboard').then(m => m.Dashboard), title: 'Dashboard | ControlPlus' },
       { path: 'etiquetas', canActivate: [productLabelsGuard], loadComponent: () => import('./features/catalog/product-labels').then(m => m.ProductLabels), title: 'Etiquetas de productos | ControlPlus' },
       { path: 'catalogo/etiquetas', pathMatch: 'full', redirectTo: '/operacion/etiquetas' },
@@ -31,5 +32,5 @@ export const routes: Routes = [
       { path: 'creditos', canActivate: [creditsGuard], loadComponent: () => import('./features/credits/credits').then(m => m.Credits), title: 'Créditos y abonos | ControlPlus' },
     ],
   },
-  { path: '**', redirectTo: 'operacion/catalogo' },
+  { path: '**', redirectTo: 'operacion/inicio' },
 ];
