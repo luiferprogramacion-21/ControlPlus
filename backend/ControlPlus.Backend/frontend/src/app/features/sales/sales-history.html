@@ -34,7 +34,7 @@
           @for (line of d.lines; track line.id) {
             <div class="sale-detail-row">
               <div class="sale-detail-row__description"><strong>{{ line.productName }}</strong><span>{{ line.productCode }}</span></div>
-              <div class="sale-detail-row__values"><span>{{ line.quantity }} × {{ line.unitPrice | currency:'COP':'symbol':'1.0-0' }}</span><strong>{{ line.netAmount | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+              <div class="sale-detail-row__values"><span>{{ line.quantity | number:'1.0-0' }} × {{ line.unitPrice | currency:'COP':'symbol':'1.0-0' }}</span><strong>{{ line.netAmount | currency:'COP':'symbol':'1.0-0' }}</strong></div>
             </div>
           }
         </div>

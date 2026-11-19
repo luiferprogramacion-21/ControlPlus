@@ -1,4 +1,5 @@
-import { CurrencyPipe } from '@angular/common';
+import { groupedNumber, NumberInput } from '../../shared/number-input';
+import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -18,7 +19,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
 
 @Component({
   selector: 'cp-sale-change',
-  imports: [CurrencyPipe, FormsModule, PaymentMethods],
+  imports: [NumberInput, DecimalPipe, CurrencyPipe, FormsModule, PaymentMethods],
   templateUrl: './sale-change.html',
   styleUrls: ['./sale-change.scss'],
 })
@@ -129,7 +130,7 @@ export class SaleChange implements OnInit {
     if (!prep.canStartChange) return prep.withinDeadline ? 'Esta venta no admite cambios.' : `El plazo para cambios venció el ${prep.changeDeadline}.`;
     const returned = this.returning().filter(line => Number(line.quantity) > 0);
     if (!returned.length) return 'Indica al menos un producto devuelto.';
-    for (const line of returned) if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) > line.remaining) return `La cantidad devuelta de ${line.name} debe ser un entero hasta ${line.remaining}.`;
+    for (const line of returned) if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) > line.remaining) return `La cantidad devuelta de ${line.name} debe ser un entero hasta ${groupedNumber(line.remaining)}.`;
     if (!this.delivering().length) return 'Agrega al menos un producto entregado.';
     for (const line of this.delivering()) {
       if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) < 1) return `La cantidad de ${line.product.name} debe ser un entero mayor que cero.`;

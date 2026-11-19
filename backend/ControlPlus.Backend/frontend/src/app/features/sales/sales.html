@@ -3,7 +3,7 @@
 
   @if (pendingDraft(); as draft) { @if (!sale()) {
     <div class="inline-feedback inline-feedback--warning draft-banner" role="status"><span>!</span>
-      <p>Hay una venta sin terminar: {{ draft.lines.length }} {{ draft.lines.length === 1 ? 'producto' : 'productos' }}, guardada a las {{ draft.updatedAtUtc | date:'HH:mm' }}.</p>
+      <p>Hay una venta sin terminar: {{ draft.lines.length | number:'1.0-0' }} {{ draft.lines.length === 1 ? 'producto' : 'productos' }}, guardada a las {{ draft.updatedAtUtc | date:'HH:mm' }}.</p>
       <button class="button button--primary" type="button" (click)="recoverDraft()" [disabled]="recoveringDraft()">{{ recoveringDraft() ? 'Recuperando…' : 'Recuperar venta' }}</button>
       <button class="button button--secondary" type="button" (click)="discardDraft()" [disabled]="recoveringDraft()">Descartar</button>
     </div>
@@ -36,7 +36,7 @@
             <div><span>Total</span><strong>{{ result.total | currency:'COP':'symbol':'1.0-0' }}</strong></div>
             <div><span>Cambio</span><strong>{{ result.change | currency:'COP':'symbol':'1.0-0' }}</strong></div>
             @if (result.discountTotal) { <div><span>Descuento</span><strong>{{ result.discountTotal | currency:'COP':'symbol':'1.0-0' }}</strong></div> }
-            @if (receipt(); as meta) { <div><span>Cliente</span><strong>{{ meta.customer }}</strong></div><div><span>Operador</span><strong>{{ meta.operator }}</strong></div><div><span>Productos</span><strong>{{ meta.items }} · {{ meta.units }} unidades</strong></div> }
+            @if (receipt(); as meta) { <div><span>Cliente</span><strong>{{ meta.customer }}</strong></div><div><span>Operador</span><strong>{{ meta.operator }}</strong></div><div><span>Productos</span><strong>{{ meta.items | number:'1.0-0' }} · {{ meta.units | number:'1.0-0' }} unidades</strong></div> }
           </div>
 
           <h3>Productos</h3>
@@ -44,7 +44,7 @@
             @for (line of result.lines; track line.id) {
               <div class="pos-sale-detail__row">
                 <div class="pos-sale-detail__description"><strong>{{ line.productName }}</strong><span>{{ line.productCode }}</span></div>
-                <div class="pos-sale-detail__values"><span>{{ line.quantity }} × {{ line.unitPrice | currency:'COP':'symbol':'1.0-0' }}</span><strong>{{ line.netAmount | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+                <div class="pos-sale-detail__values"><span>{{ line.quantity | number:'1.0-0' }} × {{ line.unitPrice | currency:'COP':'symbol':'1.0-0' }}</span><strong>{{ line.netAmount | currency:'COP':'symbol':'1.0-0' }}</strong></div>
               </div>
             } @empty { <p class="pos-sale-detail__empty">No hay productos para mostrar.</p> }
           </div>
@@ -93,7 +93,7 @@
             </div>
           </form>
           @if (loading()) { <p class="field-hint" role="status">Buscando…</p> }
-          @if (results().length) { <div id="catalog-results" class="search-results" role="listbox" aria-label="Resultados de búsqueda">@for (product of results(); track product.id; let i = $index) { <button class="catalog-result" type="button" role="option" [class.is-active]="i === activeIndex()" [attr.aria-selected]="i === activeIndex()" (click)="add(product)"><span><strong>{{ product.name }}</strong><small>{{ product.internalCode }} · {{ product.categoryName }} · {{ product.availableStock > 0 ? 'Disponible ' + product.availableStock : 'Agotado' }}</small></span><b>{{ product.retailPrice | currency:'COP':'symbol':'1.0-0' }}</b></button> }</div> }
+          @if (results().length) { <div id="catalog-results" class="search-results" role="listbox" aria-label="Resultados de búsqueda">@for (product of results(); track product.id; let i = $index) { <button class="catalog-result" type="button" role="option" [class.is-active]="i === activeIndex()" [attr.aria-selected]="i === activeIndex()" (click)="add(product)"><span><strong>{{ product.name }}</strong><small>{{ product.internalCode }} · {{ product.categoryName }} · {{ product.availableStock > 0 ? 'Disponible ' + (product.availableStock | number:'1.0-0') : 'Agotado' }}</small></span><b>{{ product.retailPrice | currency:'COP':'symbol':'1.0-0' }}</b></button> }</div> }
         </div>
         @if (feedback() && !error()) { <div class="inline-feedback" [class.inline-feedback--success]="feedbackKind() === 'success'" [class.inline-feedback--error]="feedbackKind() === 'error'" role="status" aria-live="polite"><span aria-hidden="true">{{ feedbackKind() === 'error' ? '!' : feedbackKind() === 'success' ? '✓' : 'i' }}</span>{{ feedback() }}</div> }
 
@@ -101,7 +101,7 @@
           <table aria-label="Carrito de venta"><thead><tr><th>Producto</th><th class="align-right">Cant.</th><th class="align-right">Tipo de precio</th><th class="align-right">Precio</th><th class="align-right">Desc.</th><th class="align-right">Subtotal</th></tr></thead>
             <tbody>@for (line of cart(); track line.product.id) {
               <tr tabindex="0" [id]="'line-' + line.product.id" [class.is-wholesale]="line.priceType === 'MAYORISTA'" [class.is-selected]="selectedProductId() === line.product.id" (click)="selectedProductId.set(line.product.id)" (focusin)="selectedProductId.set(line.product.id)"><td><strong>{{ line.product.name }}</strong><small>{{ line.product.internalCode }} · {{ line.product.measurementUnitCode }}</small></td>
-                <td class="align-right"><span class="quantity-control"><input [id]="'quantity-' + line.product.id" type="number" min="1" step="1" [max]="line.product.availableStock" [(ngModel)]="line.quantity" (ngModelChange)="update()" (change)="normalizeQuantity(line)" (keydown.enter)="$any($event.target).blur(); focusSearch()" [attr.aria-label]="'Cantidad de ' + line.product.name" [disabled]="locked"></span></td>
+                <td class="align-right"><span class="quantity-control"><input [id]="'quantity-' + line.product.id" type="text" cpNumberInput min="1" step="1" [max]="line.product.availableStock" [(ngModel)]="line.quantity" (ngModelChange)="update()" (change)="normalizeQuantity(line)" (keydown.enter)="$any($event.target).blur(); focusSearch()" [attr.aria-label]="'Cantidad de ' + line.product.name" [disabled]="locked"></span></td>
                 <td class="align-right"><select class="pos-select" [value]="line.priceType" (change)="onPriceTypeChange(line, $any($event.target))" [disabled]="locked" [attr.aria-label]="'Tipo de precio de ' + line.product.name">
                   <option value="MINORISTA">Minorista</option>
                   @if (line.product.wholesalePrice) { <option value="MAYORISTA" [disabled]="line.quantity < WHOLESALE_MIN" [title]="line.quantity < WHOLESALE_MIN ? 'El mayorista exige ' + WHOLESALE_MIN + ' o más unidades' : ''">Mayorista</option> }
@@ -135,7 +135,7 @@
         <div class="panel-heading"><h2>Resumen</h2></div>
         <dl class="totals-list"><div><dt>Subtotal</dt><dd>{{ subtotal | currency:'COP':'symbol':'1.0-0' }}</dd></div><div><dt>Descuentos</dt><dd class="success-text">-{{ discounts | currency:'COP':'symbol':'1.0-0' }}</dd></div></dl>
         <div class="grand-total"><span>TOTAL</span><strong>{{ estimate | currency:'COP':'symbol':'1.0-0' }}</strong></div>
-        <div class="summary-units"><strong>{{ cart().length }} productos</strong><span>Precios según catálogo</span></div>
+        <div class="summary-units"><strong>{{ cart().length | number:'1.0-0' }} productos</strong><span>Precios según catálogo</span></div>
         <button class="button button--primary button--full summary-card__charge" type="button" (click)="startCheckout()" [disabled]="!cart().length || !canSell || locked">{{ saleType() === 'CREDITO' ? 'Continuar crédito' : 'Cobrar · F9' }}</button>
         @if (canRequestCredit) { <div class="summary-card__alternatives"><button class="button button--secondary" type="button" (click)="startCreditSale()" [disabled]="!cart().length || !canSell || locked">Registrar crédito</button>@if (saleType() === 'CREDITO') { <button class="button button--secondary" type="button" (click)="startCashSale()" [disabled]="locked">Venta de contado</button> }</div> }
         <button class="link-button" type="button" (click)="showCancel.set(true)" [disabled]="!cart().length || locked">Cancelar venta</button>
@@ -151,7 +151,7 @@
           <div class="discount-sheet__backdrop" (click)="showCancel.set(false)"></div>
           <section class="discount-sheet__card">
             <h2 id="cancel-title">¿Cancelar esta venta?</h2>
-            <p>Se retirarán {{ cart().length }} productos del carrito, por {{ estimate | currency:'COP':'symbol':'1.0-0' }}. No hay un cobro registrado.</p>
+            <p>Se retirarán {{ cart().length | number:'1.0-0' }} productos del carrito, por {{ estimate | currency:'COP':'symbol':'1.0-0' }}. No hay un cobro registrado.</p>
             <div class="form-actions"><button class="button button--secondary" type="button" (click)="showCancel.set(false)">Continuar venta</button><button class="button button--danger" type="button" (click)="cancelSale()">Confirmar cancelación</button></div>
           </section>
         </div>
@@ -180,9 +180,9 @@
           @for (payment of activePaymentRows; track payment.code) {
             <fieldset class="payment-card" [disabled]="busy() || locked"><legend>Medio {{ $index + 1 }}</legend><div class="payment-card__grid">
               <div><label class="field-label" [for]="'method-' + payment.code">Medio</label><select class="text-field" [id]="'method-' + payment.code" [value]="payment.code" (change)="setPaymentMethod(payment.code, $any($event.target).value)"><option value="EFECTIVO" [disabled]="paymentUsed('EFECTIVO') && payment.code !== 'EFECTIVO'">Efectivo</option><option value="TRANSFERENCIA" [disabled]="paymentUsed('TRANSFERENCIA') && payment.code !== 'TRANSFERENCIA'">Transferencia</option><option value="NEQUI" [disabled]="paymentUsed('NEQUI') && payment.code !== 'NEQUI'">Nequi</option></select></div>
-              @if (payment.code === 'EFECTIVO') { <div><label class="field-label" for="cash-received">Efectivo entregado</label><div class="money-field"><span>$</span><input id="cash-received" type="number" min="0" step="1" [ngModel]="cashReceived" (ngModelChange)="onCashReceived($event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('EFECTIVO')">Efectivo exacto</button><div class="payment-result"><span>Aporta a la venta</span><strong>{{ cashApplied | currency:'COP':'symbol':'1.0-0' }}</strong><small>Cambio: {{ change | currency:'COP':'symbol':'1.0-0' }}</small></div></div> }
-              @if (payment.code === 'TRANSFERENCIA') { <div><label class="field-label" for="transfer-applied">Monto con este medio</label><div class="money-field"><span>$</span><input id="transfer-applied" type="number" min="0" step="1" [ngModel]="transferApplied" (ngModelChange)="onElectronicAmount('TRANSFERENCIA', $event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('TRANSFERENCIA')">Usar saldo pendiente</button></div><div class="payment-card__wide"><label class="field-label" for="transfer-reference">Referencia de transferencia <span>(opcional)</span></label><input id="transfer-reference" class="text-field" [(ngModel)]="transferReference" maxlength="100" placeholder="Número del comprobante, si está disponible"></div> }
-              @if (payment.code === 'NEQUI') { <div><label class="field-label" for="nequi-applied">Monto con este medio</label><div class="money-field"><span>$</span><input id="nequi-applied" type="number" min="0" step="1" [ngModel]="nequiApplied" (ngModelChange)="onElectronicAmount('NEQUI', $event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('NEQUI')">Usar saldo pendiente</button></div><div class="payment-card__wide"><label class="field-label" for="nequi-reference">Referencia de Nequi <span>(opcional)</span></label><input id="nequi-reference" class="text-field" [(ngModel)]="nequiReference" maxlength="100" placeholder="Número del comprobante, si está disponible"></div> }
+              @if (payment.code === 'EFECTIVO') { <div><label class="field-label" for="cash-received">Efectivo entregado</label><div class="money-field"><span>$</span><input id="cash-received" type="text" cpNumberInput min="0" step="1" [ngModel]="cashReceived" (ngModelChange)="onCashReceived($event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('EFECTIVO')">Efectivo exacto</button><div class="payment-result"><span>Aporta a la venta</span><strong>{{ cashApplied | currency:'COP':'symbol':'1.0-0' }}</strong><small>Cambio: {{ change | currency:'COP':'symbol':'1.0-0' }}</small></div></div> }
+              @if (payment.code === 'TRANSFERENCIA') { <div><label class="field-label" for="transfer-applied">Monto con este medio</label><div class="money-field"><span>$</span><input id="transfer-applied" type="text" cpNumberInput min="0" step="1" [ngModel]="transferApplied" (ngModelChange)="onElectronicAmount('TRANSFERENCIA', $event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('TRANSFERENCIA')">Usar saldo pendiente</button></div><div class="payment-card__wide"><label class="field-label" for="transfer-reference">Referencia de transferencia <span>(opcional)</span></label><input id="transfer-reference" class="text-field" [(ngModel)]="transferReference" maxlength="100" placeholder="Número del comprobante, si está disponible"></div> }
+              @if (payment.code === 'NEQUI') { <div><label class="field-label" for="nequi-applied">Monto con este medio</label><div class="money-field"><span>$</span><input id="nequi-applied" type="text" cpNumberInput min="0" step="1" [ngModel]="nequiApplied" (ngModelChange)="onElectronicAmount('NEQUI', $event)"><b>COP</b></div><button class="small-action" type="button" (click)="useRemaining('NEQUI')">Usar saldo pendiente</button></div><div class="payment-card__wide"><label class="field-label" for="nequi-reference">Referencia de Nequi <span>(opcional)</span></label><input id="nequi-reference" class="text-field" [(ngModel)]="nequiReference" maxlength="100" placeholder="Número del comprobante, si está disponible"></div> }
             </div>@if (activePayments().length > 1) { <button class="payment-card__remove" type="button" (click)="removePayment(payment.code)">Quitar medio</button> }</fieldset>
           }
         </div>

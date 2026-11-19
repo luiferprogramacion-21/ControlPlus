@@ -36,5 +36,5 @@ export function validateDiscount(discount: Discount, gross: number, maxPercent: 
 
 /** Short text for the screen: «10 %» or «$ 5.000». */
 export function describeDiscount(discount: Discount): string {
-  return discount.type === 'PORCENTAJE' ? `${discount.value} %` : cop(discount.value);
+  return discount.type === 'PORCENTAJE' ? `${discount.value.toLocaleString('es-CO')} %` : cop(discount.value);
 }

@@ -1,3 +1,4 @@
+import { NumberInput } from '../../shared/number-input';
 import { A11yModule } from '@angular/cdk/a11y';
 import { CurrencyPipe } from '@angular/common';
 import { Component, input, OnInit, output } from '@angular/core';
@@ -7,7 +8,7 @@ import { describeDiscount, Discount, discountAmount, maxDiscountAmount, validate
 export interface DiscountApplied { discount: Discount; reason: string; }
 
 /** Floating window to apply a discount, by percentage or by value, to a product or to the whole sale. */
-@Component({ selector: 'cp-discount-dialog', imports: [FormsModule, A11yModule, CurrencyPipe], templateUrl: './discount-dialog.html', styles: [`
+@Component({ selector: 'cp-discount-dialog', imports: [NumberInput, FormsModule, A11yModule, CurrencyPipe], templateUrl: './discount-dialog.html', styles: [`
   .discount-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border-radius: 10px; background: var(--cp-table-head); }
   .discount-mode__option { min-height: 40px; border: 0; border-radius: 8px; background: transparent; color: var(--cp-text-secondary); font: inherit; font-weight: 600; cursor: pointer; }
   .discount-mode__option.is-active { background: var(--cp-surface); color: var(--cp-primary); box-shadow: 0 1px 3px rgb(22 34 47 / 18%); }

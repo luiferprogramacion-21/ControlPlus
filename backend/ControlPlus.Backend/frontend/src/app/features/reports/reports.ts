@@ -1,3 +1,4 @@
+import { groupedNumber } from '../../shared/number-input';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
@@ -112,7 +113,7 @@ export class Reports implements OnInit {
   }
   missingText(report: SalesOverview): string {
     const lines = report.missingCostLines + report.missingMovementLines;
-    return lines > 0 ? `Faltan costos históricos en ${lines} ${lines === 1 ? 'línea' : 'líneas'}.` : 'Faltan costos históricos.';
+    return lines > 0 ? `Faltan costos históricos en ${groupedNumber(lines)} ${lines === 1 ? 'línea' : 'líneas'}.` : 'Faltan costos históricos.';
   }
   origin(code: string): string { return originLabel(code); }
   method(code: string | null): string { return methodLabel(code); }

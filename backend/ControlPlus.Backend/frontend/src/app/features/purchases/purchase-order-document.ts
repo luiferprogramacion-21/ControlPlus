@@ -15,7 +15,7 @@ const supplierDocument = (supplier: Supplier): string => supplier.documentNumber
 /** Builds the supplier-facing purchase order generated when an order is sent. */
 export function buildPurchaseOrderHtml(order: Order, supplier: Supplier, operatorName = '', establishment?: Establishment | null): string {
   const rows = order.lines.map((line, index) => `<tr>
-    <td class="index">${index + 1}</td>
+    <td class="index">${(index + 1).toLocaleString('es-CO')}</td>
     <td><strong>${escapeHtml(line.productName)}</strong><small>${escapeHtml(line.productCode)}</small></td>
     <td class="quantity">${line.requestedQuantity.toLocaleString('es-CO')}</td>
     <td>${line.observation ? escapeHtml(line.observation) : '—'}</td>
@@ -41,9 +41,9 @@ td { padding: 10px; border-bottom: 1px solid #d9e1eb; vertical-align: top; } td 
 footer { position: fixed; right: 0; bottom: 0; left: 0; color: #718096; font-size: 9px; text-align: center; }
 </style></head><body>
 <header><div class="brand">${escapeHtml(businessName)}<small>ControlPlus · Pedido a proveedor${businessContact ? `<br>${businessContact}` : ''}</small></div><div class="document"><h1>Pedido de compra</h1><strong>${escapeHtml(order.visibleNumber)}</strong><div>${escapeHtml(formatDate(order.sentAt ?? order.createdAt))}</div></div></header>
-<section class="meta"><div class="card"><span class="label">Proveedor</span><b>${escapeHtml(supplier.name)}</b><p>${escapeHtml(supplierDocument(supplier))}${contact ? `<br>${contact}` : ''}</p></div><div class="card"><span class="label">Información del pedido</span><b>${order.lines.length} producto(s) · ${totalUnits.toLocaleString('es-CO')} unidades</b><p>Estado: Enviado${operatorName ? `<br>Generado por ${escapeHtml(operatorName)}` : ''}</p></div></section>
+<section class="meta"><div class="card"><span class="label">Proveedor</span><b>${escapeHtml(supplier.name)}</b><p>${escapeHtml(supplierDocument(supplier))}${contact ? `<br>${contact}` : ''}</p></div><div class="card"><span class="label">Información del pedido</span><b>${order.lines.length.toLocaleString('es-CO')} producto(s) · ${totalUnits.toLocaleString('es-CO')} unidades</b><p>Estado: Enviado${operatorName ? `<br>Generado por ${escapeHtml(operatorName)}` : ''}</p></div></section>
 <table><thead><tr><th>#</th><th>Producto</th><th class="quantity">Cantidad</th><th>Observación</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="summary"><span>Total de productos <strong>${order.lines.length}</strong></span><span>Total de unidades <strong>${totalUnits.toLocaleString('es-CO')}</strong></span></div>
+<div class="summary"><span>Total de productos <strong>${order.lines.length.toLocaleString('es-CO')}</strong></span><span>Total de unidades <strong>${totalUnits.toLocaleString('es-CO')}</strong></span></div>
 <section class="signatures"><div class="signature">Elaboró</div><div class="signature">Recibido por el proveedor</div></section>
 <footer>Documento generado por ControlPlus · ${escapeHtml(order.visibleNumber)}</footer>
 </body></html>`;

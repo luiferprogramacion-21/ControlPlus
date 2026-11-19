@@ -1,3 +1,4 @@
+import { NumberInput } from '../../shared/number-input';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
@@ -7,7 +8,7 @@ import { toastSignal } from '../../core/toast';
 /** Reglas de cambios, apartados, créditos y mayorista, en tarjetas (rediseño aprobado el 19 de noviembre de 2026). Solo afectan lo que se registre después. */
 @Component({
   selector: 'cp-settings-panel',
-  imports: [FormsModule],
+  imports: [NumberInput, FormsModule],
   template: `
     @if (loadError()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ loadError() }} <button class="link-button" type="button" (click)="load()">Reintentar</button></div> }
 
@@ -18,7 +19,7 @@ import { toastSignal } from '../../core/toast';
         @if (policy(); as current) {
           <form class="rule-card__body" (submit)="$event.preventDefault(); savePolicy()">
             <label class="rule-field"><span class="rule-field__label">Plazo para cambios</span>
-              <span class="rule-input"><input id="change-days" name="changeDays" type="number" min="1" step="1" [(ngModel)]="days"><b>días</b></span></label>
+              <span class="rule-input"><input id="change-days" name="changeDays" type="text" cpNumberInput min="1" step="1" [(ngModel)]="days"><b>días</b></span></label>
             <p class="rule-note">Cada venta conserva el plazo con el que se registró.</p>
             @if (policyError()) { <p class="field-error" role="alert">{{ policyError() }}</p> }
             <div class="rule-card__foot"><button class="button button--primary" type="submit" [disabled]="savingPolicy() || Number(days) === current.days">{{ savingPolicy() ? 'Guardando…' : 'Guardar' }}</button></div>
@@ -34,13 +35,13 @@ import { toastSignal } from '../../core/toast';
             <label class="rule-switch"><input id="layaway-require-minimum" type="checkbox" role="switch" name="requireMinimum" [(ngModel)]="requireMinimum"><span class="rule-switch__track" aria-hidden="true"></span><span>Exigir un pago inicial mínimo</span></label>
             @if (requireMinimum) {
               <label class="rule-field rule-field--nested"><span class="rule-field__label">Pago inicial mínimo</span>
-                <span class="rule-input"><input id="layaway-percentage" name="layawayPercentage" type="number" min="0.01" max="100" step="0.01" [(ngModel)]="percentage"><b>% del total</b></span></label>
+                <span class="rule-input"><input id="layaway-percentage" name="layawayPercentage" type="text" cpNumberInput min="0.01" max="100" step="0.01" [(ngModel)]="percentage"><b>% del total</b></span></label>
             } @else { <p class="rule-note rule-note--nested">El pago inicial puede ser cualquier valor desde $1.</p> }
             <div class="rule-divider"></div>
             <label class="rule-switch"><input type="checkbox" role="switch" name="chooseEachDate" [(ngModel)]="chooseEachDate"><span class="rule-switch__track" aria-hidden="true"></span><span>Elegir la fecha límite en cada apartado</span></label>
             @if (!chooseEachDate) {
               <label class="rule-field rule-field--nested"><span class="rule-field__label">Plazo para retirar</span>
-                <span class="rule-input"><input id="layaway-days" name="layawayDays" type="number" min="1" max="365" step="1" [(ngModel)]="layawayDays"><b>días</b></span></label>
+                <span class="rule-input"><input id="layaway-days" name="layawayDays" type="text" cpNumberInput min="1" max="365" step="1" [(ngModel)]="layawayDays"><b>días</b></span></label>
             }
             <p class="rule-note">Los apartados existentes conservan lo que tenían al crearse.</p>
             @if (layawayError()) { <p class="field-error" role="alert">{{ layawayError() }}</p> }
@@ -57,7 +58,7 @@ import { toastSignal } from '../../core/toast';
             <label class="rule-switch"><input type="checkbox" role="switch" name="creditChooseEachTime" [(ngModel)]="creditChooseEachTime"><span class="rule-switch__track" aria-hidden="true"></span><span>Elegir el vencimiento en cada venta</span></label>
             @if (!creditChooseEachTime) {
               <label class="rule-field rule-field--nested"><span class="rule-field__label">Vencimiento sugerido</span>
-                <span class="rule-input"><input id="credit-days" name="creditDays" type="number" min="1" max="90" step="1" [(ngModel)]="creditDays"><b>días</b></span></label>
+                <span class="rule-input"><input id="credit-days" name="creditDays" type="text" cpNumberInput min="1" max="90" step="1" [(ngModel)]="creditDays"><b>días</b></span></label>
             }
             <p class="rule-note">Quien vende puede cambiar la fecha entre mañana y 90 días.</p>
             <div class="rule-divider"></div>
@@ -76,7 +77,7 @@ import { toastSignal } from '../../core/toast';
         @if (sales(); as current) {
           <form class="rule-card__body" (submit)="$event.preventDefault(); saveSales()">
             <label class="rule-field"><span class="rule-field__label">Mínimo para mayorista</span>
-              <span class="rule-input"><input id="wholesale-minimum" name="wholesaleMinimum" type="number" min="1" max="999" step="1" [(ngModel)]="wholesaleMinimum"><b>unidades</b></span></label>
+              <span class="rule-input"><input id="wholesale-minimum" name="wholesaleMinimum" type="text" cpNumberInput min="1" max="999" step="1" [(ngModel)]="wholesaleMinimum"><b>unidades</b></span></label>
             <p class="rule-note">Aplica en ventas, apartados y cambios. Lo ya registrado no cambia.</p>
             @if (salesError()) { <p class="field-error" role="alert">{{ salesError() }}</p> }
             <div class="rule-card__foot"><button class="button button--primary" type="submit" [disabled]="savingSales() || Number(wholesaleMinimum) === current.wholesaleMinimumQuantity">{{ savingSales() ? 'Guardando…' : 'Guardar' }}</button></div>

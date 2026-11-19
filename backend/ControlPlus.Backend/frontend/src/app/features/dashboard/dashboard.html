@@ -23,7 +23,7 @@
         <span class="dashboard-metric__badge dashboard-metric__badge--success" aria-hidden="true">$</span>
       </article>
       <article class="dashboard-metric">
-        <div><span>Transacciones</span><strong>{{ data.totalSales.transactions }}</strong><small>Promedio: {{ averageTicket(data) }}</small></div>
+        <div><span>Transacciones</span><strong>{{ number(data.totalSales.transactions) }}</strong><small>Promedio: {{ averageTicket(data) }}</small></div>
         <span class="dashboard-metric__badge dashboard-metric__badge--info" aria-hidden="true">#</span>
       </article>
       <article class="dashboard-metric">
@@ -37,7 +37,7 @@
       <article class="dashboard-metric">
         <div>
           <span>Productos con alerta</span>
-          <strong>{{ data.alerts.lowStockProducts }}</strong>
+          <strong>{{ number(data.alerts.lowStockProducts) }}</strong>
           @if (data.alerts.lowStockProducts > 0 && canOpenInventory) {
             <a class="dashboard-link dashboard-metric__attention" routerLink="/operacion/inventario" [queryParams]="lowStockQuery">Requieren revisión · Ver productos</a>
           } @else if (data.alerts.lowStockProducts > 0) { <small class="dashboard-metric__attention">Requieren revisión</small> }

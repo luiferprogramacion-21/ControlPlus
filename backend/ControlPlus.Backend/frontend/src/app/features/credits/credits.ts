@@ -1,3 +1,4 @@
+import { NumberInput } from '../../shared/number-input';
 import { A11yModule } from '@angular/cdk/a11y';
 import { DatePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
@@ -15,7 +16,7 @@ import { toastSignal } from '../../core/toast';
 type Method = PaymentMethodInput['methodCode'];
 type Draft = { methodCode: Method; appliedAmount: number; receivedAmount: number | null; reference: string; };
 const LIMIT = Number.MAX_SAFE_INTEGER;
-@Component({ selector: 'cp-credits', imports: [A11yModule, DatePipe, FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './credits.html', styleUrls: ['../directory.scss', './credits.scss'] })
+@Component({ selector: 'cp-credits', imports: [NumberInput, A11yModule, DatePipe, FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './credits.html', styleUrls: ['../directory.scss', './credits.scss'] })
 export class Credits implements OnInit {
   private readonly api = inject(CreditsApi);
   private readonly customersApi = inject(CustomersApi);

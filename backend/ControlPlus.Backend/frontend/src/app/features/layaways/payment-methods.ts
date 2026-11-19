@@ -1,3 +1,4 @@
+import { NumberInput } from '../../shared/number-input';
 import { Component, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -55,7 +56,7 @@ export const toRefunds = (drafts: PaymentDraft[]) => drafts.map(d => ({
 /** Editable list of up to three distinct payment methods; it edits the array it receives in place. */
 @Component({
   selector: 'cp-payment-methods',
-  imports: [FormsModule],
+  imports: [NumberInput, FormsModule],
   template: `
     @for (draft of drafts; track $index; let i = $index) {
       <div class="payment-row">
@@ -64,11 +65,11 @@ export const toRefunds = (drafts: PaymentDraft[]) => drafts.map(d => ({
           <option value="EFECTIVO">Efectivo</option><option value="TRANSFERENCIA">Transferencia</option><option value="NEQUI">Nequi</option>
         </select>
         <label class="field-label field-label--spaced" [for]="idPrefix + '-amount-' + i">{{ mode === 'refund' ? 'Valor a devolver' : 'Valor del abono' }}</label>
-        <input class="text-field" [id]="idPrefix + '-amount-' + i" [name]="idPrefix + '-amount-' + i" type="number" min="1" step="1" [(ngModel)]="draft.appliedAmount">
+        <input class="text-field" [id]="idPrefix + '-amount-' + i" [name]="idPrefix + '-amount-' + i" type="text" cpNumberInput min="1" step="1" [(ngModel)]="draft.appliedAmount">
         @if (draft.methodCode === 'EFECTIVO') {
           @if (mode === 'payment') {
             <label class="field-label field-label--spaced" [for]="idPrefix + '-received-' + i">Efectivo recibido</label>
-            <input class="text-field" [id]="idPrefix + '-received-' + i" [name]="idPrefix + '-received-' + i" type="number" min="1" step="1" [(ngModel)]="draft.receivedAmount">
+            <input class="text-field" [id]="idPrefix + '-received-' + i" [name]="idPrefix + '-received-' + i" type="text" cpNumberInput min="1" step="1" [(ngModel)]="draft.receivedAmount">
           }
         } @else {
           <label class="field-label field-label--spaced" [for]="idPrefix + '-reference-' + i">Referencia</label>

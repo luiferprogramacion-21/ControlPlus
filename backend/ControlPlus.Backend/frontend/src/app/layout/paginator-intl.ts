@@ -1,3 +1,4 @@
+import { groupedNumber } from '../shared/number-input';
 import { Injectable, Provider } from '@angular/core';
 import { MatPaginatorIntl } from '@angular/material/paginator';
 
@@ -10,12 +11,12 @@ export class SpanishPaginatorIntl extends MatPaginatorIntl {
   override lastPageLabel = 'Última página';
 
   override getRangeLabel = (page: number, pageSize: number, length: number): string => {
-    if (length === 0 || pageSize === 0) return `0 de ${length}`;
+    if (length === 0 || pageSize === 0) return `0 de ${groupedNumber(length)}`;
     const total = Math.max(length, 0);
     const start = page * pageSize;
-    if (start >= total) return `${total} de ${total}`;
+    if (start >= total) return `${groupedNumber(total)} de ${groupedNumber(total)}`;
     const end = Math.min(start + pageSize, total);
-    return `${start + 1}–${end} de ${total}`;
+    return `${groupedNumber(start + 1)}–${groupedNumber(end)} de ${groupedNumber(total)}`;
   };
 }
 

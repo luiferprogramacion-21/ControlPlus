@@ -8,6 +8,11 @@ const receipt: SaleReceipt = {
 };
 
 describe('ticket', () => {
+  it('separa los miles de las cantidades sin modificar códigos del comprobante', () => {
+    const html = buildTicketHtml({ ...receipt, lines: [{ ...receipt.lines[0], quantity: 1234 }] });
+    expect(html).toContain('1.234 x $ 27.500');
+    expect(html).toContain('VTA-001-000010');
+  });
   it('escapa el HTML de los datos dinámicos', () => {
     expect(escapeHtml(`<a href="x">&'</a>`)).toBe('&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;');
     const html = buildTicketHtml(receipt);

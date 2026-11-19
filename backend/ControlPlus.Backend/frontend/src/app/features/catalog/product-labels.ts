@@ -1,4 +1,5 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { groupedNumber, NumberInput } from '../../shared/number-input';
+import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, ElementRef, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -23,7 +24,7 @@ interface PrintAttempt {
 
 @Component({
   selector: 'cp-product-labels',
-  imports: [CurrencyPipe, DatePipe, FormsModule, Icon, RouterLink],
+  imports: [NumberInput, DecimalPipe, CurrencyPipe, DatePipe, FormsModule, Icon, RouterLink],
   templateUrl: './product-labels.html',
   styleUrl: './product-labels.scss',
 })
@@ -201,7 +202,7 @@ export class ProductLabels implements OnInit {
     this.printing.set(true); this.error.set(''); this.notice.set('');
     try {
       const job = await this.api.queue(input, this.attempt.key);
-      this.notice.set(`${job.labelCount} etiqueta${job.labelCount === 1 ? '' : 's'} enviada${job.labelCount === 1 ? '' : 's'} a ${job.profileName}. “Impreso” confirmará que la cola de Windows aceptó el trabajo.`);
+      this.notice.set(`${groupedNumber(job.labelCount)} etiqueta${job.labelCount === 1 ? '' : 's'} enviada${job.labelCount === 1 ? '' : 's'} a ${job.profileName}. “Impreso” confirmará que la cola de Windows aceptó el trabajo.`);
       if (this.sourceReceipt()) { this.sourceReceipt.set(null); this.selected.set([]); this.receipts.set(null); }
       this.attempt = null;
     } catch (error) {

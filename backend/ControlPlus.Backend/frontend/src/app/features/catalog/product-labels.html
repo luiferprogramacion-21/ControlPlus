@@ -15,11 +15,11 @@
       @if (loadingReceipts()) { <p class="muted" role="status">Consultando recepciones…</p> }
       <div class="labels-table-wrap"><table><thead><tr><th>Compra / recepción</th><th>Proveedor</th><th>Fecha</th><th class="align-right">Etiquetas pendientes</th><th class="align-right">Acción</th></tr></thead><tbody>
         @for (receipt of receipts()?.items ?? []; track receipt.purchaseId) {
-          <tr><td><strong>{{ receipt.visibleNumber }}</strong></td><td>{{ receipt.supplierName }}</td><td>{{ receipt.receivedAtUtc | date:'dd/MM/yyyy HH:mm' }}</td><td class="align-right numeric">{{ receipt.pendingLabelCount }}</td><td class="align-right"><button class="table-action" type="button" (click)="prepareReceipt(receipt)">Preparar etiquetas</button></td></tr>
+          <tr><td><strong>{{ receipt.visibleNumber }}</strong></td><td>{{ receipt.supplierName }}</td><td>{{ receipt.receivedAtUtc | date:'dd/MM/yyyy HH:mm' }}</td><td class="align-right numeric">{{ receipt.pendingLabelCount | number:'1.0-0' }}</td><td class="align-right"><button class="table-action" type="button" (click)="prepareReceipt(receipt)">Preparar etiquetas</button></td></tr>
         } @empty { @if (!loadingReceipts()) { <tr class="empty-row"><td colspan="5"><strong>Sin etiquetas pendientes</strong><small>No hay mercancía recibida pendiente de preparar etiquetas.</small></td></tr> } }
       </tbody></table></div>
       @if (receipts(); as page) {
-        <div class="labels-pager"><span>{{ page.totalCount }} recepción{{ page.totalCount === 1 ? '' : 'es' }}</span><div><button class="button button--secondary" type="button" [disabled]="loadingReceipts() || page.page <= 1" (click)="showReceipts(page.page - 1)">Anterior</button><span>Página {{ page.page }} de {{ page.totalPages || 1 }}</span><button class="button button--secondary" type="button" [disabled]="loadingReceipts() || page.page >= page.totalPages" (click)="showReceipts(page.page + 1)">Siguiente</button></div></div>
+        <div class="labels-pager"><span>{{ page.totalCount | number:'1.0-0' }} recepción{{ page.totalCount === 1 ? '' : 'es' }}</span><div><button class="button button--secondary" type="button" [disabled]="loadingReceipts() || page.page <= 1" (click)="showReceipts(page.page - 1)">Anterior</button><span>Página {{ page.page | number:'1.0-0' }} de {{ page.totalPages || 1 | number:'1.0-0' }}</span><button class="button button--secondary" type="button" [disabled]="loadingReceipts() || page.page >= page.totalPages" (click)="showReceipts(page.page + 1)">Siguiente</button></div></div>
       }
     </section>
   } @else if (tab() === 'jobs') {
@@ -28,10 +28,10 @@
       @if (loadingJobs()) { <p class="muted" role="status">Consultando trabajos…</p> }
       <div class="labels-table-wrap"><table><thead><tr><th>Fecha</th><th>Impresora</th><th class="align-right">Etiquetas</th><th>Estado</th><th>Origen</th><th class="align-right">Acción</th></tr></thead><tbody>
         @for (job of jobs()?.items ?? []; track job.jobId) {
-          <tr><td>{{ job.requestedAtUtc | date:'dd/MM/yyyy HH:mm' }}</td><td><strong>{{ job.profileName }}</strong></td><td class="align-right numeric">{{ job.labelCount }}</td><td><span class="status-pill" [class.status-pill--warning]="job.status === 'ERROR' || job.status === 'IMPRIMIENDO'">{{ jobStatus(job.status) }}</span>@if (job.error) { <small class="label-job-error">{{ job.error }}</small> }@if (job.status === 'IMPRIMIENDO') { <small class="label-job-error">Si no cambia, revisa la cola de Windows antes de imprimir otra copia.</small> }</td><td>{{ job.sourcePurchaseId ? 'Recepción' : 'Selección manual' }}</td><td class="align-right">@if (job.status === 'ERROR') { <button class="table-action" type="button" [disabled]="!!retryingJob()" (click)="retryJob(job)">{{ retryingJob() === job.jobId ? 'Reintentando…' : 'Reintentar lote' }}</button> }</td></tr>
+          <tr><td>{{ job.requestedAtUtc | date:'dd/MM/yyyy HH:mm' }}</td><td><strong>{{ job.profileName }}</strong></td><td class="align-right numeric">{{ job.labelCount | number:'1.0-0' }}</td><td><span class="status-pill" [class.status-pill--warning]="job.status === 'ERROR' || job.status === 'IMPRIMIENDO'">{{ jobStatus(job.status) }}</span>@if (job.error) { <small class="label-job-error">{{ job.error }}</small> }@if (job.status === 'IMPRIMIENDO') { <small class="label-job-error">Si no cambia, revisa la cola de Windows antes de imprimir otra copia.</small> }</td><td>{{ job.sourcePurchaseId ? 'Recepción' : 'Selección manual' }}</td><td class="align-right">@if (job.status === 'ERROR') { <button class="table-action" type="button" [disabled]="!!retryingJob()" (click)="retryJob(job)">{{ retryingJob() === job.jobId ? 'Reintentando…' : 'Reintentar lote' }}</button> }</td></tr>
         } @empty { @if (!loadingJobs()) { <tr class="empty-row"><td colspan="6"><strong>Sin trabajos de etiquetas</strong><small>Los lotes enviados a impresión aparecerán aquí.</small></td></tr> } }
       </tbody></table></div>
-      @if (jobs(); as page) { <div class="labels-pager"><span>{{ page.totalCount }} trabajo{{ page.totalCount === 1 ? '' : 's' }}</span><div><button class="button button--secondary" type="button" [disabled]="loadingJobs() || page.page <= 1" (click)="showJobs(page.page - 1)">Anterior</button><span>Página {{ page.page }} de {{ page.totalPages || 1 }}</span><button class="button button--secondary" type="button" [disabled]="loadingJobs() || page.page >= page.totalPages" (click)="showJobs(page.page + 1)">Siguiente</button></div></div> }
+      @if (jobs(); as page) { <div class="labels-pager"><span>{{ page.totalCount | number:'1.0-0' }} trabajo{{ page.totalCount === 1 ? '' : 's' }}</span><div><button class="button button--secondary" type="button" [disabled]="loadingJobs() || page.page <= 1" (click)="showJobs(page.page - 1)">Anterior</button><span>Página {{ page.page | number:'1.0-0' }} de {{ page.totalPages || 1 | number:'1.0-0' }}</span><button class="button button--secondary" type="button" [disabled]="loadingJobs() || page.page >= page.totalPages" (click)="showJobs(page.page + 1)">Siguiente</button></div></div> }
     </section>
   } @else {
   <section class="panel labels-shell" aria-labelledby="labels-title">
@@ -56,10 +56,10 @@
         }
         <div class="labels-table-wrap"><table><thead><tr><th>Producto</th><th>Código</th><th class="align-right">Etiquetas</th><th class="align-right">Acción</th></tr></thead><tbody>
           @for (item of selected(); track item.product.id) {
-            <tr><td><strong>{{ item.product.name }}</strong></td><td class="numeric">{{ item.product.barcode }}</td><td class="align-right"><input class="label-quantity" type="number" min="1" [max]="maximumFor(item.product.id)" step="1" [disabled]="printing()" [ngModel]="item.quantity" (ngModelChange)="changeQuantity(item.product.id, $event)" [attr.aria-label]="'Etiquetas de ' + item.product.name"></td><td class="align-right"><button class="table-action" type="button" [disabled]="printing()" (click)="remove(item.product.id)">Quitar</button></td></tr>
+            <tr><td><strong>{{ item.product.name }}</strong></td><td class="numeric">{{ item.product.barcode }}</td><td class="align-right"><input class="label-quantity" type="text" cpNumberInput min="1" [max]="maximumFor(item.product.id)" step="1" [disabled]="printing()" [ngModel]="item.quantity" (ngModelChange)="changeQuantity(item.product.id, $event)" [attr.aria-label]="'Etiquetas de ' + item.product.name"></td><td class="align-right"><button class="table-action" type="button" [disabled]="printing()" (click)="remove(item.product.id)">Quitar</button></td></tr>
           } @empty { <tr class="empty-row"><td colspan="4"><strong>Sin productos</strong><small>Busca o escanea el primer producto para preparar el lote.</small></td></tr> }
         </tbody></table></div>
-        <div class="labels-selection-footer"><strong>{{ totalLabels() }} etiqueta{{ totalLabels() === 1 ? '' : 's' }} en total</strong>@if (!sourceReceipt()) { <button class="button button--secondary" type="button" (click)="showProducts()">Agregar otro producto</button> }</div>
+        <div class="labels-selection-footer"><strong>{{ totalLabels() | number:'1.0-0' }} etiqueta{{ totalLabels() === 1 ? '' : 's' }} en total</strong>@if (!sourceReceipt()) { <button class="button button--secondary" type="button" (click)="showProducts()">Agregar otro producto</button> }</div>
       </section>
 
       <aside class="labels-preview" aria-labelledby="preview-title">
@@ -78,7 +78,7 @@
         } @else { <div class="product-label-preview product-label-preview--empty">La primera etiqueta aparecerá aquí.</div> }
         <p class="active-profile"><strong>Perfil activo:</strong> {{ selectedProfile()?.labelTemplateName || 'Ninguno' }}</p>
         @if (!profiles().length && !loading()) { <p class="profile-help">El Administrador debe crear en Configuración un perfil de tipo Etiquetas o Híbrida.</p> }
-        <button class="button button--primary print-labels" type="button" (click)="print()" [disabled]="printing() || !selected().length || !selectedProfileId()">{{ printing() ? 'Enviando…' : 'Imprimir ' + totalLabels() + ' etiqueta' + (totalLabels() === 1 ? '' : 's') }}</button>
+        <button class="button button--primary print-labels" type="button" (click)="print()" [disabled]="printing() || !selected().length || !selectedProfileId()">{{ printing() ? 'Enviando…' : 'Imprimir ' + (totalLabels() | number:'1.0-0') + ' etiqueta' + (totalLabels() === 1 ? '' : 's') }}</button>
       </aside>
     </div>
   </section>

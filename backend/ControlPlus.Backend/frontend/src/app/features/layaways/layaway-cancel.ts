@@ -1,3 +1,4 @@
+import { NumberInput } from '../../shared/number-input';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -11,7 +12,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
 
 @Component({
   selector: 'cp-layaway-cancel',
-  imports: [FormsModule, PaymentMethods],
+  imports: [NumberInput, FormsModule, PaymentMethods],
   templateUrl: './layaway-cancel.html',
   styleUrl: './layaways.scss',
 })

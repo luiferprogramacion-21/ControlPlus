@@ -15,7 +15,7 @@
     <label class="field-label field-label--spaced" for="discount-amount">{{ type === 'PORCENTAJE' ? 'Porcentaje a descontar' : 'Valor a descontar' }}</label>
     <div class="money-field">
       <span>{{ type === 'PORCENTAJE' ? '%' : '$' }}</span>
-      <input id="discount-amount" name="discountValue" type="number" min="0" [step]="type === 'PORCENTAJE' ? 0.5 : 1" [ngModel]="value" (ngModelChange)="value = $event; error = ''" cdkFocusInitial autocomplete="off">
+      <input id="discount-amount" name="discountValue" type="text" cpNumberInput min="0" [step]="type === 'PORCENTAJE' ? 0.5 : 1" [ngModel]="value" (ngModelChange)="value = $event; error = ''" cdkFocusInitial autocomplete="off">
       <b>{{ type === 'PORCENTAJE' ? 'del valor' : 'COP' }}</b>
     </div>
     <p class="discount-hint">{{ limitText }}</p>

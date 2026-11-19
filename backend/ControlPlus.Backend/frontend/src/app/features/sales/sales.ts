@@ -1,6 +1,7 @@
+import { groupedNumber, NumberInput } from '../../shared/number-input';
 import { A11yModule } from '@angular/cdk/a11y';
 import { Component, effect, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, untracked, ViewChild } from '@angular/core';
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -28,7 +29,7 @@ const DRAFT_DELAY_MS = 1200;
 const PRINT_WATCH_INTERVAL_MS = 1500;
 const PRINT_WATCH_ATTEMPTS = 20;
 
-@Component({ selector: 'cp-sales', imports: [A11yModule, FormsModule, CurrencyPipe, DatePipe, MatButtonModule, RouterLink, CustomerPicker, DiscountDialog], templateUrl: './sales.html', styleUrl: './sales.scss' })
+@Component({ selector: 'cp-sales', imports: [NumberInput, DecimalPipe, A11yModule, FormsModule, CurrencyPipe, DatePipe, MatButtonModule, RouterLink, CustomerPicker, DiscountDialog], templateUrl: './sales.html', styleUrl: './sales.scss' })
 export class Sales implements OnInit, OnDestroy {
   private readonly catalog = inject(CatalogApi);
   private readonly cash = inject(CashApi);
@@ -202,8 +203,8 @@ export class Sales implements OnInit, OnDestroy {
       this.cart.set(usable.map(({ line, product }) => ({ product, quantity: Math.min(line.quantity, product.availableStock),
         priceType: line.priceType, discount: line.discount })));
       this.feedbackKind.set('success');
-      this.feedback.set(`Venta recuperada: ${usable.length} ${usable.length === 1 ? 'producto' : 'productos'}.` +
-        (removed ? ` ${removed} ya no ${removed === 1 ? 'está disponible y se quitó' : 'están disponibles y se quitaron'}.` : '') + customerNote +
+      this.feedback.set(`Venta recuperada: ${groupedNumber(usable.length)} ${usable.length === 1 ? 'producto' : 'productos'}.` +
+        (removed ? ` ${groupedNumber(removed)} ya no ${removed === 1 ? 'está disponible y se quitó' : 'están disponibles y se quitaron'}.` : '') + customerNote +
         (this.needsConcessionAuthorization ? ' El descuento o el precio mayorista se autorizan de nuevo al cobrar.' : ''));
     } catch (error) { this.error.set(errorText(error)); }
     finally {
@@ -403,7 +404,7 @@ export class Sales implements OnInit, OnDestroy {
     const risk = this.creditRisk(); if (!risk) return '';
     const money = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
     const parts: string[] = [];
-    if (risk.overdue) parts.push(`tiene ${money(risk.overdueBalance)} vencidos en ${risk.overdueCredits} ${risk.overdueCredits === 1 ? 'crédito' : 'créditos'}`);
+    if (risk.overdue) parts.push(`tiene ${money(risk.overdueBalance)} vencidos en ${groupedNumber(risk.overdueCredits)} ${risk.overdueCredits === 1 ? 'crédito' : 'créditos'}`);
     if (risk.exceedsLimit && risk.creditLimit !== null) parts.push(`supera su cupo de ${money(risk.creditLimit)} (disponible ${money(risk.availableCredit ?? 0)}, debe ${money(risk.outstandingBalance)})`);
     return `El cliente ${parts.join(' y ')}.`;
   }
@@ -423,7 +424,7 @@ export class Sales implements OnInit, OnDestroy {
     if (type === 'MAYORISTA') {
       if (!line.product.wholesalePrice) { this.error.set(`${line.product.name} no tiene precio mayorista.`); return false; }
       if (Number(line.quantity) < this.WHOLESALE_MIN) { this.error.set(`El precio mayorista exige ${this.WHOLESALE_MIN} o más unidades de ${line.product.name}.`); return false; }
-      if (!await this.authorizeConcession('WHOLESALE', `${line.product.name} · ${line.quantity} unidades`)) return false;
+      if (!await this.authorizeConcession('WHOLESALE', `${line.product.name} · ${groupedNumber(line.quantity)} unidades`)) return false;
     }
     const losesDiscount = type === 'MAYORISTA' && (!!line.discount || !!this.generalDiscount);
     line.priceType = type; line.discount = null;
@@ -587,14 +588,14 @@ export class Sales implements OnInit, OnDestroy {
     if (this.locked) return;
     if (!product.isActive || product.availableStock < 1) { this.error.set(`${product.name ?? 'El producto'} está agotado o inactivo.`); return; }
     const lines = this.cart(); const existing = lines.find(line => line.product.id === product.id && line.priceType === 'MINORISTA' && !line.discount);
-    if (existing && existing.quantity + 1 > product.availableStock) { this.error.set(`Solo hay ${product.availableStock} unidades disponibles de ${product.name}.`); return; }
+    if (existing && existing.quantity + 1 > product.availableStock) { this.error.set(`Solo hay ${groupedNumber(product.availableStock)} unidades disponibles de ${product.name}.`); return; }
     if (existing) this.cart.set(lines.map(line => line === existing ? { ...line, quantity: line.quantity + 1 } : line));
     else this.cart.set([...lines, { product, quantity: 1, priceType: 'MINORISTA', discount: null }]);
     this.selectedProductId.set(product.id);
     this.results.set([]); this.activeIndex.set(-1); this.search = ''; this.error.set('');
     const quantity = this.cart().find(line => line.product.id === product.id)?.quantity ?? 1;
     this.feedbackKind.set('success');
-    this.feedback.set(`${product.name} agregado. Cantidad actual: ${quantity}.`);
+    this.feedback.set(`${product.name} agregado. Cantidad actual: ${groupedNumber(quantity)}.`);
     this.focusSearch();
     this.scrollToLine(product.id);
   }
@@ -614,7 +615,7 @@ export class Sales implements OnInit, OnDestroy {
     const quantity = Math.trunc(Number(line.quantity));
     const max = line.product.availableStock;
     if (!Number.isFinite(quantity) || quantity < 1) line.quantity = 1;
-    else if (quantity > max) { line.quantity = max; this.error.set(`Solo hay ${max} unidades disponibles de ${line.product.name}.`); }
+    else if (quantity > max) { line.quantity = max; this.error.set(`Solo hay ${groupedNumber(max)} unidades disponibles de ${line.product.name}.`); }
     else line.quantity = quantity;
     if (line.priceType === 'MAYORISTA' && Number(line.quantity) < this.WHOLESALE_MIN) {
       line.priceType = 'MINORISTA';
@@ -737,7 +738,7 @@ export class Sales implements OnInit, OnDestroy {
       await this.authorization.open({ title: blocked ? 'Autorizar crédito bloqueado' : 'Autorizar venta a crédito',
         description: (blocked ? `${this.creditRiskText} El bloqueo de créditos está activo: solo un Administrador puede autorizar esta venta. ` : '') +
           'Se registrará la venta a crédito, se descontará inventario y se abrirá la deuda del cliente.' + (this.needsConcessionAuthorization ? ' También autoriza el descuento o el precio mayorista.' : ''),
-        detail: `${this.selectedCustomerName} · ${this.estimate} COP · vence ${this.dueDate}`,
+        detail: `${this.selectedCustomerName} · ${groupedNumber(this.estimate)} COP · vence ${this.dueDate}`,
         operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
         selfAuthorizedRoles: blocked ? ['ADMINISTRADOR'] : ['ADMINISTRADOR', 'SUPERVISOR'],
         onError: message => this.error.set(message),
@@ -749,7 +750,7 @@ export class Sales implements OnInit, OnDestroy {
         catch (error) { this.error.set(error instanceof Error ? error.message : errorText(error)); }
       } else await this.authorization.open({ title: 'Autorizar descuento o precio mayorista',
         description: 'Un descuento o el precio mayorista necesitan la autorización de un Supervisor o Administrador.',
-        detail: `${this.selectedCustomerName} · descuento ${this.discounts} COP · total ${this.estimate} COP`,
+        detail: `${this.selectedCustomerName} · descuento ${groupedNumber(this.discounts)} COP · total ${groupedNumber(this.estimate)} COP`,
         operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
         onError: message => this.error.set(message),
         run: credentials => this.submitSale(credentials) });

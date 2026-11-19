@@ -1,6 +1,8 @@
+import { groupedNumber, NumberInput } from '../../shared/number-input';
+import { DecimalPipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -26,7 +28,7 @@ interface ProductCreateAttempt {
 
 @Component({
   selector: 'cp-catalog',
-  imports: [ReactiveFormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule, MatOptionModule, MatSelectModule, MatSlideToggleModule, MatProgressSpinnerModule, MatPaginatorModule],
+  imports: [NumberInput, DecimalPipe, FormsModule, ReactiveFormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule, MatOptionModule, MatSelectModule, MatSlideToggleModule, MatProgressSpinnerModule, MatPaginatorModule],
   templateUrl: './catalog.html',
   styleUrl: './catalog.scss',
 })
@@ -82,17 +84,17 @@ export class Catalog implements OnInit {
     supplierId: [''],
     barcode: [''], barcodeFormat: [''], description: [''],
     retailPrice: [0, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
-    wholesalePrice: ['', Validators.pattern(/^\d*$/)],
+    wholesalePrice: this.fb.control<number | string | null>('', Validators.pattern(/^\d*$/)),
     taxPercentage: ['', [Validators.min(0), Validators.max(100)]],
     minimumStock: [0, [Validators.required, Validators.min(0), Validators.pattern(/^\d+$/)]],
     initialQuantity: [0, [Validators.required, Validators.min(0), Validators.max(2147483647), Validators.pattern(/^\d+$/)]],
-    initialUnitCost: ['', Validators.pattern(/^\d{1,14}(?:\.\d{1,4})?$/)],
+    initialUnitCost: this.fb.control<string | null>('', Validators.pattern(/^\d{1,14}(?:\.\d{1,4})?$/)),
   });
 
   // --- calculadora de precio (decisión del 18 de noviembre de 2026) -------------------------------
   readonly profitPercent = signal<number | null>(null);
   readonly priceHint = toastSignal('error');
-  setProfitPercent(value: string): void { this.profitPercent.set(value === '' || !Number.isFinite(Number(value)) ? null : Number(value)); this.priceHint.set(''); }
+  setProfitPercent(value: number | string | null): void { this.profitPercent.set(value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value)); this.priceHint.set(''); }
   /** Costo con el que se calcula: el de compra que se escribe al crear, o el promedio actual si se puede ver. */
   referenceCost(product: Product): number | null {
     if (!product.id) { const value = Number(this.productForm.controls.initialUnitCost.value); return Number.isFinite(value) && value > 0 ? value : null; }
@@ -111,7 +113,7 @@ export class Catalog implements OnInit {
   priceNote(product: Product): { text: string; low: boolean } | null {
     const percent = profitPercentOf(Number(this.productForm.controls.retailPrice.value), this.referenceCost(product));
     if (percent === null) return null;
-    return percent < 0 ? { text: 'El precio minorista está por debajo del costo.', low: true } : { text: `Con el precio minorista ganas ${percent} % sobre el costo.`, low: false };
+    return percent < 0 ? { text: 'El precio minorista está por debajo del costo.', low: true } : { text: `Con el precio minorista ganas ${groupedNumber(percent)} % sobre el costo.`, low: false };
   }
 
   setHasTax(enabled: boolean): void {
@@ -328,11 +330,11 @@ export class Catalog implements OnInit {
       if (quantity > 0 && !this.canCreateWithInitialStock()) {
         this.error.set('Solo Administrador o Supervisor con permiso de crear productos puede registrar existencias iniciales.'); return;
       }
-      if (quantity > 0 && f.initialUnitCost === '') {
+      if (quantity > 0 && (f.initialUnitCost == null || f.initialUnitCost === '')) {
         this.productForm.controls.initialUnitCost.setErrors({ required: true });
         this.productForm.controls.initialUnitCost.markAsTouched(); return;
       }
-      if (quantity === 0 && f.initialUnitCost !== '') {
+      if (quantity === 0 && f.initialUnitCost != null && f.initialUnitCost !== '') {
         this.error.set('El costo inicial requiere existencias positivas.'); return;
       }
     }
@@ -344,7 +346,7 @@ export class Catalog implements OnInit {
         barcode: this.generateBarcode() && !selected.id ? null : f.barcode.trim() || null,
         barcodeFormat: selected.id && f.barcode.trim() === (selected.barcode ?? '') ? selected.barcodeFormat : null,
         description: f.description.trim() || null, retailPrice: Number(f.retailPrice),
-        wholesalePrice: f.wholesalePrice === '' ? null : Number(f.wholesalePrice),
+        wholesalePrice: f.wholesalePrice == null || f.wholesalePrice === '' ? null : Number(f.wholesalePrice),
         taxPercentage: null, // El IVA se quitó del sistema (18 de noviembre de 2026).
         minimumStock: Number(f.minimumStock),
       };
@@ -352,7 +354,7 @@ export class Catalog implements OnInit {
       if (selected.id) saved = await this.api.updateProduct(selected, { ...input, internalCode: f.internalCode.trim() });
       else {
         let createInput: CreateProductInput = { ...input, initialQuantity: Number(f.initialQuantity),
-          initialUnitCost: f.initialUnitCost === '' ? null : Number(f.initialUnitCost) };
+          initialUnitCost: f.initialUnitCost == null || f.initialUnitCost === '' ? null : Number(f.initialUnitCost) };
         let generateBarcode = this.generateBarcode();
         if (recoverOriginal && this.createAttempt) {
           const original = JSON.parse(this.createAttempt.body) as CreateProductInput & { generateBarcode: boolean };

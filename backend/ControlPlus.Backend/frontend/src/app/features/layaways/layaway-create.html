@@ -16,13 +16,13 @@
     <h3>Productos</h3>
     <div class="layaway-customer-filter"><label class="sr-only" for="create-product">Buscar producto</label><input id="create-product" class="text-field" name="productSearch" [(ngModel)]="productSearch" placeholder="Código, barras o nombre" (keydown.enter)="$event.preventDefault(); findProduct()"><button class="table-action" type="button" (click)="findProduct()">Buscar producto</button></div>
     @if (results().length) {
-      <div class="layaway-matches">@for (product of results(); track product.id) { <button class="table-action" type="button" (click)="add(product)">{{ product.internalCode }} · {{ product.name }} · {{ money(product.retailPrice) }} · disp. {{ product.availableStock }}</button> }</div>
+      <div class="layaway-matches">@for (product of results(); track product.id) { <button class="table-action" type="button" (click)="add(product)">{{ product.internalCode }} · {{ product.name }} · {{ money(product.retailPrice) }} · disp. {{ number(product.availableStock) }}</button> }</div>
     }
     <div class="table-wrap module-table-wrap"><table><thead><tr><th>Producto</th><th class="align-right">Cantidad</th><th>Precio</th><th class="align-right">Unitario</th><th class="align-right">Subtotal</th><th class="align-right"></th></tr></thead><tbody>
       @for (line of lines(); track line.product.id) {
         <tr>
-          <td><strong>{{ line.product.name }}</strong><small>{{ line.product.internalCode }} · disp. {{ line.product.availableStock }}</small></td>
-          <td class="align-right"><input class="text-field layaway-qty" type="number" min="1" step="1" [max]="line.product.availableStock" [name]="'qty-' + line.product.id" [attr.aria-label]="'Cantidad de ' + line.product.name" [(ngModel)]="line.quantity" (ngModelChange)="update()"></td>
+          <td><strong>{{ line.product.name }}</strong><small>{{ line.product.internalCode }} · disp. {{ number(line.product.availableStock) }}</small></td>
+          <td class="align-right"><input class="text-field layaway-qty" type="text" cpNumberInput min="1" step="1" [max]="line.product.availableStock" [name]="'qty-' + line.product.id" [attr.aria-label]="'Cantidad de ' + line.product.name" [(ngModel)]="line.quantity" (ngModelChange)="update()"></td>
           <td><select class="text-field" [name]="'price-' + line.product.id" [attr.aria-label]="'Tipo de precio de ' + line.product.name" [ngModel]="line.priceType" (ngModelChange)="setPriceType(line, $event)"><option value="MINORISTA">Minorista</option><option value="MAYORISTA" [disabled]="!line.product.wholesalePrice || line.quantity < wholesaleMin()" [title]="line.product.wholesalePrice && line.quantity < wholesaleMin() ? 'El mayorista exige ' + wholesaleMin() + ' o más unidades' : ''">Mayorista</option></select></td>
           <td class="align-right numeric">{{ money(unitPrice(line)) }}</td><td class="align-right numeric">{{ money(unitPrice(line) * line.quantity) }}</td>
           <td class="align-right"><button class="table-action" type="button" (click)="remove(line)">Quitar</button></td>

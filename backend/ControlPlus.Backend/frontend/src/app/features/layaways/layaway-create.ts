@@ -1,3 +1,4 @@
+import { NumberInput, groupedNumber } from '../../shared/number-input';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -31,7 +32,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
 
 @Component({
   selector: 'cp-layaway-create',
-  imports: [FormsModule, PaymentMethods],
+  imports: [NumberInput, FormsModule, PaymentMethods],
   templateUrl: './layaway-create.html',
   styleUrl: './layaways.scss',
 })
@@ -41,6 +42,7 @@ export class LayawayCreate {
   private readonly catalog = inject(CatalogApi);
   private readonly authorization = inject(AuthorizationDialog);
   readonly session = inject(SessionService);
+  readonly number = groupedNumber;
   readonly created = output<CreatedLayaway>();
   readonly closed = output<void>();
   readonly customer = signal<Customer | null>(null);

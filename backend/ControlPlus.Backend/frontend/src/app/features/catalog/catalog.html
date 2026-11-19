@@ -29,7 +29,7 @@
               @for (product of products()?.items ?? []; track product.id) {
                 <tr>
                   <td>{{ product.internalCode }}</td><td>{{ product.barcode || '—' }}</td><td><strong>{{ product.name }}</strong></td>
-                  <td>{{ product.categoryName }}</td><td>{{ product.retailPrice }}</td><td>{{ product.availableStock }}</td>
+                  <td>{{ product.categoryName }}</td><td>{{ product.retailPrice | number:'1.0-0' }}</td><td>{{ product.availableStock | number:'1.0-0' }}</td>
                   <td>{{ !product.isActive ? 'Inactivo' : product.isOutOfStock ? 'Agotado' : 'Activo' }}</td>
                   <td>@if (session.has('PRODUCTS.SENSITIVE_UPDATE')) {
                     <button mat-button type="button" (click)="editProduct(product)">Editar</button>
@@ -51,10 +51,10 @@
   @if (costHistory(); as costs) {
     <section class="panel" aria-label="Historial de costos">
       <h3>Historial de compra: {{ costProductName() }}</h3>
-      <p>Promedio actual: {{ costs.currentAverageCost ?? 'Sin dato' }} · Último costo: {{ costs.lastConfirmedPurchaseCost ?? 'Sin dato' }}</p>
+      <p>Promedio actual: {{ (costs.currentAverageCost | number:'1.0-4') ?? 'Sin dato' }} · Último costo: {{ (costs.lastConfirmedPurchaseCost | number:'1.0-4') ?? 'Sin dato' }}</p>
       <div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Cantidad</th><th>Costo unitario</th><th>Promedio resultante</th></tr></thead>
         <tbody>@for (item of costs.history.items; track item.purchaseId) {
-          <tr><td>{{ item.documentDate }}</td><td>{{ item.quantity }}</td><td>{{ item.documentUnitCost }}</td><td>{{ item.resultingAverageCost }}</td></tr>
+          <tr><td>{{ item.documentDate }}</td><td>{{ item.quantity | number:'1.0-0' }}</td><td>{{ item.documentUnitCost | number:'1.0-4' }}</td><td>{{ item.resultingAverageCost | number:'1.0-4' }}</td></tr>
         } @empty { <tr><td colspan="4">No hay compras confirmadas.</td></tr> }</tbody>
       </table></div>
       <mat-paginator [length]="costs.history.totalCount" [pageIndex]="costs.history.page-1" [pageSize]="20" (page)="showCostsByPage($event)" aria-label="Páginas de costos"></mat-paginator>
@@ -130,13 +130,13 @@
           <mat-form-field appearance="outline"><mat-label>Código de barras</mat-label><input matInput formControlName="barcode" [readonly]="!!product.id && product.barcodeGenerated"></mat-form-field>
         }
         <mat-form-field appearance="outline"><mat-label>Descripción</mat-label><textarea matInput formControlName="description"></textarea></mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Precio minorista</mat-label><input matInput type="number" step="1" min="0" formControlName="retailPrice"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Precio mayorista</mat-label><input matInput type="number" step="1" min="0" formControlName="wholesalePrice"></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Precio minorista</mat-label><input matInput type="text" cpNumberInput step="1" min="0" formControlName="retailPrice"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Precio mayorista</mat-label><input matInput type="text" cpNumberInput step="1" min="0" formControlName="wholesalePrice"></mat-form-field>
         @if (referenceCost(product) !== null) {
           <div class="price-calculator" role="group" aria-label="Calculadora de precio">
             <strong>Calculadora de precio</strong>
-            <span class="muted">{{ costLabel(product) }}: {{ referenceCost(product) }}. Se redondea hacia arriba de 50 en 50 pesos.</span>
-            <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Ganancia sobre el costo (%)</mat-label><input matInput type="number" min="0" step="1" [value]="profitPercent() ?? ''" (input)="setProfitPercent($any($event.target).value)"></mat-form-field>
+            <span class="muted">{{ costLabel(product) }}: {{ referenceCost(product) | number:'1.0-4' }}. Se redondea hacia arriba de 50 en 50 pesos.</span>
+            <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Ganancia sobre el costo (%)</mat-label><input matInput type="text" cpNumberInput min="0" step="1" [ngModel]="profitPercent()" (ngModelChange)="setProfitPercent($event)" [ngModelOptions]="{standalone: true}"></mat-form-field>
             <div class="price-calculator__actions">
               <button mat-stroked-button type="button" (click)="applyProfitTo('retailPrice', product)">Poner como precio minorista</button>
               <button mat-stroked-button type="button" (click)="applyProfitTo('wholesalePrice', product)">Poner como precio mayorista</button>
@@ -145,10 +145,10 @@
             @else if (priceNote(product); as note) { <small [class.price-calculator__low]="note.low">{{ note.text }}</small> }
           </div>
         }
-        <mat-form-field appearance="outline"><mat-label>Stock mínimo</mat-label><input matInput type="number" step="1" min="0" formControlName="minimumStock"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Stock mínimo</mat-label><input matInput type="text" cpNumberInput step="1" min="0" formControlName="minimumStock"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
         @if (!product.id) {
-          <mat-form-field appearance="outline"><mat-label>Existencia inicial</mat-label><input matInput type="number" step="1" min="0" max="2147483647" formControlName="initialQuantity"><mat-error>Usa un entero entre 0 y 2147483647.</mat-error></mat-form-field>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Costo de compra por unidad</mat-label><input matInput type="text" inputmode="decimal" formControlName="initialUnitCost"><mat-hint>Cuánto pagaste al proveedor por cada unidad que estás ingresando</mat-hint><mat-error>Usa un valor de 0 a 14 dígitos enteros y hasta 4 decimales.</mat-error></mat-form-field>
+          <mat-form-field appearance="outline"><mat-label>Existencia inicial</mat-label><input matInput type="text" cpNumberInput step="1" min="0" max="2147483647" formControlName="initialQuantity"><mat-error>Usa un entero entre 0 y 2147483647.</mat-error></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Costo de compra por unidad</mat-label><input matInput type="text" cpNumberInput [cpNumberString]="true" min="0" step="0.0001" formControlName="initialUnitCost"><mat-hint>Cuánto pagaste al proveedor por cada unidad que estás ingresando. Decimales con coma.</mat-hint><mat-error>Usa un valor de 0 a 14 dígitos enteros y hasta 4 decimales.</mat-error></mat-form-field>
         }
         @if (error()) { <div class="alert alert--error form-error" role="alert" aria-live="assertive">
           @if (createErrorKind() === 'validation') { <strong>Revisa los datos.</strong> }

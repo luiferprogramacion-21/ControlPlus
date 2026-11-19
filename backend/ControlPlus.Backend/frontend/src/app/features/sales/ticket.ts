@@ -39,7 +39,7 @@ export function buildTicketHtml(receipt: SaleReceipt, extras: TicketExtras = {},
   const date = new Intl.DateTimeFormat('es-CO', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(receipt.occurredAtUtc));
   const lines = receipt.lines.map(line =>
     `<tr><td colspan="2">${escapeHtml(line.productName)}</td></tr>` +
-    `<tr><td class="muted">${line.quantity} x ${cop(line.unitPrice)}</td><td class="r">${cop(line.netAmount)}</td></tr>`).join('');
+    `<tr><td class="muted">${line.quantity.toLocaleString('es-CO')} x ${cop(line.unitPrice)}</td><td class="r">${cop(line.netAmount)}</td></tr>`).join('');
   const vat = vatBreakdown(receipt);
   const discountRow = receipt.discountTotal ? `<tr><td>Descuento</td><td class="r">-${cop(receipt.discountTotal)}</td></tr>` : '';
   // With VAT: Subtotal + IVA = TOTAL (the price includes it, the total never changes). Without VAT the summary is unchanged.

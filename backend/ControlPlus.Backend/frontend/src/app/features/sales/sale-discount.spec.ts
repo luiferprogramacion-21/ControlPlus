@@ -39,6 +39,7 @@ describe('sale-discount', () => {
   });
 
   it('describe el descuento para la pantalla', () => {
+    expect(describeDiscount({ type: 'PORCENTAJE', value: 12.5 })).toBe('12,5 %');
     expect(describeDiscount({ type: 'PORCENTAJE', value: 10 })).toBe('10 %'); expect(describeDiscount({ type: 'VALOR_FIJO', value: 5000 })).toBe('$ 5.000');
   });
 });

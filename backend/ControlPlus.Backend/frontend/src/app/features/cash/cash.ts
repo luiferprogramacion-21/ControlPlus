@@ -1,3 +1,4 @@
+import { groupedNumber, NumberInput } from '../../shared/number-input';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe } from '@angular/common';
@@ -11,7 +12,7 @@ import { toastSignal } from '../../core/toast';
 
 @Component({
   selector: 'cp-cash',
-  imports: [FormsModule, CurrencyPipe, DatePipe, MatButtonModule],
+  imports: [NumberInput, FormsModule, CurrencyPipe, DatePipe, MatButtonModule],
   templateUrl: './cash.html',
   styleUrl: './cash.scss',
 })
@@ -121,7 +122,7 @@ export class Cash implements OnInit {
     // A Cajero opens the cash only with the authorization of a Supervisor or Administrador.
     await this.authorization.open({ title: 'Autorizar apertura de caja',
       description: 'Un Cajero necesita la autorización de un Supervisor o Administrador para abrir la caja.',
-      detail: `Fondo inicial ${this.initialAmount} COP`,
+      detail: `Fondo inicial ${groupedNumber(this.initialAmount)} COP`,
       operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
       onError: message => this.error.set(message),
       run: credentials => this.submitOpen(credentials) });

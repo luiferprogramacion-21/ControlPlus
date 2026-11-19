@@ -78,6 +78,12 @@ describe('Catalog: existencias iniciales', () => {
     expect(component.notice()).toBe('');
   });
 
+  it('conserva nulos al borrar los importes opcionales', async () => {
+    component.productForm.patchValue({ wholesalePrice: null, initialUnitCost: null });
+    await component.saveProduct();
+    expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ wholesalePrice: null, initialUnitCost: null, initialQuantity: 0 }), true, expect.any(String));
+  });
+
   describe('calculadora de precio', () => {
     const product = (overrides: object = {}) => ({ id: '', version: 0, canViewCost: false, averageCost: null, ...overrides }) as never;
     it('al crear usa el costo de compra escrito y pone el precio minorista o el mayorista', () => {
@@ -90,7 +96,7 @@ describe('Catalog: existencias iniciales', () => {
       expect(component.productForm.controls.retailPrice.value).toBe(1550);
       component.applyProfitTo('wholesalePrice', p);
       expect(component.productForm.controls.wholesalePrice.value).toBe('1550');
-      expect(component.priceNote(p)?.text).toContain('ganas 25.6 %');
+      expect(component.priceNote(p)?.text).toContain('ganas 25,6 %');
     });
     it('sin costo o sin porcentaje no cambia el precio y lo explica', () => {
       const p = product();

@@ -1,3 +1,4 @@
+import { groupedNumber } from '../../shared/number-input';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { errorText } from '../../core/api';
@@ -36,6 +37,7 @@ export class Dashboard implements OnInit {
   readonly canOpenInventory = inject(SessionService).has('INVENTORY.READ');
   /** Inventario filtrado por el mismo criterio de stock bajo que cuenta el Dashboard. */
   readonly lowStockQuery = { filtro: 'stock-bajo' };
+  readonly number = groupedNumber;
   readonly summary = signal<DashboardSummary | null>(null);
   readonly loading = signal(false);
   readonly error = toastSignal('error');
@@ -85,7 +87,7 @@ export class Dashboard implements OnInit {
   }
 
   count(amount: number, singular: string, plural: string): string {
-    return `${amount} ${amount === 1 ? singular : plural}`;
+    return `${groupedNumber(amount)} ${amount === 1 ? singular : plural}`;
   }
 
   /** An empty alert reads "Ninguno" instead of a zero count. */
@@ -98,7 +100,7 @@ export class Dashboard implements OnInit {
     const percent = data.comparison.percentChange;
     if (percent === null) return { text: 'Sin ventas ayer a esta hora', tone: 'none' };
     if (percent === 0) return { text: 'Igual que ayer a esta hora', tone: 'flat' };
-    return { text: `${percent > 0 ? '+' : '-'}${Math.abs(percent)} % frente a ayer a esta hora`, tone: percent > 0 ? 'up' : 'down' };
+    return { text: `${percent > 0 ? '+' : '-'}${groupedNumber(Math.abs(percent))} % frente a ayer a esta hora`, tone: percent > 0 ? 'up' : 'down' };
   }
 
   /** An open shift from a previous day also shows its date, so it is not mistaken for today's. */

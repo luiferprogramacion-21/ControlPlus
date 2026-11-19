@@ -62,7 +62,7 @@ export function diagnoseQueue(page: PrintQueuePage | null): ComponentDiagnosis {
   if (!page.items.length) return { label: 'Sin trabajos', detail: 'Todavía no se ha enviado nada a imprimir.', tone: 'muted' };
   const errors = page.items.filter(job => job.status === 'ERROR').length;
   const pending = page.items.filter(job => job.status === 'PENDIENTE' || job.status === 'IMPRIMIENDO').length;
-  const detail = `Últimos ${page.items.length} de ${page.totalCount} trabajos.`;
+  const detail = `Últimos ${page.items.length.toLocaleString('es-CO')} de ${page.totalCount.toLocaleString('es-CO')} trabajos.`;
   if (errors) return { label: `${errors} con error`, detail: `${detail} Revíselos en Configuración → Impresión.`, tone: 'error' };
   if (pending) return { label: `${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}`, detail, tone: 'warning' };
   return { label: 'Al día', detail, tone: 'success' };
