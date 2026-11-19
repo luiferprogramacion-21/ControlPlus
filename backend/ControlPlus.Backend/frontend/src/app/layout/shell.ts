@@ -5,6 +5,8 @@ import { filter } from 'rxjs';
 import { SessionService } from '../core/session.service';
 import { EstablishmentService } from '../core/establishment';
 import { DisplayScaleService } from '../core/display-scale';
+import { WindowsShortcuts } from '../core/windows-shortcuts';
+import { WindowSheet } from '../shared/window-sheet';
 import { Icon } from './icon';
 import { paginatorIntlProvider } from './paginator-intl';
 
@@ -51,7 +53,7 @@ function readCollapsed(): boolean { try { return localStorage.getItem(COLLAPSED_
 
 @Component({
   selector: 'cp-shell',
-  imports: [RouterOutlet, RouterLink, Icon],
+  imports: [RouterOutlet, RouterLink, Icon, WindowSheet],
   // La traducción del paginador vive aquí y no en app.config: así el paginador (con sus menús, tooltips y
   // formularios) no entra en el paquete inicial que descarga la pantalla de ingreso.
   providers: [paginatorIntlProvider],
@@ -80,6 +82,7 @@ function readCollapsed(): boolean { try { return localStorage.getItem(COLLAPSED_
                 }
               </div>
               <hr class="user-menu__separator">
+              <button class="user-menu__option" type="button" role="menuitem" (click)="openShortcuts()"><span class="user-menu__check"><cp-icon name="keyboard" /></span><span>Atajos del teclado (F1)</span></button>
               <button class="user-menu__item" type="button" role="menuitem" (click)="logout()"><cp-icon name="logout" /><span>Cerrar sesión</span></button>
             </div>
           }
@@ -93,7 +96,18 @@ function readCollapsed(): boolean { try { return localStorage.getItem(COLLAPSED_
         </header>
         <main id="main-content" class="workspace" [class.workspace--bounded]="boundedWorkspace()" tabindex="-1"><router-outlet /></main>
       </section>
-    </div>`,
+    </div>
+    @if (shortcutsOpen()) {
+      <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title"><div class="module-form-sheet__backdrop" (click)="shortcutsOpen.set(false)"></div>
+        <section class="panel panel--padded module-form">
+          <div class="panel-heading"><h2 id="shortcuts-title">Atajos del teclado</h2><p>Funcionan como en Windows en todas las pantallas.</p></div>
+          <dl class="shortcut-list">
+            @for (shortcut of shortcuts; track shortcut.keys) { <div><dt>@for (key of shortcut.keys.split('+'); track $index) { @if ($index) { + } <kbd>{{ key }}</kbd> }</dt><dd>{{ shortcut.action }}</dd></div> }
+          </dl>
+          <div class="form-actions"><button class="button button--primary" type="button" (click)="shortcutsOpen.set(false)" autofocus>Aceptar</button></div>
+        </section>
+      </div>
+    }`,
 })
 export class Shell {
   readonly session = inject(SessionService);
@@ -102,6 +116,21 @@ export class Shell {
   readonly collapsed = signal(readCollapsed());
   /** Menú del perfil de abajo de la barra lateral: tamaño de la pantalla y cerrar sesión. */
   readonly userMenuOpen = signal(false);
+  readonly shortcutsOpen = signal(false);
+  readonly shortcuts = [
+    { keys: 'Enter', action: 'Aceptar, guardar o buscar lo escrito.' },
+    { keys: 'Esc', action: 'Cancelar o cerrar la ventana.' },
+    { keys: 'Ctrl+B', action: 'Ir al campo de búsqueda de la pantalla.' },
+    { keys: 'F5', action: 'Actualizar la lista de la pantalla.' },
+    { keys: 'Tab', action: 'Pasar al siguiente campo (Mayús+Tab, al anterior).' },
+    { keys: 'Doble clic', action: 'Abrir una fila de una lista.' },
+    { keys: 'F1', action: 'Ver esta lista de atajos.' },
+    { keys: 'F2', action: 'Punto de venta: buscar o escanear un producto.' },
+    { keys: 'F3', action: 'Punto de venta: buscar o crear el cliente.' },
+    { keys: 'F4', action: 'Punto de venta: cambiar la cantidad.' },
+    { keys: 'Supr', action: 'Punto de venta: quitar el producto seleccionado.' },
+    { keys: 'F9', action: 'Punto de venta: cobrar y confirmar la venta.' },
+  ];
   private readonly host = inject(ElementRef<HTMLElement>);
   readonly boundedWorkspace = signal(false);
   readonly pageTitle = signal('Caja');
@@ -115,6 +144,7 @@ export class Shell {
   private readonly router = inject(Router);
 
   constructor() {
+    inject(WindowsShortcuts).start();
     void this.establishment.load().catch(() => undefined);
     this.syncHeader(this.router.url);
     this.router.events.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd), takeUntilDestroyed())
@@ -127,6 +157,14 @@ export class Shell {
     try { localStorage.setItem(COLLAPSED_STORAGE_KEY, String(next)); } catch { /* Sin almacenamiento: dura hasta recargar. */ }
   }
 
+  openShortcuts(): void { this.userMenuOpen.set(false); this.shortcutsOpen.set(true); }
+  /** F1, como la ayuda de Windows: muestra los atajos del teclado. */
+  @HostListener('document:keydown', ['$event'])
+  onHelpKey(event: KeyboardEvent): void {
+    if (event.key !== 'F1' || event.ctrlKey || event.altKey || event.metaKey) return;
+    event.preventDefault();
+    this.openShortcuts();
+  }
   logout(): void { this.userMenuOpen.set(false); this.session.logout(); void this.router.navigateByUrl('/ingresar'); }
   closeUserMenuAndFocus(): void {
     this.userMenuOpen.set(false);

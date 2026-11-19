@@ -774,3 +774,9 @@ app-root .cdk-overlay-popover { zoom: calc(1 / var(--cp-zoom)); }
 .mat-mdc-dialog-surface { position: relative; }
 /* Los botones de la ventana quedan siempre a la vista abajo, aunque el formulario sea largo. */
 .module-form:not(.module-form--reception) .form-actions { position: sticky; z-index: 2; bottom: -18px; margin: 24px -20px -18px; padding: 14px 20px 18px; border-top: 1px solid var(--cp-border); background: var(--cp-surface); }
+/* Atajos del teclado (F1). */
+.shortcut-list { display: grid; gap: 0; margin: 0; border-top: 1px solid var(--cp-border); }
+.shortcut-list div { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; min-height: 44px; border-bottom: 1px solid var(--cp-border); }
+.shortcut-list dt { color: var(--cp-text-secondary); white-space: nowrap; }
+.shortcut-list dd { margin: 0; }
+kbd { display: inline-block; min-width: 28px; padding: 2px 7px; border: 1px solid var(--cp-control-border); border-bottom-width: 2px; border-radius: 6px; background: var(--cp-surface-alt); color: var(--cp-text); font: 600 13px/1.4 var(--cp-font); text-align: center; }
