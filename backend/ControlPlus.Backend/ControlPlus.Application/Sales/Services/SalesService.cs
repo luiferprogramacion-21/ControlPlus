@@ -489,8 +489,11 @@ public sealed partial class SalesService(
         if (cashMovement is not null) await repository.AddCashMovementAsync(cashMovement, cancellationToken);
         if (payments.Length > 0) await repository.AddPaymentsAsync(payments, cancellationToken);
         await repository.AddInventoryMovementsAsync(inventoryMovements, cancellationToken);
-        // Venta recuperable: el borrador del carrito se cierra como CONVERTIDO en la misma transacción que la venta.
-        await draftRepository.ConvertActiveAsync(actor.UserId, shift.Id, sale.Id, now.UtcDateTime, cancellationToken);
+        // Venta recuperable: el borrador de esta venta se cierra como CONVERTIDO en la misma transacción que la venta;
+        // las ventas en espera del cajero quedan abiertas.
+        await draftRepository.ConvertAsync(actor.UserId, shift.Id, sale.Id, request.DraftId,
+            details.GroupBy(x => x.ProductoId).Select(x => (x.Key, x.Sum(y => y.Cantidad))).ToArray(),
+            now.UtcDateTime, cancellationToken);
 
         var response = Map(sale, details, payments, methodsByCode) with { CreditId = credit?.Id };
         var receiptVatPercentage = ReceiptVatPercentage(sale, details);

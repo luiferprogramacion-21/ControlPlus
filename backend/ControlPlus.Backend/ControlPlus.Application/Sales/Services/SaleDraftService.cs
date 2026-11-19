@@ -15,9 +15,13 @@ public sealed class SaleDraftService(
 {
     private const int MaximumLines = 300;
     private const int MaximumQuantity = 100_000;
+    /// <summary>Ventas sin terminar que un cajero puede tener a la vez en el turno (la de pantalla y las en espera).</summary>
+    public const int MaximumOpenDrafts = 10;
     private static readonly string[] SaleTypes = ["CONTADO", "CREDITO"];
     private static readonly string[] PriceTypes = ["MINORISTA", "MAYORISTA"];
     private static readonly string[] DiscountTypes = ["PORCENTAJE", "VALOR_FIJO"];
+
+    private enum Target { MostRecent, New, Existing }
 
     public async Task<Result<SaleDraftDto?>> GetCurrentAsync(ActorContext actor, CancellationToken cancellationToken = default)
     {
@@ -29,8 +33,51 @@ public sealed class SaleDraftService(
         return Result.Success(draft is null || draft.DetalleBorradorVenta.Count == 0 ? null : Map(draft));
     }
 
-    public async Task<Result<SaleDraftDto>> SaveAsync(ActorContext actor, SaveSaleDraftRequest request,
+    public async Task<Result<IReadOnlyCollection<HeldSaleDto>>> ListAsync(ActorContext actor,
         CancellationToken cancellationToken = default)
+    {
+        var error = await RequireSalesCreateAsync(actor, cancellationToken);
+        if (error is not null) return Result.Failure<IReadOnlyCollection<HeldSaleDto>>(error);
+        var scope = await drafts.GetScopeAsync(cancellationToken);
+        if (scope is null) return Result.Success<IReadOnlyCollection<HeldSaleDto>>([]);
+        var open = await drafts.GetOpenAsync(actor.UserId, scope.ShiftId, cancellationToken);
+        return Result.Success<IReadOnlyCollection<HeldSaleDto>>(
+            open.Where(draft => draft.DetalleBorradorVenta.Count > 0).Select(Summary).ToArray());
+    }
+
+    public async Task<Result<SaleDraftDto>> GetAsync(ActorContext actor, Guid draftId,
+        CancellationToken cancellationToken = default)
+    {
+        var error = await RequireSalesCreateAsync(actor, cancellationToken);
+        if (error is not null) return Result.Failure<SaleDraftDto>(error);
+        var scope = await drafts.GetScopeAsync(cancellationToken);
+        var draft = scope is null ? null
+            : await drafts.GetOpenByIdAsync(draftId, actor.UserId, scope.ShiftId, track: false, cancellationToken);
+        return draft is null ? Result.Failure<SaleDraftDto>(HeldSaleNotFound()) : Result.Success(Map(draft));
+    }
+
+    public Task<Result<SaleDraftDto>> SaveAsync(ActorContext actor, SaveSaleDraftRequest request,
+        CancellationToken cancellationToken = default) =>
+        SaveCoreAsync(actor, request, Target.MostRecent, null, cancellationToken);
+
+    public Task<Result<SaleDraftDto>> CreateAsync(ActorContext actor, SaveSaleDraftRequest request,
+        CancellationToken cancellationToken = default) =>
+        SaveCoreAsync(actor, request, Target.New, null, cancellationToken);
+
+    public Task<Result<SaleDraftDto>> SaveAsync(ActorContext actor, Guid draftId, SaveSaleDraftRequest request,
+        CancellationToken cancellationToken = default) =>
+        SaveCoreAsync(actor, request, Target.Existing, draftId, cancellationToken);
+
+    public async Task<Result> DiscardAsync(ActorContext actor, Guid draftId, CancellationToken cancellationToken = default)
+    {
+        var error = await RequireSalesCreateAsync(actor, cancellationToken);
+        if (error is not null) return Result.Failure(error);
+        return await drafts.DiscardAsync(draftId, actor.UserId, clock.UtcNow.UtcDateTime, cancellationToken)
+            ? Result.Success() : Result.Failure(HeldSaleNotFound());
+    }
+
+    private async Task<Result<SaleDraftDto>> SaveCoreAsync(ActorContext actor, SaveSaleDraftRequest request, Target target,
+        Guid? draftId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         var error = await RequireSalesCreateAsync(actor, cancellationToken);
@@ -64,7 +111,17 @@ public sealed class SaleDraftService(
             return Invalid("El cliente ya no existe.");
 
         var now = clock.UtcNow.UtcDateTime;
-        var draft = await drafts.GetActiveAsync(actor.UserId, scope.ShiftId, track: true, cancellationToken);
+        var draft = target switch
+        {
+            Target.MostRecent => await drafts.GetActiveAsync(actor.UserId, scope.ShiftId, track: true, cancellationToken),
+            Target.Existing => await drafts.GetOpenByIdAsync(draftId!.Value, actor.UserId, scope.ShiftId, track: true,
+                cancellationToken),
+            _ => null
+        };
+        if (target == Target.Existing && draft is null) return Result.Failure<SaleDraftDto>(HeldSaleNotFound());
+        if (draft is null && await drafts.CountOpenAsync(actor.UserId, scope.ShiftId, cancellationToken) >= MaximumOpenDrafts)
+            return Result.Failure<SaleDraftDto>(ApplicationError.Conflict(
+                $"Ya tienes {MaximumOpenDrafts} ventas en espera. Retoma o descarta alguna antes de empezar otra."));
         var isNew = draft is null;
         draft ??= new BorradorVenta
         {
@@ -140,6 +197,33 @@ public sealed class SaleDraftService(
     }
 
     private static Result<SaleDraftDto> Invalid(string message) => Result.Failure<SaleDraftDto>(ApplicationError.Validation(message));
+
+    private static ApplicationError HeldSaleNotFound() => ApplicationError.NotFound("la venta en espera");
+
+    /// <summary>Total aproximado con los precios guardados: el real se calcula al cobrar.</summary>
+    private static HeldSaleDto Summary(BorradorVenta draft)
+    {
+        var lines = draft.DetalleBorradorVenta;
+        var subtotal = lines.Sum(line =>
+        {
+            var gross = line.PrecioUnitario * line.Cantidad;
+            var discount = line.TipoDescuento switch
+            {
+                "PORCENTAJE" => decimal.Round(gross * (line.PorcentajeDescuento ?? 0) / 100m, 0, MidpointRounding.AwayFromZero),
+                "VALOR_FIJO" => line.ValorDescuento,
+                _ => 0m
+            };
+            return Math.Max(0m, gross - discount);
+        });
+        var general = draft.AmbitoDescuento == "VENTA" && draft.ValorDescuentoSolicitado is decimal value
+            ? draft.TipoDescuento == "PORCENTAJE"
+                ? decimal.Round(subtotal * value / 100m, 0, MidpointRounding.AwayFromZero)
+                : value
+            : 0m;
+        return new HeldSaleDto(draft.Id, draft.TipoVenta, draft.ClienteId, draft.Cliente?.NombreCompleto,
+            lines.Count, lines.Sum(line => line.Cantidad), Math.Max(0m, subtotal - general),
+            new DateTimeOffset(DateTime.SpecifyKind(draft.FechaModificacion ?? draft.FechaCreacion, DateTimeKind.Utc)));
+    }
 
     private static SaleDraftDto Map(BorradorVenta draft) => new(
         draft.Id, draft.TipoVenta, draft.ClienteId,

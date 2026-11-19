@@ -675,6 +675,24 @@ El usuario pidió abrir el cajón monedero a través de la impresora de recibos.
   - sin ella, la versión nueva no puede leer los perfiles de impresión.
 - **No se activa la apertura del cajón en el controlador de Windows:** abriría el cajón con cada ticket.
 
+### Decisión del 19 de noviembre de 2026: ventas en espera
+
+El usuario pidió poder dejar ventas en espera y aprobó hacerlo antes de la instalación. Amplía la venta recuperable (tarea H), que guardaba una sola venta pendiente por cajero. Detalle en `docs/sale-drafts.md`.
+
+- **Pantalla (aprobada):**
+  - en el punto de venta, **Poner en espera · F6** y **En espera (n) · F7**;
+  - una ventana con la lista (cliente, productos, total aproximado y hora), **Retomar** (o doble clic) y **Descartar** con confirmación;
+  - al entrar, el aviso de ventas sin terminar;
+  - retomar una venta deja en espera la que estaba en pantalla.
+- **Datos:**
+  - cada carrito es un borrador en `ventas.borrador_venta`, **sin migración**;
+  - hasta 10 abiertos por cajero en el turno;
+  - no reservan inventario ni tocan dinero, y no se auditan.
+- **Al confirmar:** la venta lleva `draftId` y solo ese borrador se cierra como `CONVERTIDO`, en la misma transacción.
+  - El GUID vacío indica que la venta no tiene borrador.
+  - Sin `draftId` (contrato anterior), se cierra el más reciente solo si tiene los mismos productos y cantidades.
+- **API nueva:** `GET/POST /api/sales/drafts` y `GET/PUT/DELETE /api/sales/drafts/{id}`. Se conservan las rutas `/current`.
+
 ### Reglas del reparto
 
 - Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:

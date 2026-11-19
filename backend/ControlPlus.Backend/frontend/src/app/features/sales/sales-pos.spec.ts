@@ -3,7 +3,7 @@ import { TicketPrinter } from './ticket';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { vi } from 'vitest';
 import { Sales } from './sales';
-import { SalesApi } from './sales-api';
+import { NO_SALE_DRAFT, SalesApi } from './sales-api';
 import { CashApi } from '../cash/cash-api';
 import { CatalogApi } from '../catalog/catalog-api';
 import { SessionService } from '../../core/session.service';
@@ -167,6 +167,10 @@ describe('Sales: punto de venta de contado', () => {
       expect(component.error()).toBe('');
       component.newSale();
       expect(component.drawerStatus()).toBeNull();
+    });
+    it('sin borrador guardado envía NO_SALE_DRAFT, para no cerrar ninguna venta en espera', async () => {
+      await component.confirm();
+      expect(confirm.mock.calls[0][0]).toEqual(expect.objectContaining({ draftId: NO_SALE_DRAFT }));
     });
     it('Enter en la pantalla de venta confirmada inicia una venta nueva', async () => {
       await component.confirm();

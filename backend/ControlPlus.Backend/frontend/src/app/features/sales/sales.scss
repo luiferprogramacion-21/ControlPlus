@@ -17,6 +17,9 @@
 .pos-footer { flex:0 0 auto; padding-top:4px; }
 .cart-actions { grid-template-columns:1fr 1.3fr 1fr 1fr; }
 .cart-actions .button { min-height:38px; padding:0 8px; font-size:12px; }
+.held-sales { width:min(100%, 760px); }
+.held-sales table { min-width:0; }
+.held-sales .status-pill { margin-left:6px; }
 .customer-row { margin-top:12px; }
 .customer-search { display:flex; gap:8px; }
 .customer-search input { min-width:0; min-height:40px; flex:1; padding:8px 11px; border:1px solid var(--cp-control-border); border-radius:8px; }

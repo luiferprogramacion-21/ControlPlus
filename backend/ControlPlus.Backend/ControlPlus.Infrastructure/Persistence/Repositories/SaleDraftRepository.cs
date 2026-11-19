@@ -70,20 +70,54 @@ public sealed class EfSaleDraftRepository(OfficialControlPlusDbContext dbContext
             .ExecuteUpdateAsync(set => set.SetProperty(x => x.Estado, "DESCARTADO").SetProperty(x => x.FechaCierre, nowUtc),
                 cancellationToken);
 
-    public async Task ConvertActiveAsync(Guid userId, Guid shiftId, Guid saleId, DateTime nowUtc,
-        CancellationToken cancellationToken = default)
-    {
-        var active = await dbContext.BorradorVenta
+    public async Task<IReadOnlyCollection<BorradorVenta>> GetOpenAsync(Guid userId, Guid shiftId,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.BorradorVenta.AsNoTracking().Include(x => x.DetalleBorradorVenta).Include(x => x.Cliente)
             .Where(x => x.UsuarioId == userId && x.TurnoCajaId == shiftId && ActiveStates.Contains(x.Estado))
             .OrderByDescending(x => x.FechaModificacion ?? x.FechaCreacion).ThenByDescending(x => x.Id)
             .ToArrayAsync(cancellationToken);
-        for (var index = 0; index < active.Length; index++)
-        {
-            var draft = active[index];
-            draft.FechaCierre = nowUtc;
-            draft.FechaModificacion = nowUtc;
-            if (index == 0) { draft.Estado = "CONVERTIDO"; draft.VentaConfirmadaId = saleId; }
-            else draft.Estado = "DESCARTADO";
-        }
+
+    public Task<BorradorVenta?> GetOpenByIdAsync(Guid draftId, Guid userId, Guid shiftId, bool track,
+        CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.BorradorVenta.Include(x => x.DetalleBorradorVenta).Where(x =>
+            x.Id == draftId && x.UsuarioId == userId && x.TurnoCajaId == shiftId && ActiveStates.Contains(x.Estado));
+        return (track ? query : query.AsNoTracking()).FirstOrDefaultAsync(cancellationToken);
     }
+
+    public Task<int> CountOpenAsync(Guid userId, Guid shiftId, CancellationToken cancellationToken = default) =>
+        dbContext.BorradorVenta.CountAsync(x =>
+            x.UsuarioId == userId && x.TurnoCajaId == shiftId && ActiveStates.Contains(x.Estado), cancellationToken);
+
+    public async Task<bool> DiscardAsync(Guid draftId, Guid userId, DateTime nowUtc,
+        CancellationToken cancellationToken = default) =>
+        await dbContext.BorradorVenta
+            .Where(x => x.Id == draftId && x.UsuarioId == userId && ActiveStates.Contains(x.Estado))
+            .ExecuteUpdateAsync(set => set.SetProperty(x => x.Estado, "DESCARTADO").SetProperty(x => x.FechaCierre, nowUtc),
+                cancellationToken) > 0;
+
+    public async Task ConvertAsync(Guid userId, Guid shiftId, Guid saleId, Guid? draftId,
+        IReadOnlyCollection<(Guid ProductId, int Quantity)> saleLines, DateTime nowUtc,
+        CancellationToken cancellationToken = default)
+    {
+        var open = dbContext.BorradorVenta.Include(x => x.DetalleBorradorVenta)
+            .Where(x => x.UsuarioId == userId && x.TurnoCajaId == shiftId && ActiveStates.Contains(x.Estado));
+        var draft = draftId is Guid id
+            ? await open.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            : await open.OrderByDescending(x => x.FechaModificacion ?? x.FechaCreacion).ThenByDescending(x => x.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        // Sin el borrador indicado, solo se cierra el más reciente si es esta misma venta: una venta en espera con otros
+        // productos sigue abierta.
+        if (draft is null || draftId is null && !SameLines(draft, saleLines)) return;
+        draft.Estado = "CONVERTIDO";
+        draft.VentaConfirmadaId = saleId;
+        draft.FechaCierre = nowUtc;
+        draft.FechaModificacion = nowUtc;
+    }
+
+    private static bool SameLines(BorradorVenta draft, IReadOnlyCollection<(Guid ProductId, int Quantity)> saleLines) =>
+        draft.DetalleBorradorVenta.GroupBy(x => x.ProductoId).Select(x => (ProductId: x.Key, Quantity: x.Sum(y => y.Cantidad)))
+            .OrderBy(x => x.ProductId)
+            .SequenceEqual(saleLines.GroupBy(x => x.ProductId).Select(x => (ProductId: x.Key, Quantity: x.Sum(y => y.Quantity)))
+                .OrderBy(x => x.ProductId));
 }

@@ -14,7 +14,14 @@ export interface SalePaymentInput { methodCode: 'EFECTIVO' | 'TRANSFERENCIA' | '
 export interface SaleDraftLine { productId: string; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; discount: SaleDiscount | null; }
 export interface SaleDraftInput { saleType: 'CONTADO' | 'CREDITO'; customerId: string | null; lines: SaleDraftLine[]; generalDiscount: SaleDiscount | null; discountReason: string | null; }
 export interface SaleDraft extends SaleDraftInput { id: string; updatedAtUtc: string; }
-export interface SaleInput { customerId: string | null; lines: SaleLineInput[]; generalDiscount: SaleDiscount | null; discountReason: string | null; payments: SalePaymentInput[]; saleType: 'CONTADO' | 'CREDITO'; dueDate: string | null; authorization: AuthorizationBody | null; }
+/** Resumen de una venta en espera; el total es aproximado, con los precios del momento en que se guardó. */
+export interface HeldSale {
+  id: string; saleType: 'CONTADO' | 'CREDITO'; customerId: string | null; customerName: string | null;
+  products: number; units: number; approximateTotal: number; updatedAtUtc: string;
+}
+/** La venta no tiene borrador: el servidor no cierra ninguna venta en espera al confirmarla. */
+export const NO_SALE_DRAFT = '00000000-0000-0000-0000-000000000000';
+export interface SaleInput { customerId: string | null; lines: SaleLineInput[]; generalDiscount: SaleDiscount | null; discountReason: string | null; payments: SalePaymentInput[]; saleType: 'CONTADO' | 'CREDITO'; dueDate: string | null; authorization: AuthorizationBody | null; /** Borrador de esta venta (o NO_SALE_DRAFT): solo ese se cierra al confirmarla. */ draftId?: string; }
 export interface Sale extends CashDrawerDispatch {
   id: string; visibleNumber: string; total: number; change: number; state: string; payments: (SalePaymentInput & { methodName?: string })[]; creditId: string | null;
   occurredAtUtc?: string; grossSubtotal?: number; discountTotal?: number; lines?: SaleLine[];
@@ -81,13 +88,14 @@ export function printJobStatusText(job: Pick<PrintJob, 'status' | 'error'>): str
 export class SalesApi {
   private readonly http = inject(HttpClient);
   private readonly customersApi = inject(CustomersApi);
-  /** Venta recuperable: el borrador del carrito en curso; null si no hay (204). */
-  async currentDraft(): Promise<SaleDraft | null> {
-    const response = await firstValueFrom(this.http.get<SaleDraft>('/api/sales/drafts/current', { observe: 'response' }));
-    return response.status === 204 ? null : response.body;
-  }
-  saveDraft(input: SaleDraftInput): Promise<SaleDraft> { return firstValueFrom(this.http.put<SaleDraft>('/api/sales/drafts/current', input)); }
-  discardDraft(): Promise<unknown> { return firstValueFrom(this.http.delete('/api/sales/drafts/current')); }
+  /** Ventas en espera (decisión del 19 de noviembre de 2026): las ventas sin terminar del cajero en el turno abierto. */
+  heldSales(): Promise<HeldSale[]> { return firstValueFrom(this.http.get<HeldSale[]>('/api/sales/drafts')); }
+  draft(id: string): Promise<SaleDraft> { return firstValueFrom(this.http.get<SaleDraft>(`/api/sales/drafts/${id}`)); }
+  /** Guarda un carrito nuevo como otra venta sin terminar; 409 si ya hay diez. */
+  createDraft(input: SaleDraftInput): Promise<SaleDraft> { return firstValueFrom(this.http.post<SaleDraft>('/api/sales/drafts', input)); }
+  /** Reemplaza el borrador del carrito; 404 si ya se cerró (por ejemplo, en otra pantalla). */
+  updateDraft(id: string, input: SaleDraftInput): Promise<SaleDraft> { return firstValueFrom(this.http.put<SaleDraft>(`/api/sales/drafts/${id}`, input)); }
+  discardDraft(id: string): Promise<unknown> { return firstValueFrom(this.http.delete(`/api/sales/drafts/${id}`)); }
   product(id: string): Promise<Product> { return firstValueFrom(this.http.get<Product>(`/api/products/${id}`)); }
   customer(id: string): Promise<Customer> { return this.customersApi.get(id); }
   async confirm(input: SaleInput, key: string): Promise<Sale> {

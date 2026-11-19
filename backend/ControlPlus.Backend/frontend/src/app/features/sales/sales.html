@@ -1,13 +1,19 @@
 <section class="prototype-operation">
   @if (blockReason && !sale() && !needsOperatorUnlock) { <div class="inline-feedback inline-feedback--error" role="status"><span>!</span>{{ blockReason }} <a class="link-button" routerLink="/operacion/caja">Ir a Caja</a></div> }
 
-  @if (pendingDraft(); as draft) { @if (!sale()) {
+  @if (heldNotice() && !sale() && heldSales().length) {
     <div class="inline-feedback inline-feedback--warning draft-banner" role="status"><span>!</span>
-      <p>Hay una venta sin terminar: {{ draft.lines.length | number:'1.0-0' }} {{ draft.lines.length === 1 ? 'producto' : 'productos' }}, guardada a las {{ draft.updatedAtUtc | date:'HH:mm' }}.</p>
-      <button class="button button--primary" type="button" (click)="recoverDraft()" [disabled]="recoveringDraft()">{{ recoveringDraft() ? 'Recuperando…' : 'Recuperar venta' }}</button>
-      <button class="button button--secondary" type="button" (click)="discardDraft()" [disabled]="recoveringDraft()">Descartar</button>
+      @if (heldSales().length === 1) {
+        @let held = heldSales()[0];
+        <p>Hay una venta sin terminar{{ held.customerName ? ' de ' + held.customerName : '' }}: {{ held.products | number:'1.0-0' }} {{ held.products === 1 ? 'producto' : 'productos' }}, guardada a las {{ held.updatedAtUtc | date:'HH:mm' }}.</p>
+        <button class="button button--primary" type="button" (click)="resumeHeld(held)" [disabled]="heldBusy() || recoveringDraft()">{{ heldBusy() || recoveringDraft() ? 'Retomando…' : 'Retomar venta' }}</button>
+        <button class="button button--secondary" type="button" (click)="discardHeld(held)" [disabled]="heldBusy() || recoveringDraft()">Descartar</button>
+      } @else {
+        <p>Tienes {{ heldSales().length | number:'1.0-0' }} ventas en espera.</p>
+        <button class="button button--primary" type="button" (click)="openHeldSales()">Ver ventas en espera</button>
+      }
     </div>
-  } }
+  }
 
   @if (sale(); as result) {
     <section class="panel success-page">
@@ -127,6 +133,8 @@
           <div class="cart-actions"><button class="button button--secondary" type="button" (click)="focusQuantity()" [disabled]="!cart().length">Cantidad · F4</button>@if (session.has('SALES.DISCOUNT_APPLY')) { <button class="button button--secondary" type="button" (click)="openDiscount('product')" [disabled]="!cart().length || locked">Desc. producto</button>
             <button class="button button--secondary" type="button" (click)="openDiscount('sale')" [disabled]="!cart().length || locked">Desc. venta total</button> }
             <button class="button button--secondary" type="button" (click)="removeSelected()" [disabled]="!cart().length || locked">Quitar · Supr</button>
+            <button class="button button--secondary" type="button" (click)="holdSale()" [disabled]="!cart().length || locked || heldBusy()" title="Guarda esta venta y deja la pantalla libre para atender a otro cliente">Poner en espera · F6</button>
+            <button class="button button--secondary" type="button" (click)="openHeldSales()" [disabled]="locked" title="Ventas guardadas para retomar">En espera ({{ heldSales().length | number:'1.0-0' }}) · F7</button>
           </div>
           @if (concessionAuthorizedBy()) { <div class="discount-summary" role="status"><span>Autorizado por <strong>{{ concessionAuthorizedBy() }}</strong></span></div> }
           @if (discounts > 0) { <div class="discount-summary" role="status">
@@ -162,6 +170,24 @@
             <h2 id="cancel-title">¿Cancelar esta venta?</h2>
             <p>Se retirarán {{ cart().length | number:'1.0-0' }} productos del carrito, por {{ estimate | currency:'COP':'symbol':'1.0-0' }}. No hay un cobro registrado.</p>
             <div class="form-actions"><button class="button button--secondary" type="button" (click)="showCancel.set(false)">Continuar venta</button><button class="button button--danger" type="button" (click)="cancelSale()">Confirmar cancelación</button></div>
+          </section>
+        </div>
+      }
+      @if (showHeld()) {
+        <div class="module-form-sheet held-sales-sheet" role="dialog" aria-modal="true" aria-labelledby="held-sales-title">
+          <div class="module-form-sheet__backdrop" (click)="showHeld.set(false)"></div>
+          <section class="panel panel--padded module-form held-sales">
+            <div class="panel-heading"><h2 id="held-sales-title">Ventas en espera</h2><p>Elige la venta que quieres retomar.@if (cart().length) { La venta que tienes en pantalla queda en espera. }</p></div>
+            <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Productos</th><th class="align-right">Total aprox.</th><th>Guardada</th><th></th></tr></thead><tbody>
+              @for (held of heldSales(); track held.id) {
+                <tr><td><strong>{{ held.customerName || 'Consumidor final' }}</strong>@if (held.saleType === 'CREDITO') { <span class="status-pill">Crédito</span> }</td>
+                  <td>{{ held.products | number:'1.0-0' }} ({{ held.units | number:'1.0-0' }} {{ held.units === 1 ? 'unidad' : 'unidades' }})</td>
+                  <td class="align-right numeric">{{ held.approximateTotal | currency:'COP':'symbol':'1.0-0' }}</td>
+                  <td>{{ held.updatedAtUtc | date:'HH:mm' }}</td>
+                  <td class="align-right"><button class="table-action" type="button" (click)="resumeHeld(held)" [disabled]="heldBusy()">Retomar</button><button class="table-action table-action--danger" type="button" (click)="discardHeld(held)" [disabled]="heldBusy()">Descartar</button></td></tr>
+              } @empty { <tr class="empty-row"><td colspan="5">No hay ventas en espera. Con «Poner en espera» (F6) guardas la venta en pantalla para atender a otro cliente.</td></tr> }
+            </tbody></table></div>
+            <div class="form-actions"><button class="button button--secondary" type="button" (click)="showHeld.set(false)">Cerrar</button></div>
           </section>
         </div>
       }

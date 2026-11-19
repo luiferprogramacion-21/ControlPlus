@@ -31,7 +31,11 @@ public sealed record ConfirmSaleRequest(
     string? SaleType = null,
     DateOnly? DueDate = null,
     SaleCreditAuthorizationRequest? Authorization = null,
-    IReadOnlyCollection<DateOnly>? InstallmentDueDates = null);
+    IReadOnlyCollection<DateOnly>? InstallmentDueDates = null,
+    // Ventas en espera (decisión del 19 de noviembre de 2026): el borrador de esta venta, para cerrar solo ese y dejar
+    // abiertas las demás. Guid vacío: la venta no tiene borrador. Sin indicarlo, se cierra el más reciente solo si tiene
+    // los mismos productos y cantidades. No forma parte de la huella de idempotencia.
+    Guid? DraftId = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 /// <summary>

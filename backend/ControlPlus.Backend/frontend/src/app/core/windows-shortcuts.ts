@@ -6,11 +6,11 @@ import { inject, Injectable, NgZone, OnDestroy } from '@angular/core';
  * - Ctrl+B (o Ctrl+F): lleva el cursor a la búsqueda de la pantalla o de la ventana abierta.
  * - F5: actualiza la lista con el botón «Actualizar» (o «Buscar») de la pantalla, sin recargar la página;
  *   con una ventana abierta no hace nada, para no perder lo escrito.
- * - Doble clic en una fila: la abre con su botón «Ver…», «Editar…», «Historial» o «Movimientos».
+ * - Doble clic en una fila: la abre con su botón «Ver…», «Editar…», «Historial», «Movimientos» o «Retomar» (ventas en espera).
  * - Al pasar el ratón por «Buscar» y «Actualizar» se muestra su atajo.
  * Enter acepta y Esc cancela en los formularios y ventanas (ver shared/window-sheet.ts).
  */
-const OPEN_ROW_ACTION = /^(Ver|Editar|Abrir|Movimientos|Historial)\b/;
+const OPEN_ROW_ACTION = /^(Ver|Editar|Abrir|Movimientos|Historial|Retomar)\b/;
 const WINDOW_SELECTOR = '.module-form-sheet, .cdk-overlay-container .mat-mdc-dialog-container, [role="dialog"][aria-modal="true"]';
 
 function label(element: Element): string { return (element.textContent ?? '').replace(/\s+/g, ' ').trim(); }

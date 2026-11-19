@@ -141,6 +141,78 @@ public sealed class SaleDraftApiTests : IAsyncLifetime
         Assert.NotNull(draft.FechaCierre);
     }
 
+    /// <summary>Ventas en espera (decisión del 19 de noviembre de 2026).</summary>
+    [Fact, Trait("Category", "Integration")]
+    public async Task HeldSales_AreListedResumedAndDiscardedById_AndASaleClosesOnlyItsOwnDraft()
+    {
+        using var client = Client();
+        var setup = await BootstrapAsync(client, openShift: true);
+        Assert.Empty(await ListAsync(client));
+
+        // El primer cliente queda en espera mientras se atiende al segundo.
+        var held = await CreateAsync(client, new SaveSaleDraftRequest("CONTADO", setup.CustomerId,
+            [new SaleDraftLineRequest(setup.ProductA, 2, "MINORISTA", new SaleDiscountRequest("PORCENTAJE", 10))]));
+        var current = await CreateAsync(client, new SaveSaleDraftRequest("CONTADO", null,
+            [new SaleDraftLineRequest(setup.ProductB, 1, "MINORISTA")]));
+        Assert.NotEqual(held.Id, current.Id);
+        var list = await ListAsync(client);
+        Assert.Equal([current.Id, held.Id], list.Select(x => x.Id));
+        var summary = list.Single(x => x.Id == held.Id);
+        Assert.Equal(("Cliente ficticio", 1, 2, 1_800m),
+            (summary.CustomerName, summary.Products, summary.Units, summary.ApproximateTotal));
+
+        // Se reemplaza y se retoma cada una por su identificador sin tocar la otra.
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync($"/api/sales/drafts/{current.Id}",
+            new SaveSaleDraftRequest("CONTADO", null, [new SaleDraftLineRequest(setup.ProductB, 3, "MINORISTA")]))).StatusCode);
+        var resumed = (await client.GetFromJsonAsync<SaleDraftDto>($"/api/sales/drafts/{held.Id}"))!;
+        Assert.Equal((setup.ProductA, 2), (Assert.Single(resumed.Lines).ProductId, resumed.Lines.Single().Quantity));
+        Assert.Equal(setup.CustomerId, resumed.CustomerId);
+
+        // Otro usuario no ve ni toca las ventas en espera ajenas.
+        SetBearer(client, setup.Supervisor.AccessToken);
+        Assert.Empty(await ListAsync(client));
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/sales/drafts/{held.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync($"/api/sales/drafts/{held.Id}",
+            new SaveSaleDraftRequest("CONTADO", null, [new SaleDraftLineRequest(setup.ProductB, 1, "MINORISTA")]))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync($"/api/sales/drafts/{held.Id}")).StatusCode);
+        SetBearer(client, setup.Admin.AccessToken);
+
+        // Cobrar la venta en pantalla cierra solo su borrador.
+        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(client, "held-current-sale", new ConfirmSaleRequest(null,
+            [new SaleLineRequest(setup.ProductB, 3, "MINORISTA")], null, null,
+            [new SalePaymentRequest("EFECTIVO", 3_000m, 3_000m, null)], "CONTADO", DraftId: current.Id))).StatusCode);
+        Assert.Equal([held.Id], (await ListAsync(client)).Select(x => x.Id));
+
+        // Una venta sin borrador indicado y con otros productos tampoco cierra la venta en espera.
+        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(client, "sale-without-draft", new ConfirmSaleRequest(null,
+            [new SaleLineRequest(setup.ProductB, 1, "MINORISTA")], null, null,
+            [new SalePaymentRequest("EFECTIVO", 1_000m, 1_000m, null)], "CONTADO"))).StatusCode);
+        Assert.Equal([held.Id], (await ListAsync(client)).Select(x => x.Id));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/sales/drafts/{held.Id}")).StatusCode);
+        Assert.Empty(await ListAsync(client));
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync($"/api/sales/drafts/{held.Id}")).StatusCode);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var rows = await scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>()
+            .BorradorVenta.AsNoTracking().ToDictionaryAsync(x => x.Id);
+        Assert.Equal(2, rows.Count);
+        Assert.Equal("CONVERTIDO", rows[current.Id].Estado);
+        Assert.NotNull(rows[current.Id].VentaConfirmadaId);
+        Assert.Equal("DESCARTADO", rows[held.Id].Estado);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task HeldSales_AreLimitedToTenPerCashier()
+    {
+        using var client = Client();
+        var setup = await BootstrapAsync(client, openShift: true);
+        var request = new SaveSaleDraftRequest("CONTADO", null, [new SaleDraftLineRequest(setup.ProductA, 1, "MINORISTA")]);
+        for (var index = 0; index < 10; index++) await CreateAsync(client, request);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/sales/drafts", request)).StatusCode);
+        Assert.Equal(10, (await ListAsync(client)).Length);
+    }
+
     [Fact, Trait("Category", "Integration")]
     public async Task WithoutAnOpenShift_ThereIsNothingToRecover_AndNothingIsSaved()
     {
@@ -204,6 +276,23 @@ public sealed class SaleDraftApiTests : IAsyncLifetime
 
     private static Task<HttpResponseMessage> SaveAsync(HttpClient client, SaveSaleDraftRequest request) =>
         client.PutAsJsonAsync("/api/sales/drafts/current", request);
+
+    private static async Task<SaleDraftDto> CreateAsync(HttpClient client, SaveSaleDraftRequest request)
+    {
+        var response = await client.PostAsJsonAsync("/api/sales/drafts", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<SaleDraftDto>())!;
+    }
+
+    private static async Task<HeldSaleDto[]> ListAsync(HttpClient client) =>
+        (await client.GetFromJsonAsync<HeldSaleDto[]>("/api/sales/drafts"))!;
+
+    private static async Task<HttpResponseMessage> PostSaleAsync(HttpClient client, string key, ConfirmSaleRequest request)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, "/api/sales") { Content = JsonContent.Create(request) };
+        message.Headers.Add("Idempotency-Key", key);
+        return await client.SendAsync(message);
+    }
 
     private static async Task<SaleDraftDto> CurrentAsync(HttpClient client)
     {

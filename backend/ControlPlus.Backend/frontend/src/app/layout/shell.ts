@@ -132,6 +132,8 @@ export class Shell {
     { keys: 'F3', action: 'Punto de venta: buscar o crear el cliente.' },
     { keys: 'F4', action: 'Punto de venta: cambiar la cantidad.' },
     { keys: 'Supr', action: 'Punto de venta: quitar el producto seleccionado.' },
+    { keys: 'F6', action: 'Punto de venta: poner la venta en espera para atender a otro cliente.' },
+    { keys: 'F7', action: 'Punto de venta: ver las ventas en espera y retomar una.' },
     { keys: 'F9', action: 'Punto de venta: cobrar y confirmar la venta.' },
   ];
   private readonly host = inject(ElementRef<HTMLElement>);

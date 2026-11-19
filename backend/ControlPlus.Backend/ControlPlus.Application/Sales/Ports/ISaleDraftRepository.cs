@@ -27,9 +27,24 @@ public interface ISaleDraftRepository
     /// <summary>Descarta los borradores activos del usuario (todos los turnos).</summary>
     Task DiscardActiveAsync(Guid userId, DateTime nowUtc, CancellationToken cancellationToken = default);
 
+    /// <summary>Borradores abiertos del usuario en el turno, del más reciente al más antiguo, con sus líneas y el cliente.</summary>
+    Task<IReadOnlyCollection<BorradorVenta>> GetOpenAsync(Guid userId, Guid shiftId, CancellationToken cancellationToken = default);
+
+    /// <summary>Un borrador abierto del usuario en el turno, con sus líneas; null si no existe, es de otro o ya se cerró.</summary>
+    Task<BorradorVenta?> GetOpenByIdAsync(Guid draftId, Guid userId, Guid shiftId, bool track,
+        CancellationToken cancellationToken = default);
+
+    Task<int> CountOpenAsync(Guid userId, Guid shiftId, CancellationToken cancellationToken = default);
+
+    /// <summary>Descarta un borrador abierto del usuario. False si no había nada que descartar.</summary>
+    Task<bool> DiscardAsync(Guid draftId, Guid userId, DateTime nowUtc, CancellationToken cancellationToken = default);
+
     /// <summary>
-    /// Dentro de la transacción de la venta: marca CONVERTIDO el borrador activo del usuario en el turno, enlazado a la
-    /// venta, y DESCARTADO cualquier otro activo del mismo turno. Solo modifica entidades rastreadas; guarda quien llama.
+    /// Dentro de la transacción de la venta cierra como CONVERTIDO, enlazado a la venta, el borrador de esa venta: el
+    /// indicado o, si no se indica, el más reciente del usuario en el turno solo cuando tiene los mismos productos y
+    /// cantidades. Las ventas en espera quedan abiertas. Solo modifica entidades rastreadas; guarda quien llama.
     /// </summary>
-    Task ConvertActiveAsync(Guid userId, Guid shiftId, Guid saleId, DateTime nowUtc, CancellationToken cancellationToken = default);
+    Task ConvertAsync(Guid userId, Guid shiftId, Guid saleId, Guid? draftId,
+        IReadOnlyCollection<(Guid ProductId, int Quantity)> saleLines, DateTime nowUtc,
+        CancellationToken cancellationToken = default);
 }

@@ -21,7 +21,7 @@ describe('Sales: turno compartido, desbloqueo con carné (maqueta 06b)', () => {
     cash.state.mockResolvedValue(shared());
     TestBed.configureTestingModule({ providers: [
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
-      { provide: SalesApi, useValue: { currentDraft: vi.fn().mockResolvedValue(null), pricingRules: vi.fn().mockResolvedValue({ wholesaleMinimumQuantity: 12 }) } },
+      { provide: SalesApi, useValue: { heldSales: vi.fn().mockResolvedValue([]), pricingRules: vi.fn().mockResolvedValue({ wholesaleMinimumQuantity: 12 }) } },
       { provide: CashApi, useValue: cash }, { provide: CatalogApi, useValue: {} }, { provide: AuthorizationDialog, useValue: { open: vi.fn() } },
       { provide: SessionService, useValue: { has: (code: string) => code === 'SALES.CREATE', hasRole: () => false, user: () => ({ id: 'u1', userName: 'cajera', displayName: 'Ana' }) } },
     ] });

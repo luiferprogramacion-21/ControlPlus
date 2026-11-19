@@ -70,6 +70,7 @@ Funcionan en todas las pantallas. **F1** (o tu nombre → «Atajos del teclado»
 | **Tab** / **Mayús + Tab** | Pasar al campo siguiente / anterior. |
 | **Doble clic** en una fila | Abrirla (como su botón Ver o Editar). |
 | **F2, F3, F4, Supr, F9** | Atajos del punto de venta (ver 2.3). |
+| **F6 / F7** | Punto de venta: poner la venta en espera / ver las ventas en espera (ver 2.7). |
 
 ## 1.4 Cuando el sistema pide la autorización de otra persona
 
@@ -183,16 +184,23 @@ Se puede pagar con **Efectivo, Transferencia o Nequi**, solos o combinados:
 - Debajo del total aparece un aviso del cajón. «Windows aceptó la orden» significa que la impresora recibió la orden; mira que el cajón se haya abierto.
 - Si no se abrió, la venta **ya está registrada**. No la repitas: pide a un Supervisor que lo abra desde **Caja** (ver 3.3).
 
-## 2.7 Venta sin terminar
+## 2.7 Ventas en espera y ventas sin terminar
 
-Si se cierra la sesión, se va la luz o se apaga el equipo con una venta a medias, **el carrito se conserva** (el sistema lo guarda solo cada vez que cambias algo).
+**Poner una venta en espera** sirve, por ejemplo, cuando el cliente se fue a buscar otro producto y llega el siguiente cliente:
 
-Al volver al punto de venta aparece el aviso **«Hay una venta sin terminar…»**:
+1. Con la venta en pantalla, pulsa **Poner en espera · F6**. La venta se guarda y la pantalla queda libre.
+2. Atiende al siguiente cliente normalmente.
+3. Para volver a la venta guardada, pulsa **En espera (n) · F7**. Se abre la lista con el cliente, los productos, el total aproximado y la hora.
+4. Pulsa **Retomar**, o haz doble clic en la fila. Si tenías otra venta en pantalla, esa queda en espera en su lugar; no se pierde.
+5. **Descartar** borra una venta en espera; el sistema pide confirmarlo.
 
-- **Recuperar venta:** vuelve a armar el carrito. Quita lo que ya no tiene existencias y te lo dice. Si había descuentos o mayorista, se autorizan otra vez al cobrar.
-- **Descartar:** borra la venta guardada.
+**Si se cierra la sesión, se va la luz o se apaga el equipo** con una venta a medias, el carrito también se conserva: el sistema lo guarda solo cada vez que cambias algo. Al volver al punto de venta aparece el aviso **«Hay una venta sin terminar…»** con **Retomar venta** y **Descartar**. Si son varias, dice **«Tienes n ventas en espera»** y abre la lista.
 
-El carrito guardado es solo tuyo y del turno abierto.
+Al retomar una venta, el sistema quita lo que ya no tiene existencias y te lo dice. Si había descuentos o precio mayorista, se autorizan otra vez al cobrar.
+
+- Las ventas en espera **no apartan productos ni registran dinero**. Si alguien vende antes la última unidad, se quita al retomarla.
+- Son solo tuyas y del turno abierto: al cerrar la caja dejan de estar disponibles.
+- Puedes tener hasta **10** a la vez.
 
 ## 2.8 Vender a crédito y cobrar abonos
 

@@ -1,6 +1,6 @@
 import { groupedNumber, NumberInput } from '../../shared/number-input';
 import { A11yModule } from '@angular/cdk/a11y';
-import { Component, effect, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, untracked, ViewChild } from '@angular/core';
+import { Component, DestroyRef, effect, ElementRef, HostListener, inject, OnDestroy, OnInit, signal, untracked, ViewChild } from '@angular/core';
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -10,7 +10,7 @@ import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { CatalogApi, Product } from '../catalog/catalog-api';
 import { CashApi, CashState } from '../cash/cash-api';
-import { CustomerCreditRisk, Sale, SaleDraft, SaleDraftInput, SaleInput, SalesApi, SalePaymentInput, PrintJob, PrintJobStatus } from './sales-api';
+import { CustomerCreditRisk, HeldSale, NO_SALE_DRAFT, Sale, SaleDraft, SaleDraftInput, SaleInput, SalesApi, SalePaymentInput, PrintJob, PrintJobStatus } from './sales-api';
 import { Customer } from '../customers/customers-api';
 import { CustomerPicker } from '../customers/customer-picker';
 import { buildTicketHtml, TicketPrinter } from './ticket';
@@ -19,6 +19,7 @@ import { DiscountApplied, DiscountDialog } from './discount-dialog';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { statusKind, toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 
 interface CartLine { product: Product; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; discount: Discount | null; }
 interface ReceiptMeta { customer: string; operator: string; items: number; units: number; }
@@ -98,11 +99,19 @@ export class Sales implements OnInit, OnDestroy {
   /** Moroso o sobre el cupo para la venta a crédito en curso; null si no aplica o no se pudo consultar (el servidor igual decide). */
   readonly creditRisk = signal<CustomerCreditRisk | null>(null);
   private pending: { key: string; input: SaleInput; authorizerUserName: string | null } | null = null;
-  /** Venta recuperable (decisión del 18 de noviembre de 2026): borrador encontrado al entrar, pendiente de decisión. */
-  readonly pendingDraft = signal<SaleDraft | null>(null);
+  /**
+   * Venta recuperable (18 de noviembre) y ventas en espera (19 de noviembre de 2026): cada carrito se guarda solo como un
+   * borrador. Este es el del carrito en pantalla; las demás ventas sin terminar quedan en espera.
+   */
+  private draftId: string | null = null;
+  readonly heldSales = signal<HeldSale[]>([]);
+  /** Aviso al entrar cuando hay ventas sin terminar; empezar otra venta lo oculta sin descartarlas. */
+  readonly heldNotice = signal(false);
+  readonly showHeld = signal(false);
+  readonly heldBusy = signal(false);
   readonly recoveringDraft = signal(false);
-  private draftReady = false;
-  private draftStored = false;
+  private readonly confirmations = inject(ConfirmationDialog);
+  private readonly destroyRef = inject(DestroyRef);
   private draftTimer: ReturnType<typeof setTimeout> | undefined;
   /** Cambia para detener la consulta del estado de impresión de una venta anterior. */
   private printWatch = 0;
@@ -110,8 +119,7 @@ export class Sales implements OnInit, OnDestroy {
   private readonly draftWatcher = effect(() => {
     const lines = this.cart(); this.saleType();
     untracked(() => {
-      // Empezar otra venta con el aviso a la vista descarta la que quedó sin terminar.
-      if (this.pendingDraft() && lines.length && !this.recoveringDraft()) void this.discardDraft('Se descartó la venta sin terminar porque empezaste otra.');
+      if (lines.length && this.heldNotice() && !this.recoveringDraft()) this.heldNotice.set(false);
       this.scheduleDraftSave();
     });
   });
@@ -123,7 +131,7 @@ export class Sales implements OnInit, OnDestroy {
   private static loadAutoPrint(): boolean { try { return localStorage.getItem(Sales.AUTO_PRINT_KEY) !== '0'; } catch { return true; } }
   setAutoPrint(value: boolean): void { this.autoPrint.set(value); try { localStorage.setItem(Sales.AUTO_PRINT_KEY, value ? '1' : '0'); } catch { /* sin almacenamiento: queda solo en esta sesión */ } }
 
-  ngOnInit(): void { if (this.route.snapshot.queryParamMap.get('modalidad') === 'credito' && this.canRequestCredit) this.saleType.set('CREDITO'); void this.refreshCash(); if (this.canRequestCredit) void this.loadCreditRules(); void this.loadPricingRules(); void this.loadDraft(); }
+  ngOnInit(): void { if (this.route.snapshot.queryParamMap.get('modalidad') === 'credito' && this.canRequestCredit) this.saleType.set('CREDITO'); void this.refreshCash(); if (this.canRequestCredit) void this.loadCreditRules(); void this.loadPricingRules(); void this.loadHeldSales(true); }
   private async loadPricingRules(): Promise<void> {
     try { this.wholesaleMin.set((await this.api.pricingRules()).wholesaleMinimumQuantity); }
     catch { /* The server still enforces the minimum; the screen keeps the default. */ }
@@ -139,41 +147,53 @@ export class Sales implements OnInit, OnDestroy {
     if (this.draftTimer !== undefined) { clearTimeout(this.draftTimer); this.draftTimer = undefined; void this.persistDraft(); }
   }
 
-  private async loadDraft(): Promise<void> {
+  /** Lee las ventas sin terminar del turno (sin la de pantalla). Al entrar, avisa si hay alguna. */
+  async loadHeldSales(onEnter = false): Promise<void> {
+    if (!this.session.has('SALES.CREATE')) return;
     try {
-      if (!this.session.has('SALES.CREATE')) return;
-      const draft = await this.api.currentDraft();
-      if (!draft) return;
-      this.draftStored = true;
-      if (!this.cart().length && !this.sale()) this.pendingDraft.set(draft);
-    } catch { /* sin borrador o sin turno: se vende normalmente */ }
-    finally { if (!this.pendingDraft()) this.draftReady = true; }
+      const held = (await this.api.heldSales()).filter(item => item.id !== this.draftId);
+      this.heldSales.set(held);
+      if (!held.length) this.heldNotice.set(false);
+      else if (onEnter && !this.cart().length && !this.sale()) this.heldNotice.set(true);
+    } catch { /* sin turno o sin servidor: se vende normalmente */ }
   }
 
-  /** Programa el guardado del carrito (no se guarda mientras el aviso de recuperación espera una decisión). */
+  /** Programa el guardado del carrito (no mientras se arma una venta retomada). */
   private scheduleDraftSave(): void {
-    if (!this.draftReady) return;
+    if (this.recoveringDraft()) return;
     clearTimeout(this.draftTimer);
     this.draftTimer = setTimeout(() => { this.draftTimer = undefined; void this.persistDraft(); }, DRAFT_DELAY_MS);
   }
 
-  /** Guarda o descarta el borrador. Es de mejor esfuerzo: un fallo nunca bloquea la venta. */
+  /** Guarda o descarta el borrador del carrito. Es de mejor esfuerzo: un fallo nunca bloquea la venta. */
   private async persistDraft(): Promise<void> {
-    if (!this.draftReady || this.sale() || this.pending) return;
+    if (this.sale() || this.pending) return;
+    try { await this.writeDraft(); } catch { /* se reintenta con el siguiente cambio */ }
+  }
+
+  /** Escribe el carrito en su borrador (uno nuevo si aún no tiene), en orden con los guardados anteriores. */
+  private writeDraft(): Promise<void> {
     const previous = this.draftSave;
     const run = (async () => {
       await previous?.catch(() => undefined);
-      try {
-        if (!this.cart().length) {
-          if (this.draftStored) { await this.api.discardDraft(); this.draftStored = false; }
-          return;
+      if (!this.cart().length) {
+        const id = this.draftId;
+        if (id) { this.draftId = null; await this.api.discardDraft(id).catch(() => undefined); }
+        return;
+      }
+      const input = this.draftInput();
+      if (this.draftId) {
+        try { await this.api.updateDraft(this.draftId, input); return; }
+        catch (error) {
+          // Cerrado en otra pantalla: este carrito sigue y se guarda como otra venta.
+          if (!(error instanceof HttpErrorResponse && error.status === 404)) throw error;
+          this.draftId = null;
         }
-        await this.api.saveDraft(this.draftInput());
-        this.draftStored = true;
-      } catch { /* se reintenta con el siguiente cambio */ }
+      }
+      this.draftId = (await this.api.createDraft(input)).id;
     })();
     this.draftSave = run;
-    try { await run; } finally { if (this.draftSave === run) this.draftSave = null; }
+    return run.finally(() => { if (this.draftSave === run) this.draftSave = null; });
   }
 
   private draftInput(): SaleDraftInput {
@@ -186,10 +206,74 @@ export class Sales implements OnInit, OnDestroy {
     };
   }
 
-  /** Vuelve a armar el carrito guardado. Los productos inactivos o agotados se quitan; el resto se valida al cobrar. */
-  async recoverDraft(): Promise<void> {
-    const draft = this.pendingDraft();
-    if (!draft || this.recoveringDraft()) return;
+  /** Poner en espera: guarda la venta en pantalla y deja la pantalla libre para el siguiente cliente. */
+  async holdSale(): Promise<void> {
+    if (!this.cart().length || this.locked || this.busy() || this.heldBusy() || this.checkoutMode() || this.sale()) return;
+    this.heldBusy.set(true); this.error.set('');
+    clearTimeout(this.draftTimer); this.draftTimer = undefined;
+    try {
+      await this.writeDraft();
+      const customer = this.customerId.trim() ? this.selectedCustomerName : '';
+      this.draftId = null;
+      this.clearCart();
+      this.feedbackKind.set('success');
+      this.feedback.set(`Venta puesta en espera${customer ? ` (${customer})` : ''}. Retómala con «En espera» · F7.`);
+      await this.loadHeldSales();
+    } catch (error) { this.error.set(`No se pudo poner en espera. ${errorText(error)}`); }
+    finally { this.heldBusy.set(false); this.focusSearch(); }
+  }
+
+  async openHeldSales(): Promise<void> {
+    if (this.locked || this.sale() || this.checkoutMode()) return;
+    this.showHeld.set(true);
+    await this.loadHeldSales();
+  }
+
+  /** Retoma una venta en espera; la que está en pantalla queda en espera en su lugar. */
+  async resumeHeld(held: HeldSale): Promise<void> {
+    if (this.locked || this.busy() || this.heldBusy() || this.recoveringDraft() || this.checkoutMode() || this.sale()) return;
+    this.heldBusy.set(true); this.error.set('');
+    clearTimeout(this.draftTimer); this.draftTimer = undefined;
+    try {
+      if (this.cart().length) await this.writeDraft();
+      const draft = await this.api.draft(held.id);
+      this.draftId = null;
+      this.clearCart();
+      this.showHeld.set(false); this.heldNotice.set(false);
+      await this.applyDraft(draft);
+    } catch (error) {
+      this.error.set(error instanceof HttpErrorResponse && error.status === 404
+        ? 'Esa venta ya no está en espera: se cobró o se descartó en otra pantalla.'
+        : `No se pudo retomar la venta. ${errorText(error)}`);
+    }
+    finally { this.heldBusy.set(false); await this.loadHeldSales(); }
+  }
+
+  /** Descarta una venta en espera, después de confirmarlo. */
+  async discardHeld(held: HeldSale): Promise<void> {
+    if (this.heldBusy()) return;
+    const products = `${groupedNumber(held.products)} ${held.products === 1 ? 'producto' : 'productos'}`;
+    const approved = await this.confirmations.confirm({
+      title: 'Descartar venta en espera',
+      message: `Se borrará la venta en espera de ${held.customerName || 'Consumidor final'} (${products}). No se registra ningún cobro.`,
+      confirmText: 'Descartar venta',
+    }, this.destroyRef);
+    if (!approved || this.destroyRef.destroyed) return;
+    this.heldBusy.set(true);
+    try { await this.api.discardDraft(held.id); this.feedbackKind.set('info'); this.feedback.set('Se descartó la venta en espera.'); }
+    catch (error) { if (!(error instanceof HttpErrorResponse && error.status === 404)) this.error.set(errorText(error)); }
+    finally { this.heldBusy.set(false); await this.loadHeldSales(); }
+  }
+
+  /** Deja la pantalla lista para otro cliente sin tocar las ventas guardadas. */
+  private clearCart(): void {
+    this.cart.set([]); this.results.set([]); this.selectedProductId.set(null);
+    this.generalDiscount = null; this.discountReason = ''; this.customerId = ''; this.customers.set([]); this.dueDate = '';
+    this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.saleType.set('CONTADO');
+  }
+
+  /** Vuelve a armar una venta guardada. Los productos inactivos o agotados se quitan; el resto se valida al cobrar. */
+  private async applyDraft(draft: SaleDraft): Promise<void> {
     this.recoveringDraft.set(true); this.error.set('');
     try {
       const found = await Promise.all(draft.lines.map(line =>
@@ -206,24 +290,17 @@ export class Sales implements OnInit, OnDestroy {
       if (draft.saleType === 'CREDITO' && this.canRequestCredit) this.saleType.set('CREDITO');
       this.cart.set(usable.map(({ line, product }) => ({ product, quantity: Math.min(line.quantity, product.availableStock),
         priceType: line.priceType, discount: line.discount })));
+      // Desde aquí el carrito en pantalla es esta venta: los guardados siguientes la actualizan.
+      this.draftId = draft.id;
       this.feedbackKind.set('success');
-      this.feedback.set(`Venta recuperada: ${groupedNumber(usable.length)} ${usable.length === 1 ? 'producto' : 'productos'}.` +
+      this.feedback.set(`Venta retomada: ${groupedNumber(usable.length)} ${usable.length === 1 ? 'producto' : 'productos'}.` +
         (removed ? ` ${groupedNumber(removed)} ya no ${removed === 1 ? 'está disponible y se quitó' : 'están disponibles y se quitaron'}.` : '') + customerNote +
         (this.needsConcessionAuthorization ? ' El descuento o el precio mayorista se autorizan de nuevo al cobrar.' : ''));
     } catch (error) { this.error.set(errorText(error)); }
     finally {
-      this.pendingDraft.set(null); this.recoveringDraft.set(false); this.draftReady = true;
+      this.recoveringDraft.set(false);
       this.scheduleDraftSave(); this.focusSearch();
     }
-  }
-
-  /** Descarta el borrador encontrado al entrar. */
-  async discardDraft(message = 'Se descartó la venta sin terminar.'): Promise<void> {
-    if (!this.pendingDraft()) return;
-    this.pendingDraft.set(null); this.draftReady = true;
-    this.feedbackKind.set('info'); this.feedback.set(message);
-    try { await this.api.discardDraft(); this.draftStored = false; } catch { /* se reemplaza con la próxima venta */ }
-    this.scheduleDraftSave();
   }
   get hasCustomerAccess(): boolean { return this.session.has('CUSTOMERS.BASIC_MANAGE') || this.session.has('CUSTOMERS.MANAGE'); }
   get canRequestCredit(): boolean { return this.session.has('SALES.CREATE') && this.session.has('CREDIT.REQUEST'); }
@@ -662,7 +739,7 @@ export class Sales implements OnInit, OnDestroy {
   @HostListener('document:keydown', ['$event'])
   handleShortcut(event: KeyboardEvent): void {
     if (typeof document !== 'undefined' && document.querySelector('.cdk-overlay-container .mat-mdc-dialog-container')) return;
-    if (this.showCustomer()) return;
+    if (this.showCustomer() || this.showHeld()) return;
     if (this.sale()) {
       if (this.showDetail()) {
         if (event.key === 'Escape') { event.preventDefault(); this.showDetail.set(false); }
@@ -683,6 +760,8 @@ export class Sales implements OnInit, OnDestroy {
     if (event.key === 'F2') { event.preventDefault(); this.focusSearch(); }
     if (event.key === 'F3') { event.preventDefault(); if (this.hasCustomerAccess) this.openCustomerPicker(); }
     if (event.key === 'F4') { event.preventDefault(); this.focusQuantity(); }
+    if (event.key === 'F6') { event.preventDefault(); void this.holdSale(); }
+    if (event.key === 'F7') { event.preventDefault(); void this.openHeldSales(); }
     if (event.key === 'F9') { event.preventDefault(); this.startCheckout(); }
     if (event.key === 'Delete' && !editing) { event.preventDefault(); this.removeSelected(); }
     if (event.key === 'Escape' && this.results().length) { event.preventDefault(); this.results.set([]); this.activeIndex.set(-1); this.focusSearch(); }
@@ -788,8 +867,10 @@ export class Sales implements OnInit, OnDestroy {
       // porque la venta lo cierra en el servidor.
       if (this.draftSave) await this.draftSave.catch(() => undefined);
       const meta: ReceiptMeta = { customer: this.selectedCustomerName, operator: this.session.user()?.displayName ?? '', items: this.cart().length, units: this.units };
-      const result = await this.api.confirm({ ...this.pending.input, authorization: credentials ? authorizationBody(credentials) : null }, this.pending.key);
-      this.draftStored = false;
+      // Solo se cierra el borrador de esta venta; las ventas en espera siguen abiertas.
+      const result = await this.api.confirm({ ...this.pending.input, draftId: this.draftId ?? NO_SALE_DRAFT,
+        authorization: credentials ? authorizationBody(credentials) : null }, this.pending.key);
+      this.draftId = null;
       this.drawerStatus.set(result.drawerStatus ?? null);
       this.receipt.set(meta); this.showDetail.set(false); this.reprintMessage.set(''); this.printed.set(false); this.lastJobStatus.set(null); this.sale.set(result);
       this.pending = null; this.cart.set([]); this.results.set([]); this.selectedProductId.set(null); this.cashApplied = this.cashReceived = this.transferApplied = this.nequiApplied = 0; this.generalDiscount = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.activePayments.set(['EFECTIVO']); this.checkoutMode.set(false);
