@@ -43,7 +43,7 @@ export interface AuthorizationPrompt {
       <mat-dialog-content>
         <p>{{ data.description }}</p><p><strong>{{ data.detail }}</strong></p>
         @if (data.allowCredential) {
-          <label for="authorization-scan">Escanear credencial del autorizador</label>
+          <label for="authorization-scan">Pasar el carné de quien autoriza</label>
           <input id="authorization-scan" class="text-field" type="password" name="scan" [(ngModel)]="scanToken" autocomplete="off" cdkFocusInitial
             placeholder="Pase el carné por el lector" (keydown.enter)="scan($event)" [disabled]="busy()">
           <p class="scan-hint">o escribe el usuario y la contraseña:</p>
@@ -108,7 +108,7 @@ export class AuthorizationDialogComponent implements OnDestroy {
     } catch (error) {
       this.error.set(error instanceof HttpErrorResponse && error.status === 401 &&
         ['authentication.invalid_credentials', 'authentication.unauthorized'].includes(error.error?.code)
-        ? 'Credenciales de autorización inválidas. Revisa el usuario y la contraseña, o vuelve a escanear la credencial.' :
+        ? 'Credenciales de autorización inválidas. Revisa el usuario y la contraseña, o vuelve a pasar el carnél.' :
         error instanceof Error && !(error instanceof HttpErrorResponse) ? error.message : errorText(error));
       this.password = ''; this.scanToken = '';
     } finally { this.busy.set(false); this.ref.disableClose = false; }

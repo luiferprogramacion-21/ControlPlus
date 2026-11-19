@@ -24,6 +24,9 @@ export class Cash implements OnInit {
   readonly state = signal<CashState | null>(null);
   readonly reconciliation = signal<Reconciliation | null>(null);
   readonly closingMode = signal(false);
+  /** Cerrar caja en pasos (decisión del 19 de noviembre de 2026): 1 contar, 2 revisar la diferencia, 3 confirmar. */
+  readonly closeStep = signal<1 | 2 | 3>(1);
+  readonly closeSteps = [{ number: 1, label: 'Contar el efectivo' }, { number: 2, label: 'Revisar la diferencia' }, { number: 3, label: 'Confirmar' }] as const;
   readonly movements = signal<CashMovement[]>([]);
   readonly loading = signal(false);
   readonly stateLoading = signal(true);
@@ -111,6 +114,13 @@ export class Cash implements OnInit {
     return this.openMode ?? (cash?.defaultShiftMode === 'COMPARTIDO' ? 'COMPARTIDO' : 'INDIVIDUAL');
   }
   /** The Administrator closes with a difference without choosing a reason (the server records the generic one). */
+  goToCloseStep(step: 1 | 2 | 3): void {
+    if (step > 1 && !this.hasValidCounts) return;
+    if (step === 2) this.onCountedChange();
+    this.error.set('');
+    this.closeStep.set(step);
+  }
+  get selectedReasonName(): string { return this.reasons()?.find(reason => reason.id === this.reasonId)?.name ?? ''; }
   get isAdministrator(): boolean { return typeof this.session.hasRole === 'function' && this.session.hasRole('ADMINISTRADOR'); }
   private resetReasons(): void { this.reasons.set(null); this.reasonsError.set(''); this.reasonId = ''; }
   async open(): Promise<void> {

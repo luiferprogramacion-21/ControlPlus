@@ -37,7 +37,7 @@
           </div>
           @if (history(); as historyResult) { <mat-paginator [length]="historyResult.totalCount" [pageIndex]="historyPage - 1" [pageSize]="historyPageSize" [pageSizeOptions]="[10,20,50]" (page)="historyChanged($event)" /> }
         }
-        <div class="credit-detail-actions"><button class="button button--secondary" type="button" [disabled]="saving()" (click)="refreshSelected()">Actualizar</button><button class="button button--primary" type="button" [disabled]="credit.state === 'PAGADO' || credit.state === 'ANULADO' || credit.balance <= 0" (click)="openPayment(credit)">Abonar</button>@if (canForgive) { <button class="button button--secondary credit-danger-action" type="button" [disabled]="saving()" (click)="startForgive()">Condonar saldo</button> }<button class="button button--secondary credit-detail-close" type="button" autofocus (click)="close()">Cerrar</button></div>
+        <div class="credit-detail-actions"><button class="button button--secondary" type="button" [disabled]="saving()" (click)="refreshSelected()">Actualizar</button><button class="button button--primary" type="button" [disabled]="credit.state === 'PAGADO' || credit.state === 'ANULADO' || credit.balance <= 0" (click)="openPayment(credit)">Abonar</button>@if (canForgive) { <button class="button button--secondary credit-danger-action" type="button" [disabled]="saving()" (click)="startForgive()">Perdonar la deuda</button> }<button class="button button--secondary credit-detail-close" type="button" autofocus (click)="close()">Cerrar</button></div>
       </section>
     </div>
   }
@@ -61,11 +61,11 @@
   } }
   @if (forgiving() && selected(); as credit) {
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="credit-forgive-title"><div class="module-form-sheet__backdrop" (click)="forgiving.set(false)"></div><form class="panel panel--padded module-form" (submit)="$event.preventDefault(); confirmForgive()">
-      <div class="panel-heading"><h2 id="credit-forgive-title">Condonar saldo</h2><p>{{ credit.saleNumber }} · saldo {{ money(credit.balance) }}</p></div>
+      <div class="panel-heading"><h2 id="credit-forgive-title">Perdonar la deuda</h2><p>{{ credit.saleNumber }} · saldo {{ money(credit.balance) }}</p></div>
       <p class="muted">El crédito pasará a Anulado. No se repone mercancía y los abonos registrados se conservan.</p>
       <label class="field-label" for="credit-forgive-reason">Motivo obligatorio</label><textarea id="credit-forgive-reason" class="text-field" name="forgivenessReason" maxlength="500" [(ngModel)]="forgivenessReason"></textarea>
       @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-      <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">Condonar saldo</button><button class="button button--secondary" type="button" [disabled]="saving()" (click)="forgiving.set(false)">Cancelar</button></div>
+      <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">Perdonar la deuda</button><button class="button button--secondary" type="button" [disabled]="saving()" (click)="forgiving.set(false)">Cancelar</button></div>
     </form></div>
   }
 </section>

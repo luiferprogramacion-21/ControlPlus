@@ -193,7 +193,7 @@ export class Credits implements OnInit {
     try {
       await this.api.forgive(credit, reason, this.pendingForgiveness.key);
       this.pendingForgiveness = null; this.forgiving.set(false);
-      this.notice.set('Saldo condonado. El crédito quedó anulado; la venta y sus abonos se conservaron.');
+      this.notice.set('Deuda perdonada. El crédito quedó anulado; la venta y sus abonos se conservaron.');
       await this.refreshSelected(); await this.reload();
     } catch (e) { this.error.set(errorText(e)); }
     finally { this.saving.set(false); }

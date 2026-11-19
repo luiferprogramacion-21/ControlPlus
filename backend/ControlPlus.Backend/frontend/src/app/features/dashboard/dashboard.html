@@ -3,7 +3,7 @@
     <div>
       <h2 id="dashboard-title">Dashboard</h2>
       @if (summary(); as data) { <p>Resumen operativo del {{ date(data.operatingDate) }}</p> }
-      @else { <p>Resumen de la fecha operativa del establecimiento</p> }
+      @else { <p>Resumen del día de caja</p> }
     </div>
     <button class="button button--secondary" type="button" (click)="refresh()" [disabled]="loading()">Actualizar</button>
   </div>

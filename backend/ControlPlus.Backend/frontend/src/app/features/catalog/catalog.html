@@ -18,7 +18,7 @@
           @for (category of categoryOptions(); track category.id) { <mat-option [value]="category.id">{{ category.name }}</mat-option> }
         </mat-select></mat-form-field>
         <button mat-flat-button type="submit">Buscar</button>
-        @if (session.has('PRODUCTS.CREATE')) { <button mat-stroked-button type="button" [disabled]="saving() || checkingCreate()" (click)="newProduct()">{{ createOutcomeUncertain() ? 'Retomar alta pendiente' : 'Nuevo producto' }}</button> }
+        @if (session.has('PRODUCTS.CREATE')) { <button mat-stroked-button type="button" [disabled]="saving() || checkingCreate()" (click)="newProduct()">{{ createOutcomeUncertain() ? 'Retomar producto sin confirmar' : 'Nuevo producto' }}</button> }
         @if (session.has('PRODUCTS.SENSITIVE_UPDATE')) { <mat-checkbox formControlName="includeInactiveProducts" (change)="search()">Inactivos</mat-checkbox> }
       </form>
       @if (loading()) { <div class="loading"><mat-spinner diameter="36"></mat-spinner><span>Cargando productos…</span></div> }
@@ -161,8 +161,8 @@
           <span>{{ error() }}</span>
           @if (createOutcomeUncertain()) {
             <p>{{ reconcilingCreate() ? 'Consultando el catálogo…' : 'Las coincidencias no confirman el resultado. El alta sigue pendiente; recuperarla envía exclusivamente el contenido y la clave originales.' }}</p>
-            <button mat-button type="button" (click)="recoverCreate()" [disabled]="saving() || checkingCreate()">Recuperar alta original</button>
-            <button mat-button type="button" (click)="reconcileCreate()" [disabled]="reconcilingCreate()">{{ reconcilingCreate() ? 'Consultando…' : 'Consultar posibles coincidencias' }}</button>
+            <button mat-button type="button" (click)="recoverCreate()" [disabled]="saving() || checkingCreate()">Volver a los datos que se enviaron</button>
+            <button mat-button type="button" (click)="reconcileCreate()" [disabled]="reconcilingCreate()">{{ reconcilingCreate() ? 'Consultando…' : 'Ver si el producto ya se guardó' }}</button>
             @if (reconciliationCandidates().length) { <ul>@for (candidate of reconciliationCandidates(); track candidate.id) { <li>{{ candidate.name }} · {{ candidate.internalCode }} · {{ candidate.barcode || 'Sin barras' }}</li> }</ul> }
             @else if (!reconcilingCreate() && !reconciliationQueryFailed()) { <p>Sin coincidencias en la consulta; esto no demuestra que el alta no se haya guardado.</p> }
           }

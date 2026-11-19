@@ -75,3 +75,12 @@
 .cash-electronic small { display:block; color:var(--cp-text-muted, inherit); }
 .cash-electronic-row { display:flex; justify-content:space-between; gap:12px; }
 .cash-electronic-row--total { border-top:1px solid var(--cp-border); padding-top:6px; font-weight:600; }
+/* Cerrar caja en pasos (decisión del 19 de noviembre de 2026). */
+.close-steps { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; padding:0; list-style:none; }
+.close-steps li { display:flex; align-items:center; gap:8px; padding:6px 12px 6px 6px; border-radius:999px; background:var(--cp-table-head); color:var(--cp-text-secondary); font-size:14px; font-weight:600; }
+.close-steps li span { display:grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--cp-surface); color:var(--cp-text-secondary); font-weight:700; }
+.close-steps li.is-current { background:var(--cp-primary); color:white; }
+.close-steps li.is-current span { color:var(--cp-primary); }
+.close-steps li.is-done { background:var(--cp-success-soft); color:var(--cp-success); }
+.close-ok { margin-top:12px; }
+.close-confirm { margin-top:4px; }

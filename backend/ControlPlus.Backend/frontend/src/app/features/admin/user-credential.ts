@@ -40,7 +40,7 @@ import { WindowSheet } from '../../shared/window-sheet';
           @if (!user().isActive) { <p class="field-error">El usuario está inactivo y no puede recibir carné.</p> }
         } @else {
           <div class="credential-preview" aria-label="Vista previa del carné">
-            <div class="credential-preview__head"><strong>{{ establishment.name() }}</strong><span>Credencial de operador</span></div>
+            <div class="credential-preview__head"><strong>{{ establishment.name() }}</strong><span>Carné de operador</span></div>
             <p><b>{{ user().displayName }}</b><br><small>{{ roleName() }} · {{ user().userName }}</small></p>
             <div class="credential-preview__barcode" [innerHTML]="barcode()"></div>
             <small>…{{ issued()!.visibleFragment }}</small>

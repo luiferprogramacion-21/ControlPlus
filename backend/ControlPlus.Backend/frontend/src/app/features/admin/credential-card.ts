@@ -22,7 +22,7 @@ export function buildCredentialCardHtml(card: CredentialCard): string {
   .barcode svg { width: 100% !important; height: 15mm !important; }
   .barcode small { display: block; font-size: 7pt; letter-spacing: 1px; }
 </style></head><body><div class="card">
-  <header><strong>${escape(card.businessName)}</strong><span>Credencial de operador</span></header>
+  <header><strong>${escape(card.businessName)}</strong><span>Carné de operador</span></header>
   <p class="person"><b>${escape(card.displayName)}</b><small>${escape(card.roleName)} · ${escape(card.userName)}</small></p>
   <div class="barcode">${code128Svg(card.token, 1.4, 60)}<small>…${escape(card.fragment)}</small></div>
 </div></body></html>`;

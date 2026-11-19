@@ -607,6 +607,47 @@ Quienes probaron el sistema dijeron que era poco usable, poco intuitivo y que se
 - **Abrir como un programa:** el instalador del servicio crea `ControlPlus.lnk` con Edge en modo aplicación (`--app=http://localhost:5000/`).
 - **Tablas de listados:** ancho mínimo 680 px, para que la columna de acciones quepa a 125 %.
 
+### Decisión del 19 de noviembre de 2026: flujos más intuitivos en todo el sistema
+
+Quienes lo probaron dijeron, en general, que era poco usable. El usuario aprobó que todos los flujos sean más intuitivos, con estos doce cambios (se apartan del prototipo y quedan aprobados):
+
+1. **Pantalla de Inicio:** botones grandes con las tareas frecuentes según el rol y los permisos (Vender, Abrir caja, Cerrar caja, Recibir abono, Nuevo apartado, Recibir mercancía, Buscar producto…).
+2. **Lenguaje sencillo:** se cambian los términos técnicos visibles por palabras comunes. Algunos ejemplos:
+   - Sangría → Retiro de efectivo;
+   - Credencial Code 128 → Carné;
+   - Arqueo → Contar la caja;
+   - Condonar saldo → Perdonar la deuda;
+   - Fecha operativa → Día de caja.
+
+   Los códigos de la API y de la base no cambian.
+3. **Listas más simples:**
+   - buscan mientras se escribe y los filtros se aplican solos;
+   - el botón «Nuevo…» va siempre en el mismo sitio;
+   - el título aparece una sola vez;
+   - una lista vacía ofrece el botón para crear.
+4. **Acciones de fila como Windows:** máximo dos botones visibles; el resto va en «Más ▾», y el clic derecho sobre la fila abre ese mismo menú.
+5. **Cerrar caja en pasos:**
+   - botón «Cerrar caja» visible en Caja;
+   - tres pasos: contar el efectivo, revisar la diferencia y confirmar con un resumen.
+6. **Compras más claras:**
+   - un solo «Registrar compra» que pregunta si viene de un pedido;
+   - Compras y Recepciones en una sola pantalla;
+   - nombres claros: «Pedido al proveedor» y «Mercancía recibida».
+7. **Punto de venta más fácil:**
+   - botones + y − en la cantidad;
+   - una X para quitar cada producto;
+   - billetes rápidos al cobrar en efectivo: Exacto, 10.000, 20.000, 50.000 y 100.000.
+8. **Qué sigue al terminar:** el mensaje de cada operación ofrece el siguiente paso (por ejemplo, «Caja abierta · Ir a vender»).
+9. **Ayuda junto a los campos:** un ícono (i) con una frase en los campos difíciles.
+10. **Cambios y devoluciones fáciles:** acceso propio en el menú y desde la venta terminada.
+11. **Ficha de usuario con pestañas:** una sola ventana por usuario con las pestañas Datos, Rol y permisos, Contraseña y Carné.
+12. **Inventario más claro:**
+   - un buscador con el filtro de estado al lado y con título;
+   - + y − en la fila para ajustar;
+   - «Movimientos» pasa a llamarse «Historial».
+
+Estos cambios son solo de pantalla. No cambian reglas de negocio, permisos, autorizaciones ni la API.
+
 ### Reglas del reparto
 
 - Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:

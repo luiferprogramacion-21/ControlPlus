@@ -71,6 +71,8 @@ export class Sales implements OnInit, OnDestroy {
   discountReason = '';
   cashApplied = 0;
   cashReceived = 0;
+  /** Billetes rápidos al cobrar en efectivo. */
+  readonly CASH_BILLS = [10_000, 20_000, 50_000, 100_000];
   transferApplied = 0;
   transferReference = '';
   nequiApplied = 0;
@@ -459,7 +461,7 @@ export class Sales implements OnInit, OnDestroy {
             : await this.api.verifyConcession(kind, credentials.userName, credentials.password);
           this.concessionAuthorization = credentials; this.concessionAuthorizedBy.set(result.authorizedBy);
         } catch (error) {
-          if (error instanceof HttpErrorResponse && error.status === 403) throw new Error('No se autorizó. Verifica las credenciales o la credencial escaneada, y que sea un Supervisor o Administrador con permiso para autorizar.');
+          if (error instanceof HttpErrorResponse && error.status === 403) throw new Error('No se autorizó. Revisa el usuario y la contraseña o el carné, y que sea un Supervisor o Administrador con permiso para autorizar.');
           throw error;
         }
       },
@@ -611,6 +613,13 @@ export class Sales implements OnInit, OnDestroy {
   removeLast(): void { const id = this.cart().at(-1)?.product.id; if (id) this.remove(id); }
   removeSelected(): void { const id = this.selectedProductId() ?? this.cart().at(-1)?.product.id; if (id) this.remove(id); }
   update(): void { this.cart.set([...this.cart()]); }
+  /** Botones + y − de la cantidad (decisión del 19 de noviembre de 2026): respetan los mismos límites que escribirla. */
+  stepQuantity(line: CartLine, delta: number): void {
+    if (this.locked) return;
+    this.selectedProductId.set(line.product.id);
+    line.quantity = Number(line.quantity || 0) + delta;
+    this.normalizeQuantity(line);
+  }
   /** Keeps the quantity an integer between 1 and the available stock once the cashier leaves the field. */
   normalizeQuantity(line: CartLine): void {
     const quantity = Math.trunc(Number(line.quantity));
