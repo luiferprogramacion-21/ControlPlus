@@ -252,7 +252,7 @@ export class Sales implements OnInit, OnDestroy {
     if (state.requiresPreviousShiftClosure) return 'Hay un turno de un día anterior sin cerrar. Ciérralo en Caja antes de vender.';
     if (!state.hasOpenShift) return 'No hay un turno de Caja abierto. Abre el turno en Caja para vender.';
     if (state.requiresOperatorSession && !state.ownOperatorSession) return 'El turno es compartido: inicia tu sesión de operador en Caja para vender.';
-    if (!state.requiresOperatorSession && state.currentShift?.responsibleUserId !== this.session.user()?.id) return 'El turno abierto pertenece a otro usuario. Solo su responsable puede vender.';
+    if (!state.requiresOperatorSession && state.currentShift?.responsibleUserId !== this.session.user()?.id) return `La caja está abierta por ${state.openShiftResponsibleName || 'otro usuario'}. Solo esa persona puede vender en este turno; pídele que la cierre o que se abra como turno compartido.`;
     return '';
   }
 

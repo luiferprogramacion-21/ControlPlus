@@ -346,6 +346,7 @@ describe('Sales: punto de venta de contado', () => {
       component.cashState.set({ ...cash, requiresPreviousShiftClosure: true }); expect(component.blockReason).toContain('anterior');
       component.cashState.set({ ...cash, requiresOperatorSession: true, ownOperatorSession: null }); expect(component.blockReason).toContain('sesión de operador');
       component.cashState.set({ ...cash, currentShift: { ...cash.currentShift, responsibleUserId: 'otro' } }); expect(component.blockReason).toContain('otro usuario');
+      component.cashState.set({ ...cash, currentShift: { ...cash.currentShift, responsibleUserId: 'otro' }, openShiftResponsibleName: 'Marta Ruiz' }); expect(component.blockReason).toContain('abierta por Marta Ruiz');
       component.cashState.set(cash); expect(component.blockReason).toBe('');
     });
   });

@@ -109,16 +109,20 @@ public sealed class CashService(
             ? (await repository.ListActiveOperatorSessionsAsync(shift!.Id, cancellationToken))
                 .FirstOrDefault(session => session.UsuarioId == actor.UserId)
             : null;
+        var responsibleName = shift?.ModoOperacion == CashConstants.IndividualMode && shift.UsuarioResponsableId is Guid responsibleId
+            ? (await userRepository.GetByIdAsync(responsibleId, cancellationToken))?.DisplayName
+            : null;
         if (canManage || (shift?.ModoOperacion == CashConstants.IndividualMode && shift.UsuarioResponsableId == actor.UserId))
             return Result.Success(MapState(cash, shift, establishment) with
             {
                 RequiresOperatorSession = shared,
                 OwnOperatorSession = ownSession is null ? null : Map(ownSession),
+                OpenShiftResponsibleName = responsibleName,
             });
 
         return Result.Success(new CashStateDto(null, null, null, null, false, null,
             cash is not null, shift is not null, shared,
-            ownSession is null ? null : Map(ownSession)));
+            ownSession is null ? null : Map(ownSession), responsibleName));
     }
 
     public async Task<Result<CashRegisterDto>> ConfigureCashRegisterAsync(

@@ -41,7 +41,10 @@ public sealed record CashStateDto(
     bool IsConfigured,
     bool HasOpenShift,
     bool RequiresOperatorSession,
-    OperatorSessionDto? OwnOperatorSession);
+    OperatorSessionDto? OwnOperatorSession,
+    // Nombre de quien tiene abierto un turno individual, para explicar por qué otro usuario no puede vender
+    // (decisión del 18 de noviembre de 2026). Solo el nombre: no revela montos ni identificadores.
+    string? OpenShiftResponsibleName = null);
 
 public sealed record ConfigureCashRegisterRequest(string Code, string Name);
 

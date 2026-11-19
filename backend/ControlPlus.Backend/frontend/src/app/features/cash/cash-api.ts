@@ -5,7 +5,7 @@ import { AuthorizationBody, Page, authorizationContext } from '../../core/api';
 
 export interface OperatorSession { id: string; state: string; }
 export interface CashShift { id: string; mode: string; state: string; operatingDate: string; openedAtUtc: string; initialAmount: number; version: number; responsibleUserId: string | null; }
-export interface CashState { isConfigured: boolean; hasOpenShift: boolean; defaultShiftMode: string | null; configurationVersion?: number | null; requiresPreviousShiftClosure: boolean; requiresOperatorSession: boolean; guidance: string | null; currentShift: CashShift | null; ownOperatorSession: OperatorSession | null; }
+export interface CashState { isConfigured: boolean; hasOpenShift: boolean; defaultShiftMode: string | null; configurationVersion?: number | null; requiresPreviousShiftClosure: boolean; requiresOperatorSession: boolean; guidance: string | null; currentShift: CashShift | null; ownOperatorSession: OperatorSession | null; openShiftResponsibleName?: string | null; }
 export interface ReconciliationMethod { paymentMethodId: string; code: string; name: string; affectsCash: boolean; expectedAmount: number; countedAmount: number | null; difference: number | null; }
 export interface Reconciliation { shiftId: string; shiftVersion: number; totalExpected: number; totalCounted: number | null; totalDifference: number | null; paymentMethods: ReconciliationMethod[]; cashDifference: number | null; }
 export interface CashMovement { id: string; type: string; category: string; amount: number; concept: string | null; occurredAtUtc: string; }

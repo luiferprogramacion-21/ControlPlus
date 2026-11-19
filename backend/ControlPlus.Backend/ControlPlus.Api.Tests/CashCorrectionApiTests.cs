@@ -667,6 +667,8 @@ public sealed partial class CashApiFlowTests
         Assert.Null(state.ConfigurationVersion);
         Assert.Null(state.Guidance);
         Assert.Null(state.OwnOperatorSession);
+        // Solo se revela el nombre de quien tiene el turno, para explicar por qué no se puede vender.
+        Assert.False(string.IsNullOrWhiteSpace(state.OpenShiftResponsibleName));
         Assert.DoesNotContain(scenario.Shift.InitialAmount.ToString("0"), payload, StringComparison.Ordinal);
         Assert.DoesNotContain(scenario.Administrator.User.Id.ToString(), payload, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Observación privada del responsable", payload, StringComparison.Ordinal);
