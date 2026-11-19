@@ -50,7 +50,7 @@ public interface ICashRepository
 
     Task<Usuario?> GetUserForUpdateAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<CredencialUsuario>> ListActiveCredentialsAsync(CancellationToken cancellationToken = default);
-    Task<CredencialUsuario?> GetActiveCredentialForUserAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<CredencialUsuario?> GetActiveCredentialForUserAsync(Guid userId, CancellationToken cancellationToken = default, bool forUpdate = false);
     Task AddCredentialAsync(CredencialUsuario credential, CancellationToken cancellationToken = default);
 
     Task<SesionOperador?> GetActiveOperatorSessionForUpdateAsync(Guid terminalId, CancellationToken cancellationToken = default);

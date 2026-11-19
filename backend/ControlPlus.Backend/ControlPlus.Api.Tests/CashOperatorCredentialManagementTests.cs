@@ -7,12 +7,72 @@ using ControlPlus.Infrastructure.Persistence.Official;
 using ControlPlus.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Xunit;
 
 namespace ControlPlus.Api.Tests;
 
 public sealed partial class CashApiFlowTests
 {
+    [Fact, Trait("Category", "Integration")]
+    public async Task OperatorCredential_RevocationWhileStartWaitsOnShift_CannotCreateAnActiveSessionFromStaleSnapshot()
+    {
+        using var manager = CreateClient();
+        await SetupAsync(manager);
+        var administrator = await LoginAsync(manager, AdministratorUserName, AdministratorPassword);
+        SetBearer(manager, administrator.AccessToken);
+        var users = await CreateOperationalUsersAsync(manager);
+        await ReadSuccessAsync<CashRegisterDto>(await manager.PostAsJsonAsync(
+            "/api/cash/register", new ConfigureCashRegisterRequest("CARD-RACE", "Caja concurrencia carné")), HttpStatusCode.Created);
+        var state = await ReadSuccessAsync<CashStateDto>(await manager.GetAsync("/api/cash/state"), HttpStatusCode.OK);
+        await ReadSuccessAsync<CashStateDto>(await manager.PutAsJsonAsync("/api/cash/shift-mode",
+            new UpdateCashShiftModeRequest(CashConstants.SharedMode, state.ConfigurationVersion!.Value)), HttpStatusCode.OK);
+        var shift = await ReadSuccessAsync<CashShiftDto>(await manager.PostAsJsonAsync("/api/cash/shifts",
+            new OpenCashShiftRequest(0m, "Concurrencia carné")), HttpStatusCode.Created);
+        var issued = await ReadSuccessAsync<IssuedOperatorCredentialDto>(await manager.PostAsJsonAsync(
+            $"/api/cash/operator-credentials/{users.Cashier.Id}", new IssueOperatorCredentialRequest(null)), HttpStatusCode.Created);
+        using var scanner = CreateClient();
+        var cashier = await LoginAsync(scanner, CashierUserName, CashierPassword);
+        SetBearer(scanner, cashier.AccessToken);
+
+        // Stage the same shift lock and credential update used by revocation, withholding COMMIT.
+        // The scanner then establishes its Serializable snapshot while waiting for this shift.
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        await using var revokeTransaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted);
+        await db.TurnoCaja.FromSqlInterpolated($"SELECT * FROM caja.turno_caja WHERE id = {shift.Id} FOR UPDATE").ToArrayAsync();
+        var credential = await db.CredencialUsuario.SingleAsync(x => x.Id == issued.CredentialId);
+        credential.Revoke(administrator.User.Id, _clock.UtcNow, "ELIMINACION_ADMINISTRADOR");
+        await db.SaveChangesAsync();
+        var revokePid = ((NpgsqlConnection)db.Database.GetDbConnection()).ProcessID;
+        var start = scanner.PostAsJsonAsync("/api/cash/operator-sessions", new StartOperatorSessionRequest(issued.CredentialToken));
+        try
+        {
+            await using var observer = new NpgsqlConnection(_postgres.GetConnectionString());
+            await observer.OpenAsync();
+            var waiting = false;
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            while (!waiting)
+            {
+                await using var command = new NpgsqlCommand(
+                    "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND @blocker = ANY(pg_blocking_pids(pid)))", observer);
+                command.Parameters.AddWithValue("blocker", revokePid);
+                waiting = (bool)(await command.ExecuteScalarAsync(deadline.Token))!;
+                if (!waiting) await Task.Delay(25, deadline.Token);
+            }
+            await revokeTransaction.CommitAsync();
+            Assert.Equal(HttpStatusCode.Conflict, (await start).StatusCode);
+            Assert.False(await db.SesionOperador.AsNoTracking().AnyAsync(x =>
+                x.CredencialUsuarioId == issued.CredentialId && x.Estado == CashConstants.ActiveSessionState));
+        }
+        finally
+        {
+            // Release any waiter even if observing the controlled interleaving failed.
+            await revokeTransaction.DisposeAsync();
+            await start;
+        }
+    }
+
     [Fact, Trait("Category", "Integration")]
     public async Task OperatorCredential_CanBeViewedAndRevokedByAdministratorWithoutLosingHistory()
     {

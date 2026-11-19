@@ -419,12 +419,25 @@ public sealed class EfCashRepository(OfficialControlPlusDbContext dbContext) : I
             .OrderBy(credential => credential.UsuarioId)
             .ToArrayAsync(cancellationToken);
 
-    public Task<CredencialUsuario?> GetActiveCredentialForUserAsync(
+    public async Task<CredencialUsuario?> GetActiveCredentialForUserAsync(
         Guid userId,
-        CancellationToken cancellationToken = default) =>
-        dbContext.CredencialUsuario.SingleOrDefaultAsync(
-            credential => credential.UsuarioId == userId && credential.Estado == "ACTIVA",
-            cancellationToken);
+        CancellationToken cancellationToken = default,
+        bool forUpdate = false)
+    {
+        if (!forUpdate)
+            return await dbContext.CredencialUsuario.SingleOrDefaultAsync(
+                credential => credential.UsuarioId == userId && credential.Estado == "ACTIVA", cancellationToken);
+
+        var rows = await dbContext.CredencialUsuario.FromSqlInterpolated(
+                $"""
+                SELECT credential.*
+                FROM seguridad.credencial_usuario AS credential
+                WHERE credential.usuario_id = {userId} AND credential.estado = 'ACTIVA'
+                FOR UPDATE
+                """)
+            .AsTracking().ToArrayAsync(cancellationToken);
+        return rows.SingleOrDefault();
+    }
 
     public Task AddCredentialAsync(
         CredencialUsuario credential,

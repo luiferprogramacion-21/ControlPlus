@@ -610,7 +610,10 @@ public sealed partial class CashService(
         if (shift is null) return Result.Failure<OperatorSessionDto>(ApplicationError.NotFound("un turno abierto"));
         if (shift.ModoOperacion != CashConstants.SharedMode)
             return Result.Failure<OperatorSessionDto>(ApplicationError.Conflict("Las sesiones rápidas solo están disponibles en turnos compartidos."));
-        var credential = await repository.GetActiveCredentialForUserAsync(actor.UserId, cancellationToken);
+        // A Serializable transaction may have waited on the shift using an older snapshot.
+        // Lock the credential too: a revocation committed during that wait must abort the stale
+        // start with a concurrency conflict, rather than create a session from its old ACTIVA row.
+        var credential = await repository.GetActiveCredentialForUserAsync(actor.UserId, cancellationToken, forUpdate: true);
         var now = clock.UtcNow;
         if (credential is null || credential.FormatoCodigo != "CODE128" ||
             (credential.FechaVencimiento is not null && credential.FechaVencimiento <= now.UtcDateTime) ||
