@@ -47,7 +47,7 @@ public sealed class SaleCorrectionsMigrationDatabaseTests : IAsyncLifetime
         await using var db = new ControlPlusDbContext(new DbContextOptionsBuilder<ControlPlusDbContext>()
             .UseNpgsql(postgres.GetConnectionString()).Options);
         var migrator = db.GetService<IMigrator>();
-        await migrator.MigrateAsync("20261119010000_CashDrawerV1");
+        await migrator.MigrateAsync("20261119013000_HeldSalesV1");
         await using var connection = new NpgsqlConnection(postgres.GetConnectionString()); await connection.OpenAsync();
         async Task<string> Body()
         {
@@ -57,7 +57,7 @@ public sealed class SaleCorrectionsMigrationDatabaseTests : IAsyncLifetime
         var before = await Body(); Assert.Contains("OR v_lineas_entregadas = 0", before);
         await migrator.MigrateAsync("20261119020000_SaleCorrectionsV1");
         Assert.Equal(before.Replace("           OR v_lineas_entregadas = 0\n", "", StringComparison.Ordinal), await Body());
-        Assert.Equal(29, (await db.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(30, (await db.Database.GetAppliedMigrationsAsync()).Count());
         Assert.Equal("20261119020000_SaleCorrectionsV1", (await db.Database.GetAppliedMigrationsAsync()).Last());
     }
 }

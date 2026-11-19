@@ -669,7 +669,7 @@ El usuario pidió abrir el cajón monedero a través de la impresora de recibos.
   - cada intento queda en `caja.apertura_cajon` y en la auditoría (`CashDrawer*`);
   - con el cajón apagado no se escribe nada, así que las ventas conservan exactamente sus escrituras y su auditoría;
   - sus escrituras toman primero la instalación con `FOR KEY SHARE`, en el mismo orden que ventas y caja, para no bloquearse en ciclo con una operación simultánea.
-- **Migración** `20261119010000_CashDrawerV1` (historial 27 → 28):
+- **Migración** `20261119010000_CashDrawerV1` (historial 27 → 28; el mismo activador aplica después `HeldSalesV1`, 28 → 29):
   - agrega cuatro columnas a `configuracion.perfil_impresora` y la tabla `caja.apertura_cajon`;
   - la aplica el operador **antes** de instalar la versión nueva, con `scripts/cash-drawer/Invoke-Activation.ps1 -UsePostgresCredential` (servicio detenido, respaldo, preflight y postflight);
   - sin ella, la versión nueva no puede leer los perfiles de impresión.
@@ -685,7 +685,7 @@ El usuario pidió poder dejar ventas en espera y aprobó hacerlo antes de la ins
   - al entrar, el aviso de ventas sin terminar;
   - retomar una venta deja en espera la que estaba en pantalla.
 - **Datos:**
-  - cada carrito es un borrador en `ventas.borrador_venta`, **sin migración**;
+  - cada carrito es un borrador en `ventas.borrador_venta`; la migración `20261119013000_HeldSalesV1` quita el único de un borrador abierto por terminal y se activa junto con la del cajón;
   - hasta 10 abiertos por cajero en el turno;
   - no reservan inventario ni tocan dinero, y no se auditan.
 - **Al confirmar:** la venta lleva `draftId` y solo ese borrador se cierra como `CONVERTIDO`, en la misma transacción.

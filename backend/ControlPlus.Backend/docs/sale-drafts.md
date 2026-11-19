@@ -51,7 +51,7 @@
 
 ## Datos
 
-Usa las tablas oficiales de Fase 4 `ventas.borrador_venta` y `ventas.detalle_borrador_venta`, **sin migración**. La tabla ya admitía varios borradores abiertos por usuario.
+Usa las tablas oficiales de Fase 4 `ventas.borrador_venta` y `ventas.detalle_borrador_venta`. El esquema oficial admitía **un solo borrador abierto por terminal** (`uq_borrador_venta_activo_terminal`); la migración `20261119013000_HeldSalesV1` lo cambia por un índice no único por usuario y turno. Se aplica junto con la del cajón (`scripts/cash-drawer/Invoke-Activation.ps1`, historial 27 → 29).
 
 - **Estados:**
   - abiertos: `ACTIVO` (y `RECUPERADO`, que el esquema permite);
