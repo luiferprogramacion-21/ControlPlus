@@ -693,6 +693,20 @@ El usuario pidió poder dejar ventas en espera y aprobó hacerlo antes de la ins
   - Sin `draftId` (contrato anterior), se cierra el más reciente solo si tiene los mismos productos y cantidades.
 - **API nueva:** `GET/POST /api/sales/drafts` y `GET/PUT/DELETE /api/sales/drafts/{id}`. Se conservan las rutas `/current`.
 
+### Decisión del 19 de noviembre de 2026: contraseñas de 4 números
+
+El usuario pidió contraseñas de 4 números **para todos los roles, incluido el Administrador**, y que quien tenga una contraseña anterior **deba cambiarla al entrar**.
+
+- **Regla:** `Security:PasswordFormat = PIN4` (en `appsettings.Production.json`, que usa el servicio instalado).
+  - Toda contraseña nueva debe ser exactamente 4 dígitos: crear usuario, restablecerla, recuperarla por correo, primer Administrador y recuperación del Administrador inicial.
+  - Sin la regla (desarrollo y pruebas) se acepta cualquiera no vacía.
+- **Entrar con una anterior:**
+  - sigue sirviendo, pero el token lleva `pwd_change=required`;
+  - un filtro devuelve 403 `password.change_required` a toda la API salvo `/api/auth/password-change`, `/api/auth/me` y `/api/auth/refresh`;
+  - la pantalla `/cambiar-contrasena` pide la actual y la nueva;
+  - el cambio rota el sello de seguridad y devuelve una sesión sin la marca. Sin migración.
+- Siguen el bloqueo tras 5 intentos fallidos y la autorización con carné. El CI genera la contraseña del Administrador de las pruebas de navegador con 4 números.
+
 ### Reglas del reparto
 
 - Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:

@@ -114,8 +114,8 @@ try {
 
     $password = $env:CONTROLPLUS_SETUP_ADMIN_PASSWORD
     if ([string]::IsNullOrEmpty($password)) {
-        $password = ConvertFrom-Secure (Read-Host 'Contraseña del Administrador (oculta)' -AsSecureString)
-        $confirmation = ConvertFrom-Secure (Read-Host 'Repita la contraseña (oculta)' -AsSecureString)
+        $password = ConvertFrom-Secure (Read-Host 'Contraseña del Administrador: 4 números (oculta)' -AsSecureString)
+        $confirmation = ConvertFrom-Secure (Read-Host 'Repita los 4 números (oculta)' -AsSecureString)
         if ($password -cne $confirmation) { $confirmation = $null; throw 'Las contraseñas no coinciden. No se cambió nada.' }
         $confirmation = $null
     }

@@ -3,7 +3,9 @@ import { inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 export interface User { id: string; userName: string; displayName: string; roles: string[]; permissions: string[]; }
-interface LoginResponse { accessToken: string; expiresAtUtc: string; user: User; }
+interface LoginResponse { accessToken: string; expiresAtUtc: string; user: User; passwordChangeRequired?: boolean; }
+/** Pantalla para cambiar la contraseña cuando la sesión lo exige (contraseñas de 4 números, 19 de noviembre de 2026). */
+export const PASSWORD_CHANGE_ROUTE = '/cambiar-contrasena';
 const KEY = 'controlplus.session';
 /** Cada cuánto se revisa si conviene renovar la sesión. */
 export const KEEP_ALIVE_INTERVAL_MS = 30_000;
@@ -18,6 +20,8 @@ export class SessionService {
   private readonly http = inject(HttpClient);
   readonly token = signal<string | null>(null);
   readonly user = signal<User | null>(null);
+  /** La contraseña con la que entró ya no cumple la regla (4 números): solo puede cambiarla. */
+  readonly passwordChangeRequired = signal(false);
   private expiresAt = 0;
   private receivedAt = 0;
   private lastActivity = 0;
@@ -37,6 +41,12 @@ export class SessionService {
 
   async login(userName: string, password: string): Promise<void> {
     const result = await firstValueFrom(this.http.post<LoginResponse>('/api/auth/login', { userName, password }));
+    this.store(result);
+  }
+
+  /** Cambia la contraseña cuando la sesión lo exige; el servidor devuelve una sesión nueva sin la restricción. */
+  async changeRequiredPassword(currentPassword: string, newPassword: string): Promise<void> {
+    const result = await firstValueFrom(this.http.post<LoginResponse>('/api/auth/password-change', { currentPassword, newPassword }));
     this.store(result);
   }
 
@@ -85,6 +95,7 @@ export class SessionService {
   logout(): void {
     this.token.set(null);
     this.user.set(null);
+    this.passwordChangeRequired.set(false);
     this.expiresAt = 0;
     this.receivedAt = 0;
     if (this.keepAliveTimer !== undefined) { clearInterval(this.keepAliveTimer); this.keepAliveTimer = undefined; }
@@ -97,6 +108,7 @@ export class SessionService {
   private set(result: LoginResponse): void {
     this.token.set(result.accessToken);
     this.user.set(result.user);
+    this.passwordChangeRequired.set(!!result.passwordChangeRequired);
     this.expiresAt = Date.parse(result.expiresAtUtc);
     this.receivedAt = Date.now();
     this.keepAliveTimer ??= setInterval(() => void this.keepAlive(), KEEP_ALIVE_INTERVAL_MS);

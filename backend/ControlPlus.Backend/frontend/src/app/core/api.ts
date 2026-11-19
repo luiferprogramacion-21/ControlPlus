@@ -2,7 +2,7 @@ import { HttpContext, HttpContextToken, HttpErrorResponse, HttpInterceptorFn } f
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
-import { SessionService } from './session.service';
+import { PASSWORD_CHANGE_ROUTE, SessionService } from './session.service';
 
 export interface Page<T> { items: T[]; page: number; pageSize: number; totalCount: number; totalPages: number; }
 export const authorizationAttempt = new HttpContextToken<boolean>(() => false);
@@ -41,6 +41,10 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
       if (error instanceof HttpErrorResponse && error.status === 401 && authenticated && !rejectedAuthorizer) {
         session.logout();
         void router.navigateByUrl('/ingresar');
+      }
+      if (error instanceof HttpErrorResponse && error.status === 403 && error.error?.code === 'password.change_required') {
+        session.passwordChangeRequired.set(true);
+        void router.navigateByUrl(PASSWORD_CHANGE_ROUTE);
       }
       return throwError(() => error);
     }),

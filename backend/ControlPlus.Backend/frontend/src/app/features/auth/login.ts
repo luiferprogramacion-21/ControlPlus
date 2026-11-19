@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { SessionService } from '../../core/session.service';
+import { PASSWORD_CHANGE_ROUTE, SessionService } from '../../core/session.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { errorText } from '../../core/api';
 import { PasswordRecoveryApi } from './password-recovery-api';
@@ -56,11 +56,11 @@ import { toastSignal } from '../../core/toast';
             <mat-form-field appearance="outline"><mat-label>Código del correo</mat-label>
               <input matInput formControlName="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" autofocus>
             </mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Nueva contraseña</mat-label>
-              <input matInput type="password" formControlName="newPassword" autocomplete="new-password">
+            <mat-form-field appearance="outline"><mat-label>Nueva contraseña (4 números)</mat-label>
+              <input matInput type="password" formControlName="newPassword" inputmode="numeric" autocomplete="new-password">
             </mat-form-field>
             <mat-form-field appearance="outline"><mat-label>Repite la nueva contraseña</mat-label>
-              <input matInput type="password" formControlName="confirmPassword" autocomplete="new-password">
+              <input matInput type="password" formControlName="confirmPassword" inputmode="numeric" autocomplete="new-password">
             </mat-form-field>
             <button mat-flat-button type="submit" [disabled]="busy()">{{ busy() ? 'Cambiando…' : 'Cambiar contraseña' }}</button>
             <button class="cp-login__link" type="button" (click)="view.set('request'); error.set('')">No me llegó el código</button>
@@ -138,7 +138,7 @@ export class Login {
     try {
       const { userName, password } = this.form.getRawValue();
       await this.session.login(userName.trim(), password);
-      await this.router.navigateByUrl(HOME_ROUTE);
+      await this.router.navigateByUrl(this.session.passwordChangeRequired() ? PASSWORD_CHANGE_ROUTE : HOME_ROUTE);
     } catch (e) { this.error.set(errorText(e)); }
     finally { this.busy.set(false); }
   }

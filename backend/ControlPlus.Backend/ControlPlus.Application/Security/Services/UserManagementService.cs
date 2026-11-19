@@ -18,6 +18,7 @@ public sealed class UserManagementService : IUserManagementService
     private readonly IAuditRepository _auditRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
+    private readonly IPasswordPolicy _passwordPolicy;
 
     public UserManagementService(
         IUserRepository userRepository,
@@ -27,8 +28,10 @@ public sealed class UserManagementService : IUserManagementService
         IPermissionChecker permissionChecker,
         IAuditRepository auditRepository,
         IUnitOfWork unitOfWork,
-        IClock clock)
+        IClock clock,
+        IPasswordPolicy? passwordPolicy = null)
     {
+        _passwordPolicy = passwordPolicy ?? PasswordPolicy.Free;
         _userRepository = userRepository;
         _roleRepository = roleRepository;
         _permissionRepository = permissionRepository;
@@ -65,7 +68,7 @@ public sealed class UserManagementService : IUserManagementService
             return Result.Failure<UserDto>(displayName.Error!);
         }
 
-        var password = SecurityInput.RequiredPassword(request.Password);
+        var password = SecurityInput.NewPassword(request.Password, _passwordPolicy);
         if (password.IsFailure)
         {
             return Result.Failure<UserDto>(password.Error!);
@@ -364,7 +367,7 @@ public sealed class UserManagementService : IUserManagementService
         ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(request);
 
-        var newPassword = SecurityInput.RequiredPassword(request.NewPassword, "nueva contraseña");
+        var newPassword = SecurityInput.NewPassword(request.NewPassword, _passwordPolicy, "nueva contraseña");
         if (newPassword.IsFailure)
         {
             return Result.Failure(newPassword.Error!);

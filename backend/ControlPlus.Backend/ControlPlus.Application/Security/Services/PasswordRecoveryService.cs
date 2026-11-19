@@ -25,8 +25,10 @@ public sealed partial class PasswordRecoveryService(
     IClock clock,
     ILoginAttemptCoordinator loginAttemptCoordinator,
     IEmailSender emailSender,
-    IPasswordRecoveryCodes codes) : IPasswordRecoveryService
+    IPasswordRecoveryCodes codes,
+    IPasswordPolicy? passwordPolicy = null) : IPasswordRecoveryService
 {
+    private readonly IPasswordPolicy _passwordPolicy = passwordPolicy ?? PasswordPolicy.Free;
     private static readonly ApplicationError NotConfigured = new("email.not_configured",
         "La recuperación por correo no está configurada. Pida al Administrador que restablezca su contraseña.");
     private static readonly ApplicationError DeliveryFailed = new("email.delivery_failed",
@@ -87,7 +89,7 @@ public sealed partial class PasswordRecoveryService(
         if (userName.IsFailure) return Result.Failure(userName.Error!);
         var code = request.Code?.Trim() ?? string.Empty;
         if (!SixDigits().IsMatch(code)) return Result.Failure(ApplicationError.Validation("El código tiene 6 números."));
-        var password = SecurityInput.RequiredPassword(request.NewPassword, "nueva contraseña");
+        var password = SecurityInput.NewPassword(request.NewPassword, _passwordPolicy, "nueva contraseña");
         if (password.IsFailure) return Result.Failure(password.Error!);
 
         return await loginAttemptCoordinator.ExecuteAsync(

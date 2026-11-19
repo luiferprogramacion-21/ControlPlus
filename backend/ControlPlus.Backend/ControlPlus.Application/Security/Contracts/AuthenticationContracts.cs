@@ -22,7 +22,14 @@ public sealed record RecoverInitialAdministratorRequest(
 public sealed record AuthenticationResult(
     string AccessToken,
     DateTimeOffset ExpiresAtUtc,
-    AuthenticatedUserDto User);
+    AuthenticatedUserDto User,
+    // La contraseña con la que entró ya no cumple la regla (4 números): la pantalla pide cambiarla antes de seguir.
+    bool PasswordChangeRequired = false);
+
+/// <summary>Cambio obligatorio de la contraseña propia al entrar con una que no cumple la regla vigente.</summary>
+public sealed record ChangeRequiredPasswordRequest(
+    [Required] string CurrentPassword,
+    [Required] string NewPassword);
 
 public sealed record AuthenticatedUserDto(
     Guid Id,

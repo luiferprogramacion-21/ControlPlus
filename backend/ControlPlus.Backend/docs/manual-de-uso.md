@@ -26,6 +26,10 @@ Cada persona tiene **un solo rol**. Lo que ves en el menú depende de él: si un
 3. Llegas a **Inicio**: una pantalla con botones grandes de lo que más haces (Vender, Abrir caja, Cerrar caja, Cambiar o devolver, Recibir abono, Nuevo apartado, Buscar producto, Recibir mercancía…) y el estado de la caja. Solo aparecen las tareas que tu rol permite; si la caja está cerrada, **Abrir caja** va primero. Puedes volver a Inicio desde el menú en cualquier momento.
 4. Para salir, usa el botón de salir de la barra superior.
 
+**La contraseña es de 4 números** (por ejemplo 4821), para todos. Elige una que no sea fácil de adivinar: no uses 1234, 0000 ni tu año de nacimiento.
+
+**Si tu contraseña anterior no es de 4 números**, todavía te deja entrar, pero enseguida aparece **«Cambia tu contraseña»**: escribe la actual y la nueva de 4 números (dos veces). Hasta cambiarla no puedes usar el sistema.
+
 **Cuidado con tu contraseña.** Tras **5 intentos fallidos** tu usuario se bloquea. Lo reactiva una persona con un rol superior (el Administrador).
 
 **La sesión se renueva sola mientras trabajas.** Si dejas el sistema sin usar unos 30 minutos, se cierra por seguridad. Si tenías una venta a medias, no se pierde (ver 2.7).
@@ -34,7 +38,7 @@ Cada persona tiene **un solo rol**. Lo que ves en el menú depende de él: si un
 
 Nadie cambia su propia contraseña desde dentro del sistema. Hay dos caminos:
 
-- **Por correo (lo más rápido):** en la pantalla de ingreso pulsa **«¿Olvidaste tu contraseña?»**, escribe tu usuario y el sistema envía un **código de 6 números** al correo que el Administrador registró en tu usuario. Escribe el código y tu contraseña nueva. El código vale unos 10 minutos. Equivocarte con el código cuenta como intento fallido.
+- **Por correo (lo más rápido):** en la pantalla de ingreso pulsa **«¿Olvidaste tu contraseña?»**, escribe tu usuario y el sistema envía un **código de 6 números** al correo que el Administrador registró en tu usuario. Escribe el código y tu contraseña nueva de 4 números. El código vale unos 10 minutos. Equivocarte con el código cuenta como intento fallido.
   - Necesita que tu usuario tenga correo registrado y que el computador tenga Internet en ese momento.
 - **Con el Administrador:** él te pone una contraseña nueva desde Administración → Usuarios. Es la salida cuando no tienes correo o no hay Internet.
 
@@ -391,7 +395,7 @@ El Administrador es responsable de que el sistema sea confiable: configura el ne
 
 Administración → **Usuarios**.
 
-- **Nuevo usuario:** nombre, usuario, **correo** (opcional pero recomendado), **rol** (Cajero, Supervisor o Administrador) y contraseña inicial.
+- **Nuevo usuario:** nombre, usuario, **correo** (opcional pero recomendado), **rol** (Cajero, Supervisor o Administrador) y contraseña inicial de **4 números**.
 - **Abrir ficha:** abre una sola ventana con pestañas:
   - **Datos:** nombre y correo.
   - **Rol:** cambia el rol de la persona. Sus sesiones abiertas se cierran.

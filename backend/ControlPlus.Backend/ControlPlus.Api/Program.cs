@@ -37,6 +37,7 @@ using ControlPlus.Application.Purchases.Services;
 using ControlPlus.Application.PurchaseOrders.Contracts;
 using ControlPlus.Application.PurchaseOrders.Services;
 using ControlPlus.Infrastructure.Persistence;
+using ControlPlus.Application.Security.Ports;
 using ControlPlus.Infrastructure.Security;
 using ControlPlus.Infrastructure.Printing;
 using Microsoft.AspNetCore.Authorization;
@@ -154,6 +155,9 @@ builder.Services.AddControlPlusJwtAuthentication(builder.Configuration);
 
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();
+// Contraseñas de 4 números: el servicio instalado activa la regla en appsettings.Production.json.
+builder.Services.AddSingleton<IPasswordPolicy>(new PasswordPolicy(string.Equals(
+    builder.Configuration["Security:PasswordFormat"], PasswordPolicy.PinFormat, StringComparison.OrdinalIgnoreCase)));
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();
 builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
@@ -254,6 +258,28 @@ if (hasFrontend)
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+// Contraseña de 4 números (decisión del 19 de noviembre de 2026): una sesión iniciada con una contraseña anterior
+// solo puede cambiarla, consultar su usuario y renovarse.
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path;
+    if (context.User.HasClaim(JwtClaimTypes.PasswordChange, JwtClaimTypes.PasswordChangeRequiredValue) &&
+        path.StartsWithSegments("/api") &&
+        !path.StartsWithSegments("/api/auth/password-change") &&
+        !path.StartsWithSegments("/api/auth/me") &&
+        !path.StartsWithSegments("/api/auth/refresh"))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new ProblemDetails
+        {
+            Status = StatusCodes.Status403Forbidden,
+            Title = "Cambia tu contraseña por una de 4 números para continuar.",
+            Extensions = { ["code"] = "password.change_required" }
+        }, (System.Text.Json.JsonSerializerOptions?)null, "application/problem+json");
+        return;
+    }
+    await next();
+});
 
 app.MapControllers();
 if (hasFrontend)

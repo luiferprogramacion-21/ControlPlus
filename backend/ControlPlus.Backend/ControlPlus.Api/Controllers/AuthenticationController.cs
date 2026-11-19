@@ -186,7 +186,26 @@ public sealed class AuthenticationController(
             return MissingActor();
         }
 
-        return FromResult(await authenticationService.RenewAsync(actor.UserId, cancellationToken), Ok);
+        // Una sesión que debe cambiar la contraseña sigue igual al renovarse.
+        var changeRequired = User.HasClaim(JwtClaimTypes.PasswordChange, JwtClaimTypes.PasswordChangeRequiredValue);
+        return FromResult(await authenticationService.RenewAsync(actor.UserId, changeRequired, cancellationToken), Ok);
+    }
+
+    /// <summary>
+    /// Cambio obligatorio de la contraseña propia (decisión del 19 de noviembre de 2026: 4 números para todos). Es lo único
+    /// que permite una sesión iniciada con una contraseña anterior; devuelve una sesión nueva sin esa restricción.
+    /// </summary>
+    [HttpPost("password-change")]
+    [Consumes("application/json")]
+    [ProducesResponseType<AuthenticationResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ChangeRequiredPassword([FromBody] ChangeRequiredPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        if (actor is null) return MissingActor();
+        return FromResult(await authenticationService.ChangeRequiredPasswordAsync(actor.UserId, request, cancellationToken), Ok);
     }
 
     [HttpGet("me")]

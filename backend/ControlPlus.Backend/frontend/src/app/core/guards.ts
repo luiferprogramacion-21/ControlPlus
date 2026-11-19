@@ -1,11 +1,13 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { SessionService } from './session.service';
+import { PASSWORD_CHANGE_ROUTE, SessionService } from './session.service';
 
 export const sessionGuard: CanActivateFn = async () => {
   const session = inject(SessionService);
   const router = inject(Router);
-  return await session.validate() ? true : router.parseUrl('/ingresar');
+  if (!await session.validate()) return router.parseUrl('/ingresar');
+  // Contraseña de 4 números: con una contraseña anterior solo se puede ir a cambiarla.
+  return session.passwordChangeRequired() ? router.parseUrl(PASSWORD_CHANGE_ROUTE) : true;
 };
 
 export const catalogGuard: CanActivateFn = () => {
@@ -33,3 +35,11 @@ export const purchasesGuard: CanActivateFn = () => { const session = inject(Sess
 export const purchaseReceiptsGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('PURCHASES.RECEIVE') && session.has('PURCHASE_ORDERS.MANAGE'); };
 
 export const configGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('CONFIGURATION.MANAGE') || session.has('CASH.SHIFT_MODE_MANAGE'); };
+
+/** La pantalla de cambio obligatorio solo tiene sentido con una sesión que lo exige. */
+export const passwordChangeGuard: CanActivateFn = async () => {
+  const session = inject(SessionService);
+  const router = inject(Router);
+  if (!await session.validate()) return router.parseUrl('/ingresar');
+  return session.passwordChangeRequired() ? true : router.parseUrl('/operacion/inicio');
+};

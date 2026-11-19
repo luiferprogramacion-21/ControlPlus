@@ -222,7 +222,7 @@ jobs:
           PGDATABASE: postgres
           PGPASSWORD: ci-e2e-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
-          master_key="$(openssl rand -hex 32)"; jwt_key="$(openssl rand -hex 48)"; admin_password="E2e-$(openssl rand -hex 12)-Aa9"
+          master_key="$(openssl rand -hex 32)"; jwt_key="$(openssl rand -hex 48)"; admin_password="$(shuf -i 1000-9999 -n 1)"  # contraseñas de 4 números, como en la tienda
           echo "::add-mask::$master_key"; echo "::add-mask::$jwt_key"; echo "::add-mask::$admin_password"
           psql -X -v ON_ERROR_STOP=1 -c "CREATE DATABASE controlplus_e2e_ci"
           connection="Host=127.0.0.1;Port=5432;Database=controlplus_e2e_ci;Username=postgres;Password=${PGPASSWORD}"

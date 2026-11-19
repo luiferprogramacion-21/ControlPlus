@@ -39,5 +39,13 @@ public interface IAuthenticationService
     /// validación del token actual (usuario activo, no bloqueado y sello de seguridad vigente) ya ocurrió al autenticar
     /// la solicitud; aquí se exige además un rol activo, igual que al iniciar sesión.
     /// </summary>
-    Task<Result<AuthenticationResult>> RenewAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<Result<AuthenticationResult>> RenewAsync(Guid userId, bool passwordChangeRequired = false,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cambia la contraseña propia cuando la sesión lo exige (decisión del 19 de noviembre de 2026: 4 números para todos).
+    /// Comprueba la actual, exige la regla vigente y una distinta; devuelve una sesión nueva sin la restricción.
+    /// </summary>
+    Task<Result<AuthenticationResult>> ChangeRequiredPasswordAsync(Guid userId, ChangeRequiredPasswordRequest request,
+        CancellationToken cancellationToken = default);
 }

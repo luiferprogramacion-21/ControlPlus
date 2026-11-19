@@ -1,4 +1,5 @@
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Security.Ports;
 
 namespace ControlPlus.Application.Security.Services;
 
@@ -25,6 +26,17 @@ internal static class SecurityInput
 
     private static readonly System.Text.RegularExpressions.Regex EmailPattern = new(
         @"^[^@\s]+@[^@\s]+\.[^@\s]+$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>Contraseña nueva: obligatoria y, con la regla de 4 números, exactamente 4 dígitos.</summary>
+    public static Result<string> NewPassword(string? value, IPasswordPolicy policy, string fieldName = "contraseña")
+    {
+        var required = RequiredPassword(value, fieldName);
+        if (required.IsFailure) return required;
+        return policy.IsCompliant(required.Value!)
+            ? required
+            : Result.Failure<string>(ApplicationError.Validation(
+                $"La {fieldName} debe tener exactamente {PasswordPolicy.PinLength} números."));
+    }
 
     public static Result<string> RequiredPassword(string? value, string fieldName = "contraseña")
     {
