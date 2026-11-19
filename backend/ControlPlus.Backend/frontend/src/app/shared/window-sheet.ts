@@ -31,7 +31,10 @@ export class WindowSheet implements AfterViewInit, OnDestroy {
     // Algunas ventanas ya atrapan el foco con cdkTrapFocus; las demás lo atrapan aquí.
     if (!this.host.hasAttribute('cdktrapfocus')) {
       this.trap = this.focusTraps.create(this.host);
-      const focusable = this.host.querySelector<HTMLElement>('[autofocus]');
+      // Como en Windows, el cursor empieza en el primer campo, no en la X.
+      const focusable = this.host.querySelector<HTMLElement>('[autofocus]')
+        ?? Array.from(this.host.querySelectorAll<HTMLElement>('input:not([type="hidden"]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]), mat-select:not([aria-disabled="true"])'))
+          .find(element => element.getClientRects().length > 0) ?? null;
       if (!this.host.contains(document.activeElement)) {
         if (focusable) focusable.focus(); else void this.trap.focusFirstTabbableElementWhenReady();
       }

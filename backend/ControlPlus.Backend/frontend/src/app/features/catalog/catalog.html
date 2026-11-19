@@ -87,7 +87,8 @@
   }
 
   @if (selectedCategory(); as category) {
-    <section class="panel editor" aria-labelledby="category-form-title"><h3 id="category-form-title">{{ category.id ? 'Editar' : 'Nueva' }} categoría</h3>
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="category-form-title"><div class="module-form-sheet__backdrop" (click)="saving() || cancel()"></div>
+    <section class="panel editor module-form"><div class="panel-heading"><h3 id="category-form-title">{{ category.id ? 'Editar' : 'Nueva' }} categoría</h3></div>
       <form [formGroup]="categoryForm" (ngSubmit)="saveCategory()">
         <mat-form-field appearance="outline"><mat-label>Nombre</mat-label><input matInput formControlName="name" maxlength="100">
           @if (categoryForm.controls.name.invalid) { <mat-error>Nombre obligatorio, máximo 100 caracteres.</mat-error> }</mat-form-field>
@@ -95,13 +96,15 @@
           <mat-hint>Prefijo de la referencia de sus productos: de 2 a 10 letras, por ejemplo PAP para PAP-000001.</mat-hint>
           @if (categoryForm.controls.abbreviation.invalid) { <mat-error>El prefijo debe tener de 2 a 10 letras de la A a la Z, sin tildes, números ni espacios.</mat-error> }</mat-form-field>
         <mat-form-field appearance="outline"><mat-label>Descripción</mat-label><textarea matInput formControlName="description"></textarea></mat-form-field>
-        <div class="actions"><button mat-flat-button type="submit" [disabled]="saving()">Guardar</button><button mat-button type="button" (click)="cancel()">Cancelar</button></div>
+        <div class="actions form-actions"><button mat-flat-button type="submit" [disabled]="saving()">Guardar</button><button mat-button type="button" (click)="cancel()">Cancelar</button></div>
       </form>
     </section>
+    </div>
   }
 
   @if (selectedProduct(); as product) {
-    <section class="panel editor" aria-labelledby="product-form-title"><h3 id="product-form-title">{{ product.id ? 'Editar' : 'Nuevo' }} producto</h3>
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="product-form-title"><div class="module-form-sheet__backdrop" (click)="saving() || checkingCreate() || cancel()"></div>
+    <section class="panel editor module-form module-form--wide"><div class="panel-heading"><h3 id="product-form-title">{{ product.id ? 'Editar' : 'Nuevo' }} producto</h3></div>
       <form [formGroup]="productForm" (ngSubmit)="saveProduct()">
         <mat-form-field appearance="outline"><mat-label>Nombre</mat-label><input matInput formControlName="name" maxlength="200"><mat-error>Nombre obligatorio.</mat-error></mat-form-field>
         @if (product.id) {
@@ -164,9 +167,10 @@
             @else if (!reconcilingCreate() && !reconciliationQueryFailed()) { <p>Sin coincidencias en la consulta; esto no demuestra que el alta no se haya guardado.</p> }
           }
         </div> }
-        <div class="actions"><button mat-flat-button type="submit" [disabled]="saving() || checkingCreate() || (createOutcomeUncertain() && !product.id)">Guardar</button><button mat-button type="button" (click)="cancel()" [disabled]="saving() || checkingCreate()">{{ createOutcomeUncertain() && !product.id ? 'Cerrar formulario' : 'Cancelar' }}</button></div>
+        <div class="actions form-actions"><button mat-flat-button type="submit" [disabled]="saving() || checkingCreate() || (createOutcomeUncertain() && !product.id)">Guardar</button><button mat-button type="button" (click)="cancel()" [disabled]="saving() || checkingCreate()">{{ createOutcomeUncertain() && !product.id ? 'Cerrar formulario' : 'Cancelar' }}</button></div>
       </form>
     </section>
+    </div>
   }
   @if (deleting(); as doomed) {
     <div class="discount-sheet" role="dialog" aria-modal="true" aria-labelledby="delete-product-title">

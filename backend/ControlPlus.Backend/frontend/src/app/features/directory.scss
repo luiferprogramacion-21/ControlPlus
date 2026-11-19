@@ -6,7 +6,7 @@
 .directory-filters .field-label { margin: 0; }
 .directory-check { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .directory-page .module-table-wrap { max-height: min(calc(58vh / var(--cp-zoom)), 560px); }
-.directory-page .module-table-wrap table { min-width: 850px; }
+.directory-page .module-table-wrap table { min-width: 680px; }
 .directory-page .module-table-wrap th { position: sticky; top: 0; z-index: 1; }
 .directory-page .module-table-wrap td { vertical-align: middle; }
 .directory-page .module-table-wrap td small { display: block; color: var(--cp-text-muted); }

@@ -576,6 +576,37 @@ El usuario pidió quitar las pestañas **Numeración** y **Motivos** de Configur
 - El usuario pidió puntos de miles en los valores mostrados **y también al escribir** importes y cantidades: `1.234.567`; los decimales se escriben con coma: `1.234,50`. Formularios, cálculos y contratos de API conservan su valor numérico, límites e idempotencia. El costo inicial conserva una cadena decimal canónica hasta la conversión existente de la API, para no perder dígitos al editar. No se aplica a códigos, barras, documentos, teléfonos ni fechas. Sin migración ni cambios de datos.
 - Regla de CI aprobada por el usuario: después de cada push lanzar `scripts/dev/Watch-CI.ps1 -Sha (git rev-parse HEAD)` en PowerShell oculto y seguir trabajando. Consultar una sola vez `%TEMP%\controlplus-ci\<sha7>.txt` cuando se necesite cerrar la tarea o indicar una instalación; si dice `ESPERANDO`, informar que sigue en curso sin volver a consultar. No usar bucles de consultas ni `gh run watch`. Agrupar cambios para reducir pushes y comprobar `git status`/`git log origin/main..main` antes de subir, sin incluir trabajo ajeno.
 
+### Decisión del 19 de noviembre de 2026: pantalla más grande y usabilidad como Windows
+
+Quienes probaron el sistema dijeron que era poco usable, poco intuitivo y que se veía pequeño. El usuario aprobó estos cambios a la interfaz, que se apartan del prototipo:
+
+- **Tamaño de la pantalla:**
+  - todo se agranda como la «Escala» de Windows, con tres opciones: Normal 100 %, Grande 125 % (por defecto) y Muy grande 150 %;
+  - se elige en el menú del perfil y cada equipo la recuerda (`core/display-scale.ts`, `localStorage`).
+- **Cómo se implementa el tamaño:**
+  - se aplica `zoom: var(--cp-zoom)` a `app-root` y a los paneles de los diálogos globales;
+  - toda medida `vh`/`vw` se divide entre `--cp-zoom`;
+  - los `@media (max-width)` pasan a `@container cp (max-width)`, porque `app-root` es el contenedor y así responden al ancho ya agrandado;
+  - los `mat-select` se dibujan como `popover` dentro de la aplicación: se les quita el zoom heredado para que el CDK no los descoloque, y solo se agrandan sus opciones.
+  - **Al escribir estilos nuevos:** no usar `@media (max-width)` ni `vh`/`vw` sin dividir entre `--cp-zoom`.
+- **Menú siempre visible** (reemplaza el menú bajo demanda):
+  - fijo a la izquierda, como el panel de navegación de Windows, con secciones Resumen, Ventas y caja, Productos, Compras y Sistema;
+  - un ícono propio por pantalla;
+  - el botón ☰ lo pliega a solo íconos y cada equipo lo recuerda; en ventanas angostas queda en íconos.
+- **Ventanas como en Windows** (`shared/window-sheet.ts`, se aplica solo a todo `.module-form-sheet`):
+  - X arriba a la derecha;
+  - Esc cierra la ventana;
+  - el foco empieza en el primer campo, queda atrapado en la ventana y vuelve a donde estaba al cerrar;
+  - la X y Esc hacen la misma acción de cancelar de la pantalla (el fondo oscuro).
+- **Botones de las ventanas:** abajo a la derecha, primero la acción y al final Cancelar/Cerrar. La barra de botones queda siempre a la vista. Los formularios de producto y categoría del Catálogo pasaron a ser ventanas.
+- **Atajos de Windows** (`core/windows-shortcuts.ts`):
+  - Ctrl+B o Ctrl+F: ir a la búsqueda;
+  - F5: actualizar la lista sin recargar la página; con una ventana abierta no hace nada;
+  - doble clic en una fila: la abre solo con su botón Ver/Editar/Movimientos, nunca uno de borrar;
+  - F1: abre la lista de atajos.
+- **Abrir como un programa:** el instalador del servicio crea `ControlPlus.lnk` con Edge en modo aplicación (`--app=http://localhost:5000/`).
+- **Tablas de listados:** ancho mínimo 680 px, para que la columna de acciones quepa a 125 %.
+
 ### Reglas del reparto
 
 - Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:

@@ -13,7 +13,7 @@ Tiene cuatro partes. Lee la primera y la que corresponda a tu rol:
 
 Cada persona tiene **un solo rol**. Lo que ves en el menú depende de él: si una opción no aparece, tu rol no la tiene. El Administrador puede dar o quitar permisos sueltos a una persona, así que tu menú puede ser un poco distinto al de este manual.
 
-> Este manual describe la versión del 18 de noviembre de 2026. Si algo en pantalla no coincide, avisa al Administrador.
+> Este manual describe la versión del 19 de noviembre de 2026. Si algo en pantalla no coincide, avisa al Administrador.
 
 ---
 
@@ -21,7 +21,7 @@ Cada persona tiene **un solo rol**. Lo que ves en el menú depende de él: si un
 
 ## 1.1 Ingresar y salir
 
-1. Abre ControlPlus con el acceso directo del escritorio (o en el navegador, en `http://localhost:5000`).
+1. Abre ControlPlus con el acceso directo del escritorio. Se abre en su propia ventana, como un programa, con su ícono en la barra de tareas (también funciona en el navegador, en `http://localhost:5000`).
 2. Escribe tu **usuario** y tu **contraseña** y pulsa Ingresar.
 3. El sistema te lleva a donde empiezas a trabajar:
    - si vendes y no hay caja abierta, a **Caja** para abrirla;
@@ -43,9 +43,30 @@ Nadie cambia su propia contraseña desde dentro del sistema. Hay dos caminos:
 
 ## 1.3 El menú y la pantalla
 
-- A la izquierda está el **menú**. Se puede plegar para tener más espacio.
+- A la izquierda está el **menú**, siempre a la vista, como en las ventanas de Windows. El botón **☰** de arriba lo pliega para dejar solo los íconos (al pasar el ratón por un ícono aparece su nombre) y lo vuelve a desplegar. El computador recuerda cómo lo dejaste.
+- Las opciones están agrupadas (solo ves las que tu rol permite):
+  - **Resumen:** Dashboard y Reportes.
+  - **Ventas y caja:** Punto de venta, Historial de ventas, Caja, Apartados, Créditos y abonos y Clientes.
+  - **Productos:** Catálogo, Inventario y Etiquetas.
+  - **Compras:** Compras, Recepciones y Proveedores.
+  - **Sistema:** Configuración y Administración.
 - Arriba aparece el nombre de la tienda y tu nombre.
-- Las opciones del menú (según tu rol): Dashboard, Punto de venta, Historial de ventas, Caja, Inventario, Clientes, Créditos y abonos, Compras, Recepción de compras, Proveedores, Reportes, Apartados, Configuración, Administración y Catálogo.
+- **Tamaño de la pantalla.** Toca tu nombre abajo en el menú y elige **Normal (100 %)**, **Grande (125 %)** o **Muy grande (150 %)**. Agranda todo a la vez: letras, botones, campos y tablas. Viene en Grande y cada computador recuerda su tamaño.
+- **Ventanas.** Los formularios se abren en ventanas como las de Windows: la **X** de arriba a la derecha o **Esc** cierran sin guardar, y abajo a la derecha están primero el botón de la acción (Guardar, Aceptar…) y al final **Cancelar**.
+
+### Atajos del teclado
+
+Funcionan en todas las pantallas. **F1** (o tu nombre → «Atajos del teclado») muestra esta lista en cualquier momento.
+
+| Tecla | Qué hace |
+| --- | --- |
+| **Enter** | Aceptar, guardar o buscar lo escrito. |
+| **Esc** | Cancelar o cerrar la ventana. |
+| **Ctrl + B** | Ir al campo de búsqueda de la pantalla. |
+| **F5** | Actualizar la lista de la pantalla. |
+| **Tab** / **Mayús + Tab** | Pasar al campo siguiente / anterior. |
+| **Doble clic** en una fila | Abrirla (como su botón Ver o Editar). |
+| **F2, F3, F4, Supr, F9** | Atajos del punto de venta (ver 2.3). |
 
 ## 1.4 Cuando el sistema pide la autorización de otra persona
 
