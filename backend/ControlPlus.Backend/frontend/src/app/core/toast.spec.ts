@@ -44,3 +44,14 @@ describe('mensajes emergentes', () => {
     expect(statusKind('No se pudo completar la operación.')).toBe('error');
   });
 });
+
+describe('Qué sigue al terminar', () => {
+  it('ofrece el siguiente paso solo con el permiso de ese paso', async () => {
+    const { nextStep } = await import('./toast');
+    expect(nextStep('Turno abierto.', p => p === 'SALES.CREATE')?.label).toBe('Ir a vender');
+    expect(nextStep('Turno abierto.', () => false)).toBeUndefined();
+    expect(nextStep('Turno cerrado.', () => false)?.link).toBe('/operacion/inicio');
+    expect(nextStep('Producto guardado. N.º de producto: PAP-000004.', p => p === 'PRODUCTS.LABELS_MANAGE')?.label).toBe('Imprimir etiqueta');
+    expect(nextStep('No se pudo guardar.', () => true)).toBeUndefined();
+  });
+});

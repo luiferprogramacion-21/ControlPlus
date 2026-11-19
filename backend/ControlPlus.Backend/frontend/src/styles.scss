@@ -795,3 +795,5 @@ kbd { display: inline-block; min-width: 28px; padding: 2px 7px; border: 1px soli
 .module-heading { justify-content: flex-end; }
 .module-heading > .module-heading__title, .module-heading > div:first-child:has(> h2), .catalog__header > div:first-child:has(> h2) { display: none; }
 .module-heading:not(:has(button, a)) { display: none; }
+/* Qué sigue al terminar: el aviso ofrece el siguiente paso (core/toast.ts). */
+.toast__action { display: inline-block; margin-left: 8px; color: var(--cp-primary); font-weight: 700; text-decoration: underline; white-space: nowrap; }
