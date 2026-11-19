@@ -346,7 +346,8 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         "20261115010000_OptionalSalePaymentReferenceV1",
         "20261115020000_ConfigurableWholesaleMinimumV1",
         "20261116010000_CreditRiskControlsV1",
-        "20261116020000_CreditInstallmentsV1"
+        "20261116020000_CreditInstallmentsV1",
+        "20261119010000_CashDrawerV1"
     ];
 
     private readonly string _masterKey = RandomSecret(48);
@@ -369,7 +370,11 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureLogging(logging => logging.ClearProviders());
-            builder.ConfigureTestServices(services => services.AddSingleton<IPrintSpooler, FakePrintSpooler>());
+            builder.ConfigureTestServices(services =>
+            {
+                services.AddSingleton<IPrintSpooler, FakePrintSpooler>();
+                services.AddSingleton<ICashDrawerPulseSender, FakeCashDrawerPulseSender>();
+            });
             builder.UseSetting("ConnectionStrings:ControlPlusDb", _postgres.GetConnectionString());
             builder.UseSetting("Installation:MasterKey", _masterKey);
             builder.UseSetting("Jwt:Issuer", "controlplus-sales-tests");

@@ -99,16 +99,19 @@ public sealed class CashDrawerService(
         if (operation is null || operation.UserId != actor.UserId || !operation.HasCash) return null;
         var shift = await db.TurnoCaja.AsNoTracking().SingleOrDefaultAsync(x =>
             x.Id == operation.ShiftId, ct);
-        if (shift is null) return null;
+        if (shift is null || shift.Estado != "ABIERTA") return null;
         var profile = await GetDefaultReceiptProfileAsync(shift.TerminalId, ct);
+        if (profile?.CajonHabilitado != true || profile.CajonPin is not (2 or 5)) return null;
         var now = clock.UtcNow.UtcDateTime;
-        var enabledSince = profile?.FechaModificacion ?? profile?.FechaCreacion;
+        var enabledSince = profile.FechaModificacion ?? profile.FechaCreacion;
         var fresh = operation.OccurredAtUtc <= now.AddSeconds(5) &&
             operation.OccurredAtUtc >= now.AddMinutes(-2);
-        var canSend = fresh && shift.Estado == "ABIERTA" && profile?.CajonHabilitado == true &&
-            profile.CajonPin is 2 or 5 && enabledSince <= operation.OccurredAtUtc;
+        // Nothing is written when the drawer cannot open: with the drawer disabled (the default) a cash
+        // operation keeps exactly its previous writes and audit trail. A replay of an old operation, or of one
+        // confirmed before the profile last changed, never opens the drawer.
+        if (!fresh || enabledSince > operation.OccurredAtUtc) return null;
         return await ReserveAndSendAsync(actor.UserId, OperationType(kind), operationId,
-            shift, canSend ? profile : null, null, ct);
+            shift, profile, null, ct);
     }
 
     private async Task<CashDrawerOpenResultDto> ReserveAndSendAsync(Guid actorId, string operationType,
@@ -127,6 +130,7 @@ public sealed class CashDrawerService(
 
         await using (var tx = await db.Database.BeginTransactionAsync(ct))
         {
+            await LockInstallationAsync(ct);
             // The unique key serializes concurrent HTTP replays without a second pulse.
             var inserted = await db.Database.ExecuteSqlInterpolatedAsync($"""
                 INSERT INTO caja.apertura_cajon
@@ -195,20 +199,27 @@ public sealed class CashDrawerService(
     private async Task<CashDrawerOpenResultDto> CompleteAsync(Guid attemptId, string state,
         string? error, CancellationToken ct)
     {
-        var attempt = await db.AperturaCajon.SingleAsync(x => x.Id == attemptId, ct);
-        attempt.Estado = state;
-        attempt.ErrorSanitizado = error;
-        attempt.FechaResultado = clock.UtcNow.UtcDateTime;
-        var action = state switch
+        try
         {
-            "ENVIADO" => AuditAction.CashDrawerOpeningAccepted,
-            "FALLIDO" => AuditAction.CashDrawerOpeningFailed,
-            "OMITIDO" => AuditAction.CashDrawerOpeningSkipped,
-            _ => AuditAction.CashDrawerOpeningUncertain
-        };
-        await WriteAuditAsync(attempt.SolicitadoPorId, action, attempt,
-            state is "ENVIADO" or "OMITIDO" ? "EXITOSO" : "FALLIDO", ct);
-        try { await db.SaveChangesAsync(ct); }
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            await LockInstallationAsync(ct);
+            var attempt = await db.AperturaCajon.AsTracking().SingleAsync(x => x.Id == attemptId, ct);
+            attempt.Estado = state;
+            attempt.ErrorSanitizado = error;
+            attempt.FechaResultado = clock.UtcNow.UtcDateTime;
+            var action = state switch
+            {
+                "ENVIADO" => AuditAction.CashDrawerOpeningAccepted,
+                "FALLIDO" => AuditAction.CashDrawerOpeningFailed,
+                "OMITIDO" => AuditAction.CashDrawerOpeningSkipped,
+                _ => AuditAction.CashDrawerOpeningUncertain
+            };
+            await WriteAuditAsync(attempt.SolicitadoPorId, action, attempt,
+                state is "ENVIADO" or "OMITIDO" ? "EXITOSO" : "FALLIDO", ct);
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            return ToResult(attempt);
+        }
         catch (Exception exception)
         {
             logger.LogError(exception, "No se pudo guardar el resultado del intento de cajón {AttemptId}.", attemptId);
@@ -216,8 +227,19 @@ public sealed class CashDrawerService(
             return new CashDrawerOpenResultDto(attemptId, "INCIERTO",
                 "Revisa físicamente el cajón: no se pudo guardar el resultado de la orden.");
         }
-        return ToResult(attempt);
     }
+
+    /// <summary>
+    /// Takes the active installation in key-share mode before writing. Sales, payments and cash movements
+    /// lock it first (FOR UPDATE) and the shift afterwards, while the drawer row references the shift and its
+    /// audit references the installation. Taking the installation first keeps the same lock order, so a
+    /// concurrent operation waits instead of deadlocking; key-share stays compatible with the audit writes of
+    /// operations that lock the shift first.
+    /// </summary>
+    private Task LockInstallationAsync(CancellationToken ct) => db.Database.ExecuteSqlRawAsync("""
+        SELECT 1 FROM configuracion.instalacion
+        WHERE activo ORDER BY fecha_instalacion, id LIMIT 1 FOR KEY SHARE
+        """, ct);
 
     private static Result<CashDrawerOpenResultDto> ExistingManualResult(ActorContext actor,
         string reason, AperturaCajon existing)

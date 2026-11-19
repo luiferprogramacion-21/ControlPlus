@@ -664,7 +664,10 @@ El usuario pidió abrir el cajón monedero a través de la impresora de recibos.
 - **Nunca abre** con medios electrónicos, reimpresiones, reintentos ni repeticiones de la misma solicitud.
 - **Si el cajón falla:** la operación no se revierte ni se duplica. La pantalla avisa del resultado, que llega en el encabezado `X-Cash-Drawer-Status`.
 - **Apertura manual:** desde Caja, con motivo y turno abierto, solo Supervisor o Administrador con `CASH.SHIFT_MANAGE` (`POST /api/cash/drawer/open`, con `Idempotency-Key`). Si el resultado es incierto, hay que revisar el cajón antes de pedir otra apertura.
-- **Registro:** cada intento queda en `caja.apertura_cajon` y en la auditoría (`CashDrawer*`).
+- **Registro:**
+  - cada intento queda en `caja.apertura_cajon` y en la auditoría (`CashDrawer*`);
+  - con el cajón apagado no se escribe nada, así que las ventas conservan exactamente sus escrituras y su auditoría;
+  - sus escrituras toman primero la instalación con `FOR KEY SHARE`, en el mismo orden que ventas y caja, para no bloquearse en ciclo con una operación simultánea.
 - **Migración** `20261119010000_CashDrawerV1` (historial 27 → 28):
   - agrega cuatro columnas a `configuracion.perfil_impresora` y la tabla `caja.apertura_cajon`;
   - la aplica el operador **antes** de instalar la versión nueva, con `scripts/cash-drawer/Invoke-Activation.ps1 -UsePostgresCredential` (servicio detenido, respaldo, preflight y postflight);
