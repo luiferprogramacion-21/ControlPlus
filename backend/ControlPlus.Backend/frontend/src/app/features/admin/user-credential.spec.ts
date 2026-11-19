@@ -1,11 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
+import { MatDialog } from '@angular/material/dialog';
+import { Subject } from 'rxjs';
 import { TicketPrinter } from '../sales/ticket';
 import { EstablishmentService } from '../../core/establishment';
 import { AdminApi, AdminUser, IssuedCredential, OperatorCredential } from './admin-api';
 import { buildCredentialCardHtml } from './credential-card';
 import { buildPdfFromJpeg, CredentialCardExporter } from './credential-card-export';
-import { UserCredential } from './user-credential';
+import { CredentialReplacementDialog, UserCredential } from './user-credential';
 
 describe('Carné de operador', () => {
   const user: AdminUser = { id: 'u1', userName: 'supervisor', displayName: 'Ana <Supervisora>', isActive: true, isLocked: false,
@@ -15,9 +17,10 @@ describe('Carné de operador', () => {
   const issueCredential = vi.fn(); const print = vi.fn();
   const currentCredential = vi.fn(); const revokeCredential = vi.fn();
   const jpeg = vi.fn(); const pdf = vi.fn(); const save = vi.fn();
+  const openDialog = vi.fn();
 
   const create = () => {
-    TestBed.configureTestingModule({ providers: [{ provide: AdminApi, useValue: { issueCredential, currentCredential, revokeCredential } }, { provide: TicketPrinter, useValue: { print } }, { provide: CredentialCardExporter, useValue: { jpeg, pdf, save } }, { provide: EstablishmentService, useValue: { name: () => 'Negocio de prueba' } }] });
+    TestBed.configureTestingModule({ providers: [{ provide: MatDialog, useValue: { open: openDialog } }, { provide: AdminApi, useValue: { issueCredential, currentCredential, revokeCredential } }, { provide: TicketPrinter, useValue: { print } }, { provide: CredentialCardExporter, useValue: { jpeg, pdf, save } }, { provide: EstablishmentService, useValue: { name: () => 'Negocio de prueba' } }] });
     const fixture = TestBed.createComponent(UserCredential);
     fixture.componentRef.setInput('user', user);
     return fixture.componentInstance;
@@ -33,6 +36,39 @@ describe('Carné de operador', () => {
     await component.ngOnInit();
     expect(component.issued()?.credentialToken).toBe(issued.credentialToken);
     expect(issueCredential).not.toHaveBeenCalled();
+  });
+
+  it('confirma el reemplazo en una modal y evita emitir dos veces mientras está abierta', async () => {
+    const closed = new Subject<boolean | undefined>();
+    openDialog.mockReturnValue({ afterClosed: () => closed, close: vi.fn() });
+    const component = create(); component.current.set({ ...issued, version: 1, state: 'ACTIVA' });
+    const replacing = component.issue(); await component.issue();
+    expect(openDialog).toHaveBeenCalledOnce();
+    expect(openDialog).toHaveBeenCalledWith(CredentialReplacementDialog, expect.objectContaining({
+      data: { displayName: user.displayName }, role: 'alertdialog', autoFocus: '#cancel-credential-replacement',
+    }));
+    expect(globalThis.confirm).not.toHaveBeenCalled(); expect(issueCredential).not.toHaveBeenCalled();
+    closed.next(true); closed.complete(); await replacing;
+    expect(issueCredential).toHaveBeenCalledExactlyOnceWith('u1');
+  });
+
+  it.each([false, undefined])('cancelar o cerrar la modal (%s) conserva el carné anterior', async accepted => {
+    const closed = new Subject<boolean | undefined>();
+    openDialog.mockReturnValue({ afterClosed: () => closed, close: vi.fn() });
+    const component = create(); component.current.set({ ...issued, version: 1, state: 'ACTIVA' });
+    const replacing = component.issue(); closed.next(accepted); closed.complete(); await replacing;
+    expect(issueCredential).not.toHaveBeenCalled();
+    expect(component.current()?.credentialId).toBe('c1');
+  });
+
+  it('cerrar la ventana del carné descarta también una confirmación pendiente', async () => {
+    const closed = new Subject<boolean | undefined>();
+    const closeDialog = vi.fn();
+    openDialog.mockReturnValue({ afterClosed: () => closed, close: closeDialog });
+    const component = create(); component.current.set({ ...issued, version: 1, state: 'ACTIVA' });
+    const replacing = component.issue(); component.close(); closed.next(true); closed.complete(); await replacing;
+    expect(closeDialog).toHaveBeenCalledWith(false);
+    expect(issueCredential).not.toHaveBeenCalled(); expect(component.current()).toBeNull();
   });
 
   it('olvida una consulta del código que termina después de cerrar la ventana', async () => {
