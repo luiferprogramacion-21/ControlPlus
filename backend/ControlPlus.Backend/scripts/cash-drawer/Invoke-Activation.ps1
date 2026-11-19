@@ -5,7 +5,7 @@ param([switch]$UsePostgresCredential)
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$target = '20261119010000_CashDrawerV1'
+$target = '20261119013000_HeldSalesV1'  # aplica CashDrawerV1 y HeldSalesV1, en ese orden
 $previous = '20261116020000_CreditInstallmentsV1'
 $pgBin = 'C:\Program Files\PostgreSQL\18\bin'
 $dotnet = 'C:\Program Files\dotnet\dotnet.exe'
@@ -125,7 +125,8 @@ try {
     Invoke-Checked $psql ($psqlArgs + @('-f',$postflight)) $post `
         (Join-Path $evidence 'postflight.err') 'Postflight'
     $postLines = @(Get-Content -LiteralPath $post)
-    if ($postLines -cnotcontains "history|28|$target" -or
+    if ($postLines -cnotcontains "history|29|$target" -or
+        $postLines -cnotcontains 'drafts|OK' -or
         $postLines -cnotcontains $profileFingerprint[0] -or
         $postLines -cnotcontains $jobFingerprint[0] -or
         $postLines -cnotcontains 'settings|DISABLED' -or
@@ -135,7 +136,7 @@ try {
         throw 'El postflight no acreditó historia, defaults y conservación.'
     }
     [ordered]@{status='CASH_DRAWER_ACTIVATION_OK';target=$target;
-        historyBefore=27;historyAfter=28;backup=$dump;backupSha256=$backupHash;
+        historyBefore=27;historyAfter=29;backup=$dump;backupSha256=$backupHash;
         utc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json |
         Set-Content -LiteralPath (Join-Path $evidence 'result.json') -Encoding UTF8
     Write-Host ('CASH_DRAWER_ACTIVATION_OK; evidence=' + $evidence)

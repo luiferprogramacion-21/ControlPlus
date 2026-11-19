@@ -17,7 +17,7 @@ El sistema usa un trabajo Windows `RAW` separado del ticket y envía `ESC p` con
 
 ## Migración controlada
 
-`20261119010000_CashDrawerV1` agrega cuatro columnas a `configuracion.perfil_impresora` y la tabla `caja.apertura_cajon`; avanza el historial **27 → 28** después de `20261116020000_CreditInstallmentsV1`. El agente no ha accedido a `controlplus` ni aplicado la migración. El operador solo la ejecuta tras CI verde y prueba de migración en una base temporal `controlplus_test_*`. El equipo físico se revisa antes de habilitar el perfil.
+`20261119010000_CashDrawerV1` agrega cuatro columnas a `configuracion.perfil_impresora` y la tabla `caja.apertura_cajon`; avanza el historial **27 → 28**. El mismo activador aplica a continuación `20261119013000_HeldSalesV1` (ventas en espera, ver `docs/sale-drafts.md`), así que el historial queda en **29** después de `20261116020000_CreditInstallmentsV1`. El agente no ha accedido a `controlplus` ni aplicado la migración. El operador solo la ejecuta tras CI verde y prueba de migración en una base temporal `controlplus_test_*`. El equipo físico se revisa antes de habilitar el perfil.
 
 Desde PowerShell 5.1 **como Administrador**, en `C:\ControlPlus\backend\ControlPlus.Backend`:
 
@@ -27,7 +27,7 @@ Stop-Service ControlPlus
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\cash-drawer\Invoke-Activation.ps1 -UsePostgresCredential
 ```
 
-El activador solo acepta `127.0.0.1:5432/controlplus` como `postgres`. Antes de escribir exige servicio detenido, historial 27 con el objetivo pendiente, columnas/tabla ausentes y cero clientes conectados. Publica la API, crea y verifica un respaldo nuevo con SHA-256, repite el preflight para detectar cambios durante el respaldo y ejecuta `--migrate-to` **solo** para el objetivo. Después exige historial 28, perfiles existentes todavía desactivados, tabla nueva vacía, constraints validados, permisos de `controlplus_app` y huellas idénticas de perfiles y trabajos de impresión excluyendo las columnas nuevas. La confirmación final es `CASH_DRAWER_ACTIVATION_OK`, con evidencia y respaldo en `ControlPlus-Backups\CashDrawer-*`.
+El activador solo acepta `127.0.0.1:5432/controlplus` como `postgres`. Antes de escribir exige servicio detenido, historial 27 con el objetivo pendiente, columnas/tabla ausentes y cero clientes conectados. Publica la API, crea y verifica un respaldo nuevo con SHA-256, repite el preflight para detectar cambios durante el respaldo y ejecuta `--migrate-to` **solo** para el objetivo. Después exige historial 29 (`HeldSalesV1` al final), el único de borradores retirado, perfiles existentes todavía desactivados, tabla nueva vacía, constraints validados, permisos de `controlplus_app` y huellas idénticas de perfiles y trabajos de impresión excluyendo las columnas nuevas. La confirmación final es `CASH_DRAWER_ACTIVATION_OK`, con evidencia y respaldo en `ControlPlus-Backups\CashDrawer-*`.
 
 Si falta esa confirmación, conservar la carpeta de evidencia y revisar la etapa exacta; **no repetir el activador automáticamente ni ejecutar Down**. Tras la confirmación, instalar la versión nueva:
 

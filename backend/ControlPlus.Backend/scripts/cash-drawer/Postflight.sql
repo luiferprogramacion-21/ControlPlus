@@ -1,9 +1,14 @@
 \set ON_ERROR_STOP on
 BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
-SELECT CASE WHEN count(*) = 28
-  AND max("MigrationId") = '20261119010000_CashDrawerV1'
-  THEN 'history|28|20261119010000_CashDrawerV1' ELSE 'history|INVALID' END
+SELECT CASE WHEN count(*) = 29
+  AND max("MigrationId") = '20261119013000_HeldSalesV1'
+  AND count(*) FILTER (WHERE "MigrationId" = '20261119010000_CashDrawerV1') = 1
+  THEN 'history|29|20261119013000_HeldSalesV1' ELSE 'history|INVALID' END
 FROM public."__EFMigrationsHistory";
+-- Ventas en espera: ya no hay un solo borrador abierto por terminal.
+SELECT CASE WHEN to_regclass('ventas.uq_borrador_venta_activo_terminal') IS NULL
+  AND to_regclass('ventas.ix_borrador_venta_abiertos_usuario') IS NOT NULL
+  THEN 'drafts|OK' ELSE 'drafts|INVALID' END;
 SELECT 'profiles|' || count(*) || '|' ||
   md5(coalesce(string_agg((to_jsonb(p) - 'cajon_habilitado' - 'cajon_pin'
     - 'cajon_pulso_on_ms' - 'cajon_pulso_off_ms')::text, '|' ORDER BY p.id), ''))
