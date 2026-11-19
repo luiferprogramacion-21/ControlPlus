@@ -48,7 +48,7 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         var detail = await db.DetalleVenta.AsNoTracking().SingleAsync(x => x.VentaId == sale.Id);
         var header = await db.Venta.AsNoTracking().SingleAsync(x => x.Id == sale.Id);
         Assert.Equal(0m, detail.ValorIva ?? 0m);
-        Assert.False(header.IvaDiscriminadoCompleto);
+        Assert.Equal(0m, header.ImpuestoIncluidoTotal ?? 0m);
         Assert.Equal(1000m, header.Total);
     }
 

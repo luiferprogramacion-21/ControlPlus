@@ -40,7 +40,7 @@ public sealed partial class SalesApiFlowTests
         var detail = await db.DetalleVenta.AsNoTracking().SingleAsync(x => x.VentaId == sale.Id);
         Assert.Equal(0m, detail.ValorIva ?? 0m);
         var header = await db.Venta.AsNoTracking().SingleAsync(x => x.Id == sale.Id);
-        Assert.False(header.IvaDiscriminadoCompleto);
+        Assert.Equal(0m, header.ImpuestoIncluidoTotal ?? 0m);
         var receipt = await ReadAsync<SaleReceiptDto>(await client.GetAsync(
             $"/api/sales/{sale.Id}/receipt"), HttpStatusCode.OK);
         Assert.Equal(0m, receipt.VatTotal ?? 0m);
