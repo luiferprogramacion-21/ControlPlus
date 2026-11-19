@@ -117,14 +117,10 @@ describe('Catalog: existencias iniciales', () => {
       await component.saveProduct();
       expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ taxPercentage: null }), true, expect.any(String));
     });
-    it('Con IVA exige el porcentaje y luego lo envía', async () => {
-      component.setHasTax(true);
-      await component.saveProduct();
-      expect(api.createProduct).not.toHaveBeenCalled();
-      expect(component.productForm.controls.taxPercentage.invalid).toBe(true);
+    it('el IVA se quitó del sistema: aunque quede un porcentaje guardado, envía nulo', async () => {
       component.productForm.patchValue({ taxPercentage: '19' });
       await component.saveProduct();
-      expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ taxPercentage: 19 }), true, expect.any(String));
+      expect(api.createProduct).toHaveBeenCalledWith(expect.objectContaining({ taxPercentage: null }), true, expect.any(String));
     });
     it('rechaza un porcentaje fuera de 0 a 100', () => {
       component.setHasTax(true);

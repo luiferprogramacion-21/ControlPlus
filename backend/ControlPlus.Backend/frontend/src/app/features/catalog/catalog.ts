@@ -344,7 +344,7 @@ export class Catalog implements OnInit {
         barcodeFormat: selected.id && f.barcode.trim() === (selected.barcode ?? '') ? selected.barcodeFormat : null,
         description: f.description.trim() || null, retailPrice: Number(f.retailPrice),
         wholesalePrice: f.wholesalePrice === '' ? null : Number(f.wholesalePrice),
-        taxPercentage: this.hasTax() && f.taxPercentage !== '' ? Number(f.taxPercentage) : null,
+        taxPercentage: null, // El IVA se quitó del sistema (18 de noviembre de 2026).
         minimumStock: Number(f.minimumStock),
       };
       let saved: Product;

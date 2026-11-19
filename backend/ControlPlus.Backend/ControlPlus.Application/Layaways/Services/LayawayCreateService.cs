@@ -207,7 +207,7 @@ public sealed class LayawayCreateService(
                 var lineTotal = CashMoney.Require(checked(unitPrice.Value * line.Quantity), allowNegative: false);
                 SalePricingPolicy.EnsureNotBelowCost(lineTotal, product.CostoPromedio.Value, line.Quantity);
                 var tax = LayawayPolicy.CalculateIncludedTax(lineTotal,
-                    establishment.VatEnabled ? establishment.VatPercentage : 0m);
+                    0m /* El IVA se quitó del sistema el 18 de noviembre de 2026: las ventas y apartados nuevos no lo desglosan. */);
                 prepared.Add(new PreparedLine(product, line.Quantity, line.PriceType, unitPrice.Value,
                     lineTotal, tax.Base, tax.Tax));
             }
@@ -304,7 +304,7 @@ public sealed class LayawayCreateService(
                 CodigoProducto = product.CodigoInterno, NombreProducto = product.Nombre,
                 UnidadMedida = unitNames[product.UnidadMedidaId], Cantidad = line.Quantity,
                 PrecioReserva = line.UnitPrice, CostoUnitario = product.CostoPromedio,
-                PorcentajeIva = establishment.VatEnabled ? establishment.VatPercentage : 0m,
+                PorcentajeIva = 0m /* El IVA se quitó del sistema el 18 de noviembre de 2026: las ventas y apartados nuevos no lo desglosan. */,
                 SubtotalBruto = line.Total,
                 OrigenDescuento = "NINGUNO", ValorDescuento = 0,
                 BaseGravable = line.TaxBase, ValorIva = line.TaxAmount,

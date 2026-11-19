@@ -29,8 +29,6 @@ export interface ChangePolicy { days: number; version: number; }
 /** `requireMinimumInitial` off means any initial payment above zero is accepted; the percentage is kept for when it is switched on again. */
 export interface LayawaySettings { minimumPercentage: number; defaultDays: number | null; requireMinimumInitial: boolean; version: number; }
 
-/** Business-wide VAT switch. `percentage` is null until the Administrator sets it for the first time. */
-export interface VatSettings { enabled: boolean; percentage: number | null; version: number; updatedAtUtc: string | null; }
 
 /** Default due-date term of a credit sale in days (1 to 90); null means the seller must choose the date each time. */
 /** blockRiskyCredit: con true, vender a crédito a un moroso o sobre el cupo exige autorización de un Administrador. */
@@ -84,10 +82,6 @@ export class ConfigApi {
     return firstValueFrom(this.http.put<CreditSettings>('/api/credits/settings', { defaultDays, expectedVersion, blockRiskyCredit }));
   }
 
-  vatSettings(): Promise<VatSettings> { return firstValueFrom(this.http.get<VatSettings>('/api/settings/vat')); }
-  updateVatSettings(enabled: boolean, percentage: number | null, expectedVersion: number): Promise<VatSettings> {
-    return firstValueFrom(this.http.put<VatSettings>('/api/settings/vat', { enabled, percentage, expectedVersion }));
-  }
 
   reasons(group: ReasonGroup): Promise<ReasonItem[]> { return firstValueFrom(this.http.get<ReasonItem[]>(group.list)); }
   initializeReasons(group: ReasonGroup): Promise<ReasonItem[]> { return firstValueFrom(this.http.post<ReasonItem[]>(group.initialize, {})); }

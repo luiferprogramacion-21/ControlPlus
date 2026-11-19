@@ -376,14 +376,13 @@ Menú **Inventario**: existencias, **Movimientos** (kardex de cada cambio) y ale
 
 ## 4.6 Configuración
 
-Menú **Configuración**, con siete pestañas:
+Menú **Configuración**, con seis pestañas (ControlPlus no maneja IVA):
 
 | Pestaña | Para qué sirve |
 | --- | --- |
 | **Establecimiento** | Nombre comercial, NIT o documento, teléfono, dirección y los textos de encabezado y pie del ticket. |
 | **Caja y turnos** | Modalidad predeterminada: individual o compartido (solo sin turno abierto). |
 | **Cambios, apartados y créditos** | Plazo de cambios de producto (15 días), pago inicial mínimo de apartados (20 %, se puede apagar; siempre al menos $1), plazo límite de apartados (15 días), plazo sugerido de los créditos (1 a 90 días) y **mínimo mayorista** (12 unidades). También el **bloqueo de créditos a morosos y de cupo excedido**: si lo activas, solo tú puedes autorizar una excepción. |
-| **IVA** | Apaga o enciende el IVA incluido en las ventas nuevas (viene apagado). No cambia precios ni totales; solo guarda la base y el IVA de cada venta. |
 | **Numeración** | Muestra la numeración de ventas, abonos, apartados, compras, cambios y pedidos. Se crea sola al primer uso: aquí solo se consulta y, antes del primer documento, se ajusta. |
 | **Motivos** | Catálogos de motivos de anulación y cierre (ventas, compras, pedidos). Si falta alguno, **Completar faltantes**. |
 | **Impresión** | Perfiles de impresora y cola de impresión (ver 4.7). |
@@ -422,7 +421,7 @@ La tabla **Cola de impresión** muestra cada trabajo y su estado. **Reintentar**
 
 - **Dashboard:** el resumen del día: ventas, comparación con el mismo lapso de ayer, caja actual (efectivo esperado del turno abierto), alertas (stock bajo, créditos vencidos, apartados próximos a vencer), ventas por hora, actividad reciente y estado del respaldo externo.
 - **Reportes:** ventas por día, flujo de caja por día, medios de pago y, con costos, **margen comercial estimado**. Hay versión en pantalla y en PDF.
-  - El margen usa el costo histórico de cada venta y el precio con IVA incluido. **No es utilidad contable**: no descuenta impuestos ni gastos.
+  - El margen usa el costo histórico de cada venta y el precio de venta. **No es utilidad contable**: no descuenta impuestos ni gastos.
   - Si falta el costo de algún producto, el sistema dice cuántas líneas faltan en vez de inventar el dato.
 
 ## 4.11 Respaldos y restauración

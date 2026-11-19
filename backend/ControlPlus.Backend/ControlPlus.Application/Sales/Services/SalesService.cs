@@ -216,7 +216,7 @@ public sealed partial class SalesService(
         try
         {
             prepared = PrepareSale(normalizedLines, input.GeneralDiscount, productsById, maximumDiscount,
-                establishment.VatEnabled ? establishment.VatPercentage : 0m, establishment.MinimoUnidadesMayorista);
+                0m /* El IVA se quitó del sistema el 18 de noviembre de 2026: las ventas y apartados nuevos no lo desglosan. */, establishment.MinimoUnidadesMayorista);
         }
         catch (DomainRuleViolationException exception)
         {
@@ -364,7 +364,7 @@ public sealed partial class SalesService(
                 TipoPrecio = line.PriceType,
                 PrecioUnitario = line.UnitPrice,
                 CostoUnitario = product.CostoPromedio,
-                PorcentajeIva = establishment.VatEnabled ? establishment.VatPercentage : 0m,
+                PorcentajeIva = 0m /* El IVA se quitó del sistema el 18 de noviembre de 2026: las ventas y apartados nuevos no lo desglosan. */,
                 SubtotalBruto = line.GrossAmount,
                 OrigenDescuento = line.DiscountOrigin,
                 TipoDescuento = line.DiscountType,

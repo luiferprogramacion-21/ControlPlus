@@ -553,6 +553,10 @@ Botón «Eliminar» en Administración → Usuarios.
 
 El Administrador con `CONFIGURATION.MANAGE` elimina perfiles desde Configuración → Impresión (`DELETE /api/printing/profiles/{profileId}`). Sin trabajos de impresión se borra con su plantilla; con historial se retira (inactivo, sin ser predeterminado, oculto y con el nombre liberado) y conserva sus trabajos; con trabajos pendientes o en curso responde 409. Auditado como `PrintProfileDeleted`. Sin migración. Véase `docs/printing-implementation.md`.
 
+### Decisión del 18 de noviembre de 2026: el IVA se quita de todo el sistema
+
+El usuario decidió quitar el IVA de ControlPlus «de todo el sistema». Desaparecen la pestaña IVA de Configuración, el interruptor y el porcentaje de IVA del producto, el modo y el porcentaje de IVA en compras y recepciones, el desglose del ticket y las menciones en reportes. En el servidor, ventas y apartados nuevos se calculan siempre sin IVA aunque `iva_negocio_habilitado` siga encendido en la base, y `PUT /api/settings/vat` rechaza encenderlo (400). No hay migración ni se borran datos: las ventas, apartados y cambios antiguos conservan su desglose guardado y C3 lo sigue usando para el margen. Se eliminaron las pruebas de IVA en apartados y cambios (`LayawayBusinessVatApiTests`, `SaleChangeBusinessVatApiTests`) porque ya no se pueden crear ventas con IVA. Las secciones anteriores sobre el IVA quedan como historia.
+
 ### Reglas del reparto
 
 - Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:

@@ -24,6 +24,8 @@ const longDate = (value: string): string => new Intl.DateTimeFormat('es-CO', { d
 
 /** The VAT lines appear only for sales that saved a breakdown, i.e. made while VAT was switched on. The price already includes it. */
 export function vatBreakdown(receipt: SaleReceipt): { label: string; base: number; vat: number } | null {
+  // El IVA se quitó del sistema el 18 de noviembre de 2026: el ticket ya no lo muestra, ni siquiera en ventas antiguas.
+  if (receipt) return null;
   const { vatPercentage: rate, taxableBaseTotal: base, vatTotal: vat } = receipt;
   if (typeof rate !== 'number' || typeof base !== 'number' || typeof vat !== 'number') return null;
   if (!Number.isFinite(rate) || !Number.isFinite(base) || !Number.isFinite(vat) || rate <= 0) return null;

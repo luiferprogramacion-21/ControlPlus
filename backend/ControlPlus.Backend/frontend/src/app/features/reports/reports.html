@@ -27,15 +27,15 @@
         <article class="report-card"><div><span>Costo productos</span><strong>{{ optionalMoney(s.estimatedCost) }}</strong>
           @if (s.costCompleteness === 'INCOMPLETE') { <small class="report-warning">{{ missingText(s) }}</small> } @else { <small>{{ costShare(s) ? costShare(s) + ' del total vendido' : 'Lo que costó comprar lo que vendiste' }}</small> }</div><i class="report-card__badge" aria-hidden="true">C</i></article>
         <article class="report-card"><div><span>Ganancia estimada</span><strong>{{ optionalMoney(s.estimatedMargin) }}</strong>
-          @if (s.costCompleteness === 'INCOMPLETE') { <small class="report-warning">No se puede calcular: faltan costos</small> } @else { <small [class.report-positive]="(s.estimatedMarginPercentage ?? 0) > 0">{{ percent(s.estimatedMarginPercentage) }} de las ventas sin IVA</small> }</div><i class="report-card__badge report-card__badge--success" aria-hidden="true">%</i></article>
+          @if (s.costCompleteness === 'INCOMPLETE') { <small class="report-warning">No se puede calcular: faltan costos</small> } @else { <small [class.report-positive]="(s.estimatedMarginPercentage ?? 0) > 0">{{ percent(s.estimatedMarginPercentage) }} de las ventas</small> }</div><i class="report-card__badge report-card__badge--success" aria-hidden="true">%</i></article>
       </div>
-      <p class="report-note">Contado {{ money(s.sales.cashTotal) }} · Crédito {{ money(s.sales.creditTotal) }} · Cambios de productos ({{ s.changes.transactions }}) {{ money(s.changes.netTotal) }} · Total vendido {{ money(s.netSalesTotal) }}. Ganancia estimada = total vendido, sin el IVA que incluye, menos lo que costó la mercancía vendida (con el costo guardado al vender). No descuenta gastos ni otros impuestos.</p>
+      <p class="report-note">Contado {{ money(s.sales.cashTotal) }} · Crédito {{ money(s.sales.creditTotal) }} · Cambios de productos ({{ s.changes.transactions }}) {{ money(s.changes.netTotal) }} · Total vendido {{ money(s.netSalesTotal) }}. Ganancia estimada = total vendido menos lo que costó la mercancía vendida (con el costo guardado al vender). No descuenta gastos ni otros impuestos.</p>
 
       <div class="report-grid">
         <section class="report-box" aria-labelledby="report-chart-title">
           <h3 id="report-chart-title">Ventas por día</h3>
           @if (salesEmpty()) { <p class="report-empty">No hay ventas ni cambios en el período seleccionado.</p> } @else {
-            <p class="muted">Importes en pesos, con IVA incluido</p>
+            <p class="muted">Importes en pesos</p>
             <div class="bars" role="img" [attr.aria-label]="'Ventas por día del ' + dateText(s.from) + ' al ' + dateText(s.to)">
               @for (bar of salesBars(); track bar.date) {
                 <div class="bar" [attr.title]="bar.title"><span class="bar__value">{{ bar.label }}</span><div class="bar__track"><i class="bar__fill" [class.bar__fill--last]="$last" [style.height.%]="bar.height"></i></div><span class="bar__day">{{ bar.day }}</span></div>

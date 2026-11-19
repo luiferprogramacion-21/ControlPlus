@@ -7,7 +7,6 @@
       @if (canShiftMode) { <button mat-button type="button" [class.active]="tab() === 'shift-mode'" (click)="switchTab('shift-mode')">Caja y turnos</button> }
       @if (canConfigure) { <button mat-button type="button" [class.active]="tab() === 'settings'" (click)="switchTab('settings')">Cambios, apartados y créditos</button> }
       @if (canConfigure) { <button mat-button type="button" [class.active]="tab() === 'printing'" (click)="switchTab('printing')">Impresión</button> }
-      @if (canVat) { <button mat-button type="button" [class.active]="tab() === 'vat'" (click)="switchTab('vat')">IVA</button> }
       @if (canConfigure) { <button mat-button type="button" [class.active]="tab() === 'reasons'" (click)="switchTab('reasons')">Motivos</button> }
     </div>
   </div>
@@ -18,7 +17,6 @@
     @case ('shift-mode') { @if (canShiftMode) { <cp-shift-mode-panel /> } }
     @case ('settings') { @if (canConfigure) { <cp-settings-panel /> } }
     @case ('printing') { @if (canConfigure) { <cp-print-settings /> } }
-    @case ('vat') { @if (canVat) { <cp-vat-panel /> } }
     @case ('reasons') { @if (canConfigure) { <cp-reasons-panel /> } }
   }
 </section>

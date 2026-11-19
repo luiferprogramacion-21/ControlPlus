@@ -32,4 +32,4 @@ export const dashboardGuard: CanActivateFn = () => inject(SessionService).has('R
 export const purchasesGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('PURCHASES.RECEIVE') || session.has('PURCHASE_ORDERS.MANAGE'); };
 export const purchaseReceiptsGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('PURCHASES.RECEIVE') && session.has('PURCHASE_ORDERS.MANAGE'); };
 
-export const configGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('CONFIGURATION.MANAGE') || session.has('NUMBERING.MANAGE') || session.has('TAXES.MANAGE') || session.has('CASH.SHIFT_MODE_MANAGE'); };
+export const configGuard: CanActivateFn = () => { const session = inject(SessionService); return session.has('CONFIGURATION.MANAGE') || session.has('NUMBERING.MANAGE') || session.has('CASH.SHIFT_MODE_MANAGE'); };

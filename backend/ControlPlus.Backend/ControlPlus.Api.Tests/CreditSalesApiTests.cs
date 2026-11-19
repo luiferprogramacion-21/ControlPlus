@@ -29,14 +29,13 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
 {
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task CreditSale_WithBusinessVat_ConfirmsAndStoresWholePesoBreakdown()
+    public async Task CreditSale_WithoutVat_StoresNoBreakdown_AndVatCannotBeEnabled()
     {
         using var client = CreateClient();
         var scenario = await BootstrapAsync(client);
         SetBearer(client, scenario.Admin.AccessToken);
-        var vat = await ReadAsync<VatSettingDto>(await client.PutAsJsonAsync("/api/settings/vat",
-            new UpdateVatSettingRequest(true, 19m, 0)), HttpStatusCode.OK);
-        Assert.Equal(1, vat.Version);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync("/api/settings/vat",
+            new UpdateVatSettingRequest(true, 19m, 0))).StatusCode);
 
         await StartSessionAsync(client, scenario, scenario.Cashier);
         SetBearer(client, scenario.Cashier.AccessToken);
@@ -48,12 +47,8 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var detail = await db.DetalleVenta.AsNoTracking().SingleAsync(x => x.VentaId == sale.Id);
         var header = await db.Venta.AsNoTracking().SingleAsync(x => x.Id == sale.Id);
-        Assert.Equal(19m, detail.PorcentajeIva);
-        Assert.Equal(840m, detail.BaseGravable);
-        Assert.Equal(160m, detail.ValorIva);
-        Assert.True(header.IvaDiscriminadoCompleto);
-        Assert.Equal(840m, header.BaseGravableTotal);
-        Assert.Equal(160m, header.ImpuestoIncluidoTotal);
+        Assert.Equal(0m, detail.ValorIva ?? 0m);
+        Assert.False(header.IvaDiscriminadoCompleto);
         Assert.Equal(1000m, header.Total);
     }
 

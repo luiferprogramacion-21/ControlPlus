@@ -28,6 +28,9 @@ public sealed partial class SalesService
     public async Task<Result<VatSettingDto>> UpdateVatSettingAsync(ActorContext actor,
         UpdateVatSettingRequest request, CancellationToken cancellationToken = default)
     {
+        // Decisión del 18 de noviembre de 2026: el IVA se quitó del sistema y no se puede volver a encender.
+        if (request is { Enabled: true })
+            return Result.Failure<VatSettingDto>(Validation("El IVA no se usa en ControlPlus: se quitó del sistema."));
         if (request is null || request.ExpectedVersion < 0 ||
             request.Percentage is decimal percentage && (percentage <= 0 || percentage > 100 ||
                 decimal.Round(percentage, 2) != percentage) ||

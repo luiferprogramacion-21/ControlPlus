@@ -21,8 +21,6 @@ public sealed partial class SalesApiFlowTests
         var scenario = await BootstrapAsync(client);
         await ConfigureChangeNumberingAsync(client, scenario.Admin.AccessToken);
         SetBearer(client, scenario.Admin.AccessToken);
-        _ = await ReadAsync<VatSettingDto>(await client.PutAsJsonAsync(
-            "/api/settings/vat", new UpdateVatSettingRequest(true, 19m, 0)), HttpStatusCode.OK);
         await OpenSharedShiftAsync(client, scenario.Admin.AccessToken);
         _ = await StartSessionAsync(client, scenario.Admin.AccessToken,
             scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
@@ -57,9 +55,8 @@ public sealed partial class SalesApiFlowTests
         var expectedCost = original.CostoUnitario!.Value * original.Cantidad -
                            original.CostoUnitario.Value + delivered.CostoPromedioAnterior!.Value;
         var includedChangeVat = changeLines.Sum(x => x.TipoDetalle == "ENTREGADO"
-            ? x.ValorIva!.Value : -x.ValorIva!.Value);
-        var expectedCommercialBase = report.NetSalesTotal - original.ValorIva!.Value - includedChangeVat;
-        Assert.All(changeLines, x => Assert.Equal(19m, x.PorcentajeIva));
+            ? x.ValorIva ?? 0m : -(x.ValorIva ?? 0m));
+        var expectedCommercialBase = report.NetSalesTotal - (original.ValorIva ?? 0m) - includedChangeVat;
         Assert.Equal(expectedCost, report.EstimatedCost);
         Assert.Equal(expectedCommercialBase - expectedCost, report.EstimatedMargin);
     }

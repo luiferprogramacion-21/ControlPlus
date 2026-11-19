@@ -11,7 +11,7 @@ namespace ControlPlus.Api.Tests;
 public sealed partial class SalesApiFlowTests
 {
     [Fact, Trait("Category", "Integration")]
-    public async Task VatSetting_RequiresAdministratorValidatesVersionAndPersistsSaleBreakdown()
+    public async Task VatSetting_IsRemoved_CannotBeEnabled_AndSalesHaveNoBreakdown()
     {
         using var client = CreateClient();
         var setup = await BootstrapAsync(client);
@@ -23,17 +23,10 @@ public sealed partial class SalesApiFlowTests
         Assert.False(initial.Enabled);
         Assert.Null(initial.Percentage);
         Assert.Equal(0, initial.Version);
+        // El IVA se quitó del sistema (18 de noviembre de 2026): no se puede encender.
         await AssertProblemAsync(await client.PutAsJsonAsync("/api/settings/vat",
-            new UpdateVatSettingRequest(true, null, 0)), HttpStatusCode.BadRequest);
-        await AssertProblemAsync(await client.PutAsJsonAsync("/api/settings/vat",
-            new UpdateVatSettingRequest(true, 19.123m, 0)), HttpStatusCode.BadRequest);
-        var enabled = await ReadAsync<VatSettingDto>(await client.PutAsJsonAsync("/api/settings/vat",
-            new UpdateVatSettingRequest(true, 19m, 0)), HttpStatusCode.OK);
-        Assert.Equal(19m, enabled.Percentage);
-        Assert.Equal(1, enabled.Version);
-        Assert.NotNull(enabled.UpdatedAtUtc);
-        await AssertProblemAsync(await client.PutAsJsonAsync("/api/settings/vat",
-            new UpdateVatSettingRequest(false, null, 0)), HttpStatusCode.Conflict);
+            new UpdateVatSettingRequest(true, 19m, 0)), HttpStatusCode.BadRequest);
+        Assert.False((await ReadAsync<VatSettingDto>(await client.GetAsync("/api/settings/vat"), HttpStatusCode.OK)).Enabled);
 
         await OpenSharedShiftAsync(client, setup.Admin.AccessToken);
         _ = await StartSessionAsync(client, setup.Admin.AccessToken,
@@ -43,19 +36,14 @@ public sealed partial class SalesApiFlowTests
             CashRequest(setup.Products.Standard, 1, 1000m)), HttpStatusCode.Created);
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
-        var audit = await db.EventoAuditoria.AsNoTracking()
-            .SingleAsync(x => x.Accion == "VATSETTINGUPDATED");
-        Assert.NotNull(audit.UsuarioId);
-        Assert.Contains("PreviousEnabled", audit.DatosAnteriores ?? audit.DatosNuevos ?? "");
+        Assert.False(await db.EventoAuditoria.AsNoTracking().AnyAsync(x => x.Accion == "VATSETTINGUPDATED"));
         var detail = await db.DetalleVenta.AsNoTracking().SingleAsync(x => x.VentaId == sale.Id);
-        Assert.Equal(19m, detail.PorcentajeIva);
-        Assert.Equal(decimal.Round(detail.SubtotalNeto / 1.19m, 0, MidpointRounding.AwayFromZero), detail.BaseGravable);
-        Assert.Equal(detail.SubtotalNeto - detail.BaseGravable, detail.ValorIva);
+        Assert.Equal(0m, detail.ValorIva ?? 0m);
+        var header = await db.Venta.AsNoTracking().SingleAsync(x => x.Id == sale.Id);
+        Assert.False(header.IvaDiscriminadoCompleto);
         var receipt = await ReadAsync<SaleReceiptDto>(await client.GetAsync(
             $"/api/sales/{sale.Id}/receipt"), HttpStatusCode.OK);
-        Assert.Equal(19m, receipt.VatPercentage);
-        Assert.Equal(detail.BaseGravable, receipt.TaxableBaseTotal);
-        Assert.Equal(detail.ValorIva, receipt.VatTotal);
+        Assert.Equal(0m, receipt.VatTotal ?? 0m);
         Assert.Equal(sale.Total, receipt.Total);
         Assert.Equal(1000m, receipt.Payments.Sum(x => x.AppliedAmount));
     }
