@@ -14,6 +14,7 @@ export interface AdminUser {
   email?: string | null;
 }
 export interface IssuedCredential { credentialId: string; userId: string; format: string; credentialToken: string; visibleFragment: string; issuedAtUtc: string; expiresAtUtc: string | null; }
+export interface OperatorCredential extends Omit<IssuedCredential, 'credentialToken'> { credentialToken: string | null; state: string; version: number; }
 export interface AdminPermission { id: string; code: string; name: string; description: string | null; module: string; isActive: boolean; }
 export interface AdminRole extends RoleSummary { permissions: AdminPermission[]; }
 /** Source is ROL or INDIVIDUAL; individualEffect is CONCEDER or REVOCAR when an exception exists. */
@@ -33,6 +34,12 @@ export class AdminApi {
   }
   /** Issues the Code 128 operator credential of a user; the token is returned only this once and the previous one is revoked. */
   issueCredential(userId: string): Promise<IssuedCredential> { return firstValueFrom(this.http.post<IssuedCredential>(`/api/cash/operator-credentials/${userId}`, { expiresAtUtc: null })); }
+  currentCredential(userId: string): Promise<OperatorCredential | null> { return firstValueFrom(this.http.get<OperatorCredential | null>(`/api/cash/operator-credentials/${userId}`)); }
+  revokeCredential(userId: string, credentialId: string, version: number): Promise<void> {
+    return firstValueFrom(this.http.delete<void>(`/api/cash/operator-credentials/${userId}`, {
+      params: new HttpParams().set('credentialId', credentialId).set('expectedVersion', version),
+    }));
+  }
   createUser(input: CreateUserInput): Promise<AdminUser> { return firstValueFrom(this.http.post<AdminUser>('/api/users', input)); }
   updateUser(id: string, displayName: string, email: string | null): Promise<AdminUser> { return firstValueFrom(this.http.put<AdminUser>(`/api/users/${id}`, { displayName, email })); }
   /** Solo Administrador y solo usuarios sin historial; 409 si tiene historial (se inactiva en su lugar). */

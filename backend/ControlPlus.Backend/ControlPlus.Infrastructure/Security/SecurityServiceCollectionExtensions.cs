@@ -66,6 +66,8 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<IPurchaseRepository, EfPurchaseRepository>();
         services.AddScoped<IPurchaseOrderRepository, EfPurchaseOrderRepository>();
         services.AddSingleton<ICredentialTokenGenerator, Code128CredentialTokenGenerator>();
+        services.AddSingleton<OperatorCredentialProtector>();
+        services.AddScoped<IOperatorCredentialStore, ProtectedOperatorCredentialStore>();
         services.AddScoped<SecurityCatalogSeeder>();
         services.AddScoped<InstallationBootstrapper>();
 

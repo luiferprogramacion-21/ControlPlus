@@ -212,6 +212,30 @@ public sealed class CashController(
             : FromResult(await cashService.CloseShiftAsync(actor, shiftId, request, cancellationToken), Ok);
     }
 
+    [HttpGet("operator-credentials/{userId:guid}")]
+    [PermissionAuthorize(PermissionCodes.UsersManage)]
+    [ProducesResponseType<OperatorCredentialDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOperatorCredential(Guid userId, CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers.Pragma = "no-cache";
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() :
+            FromResult(await cashService.GetOperatorCredentialAsync(actor, userId, cancellationToken), value => Ok(value));
+    }
+
+    [HttpDelete("operator-credentials/{userId:guid}")]
+    [PermissionAuthorize(PermissionCodes.UsersManage)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> RevokeOperatorCredential(
+        Guid userId, [FromQuery] Guid credentialId, [FromQuery] long expectedVersion, CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "no-store";
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() :
+            FromResult(await cashService.RevokeOperatorCredentialAsync(actor, userId, credentialId, expectedVersion, cancellationToken));
+    }
+
     [HttpPost("operator-credentials/{userId:guid}")]
     [PermissionAuthorize(PermissionCodes.UsersManage)]
     [Consumes("application/json")]

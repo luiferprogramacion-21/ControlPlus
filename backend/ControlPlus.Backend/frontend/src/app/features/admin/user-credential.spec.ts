@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { TicketPrinter } from '../sales/ticket';
 import { EstablishmentService } from '../../core/establishment';
-import { AdminApi, AdminUser, IssuedCredential } from './admin-api';
+import { AdminApi, AdminUser, IssuedCredential, OperatorCredential } from './admin-api';
 import { buildCredentialCardHtml } from './credential-card';
 import { buildPdfFromJpeg, CredentialCardExporter } from './credential-card-export';
 import { UserCredential } from './user-credential';
@@ -13,16 +13,59 @@ describe('Carné de operador', () => {
   const issued: IssuedCredential = { credentialId: 'c1', userId: 'u1', format: 'CODE128', credentialToken: '0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF',
     visibleFragment: '456789AB'.slice(0, 8), issuedAtUtc: '2026-11-10T15:00:00Z', expiresAtUtc: null };
   const issueCredential = vi.fn(); const print = vi.fn();
+  const currentCredential = vi.fn(); const revokeCredential = vi.fn();
   const jpeg = vi.fn(); const pdf = vi.fn(); const save = vi.fn();
 
   const create = () => {
-    TestBed.configureTestingModule({ providers: [{ provide: AdminApi, useValue: { issueCredential } }, { provide: TicketPrinter, useValue: { print } }, { provide: CredentialCardExporter, useValue: { jpeg, pdf, save } }, { provide: EstablishmentService, useValue: { name: () => 'Negocio de prueba' } }] });
+    TestBed.configureTestingModule({ providers: [{ provide: AdminApi, useValue: { issueCredential, currentCredential, revokeCredential } }, { provide: TicketPrinter, useValue: { print } }, { provide: CredentialCardExporter, useValue: { jpeg, pdf, save } }, { provide: EstablishmentService, useValue: { name: () => 'Negocio de prueba' } }] });
     const fixture = TestBed.createComponent(UserCredential);
     fixture.componentRef.setInput('user', user);
     return fixture.componentInstance;
   };
-  beforeEach(() => { vi.clearAllMocks(); issueCredential.mockResolvedValue(issued); print.mockResolvedValue(undefined);
+  beforeEach(() => { vi.clearAllMocks(); currentCredential.mockResolvedValue(null); revokeCredential.mockResolvedValue(undefined); issueCredential.mockResolvedValue(issued); print.mockResolvedValue(undefined);
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
     jpeg.mockResolvedValue(new Blob(['j'])); pdf.mockResolvedValue(new Blob(['p'])); });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('vuelve a mostrar el carné guardado sin emitir otro', async () => {
+    currentCredential.mockResolvedValue({ ...issued, version: 3, state: 'ACTIVA' } satisfies OperatorCredential);
+    const component = create();
+    await component.ngOnInit();
+    expect(component.issued()?.credentialToken).toBe(issued.credentialToken);
+    expect(issueCredential).not.toHaveBeenCalled();
+  });
+
+  it('olvida una consulta del código que termina después de cerrar la ventana', async () => {
+    let resolve!: (value: OperatorCredential) => void;
+    currentCredential.mockReturnValueOnce(new Promise<OperatorCredential>(done => resolve = done));
+    const component = create(); const load = component.ngOnInit(); component.close();
+    resolve({ ...issued, version: 1, state: 'ACTIVA' }); await load;
+    expect(component.issued()).toBeNull(); expect(component.current()).toBeNull();
+  });
+
+  it('un carné anterior conserva los datos aunque no tenga código recuperable', async () => {
+    currentCredential.mockResolvedValue({ ...issued, credentialToken: null, version: 2, state: 'ACTIVA' });
+    const component = create();
+    await component.ngOnInit();
+    expect(component.current()?.visibleFragment).toBe(issued.visibleFragment);
+    expect(component.issued()).toBeNull();
+  });
+
+  it('elimina el carné que se está viendo con su versión y olvida el código', async () => {
+    currentCredential.mockResolvedValue({ ...issued, version: 3, state: 'ACTIVA' });
+    const component = create();
+    await component.ngOnInit(); await component.remove();
+    expect(revokeCredential).toHaveBeenCalledWith('u1', 'c1', 3);
+    expect(component.issued()).toBeNull(); expect(component.current()).toBeNull();
+    expect(component.notice()).toBe('Carné eliminado.');
+  });
+
+  it('si la eliminación falla conserva el carné visible para revisar el error', async () => {
+    revokeCredential.mockRejectedValueOnce(new Error('El carné cambió.'));
+    const component = create(); await component.issue(); await component.remove();
+    expect(component.issued()).not.toBeNull();
+    expect(component.error()).not.toBe('');
+  });
 
   it('emite el carné y muestra el código solo en la ventana', async () => {
     const component = create();

@@ -14,6 +14,7 @@ export const AUDIT_ACTION_GROUPS: AuditActionGroup[] = [
     PermissionRevoked: 'Permiso retirado del rol', RolePermissionsReset: 'Permisos del rol restablecidos',
     UserPermissionGranted: 'Permiso concedido al usuario', UserPermissionRevoked: 'Permiso revocado al usuario',
     UserPermissionsReset: 'Permisos del usuario restablecidos', OperatorCredentialIssued: 'Carné de operador emitido',
+    OperatorCredentialRevoked: 'Carné de operador eliminado',
   } },
   { module: 'Catálogo', actions: {
     CategoryCreated: 'Categoría creada', CategoryUpdated: 'Categoría modificada', CategoryActivated: 'Categoría activada',

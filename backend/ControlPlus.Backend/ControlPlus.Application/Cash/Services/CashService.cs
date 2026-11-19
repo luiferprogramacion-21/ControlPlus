@@ -12,7 +12,7 @@ using ControlPlus.Domain.Security.Enums;
 
 namespace ControlPlus.Application.Cash.Services;
 
-public sealed class CashService(
+public sealed partial class CashService(
     ICashRepository repository,
     ICashTransactionManager transactionManager,
     IUnitOfWork unitOfWork,
@@ -22,6 +22,7 @@ public sealed class CashService(
     IPasswordHasher passwordHasher,
     IAuthorizerCredentialResolver credentialResolver,
     ICredentialTokenGenerator tokenGenerator,
+    IOperatorCredentialStore credentialStore,
     IAuditRepository auditRepository,
     IClock clock,
     ILoginAttemptCoordinator loginAttemptCoordinator,
@@ -559,7 +560,7 @@ public sealed class CashService(
         IssueOperatorCredentialRequest request,
         CancellationToken cancellationToken = default)
     {
-        var error = await RequireAsync(actor, PermissionCodes.UsersManage, cancellationToken);
+        var error = await RequireCredentialAdministratorAsync(actor, cancellationToken);
         if (error is not null) return Result.Failure<IssuedOperatorCredentialDto>(error);
         var expiresAtUtc = request?.ExpiresAtUtc;
         if (expiresAtUtc is DateTimeOffset expires && (expires.Offset != TimeSpan.Zero || expires <= clock.UtcNow))
@@ -582,6 +583,8 @@ public sealed class CashService(
             FechaEmision = now.UtcDateTime, FechaVencimiento = expiresAtUtc?.UtcDateTime, Version = 1
         };
         await repository.AddCredentialAsync(credential, cancellationToken);
+        if (existing is not null) await credentialStore.RemoveAsync(userId, existing.Id, cancellationToken);
+        await credentialStore.StoreAsync(userId, credential.Id, token, cancellationToken);
         var correlationId = Guid.CreateVersion7();
         await AuditWriter.WriteCashAsync(auditRepository, clock, actor.UserId, AuditAction.OperatorCredentialIssued,
             nameof(CredencialUsuario), credential.Id, new { credential.UsuarioId, credential.FormatoCodigo, credential.FragmentoVisible, credential.FechaVencimiento },

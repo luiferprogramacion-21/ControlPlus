@@ -15,6 +15,18 @@ describe('AdminApi: usuarios y roles', () => {
   });
   afterEach(() => http.verify());
 
+  it('consulta el carné sin reemitirlo y lo elimina con identidad y versión', async () => {
+    const read = api.currentCredential('u1');
+    const get = http.expectOne('/api/cash/operator-credentials/u1');
+    expect(get.request.method).toBe('GET'); get.flush(null); await read;
+    const remove = api.revokeCredential('u1', 'c1', 4);
+    const request = http.expectOne(r => r.url === '/api/cash/operator-credentials/u1');
+    expect(request.request.method).toBe('DELETE');
+    expect(request.request.params.get('credentialId')).toBe('c1');
+    expect(request.request.params.get('expectedVersion')).toBe('4');
+    request.flush(null); await remove;
+  });
+
   it('lista usuarios con filtros y omite los parámetros vacíos', async () => {
     const task = api.users({ search: 'ana', isActive: true, isLocked: null, page: 2, pageSize: 20 });
     const request = http.expectOne(r => r.url === '/api/users');

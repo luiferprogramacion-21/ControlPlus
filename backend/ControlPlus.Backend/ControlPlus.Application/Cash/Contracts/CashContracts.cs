@@ -115,6 +115,11 @@ public sealed record CloseCashShiftRequest(
 
 public sealed record IssueOperatorCredentialRequest(DateTimeOffset? ExpiresAtUtc);
 
+public sealed record OperatorCredentialDto(
+    Guid CredentialId, Guid UserId, string Format, string VisibleFragment,
+    DateTimeOffset IssuedAtUtc, DateTimeOffset? ExpiresAtUtc, string State, long Version,
+    string? CredentialToken);
+
 public sealed record IssuedOperatorCredentialDto(
     Guid CredentialId,
     Guid UserId,
@@ -162,6 +167,8 @@ public interface ICashService
     Task<Result<CashReconciliationDto>> GetReconciliationAsync(ActorContext actor, CancellationToken cancellationToken = default);
     Task<Result<CashReconciliationDto>> CloseShiftAsync(ActorContext actor, Guid shiftId, CloseCashShiftRequest request, CancellationToken cancellationToken = default);
     Task<Result<IssuedOperatorCredentialDto>> IssueOperatorCredentialAsync(ActorContext actor, Guid userId, IssueOperatorCredentialRequest request, CancellationToken cancellationToken = default);
+    Task<Result<OperatorCredentialDto?>> GetOperatorCredentialAsync(ActorContext actor, Guid userId, CancellationToken cancellationToken = default);
+    Task<Result> RevokeOperatorCredentialAsync(ActorContext actor, Guid userId, Guid credentialId, long expectedVersion, CancellationToken cancellationToken = default);
     Task<Result<OperatorSessionDto>> StartOperatorSessionAsync(ActorContext actor, StartOperatorSessionRequest request, CancellationToken cancellationToken = default);
     Task<Result<OperatorSessionDto>> CloseOperatorSessionAsync(ActorContext actor, Guid sessionId, CancellationToken cancellationToken = default);
 }
