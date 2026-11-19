@@ -514,7 +514,7 @@ app-root .cdk-overlay-popover { zoom: calc(1 / var(--cp-zoom)); }
 .app-shell--fixed .sidebar__label { display: block; margin: 10px 10px 2px; color: #b8c5d2; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .app-shell--fixed .sidebar__nav { flex: 1 1 auto; flex-direction: column; gap: 2px; min-height: 0; padding: 0 10px 8px; overflow-y: auto; scrollbar-color: var(--cp-sidebar-soft) transparent; }
 .app-shell--fixed .nav-item { display: flex; justify-content: flex-start; flex: 0 0 auto; padding: 0 10px; min-height: 38px; }
-.app-shell--fixed .nav-item b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-shell--fixed .nav-item b { display: block; overflow: hidden; line-height: 1.2; overflow-wrap: anywhere; }
 .app-shell--fixed .sidebar__user { display: flex; flex: 0 0 auto; justify-content: flex-start; margin: 0 14px 12px; padding-top: 12px; }
 .app-shell--fixed .sidebar__user-copy { display: flex; }
 .app-shell--fixed .sidebar :focus-visible { outline-color: var(--cp-surface); }
@@ -780,3 +780,11 @@ app-root .cdk-overlay-popover { zoom: calc(1 / var(--cp-zoom)); }
 .shortcut-list dt { color: var(--cp-text-secondary); white-space: nowrap; }
 .shortcut-list dd { margin: 0; }
 kbd { display: inline-block; min-width: 28px; padding: 2px 7px; border: 1px solid var(--cp-control-border); border-bottom-width: 2px; border-radius: 6px; background: var(--cp-surface-alt); color: var(--cp-text); font: 600 13px/1.4 var(--cp-font); text-align: center; }
+/* Acciones de fila como en Windows: «Más ▾» y menú del clic derecho (core/row-actions.ts). */
+.row-action--hidden { display: none !important; }
+.row-menu { position: fixed; z-index: 1000; display: flex; flex-direction: column; min-width: 200px; max-width: 320px; padding: 6px; border: 1px solid var(--cp-border); border-radius: 10px; background: var(--cp-surface); box-shadow: var(--cp-shadow); font-family: var(--cp-font); }
+.row-menu__item { display: block; width: 100%; padding: 9px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--cp-text); font: 500 15px/1.3 var(--cp-font); text-align: left; cursor: pointer; }
+.row-menu__item:hover:not(:disabled), .row-menu__item:focus-visible { background: var(--cp-primary-soft); outline: none; }
+.row-menu__item--danger { color: var(--cp-error); }
+.row-menu__item--danger:hover:not(:disabled), .row-menu__item--danger:focus-visible { background: var(--cp-error-soft); }
+.row-menu__item:disabled { color: var(--cp-text-muted); cursor: default; }
