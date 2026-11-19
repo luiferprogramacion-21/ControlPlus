@@ -23,10 +23,7 @@ Cada persona tiene **un solo rol**. Lo que ves en el menú depende de él: si un
 
 1. Abre ControlPlus con el acceso directo del escritorio. Se abre en su propia ventana, como un programa, con su ícono en la barra de tareas (también funciona en el navegador, en `http://localhost:5000`).
 2. Escribe tu **usuario** y tu **contraseña** y pulsa Ingresar.
-3. El sistema te lleva a donde empiezas a trabajar:
-   - si vendes y no hay caja abierta, a **Caja** para abrirla;
-   - si vendes y ya hay caja abierta, al **punto de venta**;
-   - el Administrador entra al **Dashboard**.
+3. Llegas a **Inicio**: una pantalla con botones grandes de lo que más haces (Vender, Abrir caja, Cerrar caja, Cambiar o devolver, Recibir abono, Nuevo apartado, Buscar producto, Recibir mercancía…) y el estado de la caja. Solo aparecen las tareas que tu rol permite; si la caja está cerrada, **Abrir caja** va primero. Puedes volver a Inicio desde el menú en cualquier momento.
 4. Para salir, usa el botón de salir de la barra superior.
 
 **Cuidado con tu contraseña.** Tras **5 intentos fallidos** tu usuario se bloquea. Lo reactiva una persona con un rol superior (el Administrador).
@@ -45,14 +42,19 @@ Nadie cambia su propia contraseña desde dentro del sistema. Hay dos caminos:
 
 - A la izquierda está el **menú**, siempre a la vista, como en las ventanas de Windows. El botón **☰** de arriba lo pliega para dejar solo los íconos (al pasar el ratón por un ícono aparece su nombre) y lo vuelve a desplegar. El computador recuerda cómo lo dejaste.
 - Las opciones están agrupadas (solo ves las que tu rol permite):
-  - **Resumen:** Dashboard y Reportes.
-  - **Ventas y caja:** Punto de venta, Historial de ventas, Caja, Apartados, Créditos y abonos y Clientes.
+  - **Resumen:** Inicio, Dashboard y Reportes.
+  - **Ventas y caja:** Punto de venta, Historial de ventas, Cambios y devoluciones, Caja, Apartados, Créditos y abonos y Clientes.
   - **Productos:** Catálogo, Inventario y Etiquetas.
-  - **Compras:** Compras, Recepciones y Proveedores.
+  - **Compras:** Compras y Proveedores.
   - **Sistema:** Configuración y Administración.
 - Arriba aparece el nombre de la tienda y tu nombre.
 - **Tamaño de la pantalla.** Toca tu nombre abajo en el menú y elige **Normal (100 %)**, **Grande (125 %)** o **Muy grande (150 %)**. Agranda todo a la vez: letras, botones, campos y tablas. Viene en Grande y cada computador recuerda su tamaño.
 - **Ventanas.** Los formularios se abren en ventanas como las de Windows: la **X** de arriba a la derecha o **Esc** cierran sin guardar, y abajo a la derecha están primero el botón de la acción (Guardar, Aceptar…) y al final **Cancelar**.
+
+- **Listas.** Buscan mientras escribes y los filtros se aplican al elegirlos; no hace falta pulsar Buscar. Si una lista está vacía, ahí mismo aparece el botón para crear el primero (por ejemplo **Nuevo cliente**).
+- **Botones de cada fila.** Cada fila muestra como mucho dos botones; los demás están en **Más ▾**. También puedes hacer **clic derecho** sobre la fila para ver todas sus acciones.
+- **Ayuda.** El ícono **(i)** junto a un campo explica para qué sirve.
+- **Qué sigue.** Al terminar algo, el aviso de arriba a la derecha puede ofrecer el siguiente paso, por ejemplo «Turno abierto · **Ir a vender →**».
 
 ### Atajos del teclado
 
@@ -114,7 +116,7 @@ El Administrador lo emite en Administración → Usuarios → **Carné**. Si se 
 1. **Abrir la caja** con el fondo inicial (con la autorización de un Supervisor o del Administrador).
 2. **Vender**: buscar productos, cobrar, entregar el ticket y el cambio.
 3. Si hace falta: ventas a crédito, abonos, apartados.
-4. Al terminar, **un Supervisor o el Administrador cierra la caja** con el arqueo.
+4. Al terminar, **un Supervisor o el Administrador cierra la caja** (contando el efectivo).
 
 ## 2.2 Abrir la caja
 
@@ -127,7 +129,7 @@ Menú **Caja** → bloque **Apertura de caja**.
 3. Escribe una observación si quieres y pulsa **Iniciar turno**.
 4. Como Cajero, el sistema abre la **ventana de autorización**: un Supervisor o el Administrador escribe su usuario y contraseña, o escanea su carné.
 
-Si quedó **una caja abierta del día anterior**, el sistema te lo avisa: hay que cerrarla (con arqueo) antes de abrir otra.
+Si quedó **una caja abierta del día anterior**, el sistema te lo avisa: hay que cerrarla (contando el efectivo) antes de abrir otra.
 
 **En turno compartido**, antes de vender cada persona se identifica: en el punto de venta aparece **«Escanee el carné del empleado»**. Escanea tu propio carné (el de la persona que inició sesión). Cada venta confirmada **cierra esa sesión** y el punto de venta se bloquea para el siguiente. Si el carné no sirve (ajeno, vencido o dañado), el sistema lo explica y **no te saca del sistema**.
 
@@ -142,6 +144,8 @@ Menú **Punto de venta**.
 5. **Confirmar venta · Enter**. El sistema registra el pago, descuenta el inventario y manda el ticket a imprimir.
 
 Atajos útiles: **Enter** agrega, **F4** cantidad, **Supr** quita, **Esc** vuelve, **Nueva venta · Enter** empieza otra.
+
+En cada producto de la venta, **−** y **+** cambian la cantidad y la **×** lo quita. Al cobrar en efectivo, los botones **Exacto**, **10.000**, **20.000**, **50.000** y **100.000** escriben lo que entrega el cliente y el sistema muestra el **cambio**.
 
 **Cancelar antes de cobrar:** pulsa **Cancelar venta**; el sistema pregunta «¿Cancelar esta venta?». **Confirmar cancelación** la descarta; **Continuar venta** vuelve.
 
@@ -199,7 +203,7 @@ El carrito guardado es solo tuyo y del turno abierto.
 - Se puede pagar en uno o varios medios. En Transferencia y Nequi la **referencia es obligatoria**.
 - Un abono parcial deja saldo; uno total deja el crédito en **Pagado**.
 - Puedes consultar el **historial de abonos** del crédito.
-- **Anular un abono** o **condonar un saldo** no te corresponde (ver partes 3 y 4).
+- **Anular un abono** o **perdonar una deuda** no te corresponde (ver partes 3 y 4).
 
 ## 2.9 Apartados
 
@@ -226,7 +230,7 @@ Menú **Clientes** → **Nuevo cliente**. Lleva nombre, **dirección** (obligato
 | Cerrar la caja | Supervisor o Administrador |
 | Anular una venta | Supervisor o Administrador |
 | Cambio de producto de una venta ya hecha | Supervisor o Administrador |
-| Anular un abono, condonar un crédito | Supervisor / Administrador (anular) · solo Administrador (condonar) |
+| Anular un abono, perdonar una deuda | Supervisor / Administrador (anular) · solo Administrador (perdonar) |
 | Un descuento mayor a 5 % | Supervisor (hasta 20 %) o Administrador (hasta 80 %) |
 | Corregir un precio, nombre o código de un producto | Administrador |
 | Ajustar el inventario | Administrador |
@@ -253,7 +257,7 @@ El Supervisor hace todo lo que hace un Cajero, **sin necesitar la autorización 
 | Mayorista | Sin autorización |
 | Venta a crédito | Sin autorización (con el permiso de crédito) |
 | Crear un apartado | Sin autorización |
-| Cerrar la caja | Sí, con arqueo |
+| Cerrar la caja | Sí, contando el efectivo |
 | Anular venta, cambio de producto | Sí, con la autorización de un Administrador |
 | Autorizar a un Cajero | Sí (descuento, mayorista, crédito, apartado, apertura de caja) |
 | Reportes y Dashboard | No aparecen salvo que el Administrador te los conceda |
@@ -267,17 +271,17 @@ Igual que en 2.2, pero sin ventana de autorización. Al abrir eliges **Turno ind
 
 ## 3.3 Movimientos de caja
 
-En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto** o una **Sangría** (retiro de efectivo de la caja), con su **concepto**, y pulsa **Registrar movimiento**. Quedan en **Movimientos recientes**.
+En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto** o un **Retiro de efectivo** (dinero que se saca de la caja), con su **concepto**, y pulsa **Registrar movimiento**. Quedan en **Movimientos recientes**.
 
-## 3.4 Arqueo y cierre de caja
+## 3.4 Cerrar la caja
 
-En **Caja**, bloque **Arqueo de caja**:
+En **Caja** pulsa **Cerrar caja** (también está en Inicio). El cierre se hace en tres pasos:
 
-1. El sistema muestra lo **esperado** por medio de pago.
-2. Cuenta el **efectivo físico** y escribe lo contado. **Solo se cuenta el efectivo.** Nequi, transferencias y otros medios se muestran como información: el sistema da su total esperado por bueno.
-3. La **diferencia** es contado menos esperado. No hay cierre «a ciegas»: ves el esperado.
-4. Si hay diferencia, el sistema pide un **motivo** y la **autorización de un Administrador**. Si no hay diferencia, no hace falta.
-5. Pulsa **Cerrar caja**.
+1. **Contar el efectivo.** El sistema muestra el efectivo **esperado**; cuenta el **efectivo físico** y escribe lo contado. **Solo se cuenta el efectivo.** Nequi, transferencias y otros medios se muestran como información. Pulsa **Siguiente**.
+2. **Revisar la diferencia.** La diferencia es contado menos esperado (no hay cierre «a ciegas»). Si todo cuadra, lo dice; si no, elige el **motivo** del descuadre. Pulsa **Siguiente**.
+3. **Confirmar.** Revisa el resumen y pulsa **Cerrar caja**. Si hubo diferencia, pide la **autorización de un Administrador**.
+
+Con **Atrás** vuelves al paso anterior.
 
 Al cerrar, el sistema finaliza las sesiones de operador abiertas y hace una copia de respaldo automática.
 
@@ -308,7 +312,7 @@ Menú **Historial de ventas**: lista las ventas con sus pagos y productos. **Ver
 
 **Cambio de productos** (una venta ya hecha; no es una anulación)
 
-1. Busca la venta en el historial → **Cambio de productos**.
+1. Abre **Cambios y devoluciones** en el menú (o **Cambiar o devolver** en Inicio, o en la venta recién terminada) y escribe el **número de la venta** que aparece en el ticket. También puedes abrir la venta en el historial → **Cambio de productos**.
 2. Se permite hasta **15 días** después de la venta (el Administrador puede cambiar ese plazo).
 3. Elige lo que devuelve el cliente y lo que se lleva. La **diferencia** se paga o se suma al crédito, según corresponda.
 4. Autoriza un **Administrador**.
@@ -318,7 +322,7 @@ Menú **Historial de ventas**: lista las ventas con sus pagos y productos. **Ver
 En **Créditos y abonos** puedes registrar abonos (como el Cajero) y además:
 
 - **Anular un abono** (si se registró por error): eliges el motivo y autoriza un Administrador. El saldo del crédito se restituye y el dinero se revierte en caja.
-- **Condonar un saldo** no es tuyo: solo el Administrador.
+- **Perdonar una deuda** no es tuyo: solo el Administrador.
 
 ## 3.8 Apartados
 
@@ -332,13 +336,16 @@ En **Créditos y abonos** puedes registrar abonos (como el Cajero) y además:
 - **No ves los costos** ni cambias el nombre, código o precio de un producto ya creado: eso es del Administrador.
 - **Etiquetas:** Catálogo → **Etiquetas de productos**. Elige los productos, revisa la **vista previa** y pulsa **Imprimir etiquetas**. Necesita una impresora de etiquetas configurada por el Administrador.
 
-## 3.10 Compras: pedidos y recepciones
+## 3.10 Compras: pedidos y mercancía recibida
 
-Para pedir y recibir mercancía de los proveedores:
+Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor**, **Mercancía recibida** y **Compras sin pedido**.
 
-- **Pedidos por proveedor:** **Nuevo pedido** → elige el proveedor, agrega productos con su cantidad → **Crear pedido**.
-- **Recepciones:** cuando llega la mercancía, **Recepción de compras** → abre el pedido → **Registrar recepción**. Puedes recibir **parcial** (solo lo que llegó) o **Recibir todo lo pendiente**. Lo recibido entra al inventario y actualiza el costo.
-- **Compra directa:** una compra sin pedido previo, con proveedor, productos, costos y número de factura.
+- **Pedir mercancía:** **Nuevo pedido al proveedor** → elige el proveedor, agrega productos con su cantidad → **Crear pedido**.
+- **Cuando llega mercancía:** pulsa **Registrar compra** (también **Recibir mercancía** en Inicio). El sistema pregunta si viene de un pedido:
+  - **Sí, viene de un pedido:** eliges el pedido y anotas lo que llegó. Puedes recibir **parcial** (solo lo que llegó) o **Recibir todo lo pendiente**.
+  - **No, es una compra sin pedido:** anotas el proveedor, el número de factura, los productos y sus costos.
+
+  Lo recibido entra al inventario y actualiza el costo.
 - No creas ni editas proveedores, ni anulas compras: eso es del Administrador.
 
 ---
@@ -363,9 +370,12 @@ El Administrador es responsable de que el sistema sea confiable: configura el ne
 Administración → **Usuarios**.
 
 - **Nuevo usuario:** nombre, usuario, **correo** (opcional pero recomendado), **rol** (Cajero, Supervisor o Administrador) y contraseña inicial.
-- **Editar:** cambia nombre y correo.
-- **Rol:** cambia el rol de la persona. Sus sesiones abiertas se cierran.
-- **Contraseña:** **restablece** la contraseña de otra persona. Solo tú puedes hacerlo. (Tú puedes cambiar la tuya aquí mismo.)
+- **Abrir ficha:** abre una sola ventana con pestañas:
+  - **Datos:** nombre y correo.
+  - **Rol:** cambia el rol de la persona. Sus sesiones abiertas se cierran.
+  - **Permisos:** concede o quita permisos sueltos (ver abajo).
+  - **Contraseña:** **restablece** la contraseña de otra persona. Solo tú puedes hacerlo. (Tú puedes cambiar la tuya aquí mismo.)
+  - **Carné:** ver 4.3.
 - **Permisos:** concede o quita permisos sueltos a una persona. **Quitar siempre prevalece** sobre lo que da el rol. Cada cambio cierra las sesiones de esa persona y queda auditado.
 - **Inactivar / Reactivar acceso:** quien está inactivo no puede ingresar; reactivar acceso también desbloquea a quien falló 5 veces.
 - **Eliminar:** borra por completo a un usuario, **solo si nunca trabajó en el sistema**. Si ya tiene historial, solo se inactiva. No puedes eliminarte a ti mismo.
@@ -374,7 +384,7 @@ Administración → **Roles:** muestra la plantilla de permisos de cada rol; pue
 
 ## 4.3 Carné
 
-En **Usuarios** → **Carné**: emite el carné de una persona (código Code 128). El código se muestra **una sola vez** para imprimirlo; emitir otro desactiva el anterior.
+En **Usuarios** → **Abrir ficha** → pestaña **Carné**: emite el carné de una persona (con su código de barras). El código se muestra **una sola vez** para imprimirlo; emitir otro desactiva el anterior.
 
 ## 4.4 Catálogo
 
@@ -391,7 +401,7 @@ Menú **Catálogo**.
 
 ## 4.5 Inventario
 
-Menú **Inventario**: existencias, **Movimientos** (kardex de cada cambio) y alertas. Filtra por **Estado**: disponibles, stock bajo, agotados o inactivos.
+Menú **Inventario**: existencias, **Historial** (cada cambio de existencias) y alertas. Con **Mostrar** eliges: disponibles, stock bajo, agotados o inactivos. Los botones **−** y **+** de cada fila abren el ajuste con una unidad ya escrita.
 
 **Registrar ajuste** (conteo físico, merma o daño, pérdida, corrección de registro): elige el producto, la **cantidad a sumar o restar**, el **motivo** y confirma. Todo cambio de existencias genera un movimiento, y los ajustes quedan auditados.
 
@@ -431,7 +441,7 @@ La tabla **Cola de impresión** muestra cada trabajo y su estado. **Reintentar**
 
 - **Anular una venta** sin segundo autorizador (Historial de ventas → **Anular venta**).
 - **Cambios de producto** con tu propia autorización.
-- **Condonar el saldo de un crédito:** Créditos y abonos → **Condonar saldo**, con motivo. El crédito queda **Anulado**, la mercancía no vuelve y los abonos ya hechos se conservan.
+- **Perdonar la deuda de un crédito:** Créditos y abonos → **Perdonar la deuda**, con motivo. El crédito queda **Anulado**, la mercancía no vuelve y los abonos ya hechos se conservan.
 - **Anular un abono** sin segundo autorizador.
 - **Cancelar un apartado** y decidir cuánto se devuelve.
 - **Descuentos hasta 80 %.** Ningún rol puede pasar de 80 %, ni vender bajo el costo.
@@ -475,7 +485,7 @@ Estas reglas no se pueden cambiar con permisos:
 - Todas las cantidades son **enteras**; no se vende por peso.
 - **Cliente obligatorio** en créditos y apartados.
 - **No hay intereses** ni recargos en créditos.
-- El arqueo cuenta **solo el efectivo físico**.
+- Al cerrar la caja se cuenta **solo el efectivo físico**.
 - Anulaciones, cambios y operaciones sensibles **siempre dejan auditoría**.
 - Un producto, usuario o perfil **con historial no se borra**: se inactiva o retira.
 - Siempre debe existir **al menos un Administrador activo**.
@@ -492,7 +502,7 @@ Estas reglas no se pueden cambiar con permisos:
 | Vender a crédito | con autorización | ✔ | ✔ |
 | Abonar a un crédito | ✔ | ✔ | ✔ |
 | Anular un abono | — | con Administrador | ✔ |
-| Condonar un crédito | — | — | ✔ |
+| Perdonar la deuda de un crédito | — | — | ✔ |
 | Crear un apartado | con autorización | ✔ | ✔ |
 | Cancelar un apartado | — | con Administrador | ✔ |
 | Abrir la caja | con autorización | ✔ | ✔ |
@@ -507,7 +517,7 @@ Estas reglas no se pueden cambiar con permisos:
 | Cambiar precio, nombre o código | — | — | ✔ |
 | Ver costos | — | — | ✔ |
 | Etiquetas de productos | — | ✔ | ✔ |
-| Pedidos y recepciones | — | ✔ | ✔ |
+| Pedidos y mercancía recibida | — | ✔ | ✔ |
 | Crear proveedores, anular compras | — | — | ✔ |
 | Reportes y Dashboard | — | — | ✔ |
 | Usuarios, roles, auditoría | — | — | ✔ |
