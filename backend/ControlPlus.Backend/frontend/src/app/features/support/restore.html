@@ -11,7 +11,7 @@
   @if (overview(); as data) {
     <div class="support-metrics restore-metrics">
       <article class="support-metric">
-        <div><span>RPO vigente</span><strong>{{ data.rpoMinutes }} min</strong><small class="support-info">Pérdida máxima objetivo</small></div>
+        <div><span>RPO vigente</span><strong>{{ number(data.rpoMinutes) }} min</strong><small class="support-info">Pérdida máxima objetivo</small></div>
         <span class="support-metric__badge support-metric__badge--info" aria-hidden="true">R</span>
       </article>
       <article class="support-metric">
@@ -20,9 +20,9 @@
       </article>
       <article class="support-metric">
         <div><span>Última prueba</span><strong>{{ data.lastTest ? date(data.lastTest.startedAt) : 'Sin pruebas' }}</strong>
-          @if (data.lastTest?.result === 'EXITOSA') { <small class="support-ok">Resultado correcto · cada {{ data.restoreTestDays }} días</small> }
+          @if (data.lastTest?.result === 'EXITOSA') { <small class="support-ok">Resultado correcto · cada {{ number(data.restoreTestDays) }} días</small> }
           @else if (data.lastTest) { <small class="support-bad">Falló · {{ data.lastTest.error }}</small> }
-          @else { <small class="support-bad">Pendiente · se debe probar cada {{ data.restoreTestDays }} días</small> }
+          @else { <small class="support-bad">Pendiente · se debe probar cada {{ number(data.restoreTestDays) }} días</small> }
           @if (data.lastTest?.result === 'EXITOSA') { <small>Próxima prueba: {{ date(data.nextTestDue) }}@if (due(data)) { · vencida }</small> }
         </div>
         <span class="support-metric__badge support-metric__badge--success" aria-hidden="true">✓</span>
@@ -58,7 +58,7 @@
           <p class="field-hint">«Restaurar operación» reemplaza la base real y no está disponible desde la pantalla: se hace con la API detenida y un procedimiento documentado.</p>
           @if (result(); as r) {
             <div class="inline-feedback" [class.inline-feedback--success]="r.result === 'EXITOSA'" [class.inline-feedback--error]="r.result !== 'EXITOSA'" role="status">
-              @if (r.result === 'EXITOSA') { Prueba correcta: la copia se restauró en una base temporal, se verificó y se borró. Tardó {{ r.rtoObservedMinutes }} min. }
+              @if (r.result === 'EXITOSA') { Prueba correcta: la copia se restauró en una base temporal, se verificó y se borró. Tardó {{ number(r.rtoObservedMinutes) }} min. }
               @else { La prueba falló: {{ r.error }} }
             </div>
           }

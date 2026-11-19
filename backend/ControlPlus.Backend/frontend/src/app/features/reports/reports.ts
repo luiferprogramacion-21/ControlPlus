@@ -20,6 +20,7 @@ const MAX_LABELLED_BARS = 10;
 })
 export class Reports implements OnInit {
   private readonly api = inject(ReportsApi);
+  readonly number = groupedNumber;
   readonly session = inject(SessionService);
   readonly notAvailable = NOT_AVAILABLE;
   readonly sales = signal<SalesOverview | null>(null);
@@ -50,7 +51,7 @@ export class Reports implements OnInit {
     const labelled = report.days.length <= MAX_LABELLED_BARS;
     return report.days.map((day, index) => ({
       date: day.date, height: heights[index],
-      label: labelled ? this.compact(day.salesTotal) : '',
+      label: labelled ? this.money(day.salesTotal) : '',
       day: labelled ? `${day.date.slice(8, 10)}/${day.date.slice(5, 7)}` : String(Number(day.date.slice(8, 10))),
       title: `${day.date.split('-').reverse().join('/')}: ${this.money(day.salesTotal)}`,
     }));
@@ -101,7 +102,6 @@ export class Reports implements OnInit {
   }
 
   money(value: number): string { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value); }
-  compact(value: number): string { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', notation: 'compact', maximumFractionDigits: 1 }).format(value); }
   /** Percentages come already rounded by the server; they are only formatted here. */
   percent(value: number | null): string { return value === null ? NOT_AVAILABLE : `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(value)} %`; }
   optionalMoney(value: number | null): string { return value === null ? NOT_AVAILABLE : this.money(value); }

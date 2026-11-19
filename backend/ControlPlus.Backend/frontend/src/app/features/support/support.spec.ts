@@ -78,6 +78,17 @@ describe('Soporte y continuidad', () => {
     expect(text).toContain('Últimos 2 de 7 trabajos.');
   });
 
+  it('mantiene los puntos de miles en intervalos, retención y conteos del diagnóstico', async () => {
+    api.status.mockResolvedValue({ ...status, intervalMinutes: 1234,
+      destinations: [{ ...status.destinations[0], dailyRetention: 1234, weeklyRetention: 1234, monthlyRetention: 1234 }] });
+    api.printQueue.mockResolvedValue({ items: Array.from({ length: 1234 }, () => ({ status: 'PENDIENTE' })), totalCount: 12345 });
+    const fixture = await create(); const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Cada 1.234 minutos');
+    expect(text).toContain('1.234 diarias, 1.234 semanales y 1.234 mensuales');
+    expect(text).toContain('Últimos 1.234 de 12.345 trabajos.');
+    expect(text).toContain('1.234 pendientes');
+  });
+
   it('si no se puede consultar la impresión lo dice, sin bloquear el resto del diagnóstico', async () => {
     api.printerStatus.mockRejectedValue(new Error('403')); api.printQueue.mockRejectedValue(new Error('403'));
     const fixture = await create();

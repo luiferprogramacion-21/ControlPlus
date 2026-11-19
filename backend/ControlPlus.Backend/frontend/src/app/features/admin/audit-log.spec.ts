@@ -76,8 +76,27 @@ describe('Auditoría', () => {
     button.click(); fixture.detectChanges();
     const detail = text(fixture);
     expect(detail).toContain('total');
-    expect(detail).toContain('5000');
+    expect(detail).toContain('5.000');
     expect(fixture.componentInstance.detailRows(record({ details: 'texto libre' }))).toEqual([{ field: 'Detalle', value: 'texto libre' }]);
+  });
+
+  it('separa importes, cantidades y decimales del detalle sin cambiar códigos, versiones ni el evento guardado', async () => {
+    const fixture = await create();
+    const details = JSON.stringify({ total: 1234567.5, totalPaid: 12345, quantity: 1250, version: 1234, documentNumber: 1234567,
+      productCode: '00001234', phone: 3101234567, occurredOn: '2026-11-19',
+      after: { unitCost: 1234.5678, stock: 10000, productId: 'p-00001234', expectedVersion: 1000 },
+      lines: [{ quantity: 2000, amount: -1234.5 }], productIds: [1234, 5678], note: 'Pedido 1234567' });
+    const event = record({ details });
+    const rows = Object.fromEntries(fixture.componentInstance.detailRows(event).map(row => [row.field, row.value]));
+    expect(rows['total']).toBe('1.234.567,5');
+    expect(rows['totalPaid']).toBe('12.345');
+    expect(rows['quantity']).toBe('1.250');
+    expect(JSON.parse(rows['after'])).toEqual({ unitCost: '1.234,5678', stock: '10.000', productId: 'p-00001234', expectedVersion: 1000 });
+    expect(JSON.parse(rows['lines'])).toEqual([{ quantity: '2.000', amount: '-1.234,5' }]);
+    expect(JSON.parse(rows['productIds'])).toEqual([1234, 5678]);
+    expect(rows).toMatchObject({ version: '1234', documentNumber: '1234567', productCode: '00001234', phone: '3101234567', occurredOn: '2026-11-19', note: 'Pedido 1234567' });
+    expect(event.details).toBe(details);
+    expect(fixture.componentInstance.detailRows(record({ details: '1234.5' }))).toEqual([{ field: 'Detalle', value: '1.234,5' }]);
   });
 
   it('sin USERS.READ no ofrece el filtro de usuario ni consulta la lista de usuarios', async () => {

@@ -9,6 +9,19 @@ import { SessionService } from '../../core/session.service';
 import { AdminApi, AdminUser } from './admin-api';
 import { AUDIT_ACTION_GROUPS, auditActionLabel, auditActionModule } from './audit-actions';
 import { toastSignal } from '../../core/toast';
+import { groupedNumber } from '../../shared/number-input';
+
+/** Localize measured values for display, keeping identifiers and concurrency versions literal. */
+function displayAuditValue(value: unknown, field = ''): unknown {
+  const lastWord = field.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().split(/[_-]/).at(-1) ?? '';
+  if (/^(id|ids|code|codes|codigo|barcode|number|numero|version|phone|telephone|telefono|identification|identificacion|nit|document|documento|reference|referencia)$/.test(lastWord)) return value;
+  if (typeof value === 'number') return groupedNumber(value);
+  if (Array.isArray(value)) return value.map(item => displayAuditValue(item));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, displayAuditValue(item, key)]));
+  }
+  return value;
+}
 
 /** One audit event as GET /api/audit-records returns it (only sanitized data, never secrets). */
 export interface AuditRecord {
@@ -126,10 +139,10 @@ export class AuditLog implements OnInit {
       const parsed: unknown = JSON.parse(record.details);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         return Object.entries(parsed as Record<string, unknown>).map(([field, value]) => ({
-          field, value: value === null ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value),
+          field, value: value === null ? '—' : typeof value === 'object' ? JSON.stringify(displayAuditValue(value, field)) : String(displayAuditValue(value, field)),
         }));
       }
-      return [{ field: 'Detalle', value: JSON.stringify(parsed) }];
+      return [{ field: 'Detalle', value: typeof parsed === 'number' ? groupedNumber(parsed) : JSON.stringify(displayAuditValue(parsed)) }];
     } catch { return [{ field: 'Detalle', value: record.details }]; }
   }
 }

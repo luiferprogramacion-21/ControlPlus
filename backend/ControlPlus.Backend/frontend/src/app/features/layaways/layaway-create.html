@@ -35,7 +35,7 @@
     <label class="field-label" for="create-due">Fecha límite <span>({{ dueRequired ? 'obligatoria' : 'opcional' }})</span></label>
     <input id="create-due" class="text-field layaway-due" type="date" name="dueDate" [(ngModel)]="dueDate">
     @if (defaultDue(); as due) {
-      <p class="form-hint">Plazo predeterminado: <strong>{{ due.days }} {{ due.days === 1 ? 'día' : 'días' }}</strong>, hasta el <strong>{{ due.date }}</strong>. Déjala vacía para usarlo o elige otra fecha para cambiarlo.</p>
+      <p class="form-hint">Plazo predeterminado: <strong>{{ number(due.days) }} {{ due.days === 1 ? 'día' : 'días' }}</strong>, hasta el <strong>{{ due.date }}</strong>. Déjala vacía para usarlo o elige otra fecha para cambiarlo.</p>
     } @else if (rules()) {
       <p class="form-hint">No hay un plazo predeterminado: elige la fecha límite del apartado.</p>
     } @else {

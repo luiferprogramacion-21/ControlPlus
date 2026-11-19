@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { errorText } from '../../core/api';
 import { BackupDestination, BackupDestinationType, BackupStatus, ComponentDiagnosis, diagnosePrinter, diagnoseQueue, SupportApi } from './support-api';
 import { toastSignal, ToastService } from '../../core/toast';
+import { groupedNumber } from '../../shared/number-input';
 
 interface DestinationDraft { path: string; active: boolean; }
 
@@ -15,6 +16,7 @@ interface DestinationDraft { path: string; active: boolean; }
 })
 export class Support implements OnInit {
   private readonly api = inject(SupportApi);
+  readonly number = groupedNumber;
   readonly status = signal<BackupStatus | null>(null);
   readonly apiUp = signal<boolean | null>(null);
   readonly databaseUp = signal<boolean | null>(null);
@@ -99,7 +101,7 @@ export class Support implements OnInit {
 
   freePercent(destination: BackupDestination | null): string {
     if (!destination?.freeBytes || !destination.totalBytes) return '';
-    return `${Math.round((destination.freeBytes / destination.totalBytes) * 100)} % libre`;
+    return `${groupedNumber(Math.round((destination.freeBytes / destination.totalBytes) * 100))} % libre`;
   }
 
   resultLabel(result: string): string {

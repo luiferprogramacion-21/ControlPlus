@@ -44,7 +44,7 @@ public static class ReceiptTextRenderer
         {
             foreach (var part in Wrap(Clean(line.ProductName), columns))
                 text.AppendLine(part);
-            AppendAmount(text, $"{line.Quantity} x {Money(line.UnitPrice)}", line.NetAmount, columns);
+            AppendAmount(text, $"{line.Quantity.ToString("N0", ColombianCulture)} x {Money(line.UnitPrice)}", line.NetAmount, columns);
         }
 
         AppendRule(text, columns);

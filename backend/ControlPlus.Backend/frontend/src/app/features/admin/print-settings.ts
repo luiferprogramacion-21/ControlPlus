@@ -1,4 +1,4 @@
-import { NumberInput } from '../../shared/number-input';
+import { groupedNumber, NumberInput } from '../../shared/number-input';
 import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -19,6 +19,7 @@ import { HelpTip } from '../../shared/help-tip';
 })
 export class PrintSettings implements OnInit {
   private readonly api = inject(SalesApi);
+  readonly number = groupedNumber;
   private readonly confirmations = inject(ConfirmationDialog);
   private readonly destroyRef = inject(DestroyRef);
   private confirming = false;
@@ -44,7 +45,7 @@ export class PrintSettings implements OnInit {
 
   ngOnInit(): void { void this.reload(); }
   jobText(job: PrintJob): string { return printJobStatusText(job); }
-  copyLabel(job: PrintJob): string { return job.copyType === 'ORIGINAL' ? 'Original' : `Reimpresión ${job.copyNumber}`; }
+  copyLabel(job: PrintJob): string { return job.copyType === 'ORIGINAL' ? 'Original' : `Reimpresión ${groupedNumber(job.copyNumber)}`; }
   canRetry(job: PrintJob): boolean { return job.status === 'ERROR' && this.session.has('CONFIGURATION.MANAGE'); }
   canConfigureDrawer(profile: PrintProfile): boolean { return profile.active && profile.printerType !== 'ETIQUETAS' && this.session.has('CONFIGURATION.MANAGE'); }
   drawerLabel(profile: PrintProfile): string {

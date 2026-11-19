@@ -20,6 +20,23 @@ describe('PrintSettings', () => {
   });
   const base = { printerType: 'RECIBOS' as const, labelWidthMm: null, labelHeightMm: null, resolutionDpi: null };
   it('carga perfiles y cola', async () => { await create(); expect(api.printProfiles).toHaveBeenCalled(); expect(api.printQueue).toHaveBeenCalledWith(1, 20); });
+  it('muestra dimensiones decimales con coma y agrupa DPI, intentos y número de copia', async () => {
+    api.printProfiles.mockResolvedValue([{ ...base, id: 'p1', name: 'Etiquetas', systemQueueName: 'COLA',
+      columns: 32, printerType: 'HIBRIDA', labelWidthMm: 50.25, labelHeightMm: 30.5, resolutionDpi: 1200,
+      isDefault: true, active: true, version: 1, drawerEnabled: false }]);
+    api.printQueue.mockResolvedValue({ items: [{ id: 'j1', saleId: 's1', copyType: 'REIMPRESION', copyNumber: 1234,
+      status: 'IMPRESO', attempts: 1234, requestedAtUtc: '2026-11-19T15:00:00Z', queueAcceptedAtUtc: null, error: null }],
+      page: 1, pageSize: 20, totalCount: 1, totalPages: 1 });
+    const fixture = TestBed.createComponent(PrintSettings);
+    fixture.detectChanges(); await fixture.whenStable();
+    // reload awaits both mocked API promises before publishing the profiles and queue.
+    await new Promise(resolve => setTimeout(resolve, 0)); fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('50,25 × 30,5 mm');
+    expect(text).toContain('1.200 DPI');
+    expect(text).toContain('Reimpresión 1.234');
+    expect(fixture.nativeElement.querySelectorAll('table')[1].querySelector('.numeric')?.textContent).toBe('1.234');
+  });
   it.each([[{ name: '', systemQueueName: 'Q', columns: 32 }], [{ name: 'N', systemQueueName: '', columns: 32 }], [{ name: 'N', systemQueueName: 'Q', columns: 23 }], [{ name: 'N', systemQueueName: 'Q', columns: 81 }], [{ name: 'N', systemQueueName: 'Q', columns: 30.5 }]])('rechaza datos inválidos %j', async form => {
     const c = await create(); c.form = { ...base, ...form, makeDefault: true }; await c.save(); expect(api.createPrintProfile).not.toHaveBeenCalled(); expect(c.formError()).not.toBe('');
   });

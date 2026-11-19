@@ -99,6 +99,17 @@ describe('Reportes', () => {
   });
 
   describe('Ventas', () => {
+    it('agrupa conteos y conserva el importe completo en las barras, también en millones', async () => {
+      api.salesOverview.mockResolvedValue(overview({
+        sales: { transactions: 1234, cashTotal: 1234567, creditTotal: 0, total: 1234567 },
+        changes: { transactions: 12345, netTotal: -10000 }, days: [day('2026-11-01', 1234567)],
+      }));
+      const fixture = await create(); const content = text(fixture);
+      expect(fixture.nativeElement.querySelectorAll('.report-card strong')[1].textContent).toBe('1.234');
+      expect(content).toContain('Cambios de productos (12.345)');
+      expect(fixture.nativeElement.querySelector('.bar__value')?.textContent).toMatch(/\$\s?1\.234\.567/);
+      expect(fixture.componentInstance.salesBars()[0].label).not.toMatch(/mil|mill|M/);
+    });
     it('muestra los indicadores, la serie y solo los medios reales de la API', async () => {
       const fixture = await create(); const content = text(fixture);
       expect(content).toContain('Ventas'); expect(content).toMatch(/\$\s?100\.000/); expect(content).toContain('Ventas realizadas'); expect(content).toMatch(/Venta promedio: \$\s?50\.000/);

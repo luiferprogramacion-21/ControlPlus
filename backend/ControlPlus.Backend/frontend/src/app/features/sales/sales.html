@@ -173,7 +173,7 @@
         @if (saleType() === 'CREDITO') {
           <div class="credit-checkout-fields">
             <label class="field-label" for="credit-due-date">Fecha de vencimiento</label><input id="credit-due-date" class="text-field" type="date" [min]="minimumDueDate" [max]="maximumDueDate" [(ngModel)]="dueDate" [disabled]="locked || busy()">
-            @if (creditDefaultDays() !== null) { <p class="form-hint">Plazo predeterminado: <strong>{{ creditDefaultDays() }} {{ creditDefaultDays() === 1 ? 'día' : 'días' }}</strong>@if (defaultDueDateText) { (vence el <strong>{{ defaultDueDateText }}</strong>) }. Puedes cambiar la fecha entre mañana y 90 días.</p> }
+            @if (creditDefaultDays() !== null) { <p class="form-hint">Plazo predeterminado: <strong>{{ creditDefaultDays() | number:'1.0-0' }} {{ creditDefaultDays() === 1 ? 'día' : 'días' }}</strong>@if (defaultDueDateText) { (vence el <strong>{{ defaultDueDateText }}</strong>) }. Puedes cambiar la fecha entre mañana y 90 días.</p> }
             @else if (creditRulesKnown()) { <p class="form-hint">No hay un plazo predeterminado: elige la fecha de vencimiento, entre mañana y 90 días.</p> }
           </div>
           @if (creditRisk(); as risk) {

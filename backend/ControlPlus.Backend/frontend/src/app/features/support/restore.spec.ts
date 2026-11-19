@@ -48,6 +48,16 @@ describe('Restauración', () => {
     expect(c.selectedId()).toBe('c3');
   });
 
+  it('usa puntos de miles y coma decimal en metas, plazos y resultados mostrados', async () => {
+    api.restoreOverview.mockResolvedValue({ ...overview, rpoMinutes: 1234, rtoMinutes: 1234.5, restoreTestDays: 1234 });
+    const fixture = await create();
+    const content = fixture.nativeElement.textContent as string;
+    expect(content).toContain('1.234 min');
+    expect(content).toContain('1.234,5 min');
+    expect(content).toContain('cada 1.234 días');
+    expect(fixture.componentInstance.rto(74040)).toBe('1.234 horas');
+  });
+
   it('«Restaurar operación» queda desactivado: la pantalla solo prueba', async () => {
     const fixture = await create();
     const buttons = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>);
@@ -56,12 +66,13 @@ describe('Restauración', () => {
 
   it('prueba la copia seleccionada, muestra el resultado y recarga la última prueba', async () => {
     const fixture = await create();
-    api.restoreTest.mockResolvedValue({ id: 't1', copyId: 'c3', startedAt: '2026-11-15T19:10:00Z', finishedAt: '2026-11-15T19:11:00Z', result: 'EXITOSA', rpoObservedMinutes: 30, rtoObservedMinutes: 1, integrityVerified: true, applicationVerified: true, error: null });
+    api.restoreTest.mockResolvedValue({ id: 't1', copyId: 'c3', startedAt: '2026-11-15T19:10:00Z', finishedAt: '2026-11-15T19:11:00Z', result: 'EXITOSA', rpoObservedMinutes: 30, rtoObservedMinutes: 1.25, integrityVerified: true, applicationVerified: true, error: null });
     await fixture.componentInstance.test();
     fixture.detectChanges();
     expect(api.restoreTest).toHaveBeenCalledWith('c3');
     expect(api.restoreOverview).toHaveBeenCalledTimes(2);
     expect(fixture.nativeElement.textContent).toContain('Prueba correcta');
+    expect(fixture.nativeElement.textContent).toContain('Tardó 1,25 min.');
   });
 
   it('una prueba fallida o rechazada se informa sin perder la pantalla', async () => {

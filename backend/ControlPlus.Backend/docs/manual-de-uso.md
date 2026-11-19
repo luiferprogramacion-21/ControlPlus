@@ -54,6 +54,7 @@ Nadie cambia su propia contraseña desde dentro del sistema. Hay dos caminos:
 - **Listas.** Buscan mientras escribes y los filtros se aplican al elegirlos; no hace falta pulsar Buscar. Si una lista está vacía, ahí mismo aparece el botón para crear el primero (por ejemplo **Nuevo cliente**).
 - **Botones de cada fila.** Cada fila muestra como mucho dos botones; los demás están en **Más ▾**. También puedes hacer **clic derecho** sobre la fila para ver todas sus acciones.
 - **Ayuda.** El ícono **(i)** junto a un campo explica para qué sirve.
+- **Números.** Todo el sistema usa puntos para los miles y coma para los decimales: `1.234.567` y `1.234,50`. Se mantiene al escribir, guardar y volver a consultar, también en reportes y comprobantes; no hay que activarlo. Los códigos, documentos, teléfonos y fechas conservan su formato.
 - **Qué sigue.** Al terminar algo, el aviso de arriba a la derecha puede ofrecer el siguiente paso, por ejemplo «Turno abierto · **Ir a vender →**».
 
 ### Atajos del teclado

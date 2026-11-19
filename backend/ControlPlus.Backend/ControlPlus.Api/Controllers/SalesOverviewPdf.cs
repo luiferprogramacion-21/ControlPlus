@@ -36,7 +36,7 @@ public static class SalesOverviewPdf
     public static string FormatMoney(decimal value) =>
         (value < 0 ? "-$ " : "$ ") + decimal.Round(Math.Abs(value), 0, MidpointRounding.AwayFromZero).ToString("N0", Culture);
 
-    public static string FormatPercent(decimal value) => value.ToString("0.##", Culture) + " %";
+    public static string FormatPercent(decimal value) => value.ToString("#,##0.##", Culture) + " %";
     public static string FormatDate(DateOnly value) => value.ToString("dd/MM/yyyy", Culture);
 
     public static byte[] Render(SalesOverviewReport report)
@@ -76,9 +76,9 @@ public static class SalesOverviewPdf
         }
         Cards(
             ("Ventas del período", FormatMoney(report.Sales.Total),
-                $"{sales} {(sales == 1 ? "venta" : "ventas")} · contado {FormatMoney(report.Sales.CashTotal)} · crédito {FormatMoney(report.Sales.CreditTotal)}"),
+                $"{sales.ToString("N0", Culture)} {(sales == 1 ? "venta" : "ventas")} · contado {FormatMoney(report.Sales.CashTotal)} · crédito {FormatMoney(report.Sales.CreditTotal)}"),
             ("Cambios de productos", FormatMoney(report.Changes.NetTotal),
-                $"{report.Changes.Transactions} {(report.Changes.Transactions == 1 ? "cambio" : "cambios")} · lo entregado menos lo devuelto"));
+                $"{report.Changes.Transactions.ToString("N0", Culture)} {(report.Changes.Transactions == 1 ? "cambio" : "cambios")} · lo entregado menos lo devuelto"));
         Cards(
             ("Total vendido", FormatMoney(report.NetSalesTotal), "Ventas del período más los cambios"),
             ("Venta promedio", Optional(report.AverageTicket), "Total de ventas entre el número de ventas"));
@@ -91,7 +91,7 @@ public static class SalesOverviewPdf
         if (incomplete)
         {
             var missing = report.MissingCostLines + report.MissingMovementLines;
-            var detail = Wrap($"Faltan los costos de {missing} {(missing == 1 ? "producto vendido" : "productos vendidos")}. " +
+            var detail = Wrap($"Faltan los costos de {missing.ToString("N0", Culture)} {(missing == 1 ? "producto vendido" : "productos vendidos")}. " +
                               "Revisa que cada producto tenga su costo registrado.", 9, Right - Margin - 20);
             var height = 28 + detail.Count * 12;
             doc.EnsureSpace(height + 10);
@@ -325,7 +325,7 @@ public static class SalesOverviewPdf
                 _page = _pages[i];
                 Line(Margin, 44, Right, Rule);
                 Text(Margin, 30, "Baratísimo · Reporte de ventas", 8, color: Gray);
-                TextRight(Right, 30, $"Página {i + 1} de {_pages.Count}", 8, color: Gray);
+                TextRight(Right, 30, $"Página {(i + 1).ToString("N0", Culture)} de {_pages.Count.ToString("N0", Culture)}", 8, color: Gray);
             }
 
             var offsets = new List<long> { 0 };

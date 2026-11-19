@@ -41,7 +41,7 @@ export class LayawayCancel {
     const amount = Number(this.refundAmount);
     if (!Number.isSafeInteger(amount) || amount < 0) return 'El valor a devolver debe ser un entero no negativo.';
     if (amount > this.totalPaid()) return 'El valor a devolver no puede superar lo abonado.';
-    if (this.observation.trim().length > 1000) return 'La observación admite hasta 1000 caracteres.';
+    if (this.observation.trim().length > 1000) return 'La observación admite hasta 1.000 caracteres.';
     if (amount === 0) return '';
     return validateDrafts(this.drafts, { mode: 'refund', exact: amount, exactMessage: 'Los medios deben sumar exactamente el valor a devolver.' });
   }

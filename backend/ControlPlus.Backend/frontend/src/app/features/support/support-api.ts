@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { groupedNumber } from '../../shared/number-input';
 
 export type BackupDestinationType = 'LOCAL_FISICO_SEPARADO' | 'EXTERNO_CIFRADO';
 
@@ -53,7 +54,7 @@ export interface ComponentDiagnosis { label: string; detail: string; tone: 'succ
 export function diagnosePrinter(status: PrinterStatus | null): ComponentDiagnosis {
   if (!status) return { label: 'Sin consultar', detail: 'No se pudo leer la configuración de impresión.', tone: 'muted' };
   if (!status.hasActiveProfile) return { label: 'Sin configurar', detail: 'No hay un perfil de impresora activo (Configuración → Impresión).', tone: 'warning' };
-  return { label: 'Configurada', detail: `Perfil «${status.profileName ?? 'sin nombre'}»${status.columns ? `, ${status.columns} columnas` : ''}.`, tone: 'success' };
+  return { label: 'Configurada', detail: `Perfil «${status.profileName ?? 'sin nombre'}»${status.columns ? `, ${groupedNumber(status.columns)} columnas` : ''}.`, tone: 'success' };
 }
 
 /** Cola: estado de los trabajos más recientes (la consulta no filtra por estado). */
@@ -62,9 +63,9 @@ export function diagnoseQueue(page: PrintQueuePage | null): ComponentDiagnosis {
   if (!page.items.length) return { label: 'Sin trabajos', detail: 'Todavía no se ha enviado nada a imprimir.', tone: 'muted' };
   const errors = page.items.filter(job => job.status === 'ERROR').length;
   const pending = page.items.filter(job => job.status === 'PENDIENTE' || job.status === 'IMPRIMIENDO').length;
-  const detail = `Últimos ${page.items.length.toLocaleString('es-CO')} de ${page.totalCount.toLocaleString('es-CO')} trabajos.`;
-  if (errors) return { label: `${errors} con error`, detail: `${detail} Revíselos en Configuración → Impresión.`, tone: 'error' };
-  if (pending) return { label: `${pending} ${pending === 1 ? 'pendiente' : 'pendientes'}`, detail, tone: 'warning' };
+  const detail = `Últimos ${groupedNumber(page.items.length)} de ${groupedNumber(page.totalCount)} trabajos.`;
+  if (errors) return { label: `${groupedNumber(errors)} con error`, detail: `${detail} Revíselos en Configuración → Impresión.`, tone: 'error' };
+  if (pending) return { label: `${groupedNumber(pending)} ${pending === 1 ? 'pendiente' : 'pendientes'}`, detail, tone: 'warning' };
   return { label: 'Al día', detail, tone: 'success' };
 }
 

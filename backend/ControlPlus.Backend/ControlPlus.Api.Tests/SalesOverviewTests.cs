@@ -186,6 +186,27 @@ public sealed class SalesOverviewTests
     }
 
     [Fact]
+    public void Pdf_GroupsCountsAndUsesCommaForDecimalPercentages()
+    {
+        var report = new SalesOverviewReport(From, To, "COP", new(1234, 1234567m, 0m, 1234567m),
+            new(2345, 0m), 1234567m, 100m, 1234.5m, 1000m, null, null, null,
+            "INCOMPLETE", 1234, 2, [new(From, 1234567m, 0m, 1234567m)],
+            1234567m, [new("EFECTIVO", "Efectivo", 1234567m, 100m)]);
+
+        var pdf = RenderPdf(report);
+
+        AssertValidStructure(pdf);
+        Assert.Contains("1.234 ventas", pdf);
+        Assert.Contains("2.345 cambios", pdf);
+        Assert.Contains("Faltan los costos de 1.236 productos vendidos.", pdf);
+        Assert.Contains("las ventas subieron 1.234,5 %", pdf);
+        Assert.Contains("$ 1.234.567", pdf);
+        Assert.Contains("Página 1 de 1", pdf);
+        Assert.Equal("1.234,57 %", SalesOverviewPdf.FormatPercent(1234.567m));
+        Assert.Equal("-1.234,5 %", SalesOverviewPdf.FormatPercent(-1234.5m));
+    }
+
+    [Fact]
     public void Pdf_WithAFullMonthContinuesOnANewPageWithFooterAndEscapedNames()
     {
         var from = new DateOnly(2026, 10, 1);

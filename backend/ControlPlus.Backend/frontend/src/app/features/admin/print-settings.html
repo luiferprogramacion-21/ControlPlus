@@ -4,7 +4,7 @@
   @if (loading()) { <p class="muted" role="status">Cargando…</p> }
   <div class="table-wrap module-table-wrap"><table class="print-profiles-table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Cola de Windows</th><th>Configuración</th><th>Cajón</th><th>Estado</th><th></th></tr></thead><tbody>
     @for (profile of profiles(); track profile.id) {
-      <tr><td><strong>{{ profile.name }}</strong></td><td>{{ profile.printerType === 'HIBRIDA' ? 'Híbrida' : profile.printerType === 'ETIQUETAS' ? 'Etiquetas' : 'Recibos' }}</td><td>{{ profile.systemQueueName }}</td><td>{{ profile.columns ? profile.columns + ' columnas' : '' }}{{ profile.labelWidthMm && profile.labelHeightMm ? (profile.columns ? ' · ' : '') + profile.labelWidthMm + ' × ' + profile.labelHeightMm + ' mm' : '' }}{{ profile.resolutionDpi ? ' · ' + profile.resolutionDpi + ' DPI' : '' }}</td><td><span class="status-pill" [class.status-pill--warning]="!profile.drawerEnabled">{{ drawerLabel(profile) }}</span></td>
+      <tr><td><strong>{{ profile.name }}</strong></td><td>{{ profile.printerType === 'HIBRIDA' ? 'Híbrida' : profile.printerType === 'ETIQUETAS' ? 'Etiquetas' : 'Recibos' }}</td><td>{{ profile.systemQueueName }}</td><td>{{ profile.columns ? number(profile.columns) + ' columnas' : '' }}{{ profile.labelWidthMm && profile.labelHeightMm ? (profile.columns ? ' · ' : '') + number(profile.labelWidthMm) + ' × ' + number(profile.labelHeightMm) + ' mm' : '' }}{{ profile.resolutionDpi ? ' · ' + number(profile.resolutionDpi) + ' DPI' : '' }}</td><td><span class="status-pill" [class.status-pill--warning]="!profile.drawerEnabled">{{ drawerLabel(profile) }}</span></td>
         <td><span class="status-pill" [class.status-pill--warning]="!profile.active">{{ profile.active ? 'Activo' : 'Inactivo' }}</span>@if (profile.isDefault) { <span class="status-pill"> Predeterminado</span> }</td>
         <td class="align-right"><div class="print-profile-actions">@if (canConfigureDrawer(profile)) { <button class="table-action" type="button" (click)="startConfigureDrawer(profile)" [disabled]="drawerSaving() || deleting()">Cajón</button> }@if (session.has('CONFIGURATION.MANAGE')) { <button class="table-action table-action--danger" type="button" (click)="remove(profile)" [disabled]="deleting() || drawerSaving()">Eliminar</button> }</div></td></tr>
     } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="7">No hay perfiles. Sin un perfil no se generan trabajos de impresión.</td></tr> } }
@@ -16,7 +16,7 @@
     @for (job of jobs(); track job.id) {
       <tr><td>{{ copyLabel(job) }}</td><td>{{ job.requestedAtUtc | date:'dd/MM/yyyy HH:mm' }}</td>
         <td><span class="status-pill" [class.status-pill--warning]="job.status === 'ERROR' || (job.status === 'IMPRIMIENDO' && job.error)">{{ job.status }}</span> {{ jobText(job) }}@if (job.error) { <small class="muted"> {{ job.error }}</small> }</td>
-        <td class="align-right numeric">{{ job.attempts }}</td>
+        <td class="align-right numeric">{{ number(job.attempts) }}</td>
         <td class="align-right">@if (canRetry(job)) { <button class="table-action" type="button" (click)="retry(job)">Reintentar</button> }</td></tr>
     } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="5">No hay trabajos de impresión.</td></tr> } }
   </tbody></table></div>

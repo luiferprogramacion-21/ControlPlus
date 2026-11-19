@@ -60,7 +60,7 @@ describe('LayawayCancel: cancelación y reembolso', () => {
 
   it('rechaza una observación de más de 1000 caracteres', () => {
     const component = open(); component.observation = 'x'.repeat(1001);
-    expect(component.validation()).toContain('1000');
+    expect(component.validation()).toContain('1.000');
   });
 
   it('cancela sin devolución: sin medios, sin motivo y con la versión del apartado', async () => {

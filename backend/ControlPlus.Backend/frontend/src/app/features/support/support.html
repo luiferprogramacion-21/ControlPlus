@@ -54,7 +54,7 @@
       <div class="support-side">
         <section class="support-panel" aria-labelledby="support-backups-title">
           <h3 id="support-backups-title">Respaldos</h3>
-          <p>Cada {{ data.intervalMinutes }} minutos y después del cierre.</p>
+          <p>Cada {{ number(data.intervalMinutes) }} minutos y después del cierre.</p>
           <dl class="support-facts">
             <div><dt>Último respaldo válido</dt><dd>{{ dateTime(data.lastSuccessfulBackup?.startedAt) }}</dd></div>
             <div><dt>Tamaño</dt><dd>{{ size(data.lastSuccessfulBackup?.sizeBytes) }}</dd></div>
@@ -77,7 +77,7 @@
 
     <section class="support-panel" aria-labelledby="support-destinations-title">
       <h3 id="support-destinations-title">Destinos</h3>
-      <p>Copia local en un disco distinto al de la base (externo USB u otro disco interno) y copia externa cifrada en la carpeta de Google Drive u OneDrive. Se conservan las del día, {{ data.destinations[0]?.dailyRetention }} diarias, {{ data.destinations[0]?.weeklyRetention }} semanales y {{ data.destinations[0]?.monthlyRetention }} mensuales.</p>
+      <p>Copia local en un disco distinto al de la base (externo USB u otro disco interno) y copia externa cifrada en la carpeta de Google Drive u OneDrive. Se conservan las del día, {{ number(data.destinations[0]?.dailyRetention) }} diarias, {{ number(data.destinations[0]?.weeklyRetention) }} semanales y {{ number(data.destinations[0]?.monthlyRetention) }} mensuales.</p>
       <div class="support-destinations">
         @for (destination of data.destinations; track destination.type) {
           <form class="support-destination" (submit)="$event.preventDefault(); saveDestination(destination)">

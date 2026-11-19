@@ -36,6 +36,25 @@ public sealed class ReceiptTextRendererTests
     }
 
     [Fact]
+    public void Render_GroupsProductQuantitiesAndAmountsWithColombianSeparators()
+    {
+        var receipt = new SaleReceiptDto(
+            Guid.CreateVersion7(), "V-000123", new DateTimeOffset(2026, 11, 19, 14, 0, 0, TimeSpan.Zero),
+            new DateOnly(2026, 11, 19), "CONTADO", "CONFIRMADA", 1522756m, 0m, 1522756m, 0m,
+            [new SaleLineDto(Guid.CreateVersion7(), Guid.CreateVersion7(), "P-000001", "Cuaderno",
+                "UNIDAD", 1234, "MINORISTA", 1234m, "NINGUNO", null, null, 0m, 1522756m, 1522756m)],
+            [new SaleReceiptPaymentDto("EFECTIVO", 1522756m, 1522756m, 0m)]);
+
+        var text = Encoding.UTF8.GetString(ReceiptTextRenderer.Render(receipt, "Baratísimo", 32));
+
+        Assert.Contains("1.234 x $ 1.234", text, StringComparison.Ordinal);
+        Assert.Contains("$ 1.522.756", text, StringComparison.Ordinal);
+        Assert.Contains("V-000123", text, StringComparison.Ordinal);
+        Assert.All(text.Split('\n').Where(line => line.Length > 0),
+            line => Assert.True(line.TrimEnd('\r').Length <= 32, line));
+    }
+
+    [Fact]
     public void Render_ReprintAndHistoricalNamesUseOnlySnapshot()
     {
         var receipt = new SaleReceiptDto(Guid.CreateVersion7(), "V-000004",

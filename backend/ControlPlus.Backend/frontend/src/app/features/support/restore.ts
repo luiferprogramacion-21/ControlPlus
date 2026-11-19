@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { errorText } from '../../core/api';
 import { RestorableCopy, RestoreOverview, RestoreTest, SupportApi } from './support-api';
 import { toastSignal } from '../../core/toast';
+import { groupedNumber } from '../../shared/number-input';
 
 /** Restauración y continuidad (maqueta 22c). Only the restore test is available; the real restore is a separate procedure. */
 @Component({
@@ -13,6 +14,7 @@ import { toastSignal } from '../../core/toast';
 })
 export class Restore implements OnInit {
   private readonly api = inject(SupportApi);
+  readonly number = groupedNumber;
   readonly overview = signal<RestoreOverview | null>(null);
   readonly selectedId = signal<string | null>(null);
   readonly loading = signal(false);
@@ -68,7 +70,7 @@ export class Restore implements OnInit {
     return `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: unit === 0 ? 0 : 1 }).format(value)} ${units[unit]}`;
   }
 
-  rto(minutes: number): string { return minutes % 60 === 0 ? `${minutes / 60} horas` : `${minutes} min`; }
+  rto(minutes: number): string { return minutes % 60 === 0 ? `${groupedNumber(minutes / 60)} horas` : `${groupedNumber(minutes)} min`; }
 
   /** True when the next test date has arrived (Phase 4: at most every N days). */
   due(overview: RestoreOverview): boolean {
