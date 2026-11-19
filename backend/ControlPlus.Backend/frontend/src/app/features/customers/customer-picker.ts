@@ -31,7 +31,7 @@ export class CustomerPicker implements OnInit, OnDestroy {
 
   get canCreate(): boolean { return this.session.has('CUSTOMERS.BASIC_MANAGE') || this.session.has('CUSTOMERS.MANAGE'); }
   /** Documents are written only with the full permission; the basic one registers name, phone and address. */
-  get canWriteDocument(): boolean { return this.session.has('CUSTOMERS.MANAGE'); }
+  get canWriteDocument(): boolean { return this.session.has('CUSTOMERS.MANAGE') || this.session.has('CUSTOMERS.BASIC_MANAGE'); }
 
   ngOnInit(): void { void this.load(''); }
   ngOnDestroy(): void { clearTimeout(this.timer); }

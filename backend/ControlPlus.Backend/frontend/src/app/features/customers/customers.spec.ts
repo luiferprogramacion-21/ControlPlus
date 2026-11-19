@@ -39,6 +39,14 @@ describe('Customers', () => {
     await component.save();
     expect(api.update).toHaveBeenCalledWith(customer, expect.objectContaining({ creditLimit: 50000, phone: '300' }));
   });
+  it('con el permiso básico también envía el documento; observaciones y cupo siguen reservados', async () => {
+    permissions = ['CUSTOMERS.BASIC_MANAGE'];
+    api.create.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    component.newCustomer(); component.form.fullName = 'Ana'; component.form.address = 'Calle 1';
+    component.form.documentType = 'cc'; component.form.documentNumber = ' 123 '; component.form.observations = 'privado'; component.form.creditLimit = 9000;
+    await component.save();
+    expect(api.create).toHaveBeenLastCalledWith(expect.objectContaining({ documentType: 'CC', documentNumber: '123', observations: null, creditLimit: null }));
+  });
   it('pide confirmacion propia antes de inactivar un cliente', async () => {
     const customer = { id: 'c1', fullName: 'Ana', isActive: true, version: 2 } as never;
     api.status.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });

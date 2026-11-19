@@ -2,7 +2,7 @@
 
 El primer corte expone altas, consulta, búsqueda, edición e inactivación/reactivación sobre la entidad oficial `catalogo.cliente`. No introduce tablas ni columnas, borrado físico ni historial comercial.
 
-`CUSTOMERS.BASIC_MANAGE` permite trabajar con clientes activos y modificar nombre completo, teléfono, dirección y correo. `CUSTOMERS.MANAGE` agrega corrección de documento, observaciones, lectura de inactivos y cambio de estado. Los permisos se revalidan desde persistencia, por lo que una revocación individual prevalece sobre rol o concesión.
+`CUSTOMERS.BASIC_MANAGE` permite trabajar con clientes activos y modificar nombre completo, **documento (opcional, tipo y número juntos y sin repetirse)**, teléfono, dirección y correo. `CUSTOMERS.MANAGE` agrega observaciones, cupo de crédito, lectura de inactivos y cambio de estado. Decisión del 18 de noviembre de 2026: el documento dejó de ser exclusivo del permiso completo para que el Cajero también pueda registrarlo. Los permisos se revalidan desde persistencia, por lo que una revocación individual prevalece sobre rol o concesión.
 
 Nombre completo y dirección son obligatorios. El documento es opcional, pero tipo y número se informan juntos; se recortan y normalizan a mayúsculas, sin alterar caracteres internos del número. La pareja documental es única. Correo se recorta, pasa a minúsculas y se valida.
 

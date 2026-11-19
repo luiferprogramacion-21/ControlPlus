@@ -59,10 +59,10 @@ describe('CustomerPicker', () => {
     picker.form.address = 'Calle 2'; expect(picker.validation()).toBe('');
   });
 
-  it('con el permiso básico no escribe documento; con el completo exige tipo y número juntos', async () => {
+  it('con el permiso básico o el completo escribe el documento y exige tipo y número juntos', async () => {
     await open(); picker.startCreate(); picker.form.fullName = 'Luis'; picker.form.address = 'Calle 2'; picker.form.documentType = 'CC'; picker.form.documentNumber = '999';
     await picker.create();
-    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ documentType: null, documentNumber: null, fullName: 'Luis', address: 'Calle 2' }));
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ documentType: 'CC', documentNumber: '999', fullName: 'Luis', address: 'Calle 2' }));
     permissions = ['CUSTOMERS.MANAGE']; api.create.mockClear();
     picker.form.documentNumber = ''; expect(picker.validation()).toContain('juntos');
     picker.form.documentNumber = ' ab12 '; await picker.create();

@@ -188,11 +188,9 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
 
         SetBearer(client, users.Cashier.Token.AccessToken);
         var beforeRejected = await CustomerStateAsync();
+        // Observaciones y cupo siguen reservados al permiso completo; el documento ya no (18 de noviembre de 2026).
         var forbiddenRequests = new[]
         {
-            new CreateCustomerRequest("CC", "BASIC-DOCUMENT", "Documento", null, "Dirección", null, null),
-            new CreateCustomerRequest("CC", null, "Tipo aislado", null, "Dirección", null, null),
-            new CreateCustomerRequest(null, "BASIC-NUMBER", "Número aislado", null, "Dirección", null, null),
             new CreateCustomerRequest(null, null, "Observaciones", null, "Dirección", null, "Dato privado"),
             new CreateCustomerRequest("CC", "BASIC-BOTH", "Documento y observaciones", null, "Dirección", null, "Dato privado")
         };
@@ -213,6 +211,18 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         var afterBasicCreate = await CustomerStateAsync();
         Assert.Equal(beforeRejected.CustomerCount + 1, afterBasicCreate.CustomerCount);
         Assert.Equal(beforeRejected.AuditCount + 1, afterBasicCreate.AuditCount);
+
+        // El permiso básico escribe el documento (opcional, tipo y número juntos y sin repetirse).
+        var withDocument = await CreateAsync(client,
+            new CreateCustomerRequest("CC", "BASIC-DOCUMENT", "Documento básico", null, "Dirección", null, null));
+        Assert.Equal("CC", withDocument.DocumentType);
+        Assert.Equal("BASIC-DOCUMENT", withDocument.DocumentNumber);
+        await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
+            new CreateCustomerRequest("CC", null, "Tipo aislado", null, "Dirección", null, null)),
+            HttpStatusCode.BadRequest, "validation.failed");
+        await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
+            new CreateCustomerRequest("CC", "BASIC-DOCUMENT", "Documento repetido", null, "Dirección", null, null)),
+            HttpStatusCode.Conflict, "resource.conflict");
 
         SetBearer(client, users.Admin.Token.AccessToken);
         var managedCustomer = await CreateAsync(client,
@@ -433,7 +443,7 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         Assert.Equal("basic@example.com", updated.Email);
         var beforeRejected = await CustomerStateAsync();
         var forbidden = await client.PutAsJsonAsync($"/api/customers/{customer.Id}",
-            basic with { DocumentNumber = "CHANGED", ExpectedVersion = updated.Version });
+            basic with { DocumentNumber = "CHANGED", Observations = "changed with document", ExpectedVersion = updated.Version });
         await AssertProblemAsync(forbidden, HttpStatusCode.Forbidden, "authorization.forbidden");
         await AssertProblemAsync(await client.PutAsJsonAsync($"/api/customers/{customer.Id}",
             basic with { Observations = "changed", ExpectedVersion = updated.Version }), HttpStatusCode.Forbidden, "authorization.forbidden");

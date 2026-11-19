@@ -36,9 +36,9 @@ public sealed class CustomerService(ICustomerRepository repository, IPermissionC
     {
         if (!await HasBasicAccessAsync(actor, ct)) return Denied<CustomerDto>();
         var full = await HasAsync(actor, PermissionCodes.CustomersManage, ct);
-        if (!full && (request.DocumentType is not null ||
-                      request.DocumentNumber is not null ||
-                      request.Observations is not null ||
+        // El documento es opcional y lo puede escribir quien tiene el permiso básico (decisión del 18 de noviembre de 2026);
+        // las observaciones y el cupo siguen reservados al permiso completo.
+        if (!full && (request.Observations is not null ||
                       request.CreditLimit is not null))
         {
             return Denied<CustomerDto>();
@@ -67,7 +67,7 @@ public sealed class CustomerService(ICustomerRepository repository, IPermissionC
         var full = await HasAsync(actor, PermissionCodes.CustomersManage, ct);
         if (!customer.Activo && !full) return Denied<CustomerDto>();
         if (customer.Version != request.ExpectedVersion) return Result.Failure<CustomerDto>(Conflict);
-        if (!full && (customer.TipoDocumento != input.Type || customer.NumeroDocumento != input.Number || customer.Observaciones != input.Observations || customer.CupoCredito != request.CreditLimit)) return Denied<CustomerDto>();
+        if (!full && (customer.Observaciones != input.Observations || customer.CupoCredito != request.CreditLimit)) return Denied<CustomerDto>();
         if (input.Type is not null && await repository.DocumentExistsAsync(input.Type, input.Number!, customer.Id, ct)) return Result.Failure<CustomerDto>(ApplicationError.Conflict("Ya existe un cliente con ese documento."));
         var changed = Changed(customer, input);
         if (customer.CupoCredito != request.CreditLimit) changed = [.. changed, "cupoCredito"];
