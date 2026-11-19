@@ -35,7 +35,8 @@ public sealed record ConfirmSaleRequest(
     // Ventas en espera (decisión del 19 de noviembre de 2026): el borrador de esta venta, para cerrar solo ese y dejar
     // abiertas las demás. Guid vacío: la venta no tiene borrador. Sin indicarlo, se cierra el más reciente solo si tiene
     // los mismos productos y cantidades. No forma parte de la huella de idempotencia.
-    Guid? DraftId = null);
+    Guid? DraftId = null,
+    Guid? SourceSaleId = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 /// <summary>
@@ -101,7 +102,8 @@ public sealed record SaleDto(
     long Version,
     IReadOnlyCollection<SaleLineDto> Lines,
     IReadOnlyCollection<SalePaymentDto> Payments,
-    Guid? CreditId = null);
+    Guid? CreditId = null,
+    Guid? SourceSaleId = null);
 
 public sealed record SaleSummaryDto(
     Guid Id,
@@ -126,7 +128,8 @@ public sealed record SaleChangePreparationDto(Guid SaleId, string VisibleNumber,
     string SaleState, long SaleVersion, DateOnly OperatingDate, DateOnly ChangeDeadline,
     DateOnly CurrentLocalDate, bool WithinDeadline, bool CanStartChange,
     IReadOnlyCollection<SaleChangeLineAvailabilityDto> Lines,
-    Guid? CreditId, long? CreditVersion, decimal? CreditBalance);
+    Guid? CreditId, long? CreditVersion, decimal? CreditBalance,
+    string? BlockedReason = null);
 
 public sealed record SaleChangePolicyDto(int Days, long Version);
 
@@ -160,14 +163,18 @@ public sealed record SaleChangeDto(Guid Id, Guid SaleId, string VisibleNumber,
     decimal TotalDelivered, decimal Difference, string Treatment,
     decimal CreditAdjustment, decimal PaidOrRefunded, Guid CorrelationId,
     IReadOnlyCollection<SaleChangeDetailDto> Details,
-    IReadOnlyCollection<SaleChangePaymentDto> Payments);
+    IReadOnlyCollection<SaleChangePaymentDto> Payments, string? Reason = null);
 
 public sealed record SaleChangeDetailDto(Guid Id, string Type, Guid ProductId,
     Guid? OriginalSaleLineId, int Quantity, decimal UnitPrice,
-    decimal Discount, decimal NetAmount);
+    decimal Discount, decimal NetAmount,
+    string? ProductCode = null, string? ProductName = null, string? MeasurementUnit = null);
 
 public sealed record SaleChangePaymentDto(Guid Id, string Type, string MethodCode,
     decimal Amount, decimal? ReceivedAmount, decimal Change, string? Reference);
+
+public sealed record SaleCorrectionReceiptDto(Guid RequestId, Guid SaleId, string SaleNumber,
+    DateTimeOffset RequestedAtUtc, SaleChangeDto Correction, string EstablishmentName);
 
 public sealed record SaleReceiptDto(Guid SaleId, string VisibleNumber, DateTimeOffset OccurredAtUtc,
     DateOnly OperatingDate, string SaleType, string State, decimal GrossSubtotal,
@@ -256,6 +263,9 @@ public interface ISalesService
 
     Task<Result<SaleReprintRequestDto>> RequestReprintAsync(ActorContext actor, Guid saleId,
         string idempotencyKey, CancellationToken cancellationToken = default);
+
+    Task<Result<SaleCorrectionReceiptDto>> PrepareCorrectionReceiptAsync(ActorContext actor,
+        Guid saleId, Guid changeId, string idempotencyKey, CancellationToken cancellationToken = default);
 
     Task<Result<IReadOnlyCollection<SaleCancellationReasonDto>>> ListCancellationReasonsAsync(
         ActorContext actor, CancellationToken cancellationToken = default);

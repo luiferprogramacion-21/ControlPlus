@@ -11,10 +11,11 @@ import { AuthorizationCredentials, AuthorizationDialog, authorizationBody } from
 import { statusKind, toastSignal } from '../../core/toast';
 import { cashDrawerNotice } from '../../shared/cash-drawer-feedback';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
+import { CashCorrections } from './cash-corrections';
 
 @Component({
   selector: 'cp-cash',
-  imports: [NumberInput, FormsModule, CurrencyPipe, DatePipe, MatButtonModule],
+  imports: [CashCorrections, NumberInput, FormsModule, CurrencyPipe, DatePipe, MatButtonModule],
   templateUrl: './cash.html',
   styleUrl: './cash.scss',
 })

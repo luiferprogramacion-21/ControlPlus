@@ -23,6 +23,34 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
     private static readonly (string Code, string Name)[] CancellationCatalog =
         ApprovedReasonCatalogs.PurchaseCancellation;
 
+    public async Task<Result<PurchaseCorrectionPreparationDto>> PrepareCorrectionAsync(ActorContext actor,
+        Guid id, CancellationToken ct = default)
+    {
+        if (!await CanCancelAsync(actor, ct)) return Denied<PurchaseCorrectionPreparationDto>();
+        var purchase = await repository.GetAsync(id, ct);
+        if (purchase is null) return Result.Failure<PurchaseCorrectionPreparationDto>(ApplicationError.NotFound("la compra"));
+        var order = purchase.PedidoCompraId is Guid orderId
+            ? await repository.GetOrderForUpdateAsync(orderId, ct) : null;
+        string? block = purchase.Estado != "CONFIRMADA" ? "Solo se puede corregir una compra o recepción confirmada." : null;
+        if (block is null && purchase.PedidoCompraId is not null &&
+            (order is null || order.Estado is not ("ENVIADO" or "RECIBIDO_PARCIAL" or "COMPLETADO")))
+            block = "El pedido está cerrado o cancelado. Revisa la recepción con el Administrador.";
+        var movements = await repository.GetPurchaseMovementsAsync(id, ct);
+        if (block is null && (movements.Count != purchase.DetalleCompra.Count || movements.Count == 0))
+            block = "No se pueden acreditar los movimientos originales de esta compra.";
+        foreach (var movement in movements)
+        {
+            if (block is not null) break;
+            if (movement.OrdenRegistro is not long ordinal ||
+                await repository.HasLaterMovementAsync(movement.ProductoId, ordinal, ct) ||
+                await repository.HasReversalAsync(movement.Id, ct))
+                block = "Estos productos ya tuvieron movimientos posteriores. Esta recepción no se puede deshacer automáticamente; revisa las existencias y los costos.";
+        }
+        return Result.Success(new PurchaseCorrectionPreparationDto(purchase.Id, purchase.Version,
+            purchase.PedidoCompraId, order?.Version, block is null, block,
+            purchase.DetalleCompra.Sum(x => x.Cantidad), purchase.Total));
+    }
+
     public async Task<Result<IReadOnlyCollection<PurchaseCancellationReasonDto>>> ListCancellationReasonsAsync(
         ActorContext actor, CancellationToken ct = default)
     {
@@ -88,7 +116,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         key = key?.Trim() ?? "";
         if (id == Guid.Empty || request is null || request.ReasonId == Guid.Empty || request.ExpectedVersion <= 0 ||
             key.Length is < 1 or > 100 || key.Any(x => !char.IsAsciiLetterOrDigit(x) && x is not ('-' or '_' or '.' or ':')) ||
-            request.Observation?.Length > 500)
+            request.Observation?.Length > 500 || request.ExpectedOrderVersion is <= 0 or long.MaxValue)
             return Invalid<PurchaseDto>("La solicitud de anulación o Idempotency-Key es inválida.");
         if (request.ExpectedVersion == long.MaxValue)
             return Result.Failure<PurchaseDto>(ApplicationError.ConcurrencyConflict("La versión de la compra está agotada."));
@@ -101,7 +129,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         }
         var observation = string.IsNullOrWhiteSpace(request!.Observation) ? null : request.Observation.Trim();
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-            JsonSerializer.Serialize(new { PurchaseId = id, request.ExpectedVersion, request.ReasonId, Observation = observation, Actor = actor.UserId }))));
+            JsonSerializer.Serialize(new { PurchaseId = id, request.ExpectedVersion, request.ReasonId, Observation = observation, Actor = actor.UserId, request.ExpectedOrderVersion }))));
         // Replays without credentials still enter the same installation/purchase lock order.
         // The coordinator owns the only transaction and COMMIT for a new cancellation.
         var accountLockKey = string.IsNullOrWhiteSpace(request.Authorization?.UserName)
@@ -140,8 +168,27 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         var purchase = await repository.GetForUpdateAsync(id, ct);
         if (purchase is null) return Result.Failure<PurchaseDto>(ApplicationError.NotFound("la compra"));
         if (purchase.Version != request.ExpectedVersion) return Stale();
-        if (purchase.PedidoCompraId is not null || purchase.Estado != "CONFIRMADA")
-            return Result.Failure<PurchaseDto>(ApplicationError.Conflict("Solo puede anularse una compra independiente confirmada."));
+        if (purchase.Estado != "CONFIRMADA")
+            return Result.Failure<PurchaseDto>(ApplicationError.Conflict("Solo puede corregirse una compra o recepción confirmada."));
+        PedidoCompra? correctedOrder = null;
+        if (purchase.PedidoCompraId is Guid linkedOrderId)
+        {
+            if (request.ExpectedOrderVersion is null)
+                return Result.Failure<PurchaseDto>(ApplicationError.Conflict("Usa Corregir recepción para restituir también el pendiente del pedido."));
+            correctedOrder = await repository.GetOrderForUpdateAsync(linkedOrderId, ct);
+            if (correctedOrder is null || correctedOrder.InstalacionId != installation.Id ||
+                correctedOrder.Version != request.ExpectedOrderVersion)
+                return Result.Failure<PurchaseDto>(ApplicationError.ConcurrencyConflict("El pedido cambió. Actualiza la preparación de la corrección."));
+            if (correctedOrder.Estado is not ("ENVIADO" or "RECIBIDO_PARCIAL" or "COMPLETADO"))
+                return Result.Failure<PurchaseDto>(ApplicationError.Conflict("No se puede reabrir un pedido cerrado o cancelado mediante esta corrección."));
+            var returnedByLine = purchase.DetalleCompra.GroupBy(x => x.DetallePedidoCompraId)
+                .ToDictionary(x => x.Key ?? Guid.Empty, x => x.Sum(y => y.Cantidad));
+            if (returnedByLine.ContainsKey(Guid.Empty) || returnedByLine.Any(x =>
+                    !correctedOrder.DetallePedidoCompra.Any(line => line.Id == x.Key && line.CantidadRecibida >= x.Value)))
+                return Result.Failure<PurchaseDto>(ApplicationError.Conflict("La recepción no coincide con las cantidades del pedido."));
+        }
+        else if (request.ExpectedOrderVersion is not null)
+            return Invalid<PurchaseDto>("Una compra sin pedido no admite versión de pedido.");
         var reason = await repository.GetCancellationReasonAsync(installation.EstablecimientoId, request.ReasonId, ct);
         if (reason is null) return Result.Failure<PurchaseDto>(ApplicationError.NotFound("el motivo activo de anulación de compra"));
         if (!IsApprovedCancellationReason(reason))
@@ -248,6 +295,42 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         purchase.FechaAnulacion = now;
         purchase.ObservacionAnulacion = observation;
         purchase.Version = checked(request.ExpectedVersion + 1);
+        if (correctedOrder is not null)
+        {
+            var beforeState = correctedOrder.Estado;
+            var beforeVersion = correctedOrder.Version;
+            var restoredQuantities = purchase.DetalleCompra.GroupBy(x => x.DetallePedidoCompraId!.Value)
+                .ToDictionary(x => x.Key, x => x.Sum(y => y.Cantidad));
+            var afterQuantities = correctedOrder.DetallePedidoCompra.ToDictionary(x => x.Id,
+                x => checked(x.CantidadRecibida - restoredQuantities.GetValueOrDefault(x.Id)));
+            var afterState = afterQuantities.Values.All(x => x == 0) ? "ENVIADO"
+                : correctedOrder.DetallePedidoCompra.All(x => afterQuantities[x.Id] >= x.CantidadSolicitada)
+                    ? "COMPLETADO" : "RECIBIDO_PARCIAL";
+            // Persist the certified evidence while the order is still at its previous version/state.
+            // Deferred order totals are checked at the coordinator's final COMMIT.
+            await repository.AddReceiptCorrectionAsync(new CorreccionRecepcion
+            {
+                Id = Guid.CreateVersion7(), CompraId = purchase.Id, PedidoCompraId = correctedOrder.Id,
+                UsuarioId = actor.UserId, AutorizacionOperacionId = authorization.Id,
+                VersionPedidoAnterior = beforeVersion, VersionPedidoPosterior = checked(beforeVersion + 1),
+                EstadoAnterior = beforeState, EstadoPosterior = afterState,
+                FechaHora = now, CorrelacionId = correlation
+            }, ct);
+            await unitOfWork.SaveChangesAsync(ct);
+            foreach (var line in correctedOrder.DetallePedidoCompra)
+            {
+                line.CantidadRecibida = afterQuantities[line.Id];
+                line.CantidadExcedente = Math.Max(0, line.CantidadRecibida - line.CantidadSolicitada);
+                if (line.CantidadExcedente == 0) line.AutorizacionExcesoId = null;
+            }
+            correctedOrder.Estado = afterState;
+            if (correctedOrder.Estado != "COMPLETADO")
+            {
+                correctedOrder.FechaCierre = null;
+                correctedOrder.UsuarioCierreId = null;
+            }
+            correctedOrder.Version = checked(beforeVersion + 1);
+        }
         foreach (var movement in reverse) movement.AutorizacionOperacionId = authorization.Id;
         await repository.AddMovementsAsync(reverse, ct);
         var response = Map(purchase);

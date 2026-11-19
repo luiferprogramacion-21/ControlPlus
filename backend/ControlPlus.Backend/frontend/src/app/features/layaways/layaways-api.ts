@@ -54,6 +54,9 @@ export interface CancelLayawayInput {
   expectedVersion: number; refundAmount: number; refunds: RefundInput[]; reasonId: string | null; observation: string | null; authorization?: LayawayAuthorization;
 }
 export interface LayawayPaymentResult extends CashDrawerDispatch { layawayId: string; balance: number; state: string; version: number; correlationId: string; change: number; payments: unknown[]; }
+export interface LayawayPaymentCancellationReason { id: string; code: string; name: string; displayOrder: number; }
+export interface CancelLayawayPaymentInput { expectedVersion: number; reasonId: string; observation: string | null; authorization?: LayawayAuthorization; }
+export interface CancelLayawayPaymentResult { layawayId: string; balance: number; state: string; version: number; reversedAmount: number; correlationId: string; cancelledPaymentIds: string[]; }
 
 @Injectable({ providedIn: 'root' })
 export class LayawaysApi {
@@ -65,6 +68,13 @@ export class LayawaysApi {
     return firstValueFrom(this.http.get<Page<Layaway>>('/api/layaways', { params }));
   }
   get(id: string): Promise<LayawayDetail> { return firstValueFrom(this.http.get<LayawayDetail>(`/api/layaways/${id}`)); }
+  paymentCancellationReasons(): Promise<LayawayPaymentCancellationReason[]> {
+    return firstValueFrom(this.http.get<LayawayPaymentCancellationReason[]>('/api/layaways/payment-cancellation-reasons'));
+  }
+  cancelPayment(layaway: Layaway, paymentId: string, input: CancelLayawayPaymentInput, key: string): Promise<CancelLayawayPaymentResult> {
+    return firstValueFrom(this.http.post<CancelLayawayPaymentResult>(`/api/layaways/${layaway.id}/payments/${paymentId}/cancel`, input,
+      { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
+  }
   async applyPayment(layaway: Layaway, payments: LayawayPaymentInput[], key: string): Promise<LayawayPaymentResult> {
     const response = await firstValueFrom(this.http.post<LayawayPaymentResult>(`/api/layaways/${layaway.id}/payments`,
       { expectedVersion: layaway.version, payments },

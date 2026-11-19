@@ -27,9 +27,9 @@ public sealed partial class SalesService
             key.Any(x => !char.IsAsciiLetterOrDigit(x) && x is not ('-' or '_' or '.' or ':')))
             return Fail("La venta, versión o Idempotency-Key es inválida.");
         if (request.Returned is null || request.Delivered is null || request.Payments is null ||
-            request.Returned.Count == 0 || request.Delivered.Count == 0 ||
+            request.Returned.Count == 0 ||
             request.Returned.Count > 100 || request.Delivered.Count > 100 || request.Payments.Count > 3)
-            return Fail("El cambio requiere productos devueltos y entregados, con límites válidos.");
+            return Fail("Selecciona al menos un producto para quitar o cambiar, con límites válidos.");
         if (request.Returned.Any(x => x.SaleLineId == Guid.Empty || x.Quantity <= 0 || !x.Resellable) ||
             request.Returned.Select(x => x.SaleLineId).Distinct().Count() != request.Returned.Count)
             return Fail("Cada producto devuelto debe ser revendible, único y tener cantidad positiva.");
@@ -50,6 +50,8 @@ public sealed partial class SalesService
         if (treatment is not ("AUTO" or "PAGO_INMEDIATO" or "AGREGAR_CREDITO"))
             return Fail("El tratamiento debe ser AUTO, PAGO_INMEDIATO o AGREGAR_CREDITO.");
         var reason = NormalizeOptional(request.Reason);
+        if (request.Delivered.Count == 0 && reason is null)
+            return Fail("Selecciona un motivo para quitar productos de la venta.");
         var payments = request.Payments.Select(x => x with
         {
             MethodCode = NormalizeCode(x.MethodCode), Reference = NormalizeOptional(x.Reference)
@@ -274,11 +276,12 @@ public sealed partial class SalesService
         change.DetalleCambioVenta.OrderBy(x => x.TipoDetalle).ThenBy(x => x.ProductoId)
             .Select(MapChangeDetail).ToArray(),
         change.PagoCambioVenta.OrderBy(x => x.MetodoPago.Codigo)
-            .Select(x => MapChangePayment(x, x.MetodoPago)).ToArray());
+            .Select(x => MapChangePayment(x, x.MetodoPago)).ToArray(), change.Motivo);
 
     private static SaleChangeDetailDto MapChangeDetail(DetalleCambioVenta row) =>
         new(row.Id, row.TipoDetalle, row.ProductoId, row.DetalleVentaOrigenId,
-            row.Cantidad, row.PrecioUnitario, row.ValorDescuento, row.SubtotalNeto);
+            row.Cantidad, row.PrecioUnitario, row.ValorDescuento, row.SubtotalNeto,
+            row.CodigoProducto, row.NombreProducto, row.UnidadMedida);
 
     private static SaleChangePaymentDto MapChangePayment(PagoCambioVenta row, MetodoPago method) =>
         new(row.Id, row.TipoMovimiento, method.Codigo, row.Valor, row.ValorRecibido, row.Cambio,

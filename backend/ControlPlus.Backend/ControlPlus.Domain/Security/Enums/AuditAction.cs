@@ -134,5 +134,13 @@ public enum AuditAction
     CashDrawerOpeningAccepted = 128,
     CashDrawerOpeningFailed = 129,
     CashDrawerOpeningUncertain = 130,
-    CashDrawerOpeningSkipped = 131
+    CashDrawerOpeningSkipped = 131,
+    // Correcciones operativas (decisión del 19 de noviembre de 2026).
+    LayawayPaymentCancelled = 132,
+    LayawayPaymentCancellationAuthorizationRejected = 133,
+    LayawayProductsCorrected = 134,
+    CashMovementCorrected = 135,
+    CashClosureReviewed = 136,
+    CashCorrectionAuthorizationRejected = 137,
+    InventoryAdjustmentCorrected = 138
 }

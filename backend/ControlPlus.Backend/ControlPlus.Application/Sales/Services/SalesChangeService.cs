@@ -316,7 +316,7 @@ public sealed partial class SalesService
             totalReturned, totalDelivered, difference, treatment.Name,
             treatment.CreditAmount, treatment.CashAmount, correlation,
             detailRows.Select(MapChangeDetail).ToArray(), paymentRows.Select(x =>
-                MapChangePayment(x, paymentCheck.Methods[x.MetodoPagoId])).ToArray());
+                MapChangePayment(x, paymentCheck.Methods[x.MetodoPagoId])).ToArray(), input.Reason);
         await repository.AddIdempotencyAsync(new OperacionIdempotente
         {
             Id = Guid.CreateVersion7(), InstalacionId = installation.Id, TerminalId = terminal.Id,

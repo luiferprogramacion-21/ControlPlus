@@ -34,6 +34,17 @@ export class Inventory implements OnInit {
   readonly movementTypes = ['COMPRA', 'ANULACION_COMPRA', 'VENTA', 'ANULACION_VENTA', 'RESERVA_APARTADO', 'LIBERACION_APARTADO', 'ENTREGA_APARTADO', 'CAMBIO_DEVOLUCION', 'CAMBIO_ENTREGA', 'AJUSTE_ENTRADA', 'AJUSTE_SALIDA', 'REVERSO'];
   search = ''; status: StockStatusFilter = ''; page = 1; pageSize = 20; movementPage = 1; movementType = ''; from = ''; to = '';
   quantityDelta = 0; reasonId = ''; observation = '';
+  correctingMovementId: string | null = null;
+  get manualAdjustments(): Movement[] { return (this.movements()?.items ?? []).filter(x => ['AJUSTE_ENTRADA', 'AJUSTE_SALIDA'].includes(x.type)); }
+  async correctAdjustment(movement: Movement): Promise<void> {
+    const stock = this.selected(); if (!stock || !this.canAdjust || this.saving() || this.hasPending || !this.manualAdjustments.includes(movement)) return;
+    await this.openAdjustment(stock);
+    if (!this.adjustmentOpen() || this.selected()?.productId !== movement.productId) return;
+    this.historyOpen.set(false); this.correctingMovementId = movement.id;
+    this.quantityDelta = -movement.stockQuantity;
+    this.reasonId = this.reasons().find(x => x.code === 'CORRECCION_REGISTRO')?.id ?? '';
+    this.observation = `Corrección del ajuste de ${groupedNumber(movement.stockQuantity)} unidades.`;
+  }
   private requestId = 0;
   private movementRequestId = 0;
   private pending: { key: string; input: Omit<Adjustment, 'authorization'>; authorizerUserName: string | null } | null = null;
@@ -81,7 +92,7 @@ export class Inventory implements OnInit {
   }
   async chooseAdjustmentProduct(id: string): Promise<void> { const stock = this.stocks()?.items.find(x => x.productId === id) ?? null; if (await this.selectStock(stock) && this.selected() === stock) this.adjustmentProductId.set(stock?.productId ?? ''); }
   closeHistory(): void { this.historyOpen.set(false); this.selected.set(null); this.movements.set(null); this.historyLoading.set(false); ++this.movementRequestId; this.error.set(''); }
-  private resetForm(): void { this.quantityDelta = 0; this.reasonId = ''; this.observation = ''; }
+  private resetForm(): void { this.quantityDelta = 0; this.reasonId = ''; this.observation = ''; this.correctingMovementId = null; }
   async loadMovements(): Promise<void> { const stock = this.selected(); if (!stock) return; const id = ++this.movementRequestId; this.historyLoading.set(true); this.error.set(''); try { const result = await this.api.movements({ productId: stock.productId, type: this.movementType || undefined, fromUtc: this.from ? new Date(this.from).toISOString() : undefined, toUtc: this.to ? new Date(this.to).toISOString() : undefined, page: this.movementPage, pageSize: 20 }); if (id === this.movementRequestId && this.selected()?.productId === stock.productId) this.movements.set(result); } catch (e) { if (id === this.movementRequestId) this.error.set(errorText(e)); } finally { if (id === this.movementRequestId) this.historyLoading.set(false); } }
   historyPage(e: PageEvent): void { this.movementPage = e.pageIndex + 1; void this.loadMovements(); }
   historyFilter(): void { this.movementPage = 1; void this.loadMovements(); }
@@ -93,7 +104,7 @@ export class Inventory implements OnInit {
     }
     await this.authorization.open({ title: 'Autorizar ajuste de inventario',
       description: 'Se modificará la existencia y se registrará un movimiento auditado.',
-      detail: `${stock.name} · ${this.quantityDelta > 0 ? '+' : ''}${groupedNumber(this.quantityDelta)} unidades`,
+      detail: `${stock.name} · ${this.quantityDelta > 0 ? '+' : ''}${groupedNumber(this.quantityDelta)} unidades · quedará en ${groupedNumber(stock.currentStock + Number(this.quantityDelta))}${this.correctingMovementId ? ' · compensa el ajuste original, que permanece en el historial' : ''}`,
       operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
       onError: message => this.error.set(message),
       run: credentials => this.submitAdjustment(credentials) });
@@ -102,7 +113,7 @@ export class Inventory implements OnInit {
     const stock = this.selected(); if (!stock || this.saving() || this.conflict()) throw new Error('Actualiza existencias antes de reintentar.');
     if (this.pending && this.pending.authorizerUserName !== authorizationIdentity(credentials))
       throw new Error('Reintenta con el mismo usuario autorizador; la clave del ajuste conserva su identidad.');
-    if (!this.pending) this.pending = { key: crypto.randomUUID(), authorizerUserName: authorizationIdentity(credentials), input: { productId: stock.productId, quantityDelta: Number(this.quantityDelta), reasonId: this.reasonId, expectedVersion: stock.version, observation: this.observation.trim() || null } };
+    if (!this.pending) this.pending = { key: crypto.randomUUID(), authorizerUserName: authorizationIdentity(credentials), input: { productId: stock.productId, quantityDelta: Number(this.quantityDelta), reasonId: this.reasonId, expectedVersion: stock.version, observation: this.observation.trim() || null, ...(this.correctingMovementId ? { correctedMovementId: this.correctingMovementId } : {}) } };
     this.saving.set(true); this.error.set(''); this.notice.set('');
     try { await this.api.adjust(credentials ? { ...this.pending.input, authorization: authorizationBody(credentials) } : { ...this.pending.input }, this.pending.key); this.pending = null; this.resetForm(); this.notice.set('Ajuste registrado.'); this.adjustmentOpen.set(false); await this.refreshSelected(); }
     catch (e) { if (e instanceof HttpErrorResponse && e.status === 409) { this.conflict.set(true); this.pending = null; this.error.set('Conflicto de versión o clave. Actualiza existencias y revisa el ajuste antes de crear otro intento.'); } else if (e instanceof HttpErrorResponse && e.status >= 400 && e.status < 500) { this.pending = null; this.error.set(errorText(e)); } throw e; }

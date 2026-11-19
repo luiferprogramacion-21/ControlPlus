@@ -12,6 +12,8 @@ public sealed record InventoryStockRecord(
 
 public interface IInventoryRepository
 {
+    Task<bool> HasAdjustmentCorrectionAsync(Guid originalId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task AddAdjustmentCorrectionAsync(CorreccionMovimientoInventario link, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     Task<Instalacion?> GetActiveInstallationForUpdateAsync(CancellationToken cancellationToken = default);
     Task<Terminal?> GetActiveTerminalAsync(Guid installationId, CancellationToken cancellationToken = default);
     Task<PagedResult<InventoryStockRecord>> ListStockAsync(InventoryStockQuery query, CancellationToken cancellationToken = default);

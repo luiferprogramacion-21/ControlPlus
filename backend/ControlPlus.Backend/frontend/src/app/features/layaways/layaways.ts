@@ -7,7 +7,8 @@ import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
 import { Customer, CustomersApi } from '../customers/customers-api';
-import { CreatedLayaway, Layaway, LayawayCancellation, LayawayDetail, LayawayPaymentInput, LayawaysApi } from './layaways-api';
+import { CreatedLayaway, Layaway, LayawayCancellation, LayawayDetail, LayawayPayment, LayawayPaymentCancellationReason, LayawayPaymentInput, LayawaysApi } from './layaways-api';
+import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { LayawayCancel } from './layaway-cancel';
 import { LayawayCreate } from './layaway-create';
 import { appliedTotal, cashChange, emptyDraft, PaymentDraft, PaymentMethods, toPayments, validateDrafts } from './payment-methods';
@@ -27,6 +28,7 @@ const STATE_LABELS: Record<string, string> = { ACTIVO: 'Activo', PAGADO: 'Pagado
 })
 export class Layaways implements OnInit {
   private readonly api = inject(LayawaysApi);
+  private readonly authorization = inject(AuthorizationDialog);
   private readonly confirmation = inject(ConfirmationDialog);
   private readonly owner = inject(DestroyRef);
   private readonly customersApi = inject(CustomersApi);
@@ -44,6 +46,10 @@ export class Layaways implements OnInit {
   readonly cancelling = signal(false);
   readonly customerMatches = signal<Customer[]>([]);
   readonly customerLabel = signal('');
+  readonly correctingPayment = signal<LayawayPayment | null>(null);
+  readonly paymentReasons = signal<LayawayPaymentCancellationReason[]>([]);
+  paymentReasonId = ''; paymentObservation = '';
+  private cancellationAttempt: { fingerprint: string; key: string; authorizer: string | null } | null = null;
   state = ''; overdue: '' | 'true' | 'false' = ''; dueFrom = ''; dueTo = ''; customerSearch = ''; customerId = '';
   page = 1; pageSize = 20;
   drafts: PaymentDraft[] = [emptyDraft()];
@@ -70,6 +76,60 @@ export class Layaways implements OnInit {
     return (layaway.state === 'ACTIVO' || layaway.state === 'PAGADO') && this.session.has('LAYAWAY.CANCEL') && this.session.has('LAYAWAY.REFUND_DECIDE') && this.session.hasRole('ADMINISTRADOR', 'SUPERVISOR');
   }
   canDeliver(layaway: Layaway): boolean { return layaway.state === 'PAGADO' && layaway.balance === 0; }
+  canCorrectPayment(payment: LayawayPayment): boolean {
+    const layaway = this.detail()?.layaway;
+    return !!layaway && ['ACTIVO', 'PAGADO'].includes(layaway.state) && payment.state === 'APLICADO' &&
+      this.session.has('LAYAWAY.MANAGE') && this.session.hasRole('ADMINISTRADOR', 'SUPERVISOR');
+  }
+  get correctingPaymentTotal(): number {
+    const target = this.correctingPayment();
+    return target ? this.detail()?.payments.filter(p => p.state === 'APLICADO' &&
+      (p.id === target.id || (!!target.correlationId && p.correlationId === target.correlationId)))
+      .reduce((sum, p) => sum + p.appliedAmount, 0) ?? 0 : 0;
+  }
+  async startCorrectPayment(payment: LayawayPayment): Promise<void> {
+    if (!this.canCorrectPayment(payment) || this.saving()) return;
+    this.paymentReasonId = ''; this.paymentObservation = ''; this.cancellationAttempt = null; this.error.set('');
+    try {
+      this.paymentReasons.set(await this.api.paymentCancellationReasons());
+      if (!this.paymentReasons().length) { this.error.set('No hay motivos activos para anular el abono.'); return; }
+      this.correctingPayment.set(payment);
+    } catch (e) { this.error.set(errorText(e)); }
+  }
+  closePaymentCorrection(): void { if (!this.saving()) this.correctingPayment.set(null); }
+  async confirmPaymentCorrection(): Promise<void> {
+    const layaway = this.detail()?.layaway; const payment = this.correctingPayment();
+    if (!layaway || !payment || this.saving() || !this.canCorrectPayment(payment)) return;
+    const reason = this.paymentReasons().find(r => r.id === this.paymentReasonId);
+    if (!reason || (reason.code === 'OTRO' && !this.paymentObservation.trim()) || this.paymentObservation.trim().length > 500) {
+      this.error.set('Selecciona un motivo; Otro requiere una observación de hasta 500 caracteres.'); return;
+    }
+    await this.authorization.open({ title: 'Corregir abono de apartado',
+      description: 'Se anula el abono completo con sus medios originales en la caja actual. Los productos siguen reservados. Después podrás registrar el abono correcto.',
+      detail: `${payment.number} · ${this.money(this.correctingPaymentTotal)}`,
+      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
+      selfAuthorizedRoles: ['ADMINISTRADOR'], onError: message => this.error.set(message),
+      run: credentials => this.executePaymentCorrection(layaway, payment, credentials) });
+  }
+  private async executePaymentCorrection(layaway: Layaway, payment: LayawayPayment, credentials: AuthorizationCredentials | null): Promise<void> {
+    const current = this.detail()?.layaway;
+    if (this.owner.destroyed || this.saving() || current?.id !== layaway.id || current.version !== layaway.version ||
+      this.correctingPayment()?.id !== payment.id || !this.canCorrectPayment(payment)) throw new Error('El apartado cambió. Vuelve a consultar el abono.');
+    const body = { expectedVersion: layaway.version, reasonId: this.paymentReasonId, observation: this.paymentObservation.trim() || null };
+    const fingerprint = JSON.stringify({ id: layaway.id, paymentId: payment.id, body });
+    const authorizer = authorizationIdentity(credentials);
+    if (this.cancellationAttempt?.fingerprint === fingerprint && this.cancellationAttempt.authorizer !== authorizer)
+      throw new Error('Reintenta con el mismo Administrador autorizador.');
+    if (this.cancellationAttempt?.fingerprint !== fingerprint) this.cancellationAttempt = { fingerprint, authorizer, key: crypto.randomUUID() };
+    this.saving.set(true);
+    try {
+      const result = await this.api.cancelPayment(layaway, payment.id, credentials ? { ...body, authorization: authorizationBody(credentials) } : body, this.cancellationAttempt!.key);
+      this.cancellationAttempt = null; this.correctingPayment.set(null);
+      await this.refreshDetail(); await this.reload();
+      this.drafts = [emptyDraft()]; this.paymentKey = null; this.paymentDialog.set(true);
+      this.notice.set(`Abono anulado por ${this.money(result.reversedAmount)}. Los productos siguen reservados; registra ahora el abono correcto.`);
+    } finally { this.saving.set(false); }
+  }
 
   async reload(): Promise<void> {
     const id = ++this.requestId; this.loading.set(true); this.error.set('');

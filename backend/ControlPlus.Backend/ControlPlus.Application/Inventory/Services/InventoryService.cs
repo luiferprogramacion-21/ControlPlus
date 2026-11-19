@@ -126,10 +126,12 @@ public sealed class InventoryService(
         }
         var input = NormalizeAdjustment(idempotencyKey, request!);
         if (input.Error is not null) return Result.Failure<InventoryMovementDto>(input.Error);
+        if (request!.CorrectedMovementId == Guid.Empty)
+            return Result.Failure<InventoryMovementDto>(Validation("El ajuste original no es válido."));
 
         return await loginAttemptCoordinator.ExecuteAsync(
             input.Authorization?.UserName!.ToUpperInvariant() ?? actor.UserId.ToString("N"),
-            token => AdjustWithinTransactionAsync(actor, input, token),
+            token => AdjustWithinTransactionAsync(actor, input, request.CorrectedMovementId, token),
             cancellationToken);
     }
 
@@ -138,7 +140,7 @@ public sealed class InventoryService(
         (string? Key, Guid ProductId, int QuantityDelta, Guid ReasonId, long ExpectedVersion,
             string? Observation, InventoryAdjustmentAuthorizationRequest? Authorization, string? Canonical,
             ApplicationError? Error) input,
-        CancellationToken cancellationToken)
+        Guid? correctedMovementId, CancellationToken cancellationToken)
     {
         var installation = await repository.GetActiveInstallationForUpdateAsync(cancellationToken);
         if (installation is null) return Result.Failure<InventoryMovementDto>(ApplicationError.NotFound("la instalacion activa"));
@@ -150,7 +152,8 @@ public sealed class InventoryService(
         if (!administratorSelfAuthorized && input.Authorization is null)
             return Result.Failure<InventoryMovementDto>(Validation("Las credenciales del autorizador son obligatorias."));
 
-        var requestHash = Hash(input.Canonical! + (administratorSelfAuthorized ? "|ADMINISTRATOR_SELF" : ""));
+        var requestHash = Hash(input.Canonical! + (administratorSelfAuthorized ? "|ADMINISTRATOR_SELF" : "") +
+            (correctedMovementId is Guid corrected ? "|CORRECTION:" + corrected.ToString("N") : ""));
         var existingOperation = await repository.GetIdempotencyAsync(installation.Id, input.Key!, cancellationToken);
         if (existingOperation is not null)
         {
@@ -208,6 +211,16 @@ public sealed class InventoryService(
         if (product.Version != input.ExpectedVersion)
             return Result.Failure<InventoryMovementDto>(ApplicationError.ConcurrencyConflict(
                 "El producto cambio desde la ultima consulta. Actualice sus existencias antes de ajustar."));
+
+        if (correctedMovementId is Guid originalId)
+        {
+            var original = await repository.GetMovementAsync(originalId, cancellationToken);
+            if (original is null || original.ProductoId != product.Id || original.TipoMovimiento is not ("AJUSTE_ENTRADA" or "AJUSTE_SALIDA") ||
+                original.MovimientoRevertidoId is not null || (long)original.CantidadStock + input.QuantityDelta != 0)
+                return Result.Failure<InventoryMovementDto>(Validation("Solo puedes compensar la cantidad completa de un ajuste manual del mismo producto."));
+            if (await repository.HasAdjustmentCorrectionAsync(originalId, cancellationToken))
+                return Result.Failure<InventoryMovementDto>(ApplicationError.Conflict("El ajuste ya fue corregido. Actualiza su historial."));
+        }
 
         InventoryAdjustmentResult adjustment;
         try
@@ -278,6 +291,9 @@ public sealed class InventoryService(
         }
         await repository.AddAuthorizationAsync(authorization, cancellationToken);
         await repository.AddMovementAsync(movement, cancellationToken);
+        if (correctedMovementId is Guid sourceId)
+            await repository.AddAdjustmentCorrectionAsync(new CorreccionMovimientoInventario { Id = Guid.CreateVersion7(),
+                MovimientoOriginalId = sourceId, MovimientoCorrectorId = movement.Id, FechaHora = now.UtcDateTime }, cancellationToken);
         var operation = new OperacionIdempotente
         {
             Id = Guid.CreateVersion7(),
@@ -303,6 +319,7 @@ public sealed class InventoryService(
             new
             {
                 ProductId = product.Id,
+                CorrectedMovementId = correctedMovementId,
                 AuthorizationMode = administratorSelfAuthorized ? "ADMINISTRATOR_SELF" : "OTHER_USER",
                 movement.TipoMovimiento,
                 movement.CantidadStock,
@@ -316,6 +333,11 @@ public sealed class InventoryService(
             correlationId,
             terminal.Id,
             cancellationToken);
+
+        if (correctedMovementId is Guid correctedId)
+            await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId, AuditAction.InventoryAdjustmentCorrected,
+                nameof(MovimientoInventario), correctedId, new { OriginalMovementId = correctedId, CorrectorMovementId = movement.Id,
+                    ProductId = product.Id, QuantityDelta = input.QuantityDelta }, cancellationToken, correlationId, terminal.Id);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         var response = Map(movement, Has(executor.Snapshot!, PermissionCodes.ProductCostsRead));

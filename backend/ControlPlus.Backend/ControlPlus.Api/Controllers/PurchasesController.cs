@@ -12,6 +12,29 @@ namespace ControlPlus.Api.Controllers;
 public sealed class PurchasesController(CurrentActorContextResolver actors, IPurchaseService purchases)
     : ApiControllerBase(actors)
 {
+    [HttpGet("{purchaseId:guid}/correction-preparation")]
+    [PermissionAuthorize(PermissionCodes.PurchasesCancel)]
+    [ProducesResponseType<PurchaseCorrectionPreparationDto>(StatusCodes.Status200OK, "application/json")]
+    public async Task<IActionResult> PrepareCorrection(Guid purchaseId, CancellationToken ct)
+    {
+        var actor = await GetActorAsync(ct);
+        return actor is null ? MissingActor() : FromResult(await purchases.PrepareCorrectionAsync(actor, purchaseId, ct), Ok);
+    }
+
+    [HttpPost("{purchaseId:guid}/correct-receipt")]
+    [PermissionAuthorize(PermissionCodes.PurchasesCancel)]
+    [Consumes("application/json")]
+    [ProducesResponseType<PurchaseDto>(StatusCodes.Status200OK, "application/json")]
+    public async Task<IActionResult> CorrectReceipt(Guid purchaseId,
+        [FromHeader(Name = "Idempotency-Key"), Required] string key,
+        [FromBody] CancelPurchaseRequest request, CancellationToken ct)
+    {
+        if (request.ExpectedOrderVersion is null) return BadRequest(new ValidationProblemDetails
+            { Title = "La corrección de recepción requiere la versión vigente del pedido." });
+        var actor = await GetActorAsync(ct);
+        return actor is null ? MissingActor() : FromResult(await purchases.CancelAsync(actor, purchaseId, key, request, ct), Ok);
+    }
+
     [HttpGet("cancellation-reasons")]
     [PermissionAuthorize(PermissionCodes.PurchasesCancel)]
     [ProducesResponseType<IReadOnlyCollection<PurchaseCancellationReasonDto>>(StatusCodes.Status200OK, "application/json")]

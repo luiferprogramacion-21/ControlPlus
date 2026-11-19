@@ -78,6 +78,20 @@ public sealed record CashMovementListQuery(int Page = 1, int PageSize = 50);
 
 public sealed record CreateCashMovementRequest(decimal Amount, string? Concept, Guid? OperatorSessionId);
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CorrectCashMovementRequest(long ExpectedShiftVersion, string Reason,
+    string? ReplacementKind = null, decimal? ReplacementAmount = null, string? ReplacementConcept = null,
+    Guid? OperatorSessionId = null, CashCloseAuthorizationRequest? Authorization = null);
+
+public sealed record CashMovementCorrectionDto(Guid OriginalMovementId, Guid ReversalMovementId,
+    Guid? ReplacementMovementId, decimal ExpectedCashAfter, Guid CorrelationId);
+
+public sealed record CashClosureReviewDto(Guid Id, Guid ShiftId, Guid UserId, decimal ExpectedCash,
+    decimal OriginalCount, decimal ReviewedCount, decimal ReviewedDifference, string Reason, DateTimeOffset OccurredAtUtc);
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record ReviewCashClosureRequest(long ExpectedShiftVersion, decimal ReviewedCount, string Reason);
+
 public sealed record PaymentMethodReconciliationDto(
     Guid PaymentMethodId,
     string Code,
@@ -153,6 +167,12 @@ public sealed record ExpectedPaymentMethodAmount(
 
 public interface ICashService
 {
+    Task<Result<CashMovementCorrectionDto>> CorrectMovementAsync(ActorContext actor, Guid movementId, string key,
+        CorrectCashMovementRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task<Result<IReadOnlyCollection<CashShiftDto>>> ListClosedShiftsAsync(ActorContext actor, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task<Result<IReadOnlyCollection<CashClosureReviewDto>>> ListClosureReviewsAsync(ActorContext actor, Guid shiftId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task<Result<CashClosureReviewDto>> ReviewClosureAsync(ActorContext actor, Guid shiftId, string key,
+        ReviewCashClosureRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     Task<Result<IReadOnlyCollection<CashClosureDifferenceReasonDto>>> ListClosureDifferenceReasonsAsync(ActorContext actor, CancellationToken cancellationToken = default);
     /// <summary>Creates the default closing-difference reasons that are missing and returns the active ones.</summary>
     Task<Result<IReadOnlyCollection<CashClosureDifferenceReasonDto>>> InitializeClosureDifferenceReasonsAsync(ActorContext actor, CancellationToken cancellationToken = default);

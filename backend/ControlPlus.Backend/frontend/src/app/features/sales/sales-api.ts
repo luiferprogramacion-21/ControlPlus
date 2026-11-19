@@ -21,10 +21,10 @@ export interface HeldSale {
 }
 /** La venta no tiene borrador: el servidor no cierra ninguna venta en espera al confirmarla. */
 export const NO_SALE_DRAFT = '00000000-0000-0000-0000-000000000000';
-export interface SaleInput { customerId: string | null; lines: SaleLineInput[]; generalDiscount: SaleDiscount | null; discountReason: string | null; payments: SalePaymentInput[]; saleType: 'CONTADO' | 'CREDITO'; dueDate: string | null; authorization: AuthorizationBody | null; /** Borrador de esta venta (o NO_SALE_DRAFT): solo ese se cierra al confirmarla. */ draftId?: string; }
+export interface SaleInput { customerId: string | null; lines: SaleLineInput[]; generalDiscount: SaleDiscount | null; discountReason: string | null; payments: SalePaymentInput[]; saleType: 'CONTADO' | 'CREDITO'; dueDate: string | null; authorization: AuthorizationBody | null; /** Borrador de esta venta (o NO_SALE_DRAFT): solo ese se cierra al confirmarla. */ draftId?: string; sourceSaleId?: string; }
 export interface Sale extends CashDrawerDispatch {
   id: string; visibleNumber: string; total: number; change: number; state: string; payments: (SalePaymentInput & { methodName?: string })[]; creditId: string | null;
-  occurredAtUtc?: string; grossSubtotal?: number; discountTotal?: number; lines?: SaleLine[];
+  occurredAtUtc?: string; grossSubtotal?: number; discountTotal?: number; lines?: SaleLine[]; sourceSaleId?: string | null;
 }
 export interface SaleReprintRequest { requestId: string; saleId: string; requestedAtUtc: string; status: string; }
 
@@ -39,7 +39,7 @@ export interface CustomerCreditRisk {
 }
 export interface SaleLine { id: string; productId: string; productCode: string; productName: string; measurementUnit: string; quantity: number; priceType: string; unitPrice: number; discountAmount: number; grossAmount: number; netAmount: number; }
 export interface SalePaymentLine { id: string; methodCode: string; methodName: string; appliedAmount: number; receivedAmount: number | null; change: number; reference: string | null; }
-export interface SaleDetail { id: string; visibleNumber: string; occurredAtUtc: string; operatingDate: string; grossSubtotal: number; discountTotal: number; total: number; change: number; state: string; version: number; creditId: string | null; lines: SaleLine[]; payments: SalePaymentLine[]; }
+export interface SaleDetail { id: string; visibleNumber: string; occurredAtUtc: string; operatingDate: string; grossSubtotal: number; discountTotal: number; total: number; change: number; state: string; version: number; creditId: string | null; sourceSaleId?: string | null; lines: SaleLine[]; payments: SalePaymentLine[]; }
 export interface SaleCancellationReason { id: string; code: string; name: string; displayOrder: number; }
 export interface CancelSaleInput { expectedVersion: number; reasonId: string; observation: string | null; authorization?: AuthorizationBody; }
 export interface CancelSaleResult { saleId: string; visibleNumber: string; state: string; version: number; saleType: string; reversedAmount: number; }
@@ -49,6 +49,7 @@ export interface ChangePreparation {
   saleId: string; visibleNumber: string; saleType: 'CONTADO' | 'CREDITO'; saleState: string; saleVersion: number; operatingDate: string; changeDeadline: string;
   currentLocalDate: string; withinDeadline: boolean; canStartChange: boolean; lines: ChangeLineAvailability[];
   creditId: string | null; creditVersion: number | null; creditBalance: number | null;
+  blockedReason?: string | null;
 }
 export interface ChangePaymentInput { methodCode: string; amount: number; receivedAmount: number | null; reference: string | null; }
 export interface ConfirmChangeInput {
@@ -57,7 +58,9 @@ export interface ConfirmChangeInput {
   delivered: { productId: string; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA' }[];
   treatment: string; payments: ChangePaymentInput[]; authorization?: AuthorizationBody; reason?: string | null;
 }
-export interface ConfirmedChange extends CashDrawerDispatch { id: string; saleId: string; visibleNumber: string; totalReturned: number; totalDelivered: number; difference: number; treatment: string; creditAdjustment: number; paidOrRefunded: number; }
+export interface ChangeDetail { id: string; type: string; productId: string; originalSaleLineId: string | null; quantity: number; unitPrice: number; discount: number; netAmount: number; productCode?: string | null; productName?: string | null; measurementUnit?: string | null; }
+export interface ConfirmedChange extends CashDrawerDispatch { id: string; saleId: string; visibleNumber: string; totalReturned: number; totalDelivered: number; difference: number; treatment: string; creditAdjustment: number; paidOrRefunded: number; state?: string; occurredAtUtc?: string; details?: ChangeDetail[]; payments?: ChangePaymentInput[]; reason?: string | null; }
+export interface CorrectionReceipt { requestId: string; saleId: string; saleNumber: string; requestedAtUtc: string; correction: ConfirmedChange; establishmentName: string; }
 
 export interface PrintProfile {
   id: string; name: string; systemQueueName: string; columns: number; isDefault: boolean; active: boolean; version: number;
@@ -123,6 +126,8 @@ export class SalesApi {
   /** Busca por su número la venta a la que se le hará un cambio de productos. */
   findChangeSale(visibleNumber: string): Promise<ChangePreparation> { return firstValueFrom(this.http.get<ChangePreparation>('/api/sales/change-search', { params: { visibleNumber } })); }
   changePreparation(saleId: string): Promise<ChangePreparation> { return firstValueFrom(this.http.get<ChangePreparation>(`/api/sales/${saleId}/change-preparation`)); }
+  changes(saleId: string): Promise<ConfirmedChange[]> { return firstValueFrom(this.http.get<ConfirmedChange[]>(`/api/sales/${saleId}/changes`)); }
+  correctionReceipt(saleId: string, changeId: string, key: string): Promise<CorrectionReceipt> { return firstValueFrom(this.http.post<CorrectionReceipt>(`/api/sales/${saleId}/changes/${changeId}/receipt-requests`, null, { headers: new HttpHeaders({ 'Idempotency-Key': key }) })); }
   async confirmChange(saleId: string, input: ConfirmChangeInput, key: string): Promise<ConfirmedChange> {
     const response = await firstValueFrom(this.http.post<ConfirmedChange>(`/api/sales/${saleId}/changes`, input, {
       headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined,

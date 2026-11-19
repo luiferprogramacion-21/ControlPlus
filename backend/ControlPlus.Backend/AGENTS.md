@@ -693,6 +693,10 @@ El usuario pidió poder dejar ventas en espera y aprobó hacerlo antes de la ins
   - Sin `draftId` (contrato anterior), se cierra el más reciente solo si tiene los mismos productos y cantidades.
 - **API nueva:** `GET/POST /api/sales/drafts` y `GET/PUT/DELETE /api/sales/drafts/{id}`. Se conservan las rutas `/current`.
 
+### Decisión del 19 de noviembre de 2026: correcciones de operaciones
+
+El usuario aprobó implementar las correcciones operativas propuestas en `docs/operational-corrections.md`: «Corregir un error» con opciones válidas, motivo, resumen antes/después y autorización vigente. Incluye quitar/reducir productos de ventas confirmadas sin reemplazo, historial/comprobante de correcciones, abonos y productos de apartados antes de entrega, movimientos manuales de caja, ajustes de inventario, revisión de cierres, recepciones reversibles, ventas adicionales vinculadas y corrección de medios de pago. Los documentos originales se conservan; los efectos se registran como correcciones vinculadas, en el turno actual cuando hay dinero. El plazo y la jerarquía de autorizaciones existentes se conservan. La aprobación incluye preparar migraciones compensatorias y ensayarlas en bases temporales; la activación real corresponde al operador con respaldo y preflight/postflight. No accede el agente a `controlplus`.
+
 ### Reglas del reparto
 
 - Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:

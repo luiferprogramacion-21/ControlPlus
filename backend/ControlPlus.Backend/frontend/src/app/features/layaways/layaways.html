@@ -50,13 +50,14 @@
         @for (line of d.lines; track line.productId) { <tr><td class="numeric">{{ line.productCode }}</td><td>{{ line.productName }}</td><td>{{ line.unit }}</td><td class="align-right numeric">{{ number(line.quantity) }}</td><td class="align-right numeric">{{ money(line.unitPrice) }}</td><td class="align-right numeric">{{ money(line.subtotal) }}</td></tr> }
       </tbody></table></div>
       <h3>Abonos</h3>
-      <div class="table-wrap module-table-wrap"><table><thead><tr><th>Abono</th><th>Fecha</th><th>Medio</th><th class="align-right">Aplicado</th><th class="align-right">Cambio</th><th>Estado</th></tr></thead><tbody>
-        @for (payment of d.payments; track payment.id) { <tr><td class="numeric">{{ payment.number }}</td><td>{{ payment.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }}</td><td>{{ payment.methodName }}</td><td class="align-right numeric">{{ money(payment.appliedAmount) }}</td><td class="align-right numeric">{{ money(payment.change) }}</td><td>{{ payment.state }}</td></tr> }
-        @empty { <tr class="empty-row"><td colspan="6">No hay abonos registrados.</td></tr> }
+      <div class="table-wrap module-table-wrap"><table><thead><tr><th>Abono</th><th>Fecha</th><th>Medio</th><th class="align-right">Aplicado</th><th class="align-right">Cambio</th><th>Estado</th><th></th></tr></thead><tbody>
+        @for (payment of d.payments; track payment.id) { <tr><td class="numeric">{{ payment.number }}</td><td>{{ payment.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }}</td><td>{{ payment.methodName }}</td><td class="align-right numeric">{{ money(payment.appliedAmount) }}</td><td class="align-right numeric">{{ money(payment.change) }}</td><td>{{ payment.state }}</td><td>@if (canCorrectPayment(payment)) { <button class="table-action" type="button" (click)="startCorrectPayment(payment)" [disabled]="saving()">Corregir abono</button> }</td></tr> }
+        @empty { <tr class="empty-row"><td colspan="7">No hay abonos registrados.</td></tr> }
       </tbody></table></div>
       @if (d.delivery; as delivery) {
         <h3>Entrega</h3>
         <p class="muted">Entregado el {{ delivery.deliveredAtUtc | date:'dd/MM/yyyy HH:mm' }}. No generó una venta ni un movimiento de Caja.</p>
+        <p class="muted">Este apartado ya fue entregado. Sus productos y abonos conservan el historial; una devolución de mercancía requiere una operación de devolución propia.</p>
       }
       @if (d.cancellation; as cancellation) {
         <h3>Cancelación</h3>
@@ -85,6 +86,19 @@
         </form>
       </div>
     }
+  }
+  @if (correctingPayment(); as payment) {
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="layaway-payment-correction-title"><div class="module-form-sheet__backdrop" (click)="closePaymentCorrection()"></div>
+      <form class="panel panel--padded module-form" (submit)="$event.preventDefault(); confirmPaymentCorrection()">
+        <div class="panel-heading"><h2 id="layaway-payment-correction-title">Corregir abono</h2><p>{{ payment.number }} · {{ detail()?.layaway?.number }}</p></div>
+        <p>Se anulará la operación completa por <strong>{{ money(correctingPaymentTotal) }}</strong>, también si usó varios medios de pago. Volverá al saldo del apartado y se registrará el reverso en la Caja actual. Los productos seguirán reservados.</p>
+        <p class="muted">Después podrás registrar el abono correcto; si cancelas ese segundo paso, el abono anterior quedará anulado.</p>
+        <label class="field-label" for="layaway-payment-reason">Motivo</label><select id="layaway-payment-reason" class="text-field" name="paymentReason" [(ngModel)]="paymentReasonId"><option value="">Selecciona un motivo</option>@for (reason of paymentReasons(); track reason.id) { <option [value]="reason.id">{{ reason.name }}</option> }</select>
+        <label class="field-label field-label--spaced" for="layaway-payment-observation">Observación (obligatoria para Otro)</label><textarea id="layaway-payment-observation" class="text-field" name="paymentObservation" rows="2" maxlength="500" [(ngModel)]="paymentObservation"></textarea>
+        @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+        <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">Anular y registrar el correcto</button><button class="button button--secondary" type="button" (click)="closePaymentCorrection()" [disabled]="saving()">Cancelar</button></div>
+      </form>
+    </div>
   }
   @if (creating()) { <cp-layaway-create (created)="onCreated($event)" (closed)="creating.set(false)" /> }
   @if (cancelling()) { @if (detail(); as d) { <cp-layaway-cancel [detail]="d" (cancelled)="onCancelled($event)" (closed)="cancelling.set(false)" /> } }

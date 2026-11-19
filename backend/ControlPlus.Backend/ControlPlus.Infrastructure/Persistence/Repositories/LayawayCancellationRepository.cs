@@ -15,12 +15,14 @@ public sealed class EfLayawayCancellationRepository(OfficialControlPlusDbContext
 
     public async Task<IReadOnlyCollection<DetalleApartado>> GetLinesAsync(Guid id,
         CancellationToken cancellationToken = default) =>
-        await db.DetalleApartado.AsNoTracking().Where(x => x.ApartadoId == id)
+        await db.DetalleApartado.AsNoTracking().Where(x => x.ApartadoId == id && x.Vigente)
             .OrderBy(x => x.ProductoId).ThenBy(x => x.Id).ToArrayAsync(cancellationToken);
 
     public async Task<decimal> GetTotalPaidAsync(Guid layawayId, CancellationToken cancellationToken) =>
-        await db.PagoApartado.AsNoTracking().Where(x => x.ApartadoId == layawayId && x.Estado == "APLICADO")
-            .SumAsync(x => (decimal?)x.ValorAplicado, cancellationToken) ?? 0m;
+        (await db.PagoApartado.AsNoTracking().Where(x => x.ApartadoId == layawayId && x.Estado == "APLICADO")
+            .SumAsync(x => (decimal?)x.ValorAplicado, cancellationToken) ?? 0m) -
+        (await db.ReembolsoCorreccionApartado.Where(x => x.Correccion.ApartadoId == layawayId)
+            .SumAsync(x => (decimal?)x.Valor, cancellationToken) ?? 0m);
 
     public Task<MotivoOperacion?> GetReasonAsync(Guid establishmentId, Guid reasonId,
         CancellationToken cancellationToken) => db.MotivoOperacion.AsNoTracking()
