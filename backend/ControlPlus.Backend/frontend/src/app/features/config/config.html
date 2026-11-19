@@ -1,26 +1,18 @@
 <section class="module-page directory-page">
   <div class="module-heading">
-    <div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="settings" /></span><div><h2>{{ current?.title ?? 'Configuración' }}</h2><p>{{ current ? current.description : 'Elige qué quieres configurar.' }}</p></div></div>
-    @if (tab() && tiles.length > 1) { <button class="button button--secondary" type="button" (click)="back()">← Volver a Configuración</button> }
+    <div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="settings" /></span><div><h2>Configuración</h2><p>Establecimiento, caja y turnos, plazos e impresora</p></div></div>
+    <div class="tabs">
+      @if (canConfigure) { <button mat-button type="button" [class.active]="tab() === 'establishment'" (click)="switchTab('establishment')">Establecimiento</button> }
+      @if (canShiftMode) { <button mat-button type="button" [class.active]="tab() === 'shift-mode'" (click)="switchTab('shift-mode')">Caja y turnos</button> }
+      @if (canConfigure) { <button mat-button type="button" [class.active]="tab() === 'settings'" (click)="switchTab('settings')">Cambios, apartados y créditos</button> }
+      @if (canConfigure) { <button mat-button type="button" [class.active]="tab() === 'printing'" (click)="switchTab('printing')">Impresión</button> }
+    </div>
   </div>
 
-  @if (!tab()) {
-    <div class="config-tiles">
-      @for (tile of tiles; track tile.id) {
-        <button class="config-tile" type="button" (click)="open(tile.id)">
-          <span class="config-tile__icon"><cp-icon [name]="tile.icon" /></span>
-          <strong>{{ tile.title }}</strong>
-          <span class="config-tile__text">{{ tile.description }}</span>
-          <span class="config-tile__go" aria-hidden="true">Abrir →</span>
-        </button>
-      }
-    </div>
-  } @else {
-    @switch (tab()) {
-      @case ('establishment') { @if (canConfigure) { <cp-establishment-panel /> } }
-      @case ('shift-mode') { @if (canShiftMode) { <cp-shift-mode-panel /> } }
-      @case ('settings') { @if (canConfigure) { <cp-settings-panel /> } }
-      @case ('printing') { @if (canConfigure) { <cp-print-settings /> } }
-    }
+  @switch (tab()) {
+    @case ('establishment') { @if (canConfigure) { <cp-establishment-panel /> } }
+    @case ('shift-mode') { @if (canShiftMode) { <cp-shift-mode-panel /> } }
+    @case ('settings') { @if (canConfigure) { <cp-settings-panel /> } }
+    @case ('printing') { @if (canConfigure) { <cp-print-settings /> } }
   }
 </section>

@@ -147,17 +147,12 @@ describe('Configuración', () => {
 
 
   describe('Config', () => {
-    it('muestra un cuadro por sección según los permisos y abre la elegida', () => {
-      permissions = ['CONFIGURATION.MANAGE', 'CASH.SHIFT_MODE_MANAGE'];
+    it('la pestaña inicial depende de los permisos; ya no hay Numeración ni Motivos', () => {
       const all = TestBed.createComponent(Config).componentInstance;
-      expect(all.tab()).toBeNull();
-      expect(all.tiles.map(t => t.id)).toEqual(['establishment', 'shift-mode', 'settings', 'printing']);
-      all.open('settings'); expect(all.current?.title).toBe('Cambios, apartados y créditos');
-      all.back(); expect(all.tab()).toBeNull();
+      expect([all.tab(), all.canConfigure]).toEqual(['establishment', true]);
       permissions = ['CASH.SHIFT_MODE_MANAGE'];
       const onlyShift = TestBed.createComponent(Config).componentInstance;
-      expect(onlyShift.tiles.map(t => t.id)).toEqual(['shift-mode']);
-      expect(onlyShift.tab()).toBe('shift-mode');
+      expect([onlyShift.tab(), onlyShift.canConfigure]).toEqual(['shift-mode', false]);
     });
   });
 });

@@ -376,7 +376,7 @@ Menú **Inventario**: existencias, **Movimientos** (kardex de cada cambio) y ale
 
 ## 4.6 Configuración
 
-Menú **Configuración** muestra cuatro cuadros; pulsa uno para abrirlo y **← Volver a Configuración** para regresar. La numeración de documentos y los motivos de anulación se crean solos y no necesitan configuración; ControlPlus no maneja IVA.
+Menú **Configuración**, con cuatro pestañas. La numeración de documentos y los motivos de anulación se crean solos y no necesitan configuración; ControlPlus no maneja IVA.
 
 | Pestaña | Para qué sirve |
 | --- | --- |
