@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, inject, signal } from '@angular/core';
 import { A11yModule } from '@angular/cdk/a11y';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
@@ -42,7 +42,10 @@ import { paginatorIntlProvider } from './paginator-intl';
             @if (session.has('USERS.READ') || session.has('ROLES.READ') || session.has('AUDIT.READ')) { <a routerLink="/operacion/administracion" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'administracion'"><span><cp-icon name="settings" /></span><b>Administración</b></a> }
             @if (session.has('PRODUCTS.READ') || session.has('CATEGORIES.READ')) { <a routerLink="/operacion/catalogo" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'catalogo'" aria-label="Catálogo"><span><cp-icon name="catalog" /></span><b>Catálogo</b></a> }
           </nav>
-          <div class="sidebar__user"><span class="avatar">{{ session.user()?.displayName?.charAt(0) }}</span><span class="sidebar__user-copy"><strong>{{ session.user()?.displayName }}</strong><small>{{ session.user()?.roles?.join(', ') }}</small></span></div>
+          <div class="sidebar__user">
+            @if (userMenuOpen()) { <div class="user-menu" id="user-menu" role="menu" aria-label="Opciones de la cuenta"><button class="user-menu__item" type="button" role="menuitem" (click)="logout()"><cp-icon name="lock" /><span>Cerrar sesión</span></button></div> }
+            <button class="sidebar__user-button" type="button" aria-haspopup="menu" [attr.aria-expanded]="userMenuOpen()" aria-controls="user-menu" [title]="'Cuenta de ' + (session.user()?.displayName ?? '')" (click)="userMenuOpen.update(open => !open)" (keydown.escape)="userMenuOpen.set(false)"><span class="avatar">{{ session.user()?.displayName?.charAt(0) }}</span><span class="sidebar__user-copy"><strong>{{ session.user()?.displayName }}</strong><small>{{ session.user()?.roles?.join(', ') }}</small></span><span class="sidebar__user-caret" aria-hidden="true">⌃</span></button>
+          </div>
         </aside>
       }
       <section class="shell-content" [attr.inert]="menuOpen() ? '' : null">
@@ -58,6 +61,9 @@ export class Shell {
   readonly session = inject(SessionService);
   readonly establishment = inject(EstablishmentService);
   readonly menuOpen = signal(false);
+  /** Menú del perfil de abajo de la barra lateral (decisión del 19 de noviembre de 2026): permite cerrar sesión. */
+  readonly userMenuOpen = signal(false);
+  private readonly host = inject(ElementRef<HTMLElement>);
   readonly boundedWorkspace = signal(false);
   readonly pageTitle = signal('Caja');
   readonly pageSubtitle = signal('Apertura de turno');
@@ -68,10 +74,17 @@ export class Shell {
     void this.establishment.load().catch(() => undefined);
     this.syncHeader(this.router.url);
     this.router.events.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd), takeUntilDestroyed())
-      .subscribe(event => { this.menuOpen.set(false); this.syncHeader(event.urlAfterRedirects); });
+      .subscribe(event => { this.menuOpen.set(false); this.userMenuOpen.set(false); this.syncHeader(event.urlAfterRedirects); });
   }
 
-  logout(): void { this.session.logout(); void this.router.navigateByUrl('/ingresar'); }
+  logout(): void { this.userMenuOpen.set(false); this.session.logout(); void this.router.navigateByUrl('/ingresar'); }
+  /** Un toque fuera del perfil cierra su menú. */
+  @HostListener('document:click', ['$event'])
+  closeUserMenu(event: MouseEvent): void {
+    if (!this.userMenuOpen()) return;
+    const profile = (this.host.nativeElement as HTMLElement).querySelector('.sidebar__user');
+    if (profile && !profile.contains(event.target as Node)) this.userMenuOpen.set(false);
+  }
   onMenuKeydown(event: KeyboardEvent): void { if (event.key === 'Escape') { event.preventDefault(); this.menuOpen.set(false); } }
   private syncHeader(url: string): void {
     this.boundedWorkspace.set(url.endsWith('/ventas'));
