@@ -23,6 +23,12 @@
 
 ## Etiquetas de producto (maqueta 12c)
 
+Ampliación aprobada el 18 de noviembre: módulo **Etiquetas** en el menú, con preparación manual, «Recibido por etiquetar» y trabajos de etiquetas. La ruta anterior del Catálogo redirige a `/operacion/etiquetas`. El nombre del negocio y el precio van en paralelo en el encabezado, tanto en vista previa como en GDI; se fija el nombre en el snapshot del lote.
+
+`GET /api/product-labels/receipts` y `GET /api/product-labels/receipts/{purchaseId}` muestran compras confirmadas, directas o recepciones parciales, sin costos. `POST /api/product-labels/jobs` admite `sourcePurchaseId`: valida instalación, estado y cantidades de esa recepción bajo bloqueo; las unidades asignadas a lotes pendientes, fallidos o aceptados quedan reservadas y no se vuelven a proponer. No se imprimen automáticamente al confirmar una compra. El botón «Imprimir etiquetas recibidas» abre la selección precargada y el usuario decide cuándo enviar el lote. La mercancía histórica sin lotes vinculados aparece pendiente, ya que su etiquetado anterior no se puede deducir.
+
+`GET /api/product-labels/jobs` consulta solo etiquetas de la terminal; `POST /api/product-labels/jobs/{jobId}/retry` reintenta el mismo lote fallido y exige `PRODUCTS.LABELS_MANAGE`. No se reintentan estados inciertos. La lista de pendientes se refiere a etiquetas aún no asignadas a impresión, no certifica que ya se hayan pegado físicamente. Sin migración.
+
 - `GET /api/product-labels/profiles`, `GET /api/product-labels/products` y `POST /api/product-labels/jobs` requieren `PRODUCTS.LABELS_MANAGE`. El listado de productos conserva ceros y permite búsqueda por referencia, barras, alias o nombre.
 - Un perfil de tipo `ETIQUETAS` crea la plantilla oficial «Etiqueta mostrador»; `HIBRIDA` crea esa plantilla y la de recibos. Ancho, alto y DPI son opcionales: si no se indican, manda el tamaño configurado en el controlador de Windows.
 - Cada solicitud guarda un `documento_emitido` `ETIQUETA_PRODUCTO` y un solo `trabajo_impresion` con snapshot/hash, perfil y contenido renderizable. `Idempotency-Key` devuelve el mismo lote aunque después cambie el nombre o precio del producto; reutilizarla con otras líneas responde 409.

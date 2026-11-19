@@ -1,5 +1,13 @@
 :host { display: block; min-width: 0; }
 .labels-page { min-width: 0; }
+.labels-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.labels-source { display: grid; gap: 8px; padding: 12px 14px; border-left: 3px solid var(--cp-primary); background: var(--cp-primary-soft); border-radius: 6px; }
+.labels-source p { margin: 5px 0 0; color: var(--cp-text-secondary); font-size: 13px; }
+.labels-source > div:last-child { display: flex; flex-wrap: wrap; gap: 12px; }
+.labels-pager, .labels-pager > div { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.labels-pager { margin-top: 18px; color: var(--cp-text-secondary); font-size: 13px; }
+.labels-jobs-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.label-job-error { display: block; max-width: 320px; margin-top: 5px; color: var(--cp-text-secondary); }
 .labels-shell { min-width: 0; padding: 18px 20px 20px; }
 .labels-shell > h3 { margin: 0 0 20px; font-size: 18px; }
 .labels-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, .92fr); gap: 22px; }
@@ -23,12 +31,14 @@
 .labels-selection-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 22px; }
 .labels-selection-footer strong { color: var(--cp-text-secondary); font-size: 13px; }
 .labels-preview .text-field { width: 100%; }
-.product-label-preview { width: min(225px, 100%); min-height: 136px; display: flex; flex-direction: column; align-self: center; justify-content: center; margin: 34px auto 18px; padding: 14px 16px; overflow: hidden; border: 1px solid var(--cp-border-strong); border-radius: 5px; background: white; color: #233044; }
-.product-label-preview > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.product-label-preview > strong { margin: 3px 0 8px; font-size: 18px; }
-.product-label-preview .barcode { width: 100%; min-height: 42px; overflow: hidden; padding: 5px 8px 2px; border: 1px solid #d6dde8; border-radius: 7px; }
+.product-label-preview { width: min(225px, 100%); min-height: 136px; display: flex; flex-direction: column; align-self: center; justify-content: center; margin: 34px auto 18px; padding: 10px; overflow: hidden; border: 1px solid var(--cp-border-strong); border-radius: 5px; background: white; color: #233044; }
+.product-label-header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; line-height: 1.2; }
+.product-label-header span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; }
+.product-label-header strong { flex-shrink: 0; font-size: 16px; white-space: nowrap; }
+.product-label-name { flex-shrink: 0; overflow: hidden; margin-bottom: 4px; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 1.2; }
+.product-label-preview .barcode { width: 100%; flex-shrink: 0; min-height: 34px; overflow: hidden; padding: 3px 6px 2px; border: 1px solid #d6dde8; border-radius: 7px; }
 .product-label-preview .barcode svg { width: 100%; height: 42px; }
-.product-label-preview small { margin-top: 3px; text-align: center; letter-spacing: .5px; }
+.product-label-preview small { flex-shrink: 0; margin-top: 3px; font-size: 10px; line-height: 1.2; text-align: center; letter-spacing: .5px; }
 .product-label-preview--empty { align-items: center; color: var(--cp-text-muted); text-align: center; }
 .active-profile, .profile-help { margin: 0 0 12px; color: var(--cp-text-secondary); font-size: 13px; }
 .profile-help { color: var(--cp-warning); }

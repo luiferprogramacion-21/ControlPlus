@@ -19,6 +19,10 @@
 
   @if (error() && !editing() && !editingOrder() && !receiving() && !cancelling() && !orderTransition() && !choosingReceipt()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }}</div> }
 
+  @if (view === 'purchases') {
+    <p class="form-hint">Una compra directa registra mercancía que ya llegó, sin pedido previo. Al confirmarla se reciben las unidades y se aplica el precio nuevo indicado por el Administrador. Para solicitar mercancía que todavía no llega, vuelve a Pedidos.</p>
+  }
+
   @if (view === 'orders') {
     @if (lowStockGroups().length) {
       <div class="supplier-grid" aria-label="Productos bajo mínimo por proveedor">
@@ -69,7 +73,22 @@
   }
 
   @if (selectedPurchase(); as purchase) {
-    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="purchase-detail-title"><div class="module-form-sheet__backdrop" (click)="selectedPurchase.set(null)"></div><section class="panel panel--padded module-form module-form--wide detail-dialog"><div class="dialog-heading"><div><h2 id="purchase-detail-title">Compra {{ purchase.visibleNumber || 'en borrador' }}</h2><p>{{ supplierName(purchase.supplierId) }} · Factura {{ purchase.supplierDocumentNumber || 'sin número' }} · {{ purchase.invoiceDate }}</p></div><button class="dialog-close" type="button" aria-label="Cerrar" (click)="selectedPurchase.set(null)">×</button></div><div class="table-wrap order-lines"><table><thead><tr><th>Producto</th><th class="align-right">Cantidad</th><th class="align-right">Costo unitario</th><th class="align-right">Precio ant.</th><th class="align-right">Precio nuevo</th><th class="align-right">Total</th></tr></thead><tbody>@for (line of purchase.lines; track line.id) { <tr><td>{{ productName(line.productId) }}</td><td class="align-right numeric">{{ line.quantity }}</td><td class="align-right numeric">{{ line.unitCost | number:'1.0-4' }}</td><td class="align-right numeric">{{ line.previousRetailPrice | number:'1.0-0' }}</td><td class="align-right numeric">{{ line.newRetailPrice | number:'1.0-0' }}</td><td class="align-right numeric">{{ line.total | number:'1.0-2' }}</td></tr> }</tbody></table></div><div class="detail-total"><span>Total</span><strong>{{ purchase.total | number:'1.0-2' }}</strong></div><div class="form-actions">@if (purchase.status === 'BORRADOR' && canReceive) { <button class="button button--secondary" type="button" (click)="editPurchase(purchase)">Editar</button><button class="button button--primary" type="button" [disabled]="saving()" (click)="confirmPurchase()">Confirmar compra</button> }@if (purchase.status === 'CONFIRMADA' && !purchase.orderId && canCancel) { <button class="button button--secondary button--danger" type="button" (click)="startCancel()">Anular compra</button> }<button class="button button--secondary" type="button" (click)="selectedPurchase.set(null)">Cerrar</button></div></section></div>
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="purchase-detail-title">
+      <div class="module-form-sheet__backdrop" (click)="selectedPurchase.set(null)"></div>
+      <section class="panel panel--padded module-form module-form--wide detail-dialog">
+        <div class="dialog-heading"><div><h2 id="purchase-detail-title">Compra {{ purchase.visibleNumber || 'en borrador' }}</h2><p>{{ supplierName(purchase.supplierId) }} · Factura {{ purchase.supplierDocumentNumber || 'sin número' }} · {{ purchase.invoiceDate }}</p></div><button class="dialog-close" type="button" aria-label="Cerrar" (click)="selectedPurchase.set(null)">×</button></div>
+        <div class="table-wrap order-lines"><table><thead><tr><th>Producto</th><th class="align-right">Cantidad</th><th class="align-right">Costo unitario</th><th class="align-right">Precio ant.</th><th class="align-right">Precio nuevo</th><th class="align-right">Total</th></tr></thead><tbody>@for (line of purchase.lines; track line.id) { <tr><td>{{ productName(line.productId) }}</td><td class="align-right numeric">{{ line.quantity }}</td><td class="align-right numeric">{{ line.unitCost | number:'1.0-4' }}</td><td class="align-right numeric">{{ line.previousRetailPrice | number:'1.0-0' }}</td><td class="align-right numeric">{{ line.newRetailPrice | number:'1.0-0' }}</td><td class="align-right numeric">{{ line.total | number:'1.0-2' }}</td></tr> }</tbody></table></div>
+        <div class="detail-total"><span>Total</span><strong>{{ purchase.total | number:'1.0-2' }}</strong></div>
+        <div class="form-actions">
+          @if (purchase.status === 'BORRADOR' && canReceive) { <button class="button button--secondary" type="button" (click)="editPurchase(purchase)">Editar</button><button class="button button--primary" type="button" [disabled]="saving()" (click)="confirmPurchase()">Confirmar compra</button> }
+          @if (purchase.status === 'CONFIRMADA' && session.has('PRODUCTS.LABELS_MANAGE')) {
+            <a class="button button--primary" routerLink="/operacion/etiquetas" [queryParams]="{ compra: purchase.id }">Imprimir etiquetas recibidas</a>
+          }
+          @if (purchase.status === 'CONFIRMADA' && !purchase.orderId && canCancel) { <button class="button button--secondary button--danger" type="button" (click)="startCancel()">Anular compra</button> }
+          <button class="button button--secondary" type="button" (click)="selectedPurchase.set(null)">Cerrar</button>
+        </div>
+      </section>
+    </div>
   }
 
   @if (choosingReceipt()) {

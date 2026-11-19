@@ -32,9 +32,24 @@ export interface ProductLabelJob {
   requestedAtUtc: string;
 }
 
+export interface ProductLabelQueueItem extends ProductLabelJob {
+  sourcePurchaseId: string | null;
+  error: string | null;
+}
+
 export interface ProductLabelJobInput {
   profileId: string;
   lines: { productId: string; quantity: number }[];
+  sourcePurchaseId?: string;
+}
+
+export interface ProductLabelReceipt {
+  purchaseId: string;
+  visibleNumber: string;
+  supplierName: string;
+  receivedAtUtc: string;
+  pendingLabelCount: number;
+  lines: { product: ProductLabelProduct; receivedQuantity: number; pendingQuantity: number }[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -55,5 +70,23 @@ export class ProductLabelsApi {
     return firstValueFrom(this.http.post<ProductLabelJob>('/api/product-labels/jobs', input, {
       headers: new HttpHeaders({ 'Idempotency-Key': idempotencyKey }),
     }));
+  }
+
+  receipts(page = 1, pageSize = 20): Promise<Page<ProductLabelReceipt>> {
+    const params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    return firstValueFrom(this.http.get<Page<ProductLabelReceipt>>('/api/product-labels/receipts', { params }));
+  }
+
+  receipt(purchaseId: string): Promise<ProductLabelReceipt> {
+    return firstValueFrom(this.http.get<ProductLabelReceipt>(`/api/product-labels/receipts/${encodeURIComponent(purchaseId)}`));
+  }
+
+  jobs(page = 1, pageSize = 20): Promise<Page<ProductLabelQueueItem>> {
+    const params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    return firstValueFrom(this.http.get<Page<ProductLabelQueueItem>>('/api/product-labels/jobs', { params }));
+  }
+
+  retry(jobId: string): Promise<ProductLabelQueueItem> {
+    return firstValueFrom(this.http.post<ProductLabelQueueItem>(`/api/product-labels/jobs/${encodeURIComponent(jobId)}/retry`, {}));
   }
 }

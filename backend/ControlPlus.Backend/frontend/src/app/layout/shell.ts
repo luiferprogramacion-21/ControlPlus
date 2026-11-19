@@ -30,6 +30,7 @@ import { paginatorIntlProvider } from './paginator-intl';
             @if (session.has('SALES.OWN_READ') || session.has('SALES.ALL_READ')) { <a routerLink="/operacion/ventas/historial" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'historial-ventas'"><span><cp-icon name="sales" /></span><b>Historial de ventas</b></a> }
             @if (session.has('CASH.OWN_READ')) { <a routerLink="/operacion/caja" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'caja'" aria-label="Caja"><span><cp-icon name="cash" /></span><b>Caja</b></a> }
             @if (session.has('INVENTORY.READ')) { <a routerLink="/operacion/inventario" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'inventario'"><span><cp-icon name="inventory" /></span><b>Inventario</b></a> }
+            @if (session.has('PRODUCTS.LABELS_MANAGE')) { <a routerLink="/operacion/etiquetas" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'etiquetas'"><span><cp-icon name="catalog" /></span><b>Etiquetas</b></a> }
             @if (session.has('CUSTOMERS.BASIC_MANAGE') || session.has('CUSTOMERS.MANAGE')) { <a routerLink="/operacion/clientes" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'clientes'"><span><cp-icon name="customers" /></span><b>Clientes</b></a> }
             @if (session.has('CREDIT.MANAGE')) { <a routerLink="/operacion/creditos" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'creditos'"><span><cp-icon name="customers" /></span><b>Créditos y abonos</b></a> }
             @if (session.has('PURCHASES.RECEIVE') || session.has('PURCHASE_ORDERS.MANAGE')) { <a routerLink="/operacion/compras" (click)="menuOpen.set(false)" class="nav-item" [class.nav-item--active]="activeSection() === 'compras'"><span><cp-icon name="purchases" /></span><b>Compras</b></a> }
@@ -60,7 +61,7 @@ export class Shell {
   readonly boundedWorkspace = signal(false);
   readonly pageTitle = signal('Caja');
   readonly pageSubtitle = signal('Apertura de turno');
-  readonly activeSection = signal<'caja' | 'ventas' | 'historial-ventas' | 'catalogo' | 'inventario' | 'clientes' | 'creditos' | 'proveedores' | 'compras' | 'recepciones' | 'administracion' | 'configuracion' | 'apartados' | 'reportes' | 'dashboard'>('caja');
+  readonly activeSection = signal<'caja' | 'ventas' | 'historial-ventas' | 'catalogo' | 'etiquetas' | 'inventario' | 'clientes' | 'creditos' | 'proveedores' | 'compras' | 'recepciones' | 'administracion' | 'configuracion' | 'apartados' | 'reportes' | 'dashboard'>('caja');
   private readonly router = inject(Router);
 
   constructor() {
@@ -79,6 +80,7 @@ export class Shell {
     if (url.includes('/ventas')) { this.activeSection.set('ventas'); this.pageTitle.set('Punto de venta'); this.pageSubtitle.set('Terminal de ventas · Venta en curso'); return; }
     if (url.includes('/caja')) { this.activeSection.set('caja'); this.pageTitle.set('Caja'); this.pageSubtitle.set(url.includes('cierre') ? 'Cierre y conciliación' : 'Apertura y movimientos'); return; }
     if (url.includes('/inventario')) { this.activeSection.set('inventario'); this.pageTitle.set('Inventario'); this.pageSubtitle.set('Existencias y movimientos'); return; }
+    if (url.includes('/etiquetas')) { this.activeSection.set('etiquetas'); this.pageTitle.set('Etiquetas de productos'); this.pageSubtitle.set('Selección, vista previa e impresión'); return; }
     if (url.includes('/clientes')) { this.activeSection.set('clientes'); this.pageTitle.set('Clientes'); this.pageSubtitle.set('Consulta y gestión'); return; }
     if (url.includes('/recepciones')) { this.activeSection.set('recepciones'); this.pageTitle.set('Recepción de compras'); this.pageSubtitle.set('Recepciones completas y parciales'); return; }
     if (url.includes('/compras')) { this.activeSection.set('compras'); this.pageTitle.set('Compras'); this.pageSubtitle.set('Pedidos a proveedores y recepción'); return; }
