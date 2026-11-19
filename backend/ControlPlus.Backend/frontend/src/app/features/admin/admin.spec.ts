@@ -1,3 +1,5 @@
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
+const confirmAction = vi.fn();
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Admin } from './admin';
@@ -22,8 +24,8 @@ describe('Admin: usuarios, roles y permisos', () => {
     state.id = 'admin-1'; state.role = 'ADMINISTRADOR'; state.permissions = ['USERS.READ', 'USERS.MANAGE', 'ROLES.READ'];
     api.users.mockResolvedValue({ items: [user('ana'), user('bloqueado', { isLocked: true })], page: 1, pageSize: 20, totalCount: 2, totalPages: 1 });
     api.roles.mockResolvedValue({ items: roles, page: 1, pageSize: 50, totalCount: 3, totalPages: 1 });
-    TestBed.configureTestingModule({ providers: [{ provide: AdminApi, useValue: api }, { provide: SessionService, useValue: session }] });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    TestBed.configureTestingModule({ providers: [{ provide: ConfirmationDialog, useValue: { confirm: confirmAction } }, { provide: AdminApi, useValue: api }, { provide: SessionService, useValue: session }] });
+    confirmAction.mockResolvedValue(true);
     component = TestBed.runInInjectionContext(() => new Admin());
   });
 
@@ -83,9 +85,9 @@ describe('Admin: usuarios, roles y permisos', () => {
     component.changeRole(user('ana'));
     component.form.roleId = 'r-admin';
     await component.save();
-    expect(window.confirm).toHaveBeenCalled();
+    expect(confirmAction).toHaveBeenCalled();
     expect(api.assignRole).toHaveBeenCalledWith('ana', 'r-admin');
-    vi.mocked(window.confirm).mockReturnValue(false);
+    confirmAction.mockResolvedValue(false);
     api.assignRole.mockClear();
     component.changeRole(user('ana')); component.form.roleId = 'r-cash';
     await component.save();
@@ -99,7 +101,7 @@ describe('Admin: usuarios, roles y permisos', () => {
     await component.unlock(user('bloqueado', { isLocked: true }));
     expect(api.setUserActive).toHaveBeenCalledOnce();
     expect(api.reactivateUser).toHaveBeenCalledWith('bloqueado');
-    vi.mocked(window.confirm).mockReturnValue(false);
+    confirmAction.mockResolvedValue(false);
     await component.toggle(user('ana'));
     expect(api.setUserActive).toHaveBeenCalledOnce();
   });

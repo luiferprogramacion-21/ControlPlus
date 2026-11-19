@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Page, errorText } from '../../core/api';
@@ -6,9 +6,12 @@ import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
 import { Supplier, SupplierInput, SuppliersApi } from './suppliers-api';
 import { toastSignal } from '../../core/toast';
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 @Component({ selector: 'cp-suppliers', imports: [FormsModule, MatPaginatorModule, Icon], templateUrl: './suppliers.html', styleUrl: '../directory.scss' })
 export class Suppliers implements OnInit {
   private readonly api = inject(SuppliersApi);
+  private readonly confirmation = inject(ConfirmationDialog);
+  private readonly owner = inject(DestroyRef);
   readonly session = inject(SessionService);
   readonly result = signal<Page<Supplier> | null>(null);
   readonly selected = signal<Supplier | null>(null);
@@ -33,5 +36,13 @@ export class Suppliers implements OnInit {
   validation(): string { const f = this.normalized(); if (!f.name || f.name.length > 200) return 'Indica un nombre de hasta 200 caracteres.'; if (!!f.documentType !== !!f.documentNumber || (f.documentType?.length ?? 0) > 20 || (f.documentNumber?.length ?? 0) > 50) return 'Indica tipo y número de documento juntos.'; if ((f.phone?.length ?? 0) > 30 || (f.address?.length ?? 0) > 300) return 'Revisa el teléfono o la dirección.'; if (f.email && (f.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email))) return 'Revisa el correo.'; return ''; }
   async save(): Promise<void> { if (!this.canManage || this.saving()) return; const issue = this.validation(); if (issue) { this.error.set(issue); return; } this.saving.set(true); this.error.set(''); try { const selected = this.selected(); if (selected) await this.api.update(selected, this.normalized()); else await this.api.create(this.normalized()); this.close(); this.notice.set('Proveedor guardado.'); await this.reload(); } catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); } }
   async refreshSelected(): Promise<void> { const selected = this.selected(); if (!selected) return; try { this.edit(await this.api.get(selected.id)); } catch (e) { this.error.set(errorText(e)); } }
-  async toggle(s: Supplier): Promise<void> { if (!this.canManage || this.saving() || !confirm(`${s.isActive ? 'Inactivar' : 'Activar'} a ${s.name}?`)) return; this.saving.set(true); this.error.set(''); try { await this.api.status(s); this.notice.set('Estado actualizado.'); await this.reload(); } catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); } }
+  async toggle(s: Supplier): Promise<void> {
+    if (!this.canManage || this.saving()) return;
+    const action = s.isActive ? 'Inactivar' : 'Activar';
+    if (!await this.confirmation.confirm({ title: `${action} proveedor`, message: `¿${action} a ${s.name}?`, confirmText: action, danger: s.isActive }, this.owner)) return;
+    if (this.owner.destroyed || !this.canManage || this.saving()) return;
+    this.saving.set(true); this.error.set('');
+    try { await this.api.status(s); this.notice.set('Estado actualizado.'); await this.reload(); }
+    catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); }
+  }
 }

@@ -56,7 +56,7 @@
         <tbody>
           @for (role of roles(); track role.id) {
             <tr>
-              <td><strong>{{ role.name }}</strong></td><td>{{ levelName(role.level) }}</td><td>{{ role.permissions.length }}</td>
+              <td><strong>{{ role.name }}</strong></td><td>{{ levelName(role.level) }}</td><td>{{ number(role.permissions.length) }}</td>
               <td><span class="status-pill" [class.status-pill--warning]="!role.isActive">{{ role.isActive ? 'Activo' : 'Inactivo' }}</span></td>
               <td class="align-right"><button class="table-action" type="button" [attr.aria-expanded]="viewedRole()?.id === role.id" (click)="viewRole(role)">{{ viewedRole()?.id === role.id ? 'Ocultar permisos' : canEditTemplates ? 'Editar permisos' : 'Ver permisos' }}</button></td>
             </tr>

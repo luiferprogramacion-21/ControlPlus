@@ -38,7 +38,7 @@
         <div><span>Saldo</span><strong>{{ money(d.layaway.balance) }}</strong></div>
         <div><span>Fecha límite</span><strong>{{ d.layaway.dueOn }}</strong></div>
       </div>
-      <p class="muted">Pago inicial mínimo exigido: {{ d.initialMinimumPercentage }} %. Estado: {{ label(d.layaway.state) }}@if (d.layaway.isOverdue) { · vencido }.</p>
+      <p class="muted">Pago inicial mínimo exigido: {{ number(d.initialMinimumPercentage) }} %. Estado: {{ label(d.layaway.state) }}@if (d.layaway.isOverdue) { · vencido }.</p>
       <div class="layaway-detail-actions">
         <button class="table-action" type="button" (click)="refreshDetail()">Actualizar</button>
         <button class="button button--secondary" type="button" [disabled]="!canPay(d.layaway) || saving()" (click)="openPayment(d.layaway)">Abonar</button>
@@ -47,7 +47,7 @@
       </div>
       <h3>Productos separados</h3>
       <div class="table-wrap module-table-wrap"><table><thead><tr><th>Código</th><th>Producto</th><th>Unidad</th><th class="align-right">Cantidad</th><th class="align-right">Precio</th><th class="align-right">Subtotal</th></tr></thead><tbody>
-        @for (line of d.lines; track line.productId) { <tr><td class="numeric">{{ line.productCode }}</td><td>{{ line.productName }}</td><td>{{ line.unit }}</td><td class="align-right numeric">{{ line.quantity }}</td><td class="align-right numeric">{{ money(line.unitPrice) }}</td><td class="align-right numeric">{{ money(line.subtotal) }}</td></tr> }
+        @for (line of d.lines; track line.productId) { <tr><td class="numeric">{{ line.productCode }}</td><td>{{ line.productName }}</td><td>{{ line.unit }}</td><td class="align-right numeric">{{ number(line.quantity) }}</td><td class="align-right numeric">{{ money(line.unitPrice) }}</td><td class="align-right numeric">{{ money(line.subtotal) }}</td></tr> }
       </tbody></table></div>
       <h3>Abonos</h3>
       <div class="table-wrap module-table-wrap"><table><thead><tr><th>Abono</th><th>Fecha</th><th>Medio</th><th class="align-right">Aplicado</th><th class="align-right">Cambio</th><th>Estado</th></tr></thead><tbody>

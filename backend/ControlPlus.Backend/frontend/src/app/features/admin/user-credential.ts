@@ -1,8 +1,7 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, inject, input, OnDestroy, OnInit, output, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, input, OnDestroy, OnInit, output, signal } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
-import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { firstValueFrom } from 'rxjs';
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 import { errorText } from '../../core/api';
 import { code128Svg } from '../../core/code128';
 import { EstablishmentService } from '../../core/establishment';
@@ -11,31 +10,6 @@ import { AdminApi, AdminUser, IssuedCredential, OperatorCredential } from './adm
 import { buildCredentialCardHtml, CredentialCard } from './credential-card';
 import { CredentialCardExporter } from './credential-card-export';
 import { toastSignal } from '../../core/toast';
-
-@Component({
-  selector: 'cp-credential-replacement-dialog',
-  imports: [MatDialogModule],
-  template: `
-    <h2 mat-dialog-title>¿Emitir un carné nuevo?</h2>
-    <mat-dialog-content id="credential-replacement-description">
-      <p>Vas a reemplazar el carné de <strong>{{ data.displayName }}</strong>.</p>
-      <p class="replacement-warning">El carné anterior dejará de servir para entrar o autorizar operaciones.</p>
-      <p>El reemplazo se realiza solo cuando se completa la emisión.</p>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button id="cancel-credential-replacement" class="button button--secondary" type="button" [mat-dialog-close]="false">Cancelar</button>
-      <button class="button button--primary" type="button" [mat-dialog-close]="true">Emitir carné</button>
-    </mat-dialog-actions>`,
-  styles: [`
-    mat-dialog-content p { margin:0 0 16px; line-height:1.6; }
-    mat-dialog-content p:last-child { margin-bottom:0; }
-    .replacement-warning { padding:12px 16px; border-left:3px solid var(--cp-warning); border-radius:4px; background:var(--cp-warning-soft); color:var(--cp-warning); }
-    mat-dialog-actions { gap:8px; padding:16px 24px 24px; }
-  `],
-})
-export class CredentialReplacementDialog {
-  readonly data = inject<{ displayName: string }>(MAT_DIALOG_DATA);
-}
 
 /**
  * Shows the current operator card to its Administrator; old hash-only cards need to be reissued once.
@@ -87,8 +61,9 @@ export class UserCredential implements OnInit, OnDestroy {
   private readonly printer = inject(TicketPrinter);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly exporter = inject(CredentialCardExporter);
-  private readonly dialog = inject(MatDialog);
-  private replacementDialog: MatDialogRef<CredentialReplacementDialog, boolean> | null = null;
+  private readonly confirmation = inject(ConfirmationDialog);
+  private readonly destroyRef = inject(DestroyRef);
+  private confirming = false;
   private disposed = false;
   readonly establishment = inject(EstablishmentService);
   readonly user = input.required<AdminUser>();
@@ -115,17 +90,14 @@ export class UserCredential implements OnInit, OnDestroy {
   }
 
   async issue(): Promise<void> {
-    if (this.disposed || this.busy() || this.loading() || this.replacementDialog) return;
+    if (this.disposed || this.busy() || this.loading() || this.confirming) return;
     if (this.current()) {
-      const ref = this.dialog.open<CredentialReplacementDialog, { displayName: string }, boolean>(CredentialReplacementDialog, {
-        data: { displayName: this.user().displayName }, width: '460px', maxWidth: 'calc(100vw - 32px)',
-        role: 'alertdialog', ariaDescribedBy: 'credential-replacement-description',
-        autoFocus: '#cancel-credential-replacement', restoreFocus: true,
-      });
-      this.replacementDialog = ref;
+      this.confirming = true;
       let accepted = false;
-      try { accepted = await firstValueFrom(ref.afterClosed(), { defaultValue: false }) === true; }
-      finally { if (this.replacementDialog === ref) this.replacementDialog = null; }
+      try { accepted = await this.confirmation.confirm({ title: '¿Emitir un carné nuevo?',
+        message: `Vas a reemplazar el carné de ${this.user().displayName}. El carné anterior dejará de servir para entrar o autorizar operaciones. El reemplazo se realiza solo cuando se completa la emisión.`,
+        confirmText: 'Emitir carné' }, this.destroyRef); }
+      finally { this.confirming = false; }
       if (!accepted || this.disposed) return;
     }
     this.busy.set(true); this.error.set('');
@@ -140,7 +112,14 @@ export class UserCredential implements OnInit, OnDestroy {
 
   async remove(): Promise<void> {
     const card = this.current();
-    if (!card || this.busy() || this.replacementDialog || !confirm('¿Eliminar este carné? Dejará de servir para entrar o autorizar operaciones; el historial se conserva.')) return;
+    if (!card || this.disposed || this.busy() || this.confirming) return;
+    this.confirming = true;
+    let accepted = false;
+    try { accepted = await this.confirmation.confirm({ title: '¿Eliminar este carné?',
+      message: 'Dejará de servir para entrar o autorizar operaciones; el historial se conserva.',
+      confirmText: 'Eliminar carné', danger: true }, this.destroyRef); }
+    finally { this.confirming = false; }
+    if (!accepted || this.disposed || this.busy() || this.current()?.credentialId !== card.credentialId) return;
     this.busy.set(true); this.error.set(''); this.notice.set('');
     try {
       await this.api.revokeCredential(this.user().id, card.credentialId, card.version);
@@ -177,7 +156,7 @@ export class UserCredential implements OnInit, OnDestroy {
   close(): void { this.ngOnDestroy(); this.closed.emit(); }
   ngOnDestroy(): void {
     this.disposed = true;
-    this.replacementDialog?.close(false); this.replacementDialog = null;
+    this.confirmation.cancel(this.destroyRef);
     this.issued.set(null); this.current.set(null);
   }
 }

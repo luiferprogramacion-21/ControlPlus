@@ -1,3 +1,5 @@
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
+const confirmAction = vi.fn();
 import { TestBed } from '@angular/core/testing';
 import { SessionService } from '../../core/session.service';
 import { SalesApi } from '../sales/sales-api';
@@ -10,10 +12,10 @@ describe('PrintSettings', () => {
     const fixture = TestBed.createComponent(PrintSettings); fixture.detectChanges(); await fixture.whenStable(); return fixture.componentInstance;
   }
   beforeEach(() => {
-    vi.clearAllMocks(); permissions = ['CONFIGURATION.MANAGE'];
+    vi.clearAllMocks(); confirmAction.mockResolvedValue(true); permissions = ['CONFIGURATION.MANAGE'];
     api.printProfiles.mockResolvedValue([]); api.printQueue.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
     api.createPrintProfile.mockResolvedValue({}); api.retryAdminPrintJob.mockResolvedValue({}); api.deletePrintProfile.mockResolvedValue({ physicallyDeleted: true });
-    TestBed.configureTestingModule({ providers: [{ provide: SalesApi, useValue: api }, { provide: SessionService, useValue: { has: (c: string) => permissions.includes(c) } }] });
+    TestBed.configureTestingModule({ providers: [{ provide: ConfirmationDialog, useValue: { confirm: confirmAction } }, { provide: SalesApi, useValue: api }, { provide: SessionService, useValue: { has: (c: string) => permissions.includes(c) } }] });
   });
   const base = { printerType: 'RECIBOS' as const, labelWidthMm: null, labelHeightMm: null, resolutionDpi: null };
   it('carga perfiles y cola', async () => { await create(); expect(api.printProfiles).toHaveBeenCalled(); expect(api.printQueue).toHaveBeenCalledWith(1, 20); });
@@ -31,24 +33,24 @@ describe('PrintSettings', () => {
   });
   it('elimina un perfil tras confirmar y recarga la lista', async () => {
     const c = await create(); const profile = { id: 'p1', name: 'Recibos caja', isDefault: true } as never;
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmAction.mockResolvedValue(true);
     await c.remove(profile);
-    expect(confirmSpy.mock.calls[0][0]).toContain('predeterminado');
+    expect(confirmAction.mock.calls[0][0].message).toContain('predeterminado');
     expect(api.deletePrintProfile).toHaveBeenCalledWith('p1');
     expect(c.notice()).toBe('Perfil eliminado.');
     expect(api.printProfiles).toHaveBeenCalledTimes(2);
   });
   it('un perfil con historial se retira y la pantalla lo explica', async () => {
     api.deletePrintProfile.mockResolvedValue({ physicallyDeleted: false });
-    const c = await create(); vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const c = await create(); confirmAction.mockResolvedValue(true);
     await c.remove({ id: 'p1', name: 'Recibos', isDefault: false } as never);
     expect(c.notice()).toContain('historial');
   });
   it('no elimina si se cancela la confirmación, sin permiso o si el servidor lo rechaza', async () => {
     const c = await create(); const profile = { id: 'p1', name: 'Recibos', isDefault: false } as never;
-    vi.spyOn(window, 'confirm').mockReturnValue(false); await c.remove(profile);
+    confirmAction.mockResolvedValue(false); await c.remove(profile);
     expect(api.deletePrintProfile).not.toHaveBeenCalled();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmAction.mockResolvedValue(true);
     permissions = []; await c.remove(profile); expect(api.deletePrintProfile).not.toHaveBeenCalled();
     permissions = ['CONFIGURATION.MANAGE']; api.deletePrintProfile.mockRejectedValue(new Error('pendientes'));
     await c.remove(profile); expect(c.error()).not.toBe(''); expect(c.deleting()).toBe(false);

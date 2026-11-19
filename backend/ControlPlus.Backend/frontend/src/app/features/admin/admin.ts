@@ -1,6 +1,7 @@
 import { RouterLink } from '@angular/router';
+import { groupedNumber } from '../../shared/number-input';
 import { DatePipe } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -14,6 +15,7 @@ import { UserCredential } from './user-credential';
 import { UserPermissions } from './user-permissions';
 import { isVisibleAdminPermission } from './visible-permissions';
 import { toastSignal } from '../../core/toast';
+import { ConfirmationDialog, ConfirmationOptions } from '../../shared/confirmation-dialog';
 
 type Mode = 'create' | 'edit' | 'role' | 'password';
 type Tab = 'users' | 'roles' | 'audit';
@@ -26,7 +28,11 @@ type Tab = 'users' | 'roles' | 'audit';
 })
 export class Admin implements OnInit {
   private readonly api = inject(AdminApi);
+  private readonly confirmations = inject(ConfirmationDialog);
+  private readonly destroyRef = inject(DestroyRef);
+  private confirming = false;
   readonly session = inject(SessionService);
+  readonly number = groupedNumber;
   readonly tab = signal<Tab>('users');
   readonly users = signal<Page<AdminUser> | null>(null);
   readonly roles = signal<AdminRole[]>([]);
@@ -136,12 +142,17 @@ export class Admin implements OnInit {
 
   async save(): Promise<void> {
     const mode = this.mode(); const user = this.selected();
-    if (!mode || this.saving()) return;
+    if (!mode || this.saving() || this.confirming) return;
     const issue = this.validation();
     if (issue) { this.error.set(issue); return; }
-    if (mode === 'role' && user && !confirm(`Cambiar el rol de ${user.displayName}? Sus sesiones abiertas se invalidarán.`)) return;
+    const f = { ...this.form };
+    if (mode === 'role' && user) {
+      const approved = await this.confirmChange({ title: 'Cambiar rol',
+        message: `¿Cambiar el rol de ${user.displayName}? Sus sesiones abiertas se invalidarán.`, confirmText: 'Cambiar rol' });
+      if (!approved || this.destroyRef.destroyed || this.saving() || !this.canChooseRole ||
+        this.mode() !== mode || this.selected()?.id !== user.id || this.form.roleId !== f.roleId) return;
+    }
     this.saving.set(true); this.error.set('');
-    const f = this.form;
     try {
       if (mode === 'create') await this.api.createUser({ userName: f.userName.trim(), displayName: f.displayName.trim(), password: f.password, roleIds: [f.roleId], email: f.email.trim() || null });
       else if (mode === 'edit' && user) await this.api.updateUser(user.id, f.displayName.trim(), f.email.trim() || null);
@@ -155,19 +166,38 @@ export class Admin implements OnInit {
   }
 
   async toggle(user: AdminUser): Promise<void> {
-    if (!this.canManageUsers || this.saving() || !confirm(`${user.isActive ? 'Inactivar' : 'Activar'} a ${user.displayName}?`)) return;
-    await this.run(() => this.api.setUserActive(user), 'Estado actualizado.');
+    if (!this.canManageUsers || this.saving() || this.confirming) return;
+    const snapshot = { ...user };
+    const approved = await this.confirmChange({ title: snapshot.isActive ? 'Inactivar usuario' : 'Activar usuario',
+      message: `¿${snapshot.isActive ? 'Inactivar' : 'Activar'} a ${snapshot.displayName}?`,
+      confirmText: snapshot.isActive ? 'Inactivar' : 'Activar', danger: snapshot.isActive });
+    if (!approved || this.destroyRef.destroyed || this.saving() || !this.canManageUsers || user.isActive !== snapshot.isActive) return;
+    await this.run(() => this.api.setUserActive(snapshot), 'Estado actualizado.');
   }
   /** Decisión del 18 de noviembre de 2026: solo el Administrador, y solo usuarios que nunca operaron. */
   get canDeleteUsers(): boolean { return this.canManageUsers && this.session.hasRole('ADMINISTRADOR'); }
   async remove(user: AdminUser): Promise<void> {
-    if (!this.canDeleteUsers || this.saving() || this.isSelf(user) ||
-      !confirm(`¿Eliminar definitivamente a ${user.displayName}? Solo es posible si nunca ha trabajado en el sistema; si ya tiene historial, inactívelo.`)) return;
-    await this.run(() => this.api.deleteUser(user.id), 'Usuario eliminado.');
+    if (!this.canDeleteUsers || this.saving() || this.confirming || this.isSelf(user)) return;
+    const userId = user.id;
+    const approved = await this.confirmChange({ title: 'Eliminar usuario',
+      message: `¿Eliminar definitivamente a ${user.displayName}? Solo es posible si nunca ha trabajado en el sistema; si ya tiene historial, inactívelo.`,
+      confirmText: 'Eliminar usuario', danger: true });
+    if (!approved || this.destroyRef.destroyed || this.saving() || !this.canDeleteUsers || this.isSelf(user) || user.id !== userId) return;
+    await this.run(() => this.api.deleteUser(userId), 'Usuario eliminado.');
   }
   async unlock(user: AdminUser): Promise<void> {
-    if (!this.canManageUsers || this.saving() || !confirm(`Reactivar el acceso de ${user.displayName}?`)) return;
-    await this.run(() => this.api.reactivateUser(user.id), 'Acceso reactivado.');
+    if (!this.canManageUsers || this.saving() || this.confirming) return;
+    const userId = user.id;
+    const approved = await this.confirmChange({ title: 'Reactivar acceso',
+      message: `¿Reactivar el acceso de ${user.displayName}?`, confirmText: 'Reactivar acceso' });
+    if (!approved || this.destroyRef.destroyed || this.saving() || !this.canManageUsers || user.id !== userId) return;
+    await this.run(() => this.api.reactivateUser(userId), 'Acceso reactivado.');
+  }
+  private async confirmChange(options: ConfirmationOptions): Promise<boolean> {
+    if (this.confirming || this.saving()) return false;
+    this.confirming = true;
+    try { return await this.confirmations.confirm(options, this.destroyRef); }
+    finally { this.confirming = false; }
   }
   private async run(action: () => Promise<unknown>, message: string): Promise<void> {
     this.saving.set(true); this.error.set(''); this.notice.set('');

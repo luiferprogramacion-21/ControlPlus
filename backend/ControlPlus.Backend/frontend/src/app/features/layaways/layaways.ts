@@ -1,5 +1,6 @@
+import { groupedNumber } from '../../shared/number-input';
 import { DatePipe } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Page, errorText } from '../../core/api';
@@ -11,6 +12,7 @@ import { LayawayCancel } from './layaway-cancel';
 import { LayawayCreate } from './layaway-create';
 import { appliedTotal, cashChange, emptyDraft, PaymentDraft, PaymentMethods, toPayments, validateDrafts } from './payment-methods';
 import { toastSignal } from '../../core/toast';
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 
 const STATE_LABELS: Record<string, string> = { ACTIVO: 'Activo', PAGADO: 'Pagado', ENTREGADO: 'Entregado', ANULADO: 'Anulado' };
 
@@ -22,8 +24,11 @@ const STATE_LABELS: Record<string, string> = { ACTIVO: 'Activo', PAGADO: 'Pagado
 })
 export class Layaways implements OnInit {
   private readonly api = inject(LayawaysApi);
+  private readonly confirmation = inject(ConfirmationDialog);
+  private readonly owner = inject(DestroyRef);
   private readonly customersApi = inject(CustomersApi);
   readonly session = inject(SessionService);
+  readonly number = groupedNumber;
   readonly result = signal<Page<Layaway> | null>(null);
   readonly detail = signal<LayawayDetail | null>(null);
   readonly loading = signal(false);
@@ -147,7 +152,9 @@ export class Layaways implements OnInit {
   async deliver(): Promise<void> {
     const layaway = this.detail()?.layaway;
     if (!layaway || this.saving() || !this.canDeliver(layaway)) return;
-    if (!confirm(`Entregar los productos del apartado ${layaway.number} a ${layaway.customerName}? Se descuenta el inventario reservado; no se registra una venta ni un movimiento de Caja.`)) return;
+    if (!await this.confirmation.confirm({ title: 'Entregar apartado', message: `¿Entregar los productos del apartado ${layaway.number} a ${layaway.customerName}? Se descuenta el inventario reservado; no se registra una venta ni un movimiento de Caja.`, confirmText: 'Entregar productos' }, this.owner)) return;
+    const current = this.detail()?.layaway;
+    if (this.owner.destroyed || this.saving() || !current || current.id !== layaway.id || current.version !== layaway.version || !this.canDeliver(current)) return;
     const fingerprint = JSON.stringify({ id: layaway.id, version: layaway.version });
     if (fingerprint !== this.deliveryFingerprint) { this.deliveryKey = crypto.randomUUID(); this.deliveryFingerprint = fingerprint; }
     this.saving.set(true); this.error.set(''); this.notice.set('');

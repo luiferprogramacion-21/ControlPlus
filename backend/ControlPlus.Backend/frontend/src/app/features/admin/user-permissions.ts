@@ -1,9 +1,11 @@
-import { Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { groupedNumber } from '../../shared/number-input';
 import { errorText } from '../../core/api';
 import { AdminApi, AdminPermission, AdminUser, EffectivePermission } from './admin-api';
 import { isVisibleAdminPermission } from './visible-permissions';
 import { toastSignal } from '../../core/toast';
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 
 interface Row extends EffectivePermission { module: string; }
 
@@ -19,7 +21,7 @@ interface Row extends EffectivePermission { module: string; }
         <div class="permissions-toolbar">
           <label class="sr-only" for="permission-filter">Filtrar permisos</label>
           <input id="permission-filter" class="text-field" name="filter" [ngModel]="filter()" (ngModelChange)="filter.set($event)" placeholder="Filtrar por nombre o código">
-          <button class="button button--secondary" type="button" [disabled]="saving() || !exceptionCount()" (click)="reset()">Restablecer excepciones ({{ exceptionCount() }})</button>
+          <button class="button button--secondary" type="button" [disabled]="saving() || !exceptionCount()" (click)="reset()">Restablecer excepciones ({{ number(exceptionCount()) }})</button>
         </div>
         @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
         @if (loading()) { <p class="muted" role="status">Cargando permisos…</p> }
@@ -43,7 +45,11 @@ interface Row extends EffectivePermission { module: string; }
 })
 export class UserPermissions implements OnInit {
   private readonly api = inject(AdminApi);
+  private readonly confirmations = inject(ConfirmationDialog);
+  private readonly destroyRef = inject(DestroyRef);
+  private confirming = false;
   readonly user = input.required<AdminUser>();
+  readonly number = groupedNumber;
   readonly catalog = input.required<AdminPermission[]>();
   readonly closed = output<void>();
   readonly effective = signal<EffectivePermission[]>([]);
@@ -82,15 +88,32 @@ export class UserPermissions implements OnInit {
   }
 
   async toggle(row: Row): Promise<void> {
-    if (this.saving()) return;
+    if (this.saving() || this.confirming) return;
+    const user = this.user();
     const next = !row.granted;
-    if (!confirm(`${next ? 'Conceder' : 'Revocar'} "${row.name}" a ${this.user().displayName}? Sus sesiones abiertas se invalidarán.`)) return;
-    await this.mutate(() => this.api.setPermissionOverride(this.user().id, row.id, next));
+    this.confirming = true;
+    let approved: boolean;
+    try {
+      approved = await this.confirmations.confirm({ title: next ? 'Conceder permiso' : 'Revocar permiso',
+        message: `¿${next ? 'Conceder' : 'Revocar'} «${row.name}» a ${user.displayName}? Sus sesiones abiertas se invalidarán.`,
+        confirmText: next ? 'Conceder permiso' : 'Revocar permiso', danger: !next }, this.destroyRef);
+    } finally { this.confirming = false; }
+    if (!approved || this.destroyRef.destroyed || this.saving() || this.user() !== user) return;
+    await this.mutate(() => this.api.setPermissionOverride(user.id, row.id, next));
   }
 
   async reset(): Promise<void> {
-    if (this.saving() || !this.exceptionCount() || !confirm(`Eliminar las ${this.exceptionCount()} excepciones individuales de ${this.user().displayName}? Sus permisos volverán a depender solo de su rol y sus sesiones se invalidarán.`)) return;
-    await this.mutate(() => this.api.resetPermissionOverrides(this.user().id));
+    if (this.saving() || this.confirming || !this.exceptionCount()) return;
+    const user = this.user(); const count = this.exceptionCount();
+    this.confirming = true;
+    let approved: boolean;
+    try {
+      approved = await this.confirmations.confirm({ title: 'Restablecer excepciones',
+        message: `¿Eliminar las ${groupedNumber(count)} excepciones individuales de ${user.displayName}? Sus permisos volverán a depender solo de su rol y sus sesiones se invalidarán.`,
+        confirmText: 'Restablecer excepciones', danger: true }, this.destroyRef);
+    } finally { this.confirming = false; }
+    if (!approved || this.destroyRef.destroyed || this.saving() || this.user() !== user || this.exceptionCount() !== count) return;
+    await this.mutate(() => this.api.resetPermissionOverrides(user.id));
   }
 
   private async mutate(action: () => Promise<void>): Promise<void> {

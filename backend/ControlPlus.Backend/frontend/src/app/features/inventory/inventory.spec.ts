@@ -5,17 +5,19 @@ import { Inventory } from './inventory';
 import { InventoryApi, Stock } from './inventory-api';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationDialog, AuthorizationPrompt } from '../../shared/authorization-dialog';
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 
 describe('Inventory', () => {
   let component: Inventory;
   const api = { stock: vi.fn(), movements: vi.fn(), reasons: vi.fn(), adjust: vi.fn() };
+  const confirmAction = vi.fn();
   const dialog = { open: vi.fn(async (prompt: AuthorizationPrompt) => { try { await prompt.run({ userName: 'supervisor', password: 'clave' }); } catch { /* La ventana conserva el error. */ } return true; }) };
   const session = { has: (permission: string) => permission === 'INVENTORY.ADJUST', user: () => ({ userName: 'ejecutor' }) };
   const stock = { productId: 'p', name: 'Producto', currentStock: 8, reservedStock: 3, version: 2, isActive: true } as Stock;
-  beforeEach(() => { vi.clearAllMocks(); TestBed.configureTestingModule({ providers: [{ provide: InventoryApi, useValue: api }, { provide: SessionService, useValue: session }, { provide: AuthorizationDialog, useValue: dialog }] }); component = TestBed.runInInjectionContext(() => new Inventory()); api.stock.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 }); api.movements.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 }); api.reasons.mockResolvedValue([]); component.select(stock); });
+  beforeEach(async () => { vi.clearAllMocks(); confirmAction.mockResolvedValue(true); TestBed.configureTestingModule({ providers: [{ provide: ConfirmationDialog, useValue: { confirm: confirmAction } }, { provide: InventoryApi, useValue: api }, { provide: SessionService, useValue: session }, { provide: AuthorizationDialog, useValue: dialog }] }); component = TestBed.runInInjectionContext(() => new Inventory()); api.stock.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 }); api.movements.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 }); api.reasons.mockResolvedValue([]); await component.select(stock); });
   it('abre los movimientos en una ventana modal y permite cerrarla', async () => {
     const fixture = TestBed.createComponent(Inventory); fixture.detectChanges(); await fixture.whenStable();
-    fixture.componentInstance.openHistory(stock); fixture.detectChanges();
+    await fixture.componentInstance.openHistory(stock); fixture.detectChanges();
     const modal = fixture.nativeElement.querySelector('[role="dialog"][aria-labelledby="inventory-history-title"]');
     expect(modal).toBeTruthy(); expect(modal.textContent).toContain('Producto');
     expect(fixture.nativeElement.querySelector('section.inventory-history')).toBeNull();
@@ -26,8 +28,8 @@ describe('Inventory', () => {
     component.quantityDelta = -6; component.reasonId = 'r';
     await component.adjust(); expect(api.adjust).not.toHaveBeenCalled();
   });
-  it('abre un ajuste sin consultar el historial de movimientos', () => {
-    vi.clearAllMocks(); component.openAdjustment(stock);
+  it('abre un ajuste sin consultar el historial de movimientos', async () => {
+    vi.clearAllMocks(); await component.openAdjustment(stock);
     expect(component.adjustmentOpen()).toBe(true); expect(component.adjustmentProductId()).toBe('p');
     expect(api.movements).not.toHaveBeenCalled();
   });
@@ -56,6 +58,7 @@ describe('Inventory', () => {
   it('abre filtrado por stock bajo cuando llega desde el Dashboard', async () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
+      { provide: ConfirmationDialog, useValue: { confirm: confirmAction } },
       { provide: InventoryApi, useValue: api }, { provide: SessionService, useValue: session }, { provide: AuthorizationDialog, useValue: dialog },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ filtro: 'stock-bajo' }) } } },
     ] });
@@ -63,5 +66,19 @@ describe('Inventory', () => {
     const fixture = TestBed.createComponent(Inventory); fixture.detectChanges(); await fixture.whenStable();
     expect(fixture.componentInstance.status).toBe('STOCK_BAJO');
     expect(api.stock).toHaveBeenCalledWith(expect.objectContaining({ status: 'STOCK_BAJO' }));
+  });
+
+  it('cancelar un descarte conserva producto y clave del ajuste incierto', async () => {
+    await component.openAdjustment(stock); component.quantityDelta = 1; component.reasonId = 'r';
+    api.adjust.mockRejectedValue(new HttpErrorResponse({ status: 0 })); await component.adjust();
+    const key = api.adjust.mock.calls[0][1];
+    expect(component.hasPending).toBe(true); confirmAction.mockResolvedValue(false);
+    await component.closeAdjustment();
+    expect(component.adjustmentOpen()).toBe(true); expect(component.hasPending).toBe(true);
+    expect(await component.select({ ...stock, productId: 'otro' })).toBe(false);
+    expect(component.selected()?.productId).toBe('p');
+    await component.adjust(); expect(api.adjust.mock.calls[1][1]).toBe(key);
+    confirmAction.mockResolvedValue(true); await component.closeAdjustment();
+    expect(component.hasPending).toBe(false); expect(component.adjustmentOpen()).toBe(false);
   });
 });

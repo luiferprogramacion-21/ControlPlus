@@ -1,3 +1,5 @@
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
+const confirmAction = vi.fn();
 import { TestBed } from '@angular/core/testing';
 import { Admin } from './admin';
 import { AdminApi, AdminPermission, AdminRole, AdminUser, EffectivePermission } from './admin-api';
@@ -20,8 +22,8 @@ describe('Administración: excepciones individuales', () => {
     api.effectivePermissions.mockResolvedValue(effective());
     api.setPermissionOverride.mockResolvedValue(undefined);
     api.resetPermissionOverrides.mockResolvedValue(undefined);
-    TestBed.configureTestingModule({ providers: [{ provide: AdminApi, useValue: api }] });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    TestBed.configureTestingModule({ providers: [{ provide: ConfirmationDialog, useValue: { confirm: confirmAction } }, { provide: AdminApi, useValue: api }] });
+    confirmAction.mockResolvedValue(true);
   });
 
   function open() {
@@ -51,7 +53,7 @@ describe('Administración: excepciones individuales', () => {
   });
 
   it('no cambia nada si se cancela la confirmación', async () => {
-    vi.mocked(window.confirm).mockReturnValue(false);
+    confirmAction.mockResolvedValue(false);
     const fixture = open(); await flush(fixture);
     await fixture.componentInstance.toggle(fixture.componentInstance.rows()[0]);
     await fixture.componentInstance.reset();
@@ -88,8 +90,8 @@ describe('Administración: plantilla de rol', () => {
   const api = { grantRolePermission: vi.fn(), revokeRolePermission: vi.fn(), resetRolePermissions: vi.fn() };
   beforeEach(() => {
     vi.clearAllMocks();
-    TestBed.configureTestingModule({ providers: [{ provide: AdminApi, useValue: api }] });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    TestBed.configureTestingModule({ providers: [{ provide: ConfirmationDialog, useValue: { confirm: confirmAction } }, { provide: AdminApi, useValue: api }] });
+    confirmAction.mockResolvedValue(true);
   });
   function open() {
     const fixture = TestBed.createComponent(RoleTemplate);
@@ -121,12 +123,12 @@ describe('Administración: plantilla de rol', () => {
 
   it('revierte el checkbox si se cancela la confirmación o falla la API', async () => {
     const { fixture, updated } = open();
-    vi.mocked(window.confirm).mockReturnValue(false);
+    confirmAction.mockResolvedValue(false);
     const cancelled = box(true);
     await fixture.componentInstance.toggle(catalog[1], cancelled);
     expect(cancelled.checked).toBe(false);
     expect(api.grantRolePermission).not.toHaveBeenCalled();
-    vi.mocked(window.confirm).mockReturnValue(true);
+    confirmAction.mockResolvedValue(true);
     api.grantRolePermission.mockRejectedValue(new Error('fallo'));
     const failed = box(true);
     await fixture.componentInstance.toggle(catalog[1], failed);
@@ -138,10 +140,10 @@ describe('Administración: plantilla de rol', () => {
   it('restaura la plantilla original solo tras confirmar', async () => {
     const { fixture, updated } = open();
     api.resetRolePermissions.mockResolvedValue(role(['a', 'b']));
-    vi.mocked(window.confirm).mockReturnValue(false);
+    confirmAction.mockResolvedValue(false);
     await fixture.componentInstance.reset();
     expect(api.resetRolePermissions).not.toHaveBeenCalled();
-    vi.mocked(window.confirm).mockReturnValue(true);
+    confirmAction.mockResolvedValue(true);
     await fixture.componentInstance.reset();
     expect(api.resetRolePermissions).toHaveBeenCalledWith('r1');
     expect(updated).toHaveBeenCalledOnce();
@@ -157,7 +159,7 @@ describe('Administración: acceso a permisos desde la pantalla', () => {
     vi.clearAllMocks();
     api.permissionCatalog.mockResolvedValue(catalog);
     api.roles.mockResolvedValue({ items: [role(['a'])], page: 1, pageSize: 50, totalCount: 1, totalPages: 1 });
-    TestBed.configureTestingModule({ providers: [{ provide: AdminApi, useValue: api }, { provide: SessionService, useValue: session }] });
+    TestBed.configureTestingModule({ providers: [{ provide: ConfirmationDialog, useValue: { confirm: confirmAction } }, { provide: AdminApi, useValue: api }, { provide: SessionService, useValue: session }] });
     component = TestBed.runInInjectionContext(() => new Admin());
   });
 

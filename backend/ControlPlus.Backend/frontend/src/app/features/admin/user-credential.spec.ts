@@ -1,13 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import { MatDialog } from '@angular/material/dialog';
-import { Subject } from 'rxjs';
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 import { TicketPrinter } from '../sales/ticket';
 import { EstablishmentService } from '../../core/establishment';
 import { AdminApi, AdminUser, IssuedCredential, OperatorCredential } from './admin-api';
 import { buildCredentialCardHtml } from './credential-card';
 import { buildPdfFromJpeg, CredentialCardExporter } from './credential-card-export';
-import { CredentialReplacementDialog, UserCredential } from './user-credential';
+import { UserCredential } from './user-credential';
 
 describe('Carné de operador', () => {
   const user: AdminUser = { id: 'u1', userName: 'supervisor', displayName: 'Ana <Supervisora>', isActive: true, isLocked: false,
@@ -17,16 +16,16 @@ describe('Carné de operador', () => {
   const issueCredential = vi.fn(); const print = vi.fn();
   const currentCredential = vi.fn(); const revokeCredential = vi.fn();
   const jpeg = vi.fn(); const pdf = vi.fn(); const save = vi.fn();
-  const openDialog = vi.fn();
+  const confirmAction = vi.fn(); const cancelConfirmation = vi.fn();
 
   const create = () => {
-    TestBed.configureTestingModule({ providers: [{ provide: MatDialog, useValue: { open: openDialog } }, { provide: AdminApi, useValue: { issueCredential, currentCredential, revokeCredential } }, { provide: TicketPrinter, useValue: { print } }, { provide: CredentialCardExporter, useValue: { jpeg, pdf, save } }, { provide: EstablishmentService, useValue: { name: () => 'Negocio de prueba' } }] });
+    TestBed.configureTestingModule({ providers: [{ provide: ConfirmationDialog, useValue: { confirm: confirmAction, cancel: cancelConfirmation } }, { provide: AdminApi, useValue: { issueCredential, currentCredential, revokeCredential } }, { provide: TicketPrinter, useValue: { print } }, { provide: CredentialCardExporter, useValue: { jpeg, pdf, save } }, { provide: EstablishmentService, useValue: { name: () => 'Negocio de prueba' } }] });
     const fixture = TestBed.createComponent(UserCredential);
     fixture.componentRef.setInput('user', user);
     return fixture.componentInstance;
   };
   beforeEach(() => { vi.clearAllMocks(); currentCredential.mockResolvedValue(null); revokeCredential.mockResolvedValue(undefined); issueCredential.mockResolvedValue(issued); print.mockResolvedValue(undefined);
-    vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
+    confirmAction.mockResolvedValue(true);
     jpeg.mockResolvedValue(new Blob(['j'])); pdf.mockResolvedValue(new Blob(['p'])); });
   afterEach(() => vi.restoreAllMocks());
 
@@ -39,35 +38,31 @@ describe('Carné de operador', () => {
   });
 
   it('confirma el reemplazo en una modal y evita emitir dos veces mientras está abierta', async () => {
-    const closed = new Subject<boolean | undefined>();
-    openDialog.mockReturnValue({ afterClosed: () => closed, close: vi.fn() });
+    let resolve!: (value: boolean) => void;
+    confirmAction.mockReturnValue(new Promise<boolean>(done => resolve = done));
     const component = create(); component.current.set({ ...issued, version: 1, state: 'ACTIVA' });
     const replacing = component.issue(); await component.issue();
-    expect(openDialog).toHaveBeenCalledOnce();
-    expect(openDialog).toHaveBeenCalledWith(CredentialReplacementDialog, expect.objectContaining({
-      data: { displayName: user.displayName }, role: 'alertdialog', autoFocus: '#cancel-credential-replacement',
-    }));
-    expect(globalThis.confirm).not.toHaveBeenCalled(); expect(issueCredential).not.toHaveBeenCalled();
-    closed.next(true); closed.complete(); await replacing;
+    expect(confirmAction).toHaveBeenCalledOnce();
+    expect(confirmAction).toHaveBeenCalledWith(expect.objectContaining({ title: '¿Emitir un carné nuevo?', confirmText: 'Emitir carné' }), expect.anything());
+    expect(issueCredential).not.toHaveBeenCalled();
+    resolve(true); await replacing;
     expect(issueCredential).toHaveBeenCalledExactlyOnceWith('u1');
   });
 
-  it.each([false, undefined])('cancelar o cerrar la modal (%s) conserva el carné anterior', async accepted => {
-    const closed = new Subject<boolean | undefined>();
-    openDialog.mockReturnValue({ afterClosed: () => closed, close: vi.fn() });
+  it('cancelar la modal conserva el carné anterior', async () => {
+    confirmAction.mockResolvedValue(false);
     const component = create(); component.current.set({ ...issued, version: 1, state: 'ACTIVA' });
-    const replacing = component.issue(); closed.next(accepted); closed.complete(); await replacing;
+    await component.issue();
     expect(issueCredential).not.toHaveBeenCalled();
     expect(component.current()?.credentialId).toBe('c1');
   });
 
   it('cerrar la ventana del carné descarta también una confirmación pendiente', async () => {
-    const closed = new Subject<boolean | undefined>();
-    const closeDialog = vi.fn();
-    openDialog.mockReturnValue({ afterClosed: () => closed, close: closeDialog });
+    let resolve!: (value: boolean) => void;
+    confirmAction.mockReturnValue(new Promise<boolean>(done => resolve = done));
     const component = create(); component.current.set({ ...issued, version: 1, state: 'ACTIVA' });
-    const replacing = component.issue(); component.close(); closed.next(true); closed.complete(); await replacing;
-    expect(closeDialog).toHaveBeenCalledWith(false);
+    const replacing = component.issue(); component.close(); resolve(true); await replacing;
+    expect(cancelConfirmation).toHaveBeenCalled();
     expect(issueCredential).not.toHaveBeenCalled(); expect(component.current()).toBeNull();
   });
 
@@ -94,6 +89,12 @@ describe('Carné de operador', () => {
     expect(revokeCredential).toHaveBeenCalledWith('u1', 'c1', 3);
     expect(component.issued()).toBeNull(); expect(component.current()).toBeNull();
     expect(component.notice()).toBe('Carné eliminado.');
+  });
+
+  it('cancelar la eliminación conserva el carné y no llama a la API', async () => {
+    confirmAction.mockResolvedValue(false);
+    const component = create(); component.current.set({ ...issued, version: 1, state: 'ACTIVA' });
+    await component.remove(); expect(revokeCredential).not.toHaveBeenCalled(); expect(component.current()).not.toBeNull();
   });
 
   it('si la eliminación falla conserva el carné visible para revisar el error', async () => {

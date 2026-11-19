@@ -1,3 +1,5 @@
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
+const confirmAction = vi.fn();
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Layaways } from './layaways';
@@ -21,10 +23,10 @@ describe('Layaways: abonos y entrega', () => {
     api.get.mockResolvedValue(detail());
     api.applyPayment.mockResolvedValue({ layawayId: 'a1', balance: 30000, state: 'ACTIVO', version: 4, correlationId: 'c', change: 0, payments: [] });
     api.deliver.mockResolvedValue({ layawayId: 'a1', number: 'APT-1', state: 'ENTREGADO', version: 5 });
-    TestBed.configureTestingModule({ providers: [
+    TestBed.configureTestingModule({ providers: [{ provide: ConfirmationDialog, useValue: { confirm: confirmAction } },
       { provide: LayawaysApi, useValue: api }, { provide: CustomersApi, useValue: customers }, { provide: SessionService, useValue: session },
     ] });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    confirmAction.mockResolvedValue(true);
     component = TestBed.runInInjectionContext(() => new Layaways());
   });
 
@@ -132,7 +134,7 @@ describe('Layaways: abonos y entrega', () => {
   it('entrega solo tras confirmar y con la versión del detalle', async () => {
     api.get.mockResolvedValue(detail({ state: 'PAGADO', balance: 0, version: 6 }));
     await component.open(layaway());
-    vi.mocked(window.confirm).mockReturnValueOnce(false);
+    confirmAction.mockResolvedValueOnce(false);
     await component.deliver();
     expect(api.deliver).not.toHaveBeenCalled();
     await component.deliver();
@@ -143,7 +145,7 @@ describe('Layaways: abonos y entrega', () => {
   it('no entrega un apartado activo', async () => {
     await component.open(layaway());
     await component.deliver();
-    expect(window.confirm).not.toHaveBeenCalled();
+    expect(confirmAction).not.toHaveBeenCalled();
     expect(api.deliver).not.toHaveBeenCalled();
   });
 

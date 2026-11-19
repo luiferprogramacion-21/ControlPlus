@@ -1,19 +1,24 @@
+import { NumberInput } from '../../shared/number-input';
 import { DatePipe } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { PrintJob, printJobStatusText, PrintProfile, SalesApi } from '../sales/sales-api';
 import { toastSignal } from '../../core/toast';
+import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 
 /** Perfiles de impresora (cola de Windows) y cola de impresión. Crear un perfil no comprueba que la cola exista. */
 @Component({
   selector: 'cp-print-settings',
-  imports: [DatePipe, FormsModule],
+  imports: [NumberInput, DatePipe, FormsModule],
   templateUrl: './print-settings.html',
 })
 export class PrintSettings implements OnInit {
   private readonly api = inject(SalesApi);
+  private readonly confirmations = inject(ConfirmationDialog);
+  private readonly destroyRef = inject(DestroyRef);
+  private confirming = false;
   readonly session = inject(SessionService);
   readonly profiles = signal<PrintProfile[]>([]);
   readonly jobs = signal<PrintJob[]>([]);
@@ -61,7 +66,7 @@ export class PrintSettings implements OnInit {
   }
 
   async save(): Promise<void> {
-    if (this.saving()) return;
+    if (this.saving() || this.deleting() || this.confirming) return;
     const issue = this.validation(); if (issue) { this.formError.set(issue); return; }
     this.saving.set(true); this.formError.set('');
     try {
@@ -81,11 +86,20 @@ export class PrintSettings implements OnInit {
 
   /** Decisión del 18 de noviembre de 2026: se borra el perfil; si ya imprimió, se retira y se conserva su historial. */
   async remove(profile: PrintProfile): Promise<void> {
-    if (!this.session.has('CONFIGURATION.MANAGE') || this.deleting() ||
-      !confirm(`¿Eliminar el perfil «${profile.name}»?${profile.isDefault ? ' Es el predeterminado: mientras no haya otro, no se imprimirá desde el sistema.' : ''}`)) return;
+    if (!this.session.has('CONFIGURATION.MANAGE') || this.deleting() || this.saving() || this.confirming) return;
+    const snapshot = { ...profile };
+    this.confirming = true;
+    let approved: boolean;
+    try {
+      approved = await this.confirmations.confirm({ title: 'Eliminar perfil de impresora',
+        message: `¿Eliminar el perfil «${snapshot.name}»?${snapshot.isDefault ? ' Es el predeterminado: mientras no haya otro, no se imprimirá desde el sistema.' : ''}`,
+        confirmText: 'Eliminar perfil', danger: true }, this.destroyRef);
+    } finally { this.confirming = false; }
+    if (!approved || this.destroyRef.destroyed || this.deleting() || this.saving() ||
+      !this.session.has('CONFIGURATION.MANAGE') || profile.id !== snapshot.id || profile.isDefault !== snapshot.isDefault) return;
     this.deleting.set(true); this.error.set(''); this.notice.set('');
     try {
-      const result = await this.api.deletePrintProfile(profile.id);
+      const result = await this.api.deletePrintProfile(snapshot.id);
       this.notice.set(result.physicallyDeleted ? 'Perfil eliminado.' : 'Perfil eliminado. Se conserva el historial de lo que imprimió.');
       await this.reload();
     } catch (e) { this.error.set(errorText(e)); }
