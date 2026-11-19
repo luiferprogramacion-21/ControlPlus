@@ -39,6 +39,12 @@ describe('SalesHistory: historial y anulación', () => {
     permissions.push('SALES.ALL_READ'); await create(); expect(api.list).toHaveBeenLastCalledWith(true, 1, 20);
   });
 
+  it('muestra cómo se pagó: crédito o los medios de contado', async () => {
+    const component = await create();
+    expect(component.paymentLabel({ saleType: 'CREDITO', paymentMethods: [] })).toBe('Crédito');
+    expect(component.paymentLabel({ saleType: 'CONTADO', paymentMethods: ['Efectivo', 'Nequi'] })).toBe('Efectivo + Nequi');
+    expect(component.paymentLabel({ saleType: 'CONTADO', paymentMethods: null })).toBe('—');
+  });
   it('muestra el detalle en una ventana modal y permite cerrarla', async () => {
     const fixture = TestBed.createComponent(SalesHistory);
     fixture.detectChanges(); await fixture.whenStable();

@@ -107,7 +107,10 @@ public sealed record SaleSummaryDto(
     DateTimeOffset OccurredAtUtc,
     DateOnly OperatingDate,
     decimal Total,
-    string State);
+    string State,
+    // Cómo se pagó (decisión del 18 de noviembre de 2026): CONTADO o CREDITO y, en contado, los medios usados.
+    string SaleType = "CONTADO",
+    IReadOnlyCollection<string>? PaymentMethods = null);
 
 public sealed record SaleListQuery(int Page = 1, int PageSize = 20);
 

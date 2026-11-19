@@ -23,6 +23,11 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
   styleUrls: ['../directory.scss', './sales-history.scss'],
 })
 export class SalesHistory implements OnInit {
+  /** Cómo se pagó: «Crédito» o los medios usados en contado (por ejemplo «Efectivo + Nequi»). */
+  paymentLabel(sale: { saleType?: string; paymentMethods?: string[] | null }): string {
+    if (sale.saleType === 'CREDITO') return 'Crédito';
+    return sale.paymentMethods?.length ? sale.paymentMethods.join(' + ') : '—';
+  }
   private readonly api = inject(SalesApi);
   private readonly authorization = inject(AuthorizationDialog);
   private readonly printing = inject(SalePrinting);

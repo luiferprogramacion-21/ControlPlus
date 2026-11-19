@@ -868,7 +868,10 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         SetBearer(client, scenario.SecondCashier.AccessToken);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync($"/api/sales/{sale.Id}")).StatusCode);
         SetBearer(client, scenario.Admin.AccessToken);
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/sales?page=1&pageSize=20")).StatusCode);
+        var listed = await ReadAsync<PagedResult<SaleSummaryDto>>(await client.GetAsync("/api/sales?page=1&pageSize=20"), HttpStatusCode.OK);
+        var summary = Assert.Single(listed.Items, x => x.Id == sale.Id);
+        Assert.Equal("CONTADO", summary.SaleType);
+        Assert.Equal(["Efectivo"], summary.PaymentMethods);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/sales/{sale.Id}")).StatusCode);
 
         var ownReadPermission = await GetPermissionIdAsync(client, PermissionCodes.SalesOwnRead);

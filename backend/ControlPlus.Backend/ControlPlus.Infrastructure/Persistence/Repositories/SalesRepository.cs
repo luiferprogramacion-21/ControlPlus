@@ -211,7 +211,9 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
         if (userId is Guid ownUserId) source = source.Where(x => x.UsuarioId == ownUserId);
         var count = await source.CountAsync(cancellationToken);
         var items = await source.OrderByDescending(x => x.FechaHora).ThenByDescending(x => x.Id)
-            .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArrayAsync(cancellationToken);
+            .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            .Include(x => x.PagoVenta).ThenInclude(x => x.MetodoPago)
+            .AsSplitQuery().ToArrayAsync(cancellationToken);
         return new PagedResult<Venta>(items, query.Page, query.PageSize, count);
     }
 

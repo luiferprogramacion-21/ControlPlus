@@ -1028,7 +1028,9 @@ public sealed partial class SalesService(
 
     private static SaleSummaryDto MapSummary(Venta sale) => new(
         sale.Id, VisibleNumber(sale), sale.UsuarioId, sale.ClienteId, Utc(sale.FechaHora),
-        sale.FechaOperativa, sale.Total, sale.Estado);
+        sale.FechaOperativa, sale.Total, sale.Estado, sale.TipoVenta,
+        sale.PagoVenta.OrderBy(x => x.MetodoPago?.OrdenVisual ?? int.MaxValue)
+            .Select(x => x.MetodoPago?.Nombre ?? x.MetodoPagoId.ToString()).Distinct().ToArray());
 
     private static SaleDto Map(Venta sale) => new(
         sale.Id,

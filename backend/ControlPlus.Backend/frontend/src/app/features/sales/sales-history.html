@@ -5,15 +5,15 @@
   <section class="panel module-panel">
     <div class="module-toolbar"><div><h3>Ventas registradas</h3><p class="muted">Consulta una venta para ver su detalle{{ session.has('SALES.VOID') ? ' o anularla' : '' }}.</p></div><button class="table-action" type="button" (click)="reload()">Actualizar</button></div>
     @if (loading()) { <p class="muted" role="status">Cargando ventas…</p> }
-    <div class="table-wrap module-table-wrap"><table><thead><tr><th>Venta</th><th>Fecha</th><th class="align-right">Total</th><th>Estado</th><th class="align-right">Acciones</th></tr></thead><tbody>
+    <div class="table-wrap module-table-wrap"><table><thead><tr><th>Venta</th><th>Fecha</th><th>Pago</th><th class="align-right">Total</th><th>Estado</th><th class="align-right">Acciones</th></tr></thead><tbody>
       @for (sale of result()?.items ?? []; track sale.id) {
         <tr>
-          <td class="numeric">{{ sale.visibleNumber }}</td><td>{{ sale.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }}</td>
+          <td class="numeric">{{ sale.visibleNumber }}</td><td>{{ sale.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }}</td><td><span class="status-pill" [class.status-pill--warning]="sale.saleType === 'CREDITO'">{{ paymentLabel(sale) }}</span></td>
           <td class="align-right numeric">{{ sale.total | currency:'COP':'symbol':'1.0-0' }}</td>
           <td><span class="status-pill" [class.status-pill--warning]="sale.state === 'ANULADA'">{{ label(sale.state) }}</span></td>
           <td class="align-right"><button class="table-action" type="button" (click)="open(sale)">Ver detalle</button>@if (canPrint(sale)) { <button class="table-action" type="button" [disabled]="printingId() === sale.id" (click)="print(sale)">Imprimir</button> }</td>
         </tr>
-      } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="5">No hay ventas registradas.</td></tr> } }
+      } @empty { @if (!loading()) { <tr class="empty-row"><td colspan="6">No hay ventas registradas.</td></tr> } }
     </tbody></table></div>
     @if (result(); as pageResult) { <mat-paginator [length]="pageResult.totalCount" [pageIndex]="page - 1" [pageSize]="pageSize" [pageSizeOptions]="[10,20,50]" (page)="pageChanged($event)" aria-label="Páginas de ventas" /> }
   </section>
