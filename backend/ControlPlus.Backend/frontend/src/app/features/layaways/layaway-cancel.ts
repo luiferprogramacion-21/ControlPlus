@@ -7,12 +7,13 @@ import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, autho
 import { LayawayCancellation, LayawayDetail, LayawaysApi } from './layaways-api';
 import { appliedTotal, emptyDraft, money, PaymentDraft, PaymentMethods, toRefunds, validateDrafts } from './payment-methods';
 import { toastSignal } from '../../core/toast';
+import { WindowSheet } from '../../shared/window-sheet';
 
 interface Pending { key: string; fingerprint: string; authorizerUserName: string | null; }
 
 @Component({
   selector: 'cp-layaway-cancel',
-  imports: [NumberInput, FormsModule, PaymentMethods],
+  imports: [WindowSheet, NumberInput, FormsModule, PaymentMethods],
   templateUrl: './layaway-cancel.html',
   styleUrl: './layaways.scss',
 })

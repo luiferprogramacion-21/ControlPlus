@@ -37,7 +37,7 @@
       <label class="field-label field-label--spaced"><input type="checkbox" name="makeDefault" [(ngModel)]="form.makeDefault"> Usar como predeterminado</label>
       <p class="form-hint">Las dimensiones pueden quedar vacías para usar el tamaño configurado en el controlador. Crear el perfil no comprueba que la cola esté instalada.</p>
       @if (formError()) { <p class="field-error" role="alert">{{ formError() }}</p> }
-      <div class="form-actions"><button class="button button--secondary" type="button" (click)="creating.set(false)" [disabled]="saving()">Cancelar</button><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button></div>
+      <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button><button class="button button--secondary" type="button" (click)="creating.set(false)" [disabled]="saving()">Cancelar</button></div>
     </form>
   </div>
 }

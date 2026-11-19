@@ -13,12 +13,13 @@ import { LayawayCreate } from './layaway-create';
 import { appliedTotal, cashChange, emptyDraft, PaymentDraft, PaymentMethods, toPayments, validateDrafts } from './payment-methods';
 import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
+import { WindowSheet } from '../../shared/window-sheet';
 
 const STATE_LABELS: Record<string, string> = { ACTIVO: 'Activo', PAGADO: 'Pagado', ENTREGADO: 'Entregado', ANULADO: 'Anulado' };
 
 @Component({
   selector: 'cp-layaways',
-  imports: [DatePipe, FormsModule, MatPaginatorModule, Icon, PaymentMethods, LayawayCreate, LayawayCancel],
+  imports: [WindowSheet, DatePipe, FormsModule, MatPaginatorModule, Icon, PaymentMethods, LayawayCreate, LayawayCancel],
   templateUrl: './layaways.html',
   styleUrls: ['../directory.scss', './layaways.scss'],
 })

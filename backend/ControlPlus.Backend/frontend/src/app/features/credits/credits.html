@@ -47,7 +47,7 @@
     @if (drafts.length < 3) { <button class="table-action" type="button" (click)="addMethod()">Agregar medio</button> }
     <div class="credit-totals"><span>Total aplicado <strong>{{ money(appliedTotal) }}</strong></span><span>Cambio <strong>{{ money(change) }}</strong></span></div>
     @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-    <div class="form-actions"><button class="button button--secondary" type="button" (click)="close()" [disabled]="saving()">Cancelar</button><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Registrando…' : 'Registrar abono' }}</button></div>
+    <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Registrando…' : 'Registrar abono' }}</button><button class="button button--secondary" type="button" (click)="close()" [disabled]="saving()">Cancelar</button></div>
   </form></div> } }
   @if (cancellingPayment() && selected(); as credit) { @if (cancellationTarget(); as payment) {
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="credit-payment-cancel-title"><div class="module-form-sheet__backdrop" (click)="cancellingPayment.set(false)"></div><form class="panel panel--padded module-form" (submit)="$event.preventDefault(); confirmCancelPayment()">
@@ -56,7 +56,7 @@
       <label class="field-label" for="credit-payment-cancel-reason">Motivo</label><select id="credit-payment-cancel-reason" class="text-field" name="cancellationReason" [(ngModel)]="cancellationReasonId"><option value="">Selecciona un motivo</option>@for (reason of cancellationReasons(); track reason.id) { <option [value]="reason.id">{{ reason.name }}</option> }</select>
       <label class="field-label field-label--spaced" for="credit-payment-cancel-observation">Observación <span>{{ selectedCancellationReason?.code === 'OTRO' ? '(obligatoria)' : '(opcional)' }}</span></label><textarea id="credit-payment-cancel-observation" class="text-field" name="cancellationObservation" maxlength="500" [(ngModel)]="cancellationObservation"></textarea>
       @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-      <div class="form-actions"><button class="button button--secondary" type="button" [disabled]="saving()" (click)="cancellingPayment.set(false)">Volver</button><button class="button button--primary" type="submit" [disabled]="saving()">Continuar</button></div>
+      <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">Continuar</button><button class="button button--secondary" type="button" [disabled]="saving()" (click)="cancellingPayment.set(false)">Volver</button></div>
     </form></div>
   } }
   @if (forgiving() && selected(); as credit) {
@@ -65,7 +65,7 @@
       <p class="muted">El crédito pasará a Anulado. No se repone mercancía y los abonos registrados se conservan.</p>
       <label class="field-label" for="credit-forgive-reason">Motivo obligatorio</label><textarea id="credit-forgive-reason" class="text-field" name="forgivenessReason" maxlength="500" [(ngModel)]="forgivenessReason"></textarea>
       @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-      <div class="form-actions"><button class="button button--secondary" type="button" [disabled]="saving()" (click)="forgiving.set(false)">Cancelar</button><button class="button button--primary" type="submit" [disabled]="saving()">Condonar saldo</button></div>
+      <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">Condonar saldo</button><button class="button button--secondary" type="button" [disabled]="saving()" (click)="forgiving.set(false)">Cancelar</button></div>
     </form></div>
   }
 </section>

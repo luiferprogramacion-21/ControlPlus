@@ -81,7 +81,7 @@
           <cp-payment-methods [drafts]="drafts" mode="payment" idPrefix="layaway" />
           <div class="layaway-totals"><span>Total aplicado <strong>{{ money(appliedTotal) }}</strong></span><span class="layaway-change">Cambio <strong>{{ money(change) }}</strong></span></div>
           @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-          <div class="form-actions"><button class="button button--secondary" type="button" (click)="closePayment()" [disabled]="saving()">Cancelar</button><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Registrando…' : 'Registrar abono' }}</button></div>
+          <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Registrando…' : 'Registrar abono' }}</button><button class="button button--secondary" type="button" (click)="closePayment()" [disabled]="saving()">Cancelar</button></div>
         </form>
       </div>
     }

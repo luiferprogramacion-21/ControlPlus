@@ -39,7 +39,7 @@ export interface AuthorizationPrompt {
   imports: [FormsModule, MatButtonModule, MatDialogModule],
   template: `
     <div class="authorization-dialog">
-      <h2 mat-dialog-title>{{ data.title }}</h2>
+      <h2 mat-dialog-title class="window-heading">{{ data.title }}</h2><button class="window-close window-close--dialog" type="button" aria-label="Cerrar" title="Cerrar (Esc)" (click)="cancel()" [disabled]="busy()"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12 M6 18L18 6"/></svg></button>
       <mat-dialog-content>
         <p>{{ data.description }}</p><p><strong>{{ data.detail }}</strong></p>
         @if (data.allowCredential) {
@@ -58,8 +58,8 @@ export interface AuthorizationPrompt {
         @if (busy()) { <p role="status">Procesando autorización…</p> }
       </mat-dialog-content>
       <mat-dialog-actions align="end">
-        <button mat-button type="button" (click)="cancel()" [disabled]="busy()">Cancelar</button>
         <button mat-flat-button type="submit" form="authorization-form" [disabled]="busy()">{{ busy() ? 'Procesando…' : 'Autorizar y continuar' }}</button>
+        <button mat-button type="button" (click)="cancel()" [disabled]="busy()">Cancelar</button>
       </mat-dialog-actions>
     </div>`,
   styles: [`

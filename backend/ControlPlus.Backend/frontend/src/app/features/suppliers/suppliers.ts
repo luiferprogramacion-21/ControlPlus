@@ -7,7 +7,8 @@ import { Icon } from '../../layout/icon';
 import { Supplier, SupplierInput, SuppliersApi } from './suppliers-api';
 import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
-@Component({ selector: 'cp-suppliers', imports: [FormsModule, MatPaginatorModule, Icon], templateUrl: './suppliers.html', styleUrl: '../directory.scss' })
+import { WindowSheet } from '../../shared/window-sheet';
+@Component({ selector: 'cp-suppliers', imports: [WindowSheet, FormsModule, MatPaginatorModule, Icon], templateUrl: './suppliers.html', styleUrl: '../directory.scss' })
 export class Suppliers implements OnInit {
   private readonly api = inject(SuppliersApi);
   private readonly confirmation = inject(ConfirmationDialog);

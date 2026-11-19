@@ -17,6 +17,6 @@
     <label class="field-label field-label--spaced" for="cancel-observation">Observación <span>(opcional)</span></label>
     <textarea id="cancel-observation" class="text-field" name="observation" maxlength="1000" [(ngModel)]="observation"></textarea>
     @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-    <div class="form-actions"><button class="button button--secondary" type="button" (click)="closed.emit()" [disabled]="saving()">Volver</button><button class="button button--primary" type="submit" [disabled]="saving()">Continuar a la autorización</button></div>
+    <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">Continuar a la autorización</button><button class="button button--secondary" type="button" (click)="closed.emit()" [disabled]="saving()">Volver</button></div>
   </form>
 </div>

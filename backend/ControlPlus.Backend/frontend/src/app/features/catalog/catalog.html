@@ -175,7 +175,7 @@
         <h2 id="delete-product-title">¿Borrar este producto?</h2>
         <p><strong>{{ doomed.internalCode }} · {{ doomed.name }}</strong></p>
         <p>Se elimina del catálogo junto con su inventario inicial. Solo es posible si nunca tuvo ventas, compras, apartados ni pedidos; en ese caso, inactívalo. Esta acción no se puede deshacer.</p>
-        <div class="form-actions"><button class="button button--secondary" type="button" (click)="deleting.set(null)" [disabled]="saving()">Cancelar</button><button class="button button--danger" type="button" (click)="confirmDelete()" [disabled]="saving()">{{ saving() ? 'Borrando…' : 'Borrar producto' }}</button></div>
+        <div class="form-actions"><button class="button button--danger" type="button" (click)="confirmDelete()" [disabled]="saving()">{{ saving() ? 'Borrando…' : 'Borrar producto' }}</button><button class="button button--secondary" type="button" (click)="deleting.set(null)" [disabled]="saving()">Cancelar</button></div>
       </section>
     </div>
   }

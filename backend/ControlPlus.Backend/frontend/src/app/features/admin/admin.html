@@ -108,7 +108,7 @@
         }
         @if (currentMode === 'password') { <p class="form-hint">Al cambiar la contraseña se registra la operación en la auditoría.</p> }
         @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-        <div class="form-actions"><button class="button button--secondary" type="button" (click)="close()">Cancelar</button><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button></div>
+        <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar' }}</button><button class="button button--secondary" type="button" (click)="close()">Cancelar</button></div>
       </form>
     </div>
   }

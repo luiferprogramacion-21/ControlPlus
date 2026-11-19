@@ -13,13 +13,14 @@ import { CancelSaleInput, ConfirmedChange, printJobStatusText, SaleCancellationR
 import { SaleChange } from './sale-change';
 import { SalePrinting } from './sale-printing';
 import { statusKind, toastSignal } from '../../core/toast';
+import { WindowSheet } from '../../shared/window-sheet';
 
 const STATE_LABELS: Record<string, string> = { CONFIRMADA: 'Confirmada', ANULADA: 'Anulada' };
 interface Pending { key: string; fingerprint: string; authorizerUserName: string | null; }
 
 @Component({
   selector: 'cp-sales-history',
-  imports: [A11yModule, CurrencyPipe, DatePipe, DecimalPipe, FormsModule, MatPaginatorModule, RouterLink, Icon, SaleChange],
+  imports: [WindowSheet, A11yModule, CurrencyPipe, DatePipe, DecimalPipe, FormsModule, MatPaginatorModule, RouterLink, Icon, SaleChange],
   templateUrl: './sales-history.html',
   styleUrls: ['../directory.scss', './sales-history.scss'],
 })

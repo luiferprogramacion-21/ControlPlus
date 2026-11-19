@@ -18,6 +18,7 @@ import { describeDiscount, Discount, discountAmount, maxDiscountPercent, validat
 import { DiscountApplied, DiscountDialog } from './discount-dialog';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { statusKind, toastSignal } from '../../core/toast';
+import { WindowSheet } from '../../shared/window-sheet';
 
 interface CartLine { product: Product; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; discount: Discount | null; }
 interface ReceiptMeta { customer: string; operator: string; items: number; units: number; }
@@ -29,7 +30,7 @@ const DRAFT_DELAY_MS = 1200;
 const PRINT_WATCH_INTERVAL_MS = 1500;
 const PRINT_WATCH_ATTEMPTS = 20;
 
-@Component({ selector: 'cp-sales', imports: [NumberInput, DecimalPipe, A11yModule, FormsModule, CurrencyPipe, DatePipe, MatButtonModule, RouterLink, CustomerPicker, DiscountDialog], templateUrl: './sales.html', styleUrl: './sales.scss' })
+@Component({ selector: 'cp-sales', imports: [WindowSheet, NumberInput, DecimalPipe, A11yModule, FormsModule, CurrencyPipe, DatePipe, MatButtonModule, RouterLink, CustomerPicker, DiscountDialog], templateUrl: './sales.html', styleUrl: './sales.scss' })
 export class Sales implements OnInit, OnDestroy {
   private readonly catalog = inject(CatalogApi);
   private readonly cash = inject(CashApi);

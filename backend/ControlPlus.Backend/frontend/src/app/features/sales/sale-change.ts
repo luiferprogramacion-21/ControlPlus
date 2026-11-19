@@ -12,6 +12,7 @@ import { ChangePaymentInput, ChangePreparation, ConfirmChangeInput, ConfirmedCha
 import { ChangeTreatment, returnValue, settle } from './sale-change-math';
 import { WHOLESALE_MIN_QUANTITY } from './sale-discount';
 import { toastSignal } from '../../core/toast';
+import { WindowSheet } from '../../shared/window-sheet';
 
 interface Returning { saleLineId: string; productId: string; code: string; name: string; sold: number; remaining: number; net: number; quantity: number; resellable: boolean; }
 interface Delivering { product: Product; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; }
@@ -19,7 +20,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
 
 @Component({
   selector: 'cp-sale-change',
-  imports: [NumberInput, DecimalPipe, CurrencyPipe, FormsModule, PaymentMethods],
+  imports: [WindowSheet, NumberInput, DecimalPipe, CurrencyPipe, FormsModule, PaymentMethods],
   templateUrl: './sale-change.html',
   styleUrls: ['./sale-change.scss'],
 })

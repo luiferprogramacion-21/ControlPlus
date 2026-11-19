@@ -16,13 +16,14 @@ import { UserPermissions } from './user-permissions';
 import { isVisibleAdminPermission } from './visible-permissions';
 import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog, ConfirmationOptions } from '../../shared/confirmation-dialog';
+import { WindowSheet } from '../../shared/window-sheet';
 
 type Mode = 'create' | 'edit' | 'role' | 'password';
 type Tab = 'users' | 'roles' | 'audit';
 
 @Component({
   selector: 'cp-admin',
-  imports: [DatePipe, FormsModule, MatButtonModule, MatPaginatorModule, RouterLink, Icon, RoleTemplate, UserPermissions, UserCredential, AuditLog],
+  imports: [WindowSheet, DatePipe, FormsModule, MatButtonModule, MatPaginatorModule, RouterLink, Icon, RoleTemplate, UserPermissions, UserCredential, AuditLog],
   templateUrl: './admin.html',
   styleUrls: ['../directory.scss', './admin.scss'],
 })

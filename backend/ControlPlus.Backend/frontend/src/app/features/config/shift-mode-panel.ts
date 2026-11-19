@@ -32,8 +32,8 @@ type Mode = 'INDIVIDUAL' | 'COMPARTIDO';
         @if (cash.hasOpenShift) { <p class="field-hint" role="status">Hay un turno abierto: para cambiar el modo, ciérrelo primero en Caja. El cambio aplica desde el próximo turno.</p> }
         @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
         <div class="form-actions">
-          <button class="button button--secondary" type="button" (click)="selected = currentMode(cash)" [disabled]="saving() || selected === currentMode(cash)">Cancelar</button>
           <button class="button button--primary" type="button" (click)="save()" [disabled]="saving() || cash.hasOpenShift || selected === currentMode(cash)">{{ saving() ? 'Guardando…' : 'Guardar' }}</button>
+          <button class="button button--secondary" type="button" (click)="selected = currentMode(cash)" [disabled]="saving() || selected === currentMode(cash)">Cancelar</button>
         </div>
       } @else if (!loadError()) { <p class="muted" role="status">Cargando…</p> }
     </section>`,

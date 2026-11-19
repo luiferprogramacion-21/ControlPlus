@@ -6,12 +6,13 @@ import { AdminApi, AdminPermission, AdminUser, EffectivePermission } from './adm
 import { isVisibleAdminPermission } from './visible-permissions';
 import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
+import { WindowSheet } from '../../shared/window-sheet';
 
 interface Row extends EffectivePermission { module: string; }
 
 @Component({
   selector: 'cp-user-permissions',
-  imports: [FormsModule],
+  imports: [WindowSheet, FormsModule],
   styleUrl: './admin.scss',
   template: `
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="user-permissions-title"><div class="module-form-sheet__backdrop" (click)="closed.emit()"></div>

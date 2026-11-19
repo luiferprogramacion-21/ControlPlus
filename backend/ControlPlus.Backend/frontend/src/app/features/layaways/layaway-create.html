@@ -58,6 +58,6 @@
     <div class="layaway-totals"><span>Pago inicial <strong>{{ money(initialPayment) }}</strong></span><span class="layaway-change">Cambio <strong>{{ money(change) }}</strong></span></div>
 
     @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-    <div class="form-actions"><button class="button button--secondary" type="button" (click)="closed.emit()" [disabled]="saving()">Cancelar</button><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Creando…' : selfAuthorized ? 'Crear apartado' : 'Continuar a la autorización' }}</button></div>
+    <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Creando…' : selfAuthorized ? 'Crear apartado' : 'Continuar a la autorización' }}</button><button class="button button--secondary" type="button" (click)="closed.emit()" [disabled]="saving()">Cancelar</button></div>
   </form>
 </div>

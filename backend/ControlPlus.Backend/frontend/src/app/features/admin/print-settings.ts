@@ -7,11 +7,12 @@ import { SessionService } from '../../core/session.service';
 import { PrintJob, printJobStatusText, PrintProfile, SalesApi } from '../sales/sales-api';
 import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
+import { WindowSheet } from '../../shared/window-sheet';
 
 /** Perfiles de impresora (cola de Windows) y cola de impresión. Crear un perfil no comprueba que la cola exista. */
 @Component({
   selector: 'cp-print-settings',
-  imports: [NumberInput, DatePipe, FormsModule],
+  imports: [WindowSheet, NumberInput, DatePipe, FormsModule],
   templateUrl: './print-settings.html',
 })
 export class PrintSettings implements OnInit {

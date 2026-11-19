@@ -30,9 +30,9 @@
 
     @if (error) { <p class="field-error" role="alert">{{ error }}</p> }
     <div class="form-actions">
-      <button class="button button--secondary" type="button" (click)="closed.emit()">Cancelar</button>
       @if (current()) { <button class="button button--secondary" type="button" (click)="removed.emit()">Quitar descuento</button> }
       <button class="button button--primary" type="submit">Aplicar descuento</button>
+      <button class="button button--secondary" type="button" (click)="closed.emit()">Cancelar</button>
     </div>
   </form>
 </div>

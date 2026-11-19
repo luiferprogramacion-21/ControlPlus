@@ -15,6 +15,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PurchaseOrderDocumentPrinter } from './purchase-order-document';
 import { profitPercentOf, suggestedPrice } from '../../shared/price-calculator';
 import { toastSignal } from '../../core/toast';
+import { WindowSheet } from '../../shared/window-sheet';
 
 export function currentColombiaDate(now = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -23,7 +24,7 @@ export function currentColombiaDate(now = new Date()): string {
   const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
   return `${value['year']}-${value['month']}-${value['day']}`;
 }
-@Component({ selector: 'cp-purchases', imports: [NumberInput, CommonModule, FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './purchases.html', styleUrls: ['../directory.scss', './purchases.scss'] })
+@Component({ selector: 'cp-purchases', imports: [WindowSheet, NumberInput, CommonModule, FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './purchases.html', styleUrls: ['../directory.scss', './purchases.scss'] })
 export class Purchases implements OnInit {
   private readonly api = inject(PurchasesApi); private readonly ordersApi = inject(OrdersApi); private readonly suppliersApi = inject(SuppliersApi); private readonly catalog = inject(CatalogApi);
   private readonly authorization = inject(AuthorizationDialog);

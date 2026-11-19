@@ -12,11 +12,12 @@ import { Icon } from '../../layout/icon';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { Credit, CreditPayment, CreditPaymentCancellationReason, CreditsApi, PaymentMethodInput } from './credits-api';
 import { toastSignal } from '../../core/toast';
+import { WindowSheet } from '../../shared/window-sheet';
 
 type Method = PaymentMethodInput['methodCode'];
 type Draft = { methodCode: Method; appliedAmount: number; receivedAmount: number | null; reference: string; };
 const LIMIT = Number.MAX_SAFE_INTEGER;
-@Component({ selector: 'cp-credits', imports: [NumberInput, A11yModule, DatePipe, FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './credits.html', styleUrls: ['../directory.scss', './credits.scss'] })
+@Component({ selector: 'cp-credits', imports: [WindowSheet, NumberInput, A11yModule, DatePipe, FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './credits.html', styleUrls: ['../directory.scss', './credits.scss'] })
 export class Credits implements OnInit {
   private readonly api = inject(CreditsApi);
   private readonly customersApi = inject(CustomersApi);

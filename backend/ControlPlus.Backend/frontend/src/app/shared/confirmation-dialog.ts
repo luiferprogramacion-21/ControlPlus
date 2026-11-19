@@ -14,13 +14,13 @@ export type ConfirmationOptions = ConfirmationPrompt;
   selector: 'cp-confirmation-dialog',
   imports: [MatDialogModule],
   template: `
-    <h2 mat-dialog-title>{{ data.title }}</h2>
+    <h2 mat-dialog-title class="window-heading">{{ data.title }}</h2><button class="window-close window-close--dialog" type="button" aria-label="Cerrar" title="Cerrar (Esc)" [mat-dialog-close]="false"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12 M6 18L18 6"/></svg></button>
     <mat-dialog-content id="cp-confirmation-description">
       <p class="confirmation-message">{{ data.message }}</p>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button id="cp-confirmation-cancel" class="button button--secondary" type="button" [mat-dialog-close]="false">Cancelar</button>
       <button class="button" [class.button--primary]="!data.danger" [class.button--danger]="data.danger" type="button" [mat-dialog-close]="true">{{ data.confirmText || 'Confirmar' }}</button>
+      <button id="cp-confirmation-cancel" class="button button--secondary" type="button" [mat-dialog-close]="false">Cancelar</button>
     </mat-dialog-actions>`,
   styles: [`
     .confirmation-message { margin:0; padding:14px 16px; border-left:3px solid var(--cp-warning); border-radius:4px; background:var(--cp-warning-soft); color:var(--cp-text); line-height:1.6; white-space:pre-line; overflow-wrap:anywhere; }

@@ -4,6 +4,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Page, errorText } from '../../core/api';
 import { Customer, CustomerHistoryItem, CustomersApi } from './customers-api';
 import { toastSignal } from '../../core/toast';
+import { WindowSheet } from '../../shared/window-sheet';
 
 const TYPE_LABELS: Record<string, string> = {
   SALE: 'Venta', CREDIT: 'Crédito', CREDIT_PAYMENT: 'Abono de crédito', LAYAWAY: 'Apartado', LAYAWAY_PAYMENT: 'Abono de apartado',
@@ -16,7 +17,7 @@ const STATUS_LABELS: Record<string, string> = {
 /** Commercial history of one customer: sales, credits, layaways and their payments, newest first. */
 @Component({
   selector: 'cp-customer-history',
-  imports: [CurrencyPipe, DatePipe, MatPaginatorModule],
+  imports: [WindowSheet, CurrencyPipe, DatePipe, MatPaginatorModule],
   templateUrl: './customer-history.html',
   styles: ['.customer-history-sheet { width: min(980px, 100%); max-height: calc(92vh / var(--cp-zoom)); overflow-y: auto; } .is-payment td { color: var(--cp-text-secondary); font-size: 13px; }'],
 })

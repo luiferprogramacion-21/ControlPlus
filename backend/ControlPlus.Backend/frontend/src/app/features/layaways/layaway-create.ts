@@ -11,6 +11,7 @@ import { CreateLayawayInput, CreatedLayaway, LayawayCreationRules, LayawayPriceT
 import { appliedTotal, cashChange, emptyDraft, money, PaymentDraft, PaymentMethods, toPayments, validateDrafts } from './payment-methods';
 import { WHOLESALE_MIN_QUANTITY } from '../sales/sale-discount';
 import { toastSignal } from '../../core/toast';
+import { WindowSheet } from '../../shared/window-sheet';
 
 export interface CreateLine { product: Product; quantity: number; priceType: LayawayPriceType; }
 
@@ -32,7 +33,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
 
 @Component({
   selector: 'cp-layaway-create',
-  imports: [NumberInput, FormsModule, PaymentMethods],
+  imports: [WindowSheet, NumberInput, FormsModule, PaymentMethods],
   templateUrl: './layaway-create.html',
   styleUrl: './layaways.scss',
 })

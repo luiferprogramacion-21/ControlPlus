@@ -69,7 +69,7 @@
         <label class="field-label field-label--spaced" for="sale-cancel-observation">Observación <span>{{ selectedReason?.code === 'OTRO' ? '(obligatoria)' : '(opcional)' }}</span></label>
         <textarea id="sale-cancel-observation" class="text-field" name="observation" maxlength="500" [(ngModel)]="observation"></textarea>
         @if (formError()) { <p class="field-error" role="alert">{{ formError() }}</p> }
-        <div class="form-actions"><button class="button button--secondary" type="button" (click)="cancelling.set(false)" [disabled]="saving()">Volver</button><button class="button button--primary" type="submit" [disabled]="saving()">Continuar</button></div>
+        <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">Continuar</button><button class="button button--secondary" type="button" (click)="cancelling.set(false)" [disabled]="saving()">Volver</button></div>
       </form>
     </div>
   }

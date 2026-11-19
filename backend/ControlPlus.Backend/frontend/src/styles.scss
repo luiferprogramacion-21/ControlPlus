@@ -762,3 +762,15 @@ app-root .cdk-overlay-popover { zoom: calc(1 / var(--cp-zoom)); }
 .toast__close:focus-visible { outline: 2px solid var(--cp-focus); border-radius: 4px; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+/* Ventanas como en Windows (decisión del 19 de noviembre de 2026): X arriba a la derecha y botones abajo a la
+   derecha en el orden de Windows, primero la acción («Aceptar», «Guardar»…) y al final «Cancelar». */
+.window-heading { position: relative; padding-right: 52px; }
+.window-close { position: absolute; top: -8px; right: -8px; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--cp-text-secondary); cursor: pointer; }
+.window-close:hover { background: var(--cp-error); color: white; }
+.window-close:focus-visible { outline: 2px solid var(--cp-focus); outline-offset: 0; }
+.mat-mdc-dialog-title.window-heading { padding-right: 64px; }
+.window-close--dialog { top: 12px; right: 12px; }
+.mat-mdc-dialog-surface { position: relative; }
+/* Los botones de la ventana quedan siempre a la vista abajo, aunque el formulario sea largo. */
+.module-form:not(.module-form--reception) .form-actions { position: sticky; z-index: 2; bottom: -18px; margin: 24px -20px -18px; padding: 14px 20px 18px; border-top: 1px solid var(--cp-border); background: var(--cp-surface); }

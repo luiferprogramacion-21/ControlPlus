@@ -10,6 +10,7 @@ import { AdminApi, AdminUser, IssuedCredential, OperatorCredential } from './adm
 import { buildCredentialCardHtml, CredentialCard } from './credential-card';
 import { CredentialCardExporter } from './credential-card-export';
 import { toastSignal } from '../../core/toast';
+import { WindowSheet } from '../../shared/window-sheet';
 
 /**
  * Shows the current operator card to its Administrator; old hash-only cards need to be reissued once.
@@ -17,7 +18,7 @@ import { toastSignal } from '../../core/toast';
  */
 @Component({
   selector: 'cp-user-credential',
-  imports: [DatePipe],
+  imports: [WindowSheet, DatePipe],
   styleUrl: './admin.scss',
   template: `
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="user-credential-title"><div class="module-form-sheet__backdrop" (click)="close()"></div>
@@ -33,9 +34,9 @@ import { toastSignal } from '../../core/toast';
           } @else if (!loading()) { <p class="form-hint">Esta persona no tiene carné vigente.</p> }
           <p class="form-hint">Emitir uno nuevo <strong>revoca el anterior</strong>. Los nuevos carnés podrán consultarse aquí después.</p>
           @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-          <div class="form-actions"><button class="button button--secondary" type="button" (click)="close()">Cerrar</button>
-            @if (current()) { <button class="button button--secondary" type="button" [disabled]="busy() || loading()" (click)="remove()">Eliminar carné</button> }
-            <button class="button button--primary" type="button" [disabled]="busy() || loading() || !user().isActive" (click)="issue()">{{ busy() ? 'Emitiendo…' : 'Emitir carné' }}</button></div>
+          <div class="form-actions">@if (current()) { <button class="button button--secondary" type="button" [disabled]="busy() || loading()" (click)="remove()">Eliminar carné</button> }
+            <button class="button button--primary" type="button" [disabled]="busy() || loading() || !user().isActive" (click)="issue()">{{ busy() ? 'Emitiendo…' : 'Emitir carné' }}</button>
+            <button class="button button--secondary" type="button" (click)="close()">Cerrar</button></div>
           @if (!user().isActive) { <p class="field-error">El usuario está inactivo y no puede recibir carné.</p> }
         } @else {
           <div class="credential-preview" aria-label="Vista previa del carné">
@@ -47,11 +48,11 @@ import { toastSignal } from '../../core/toast';
           <p class="form-hint">Emitido el {{ issued()!.issuedAtUtc | date:'dd/MM/yyyy HH:mm' }}. Puedes volver a consultarlo desde Usuarios → Carné.</p>
           @if (current()?.state === 'VENCIDA') { <p class="field-error">Este carné venció y ya no sirve para operar.</p> }
           @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
-          <div class="form-actions"><button class="button button--secondary" type="button" (click)="close()">Cerrar</button>
-            <button class="button button--secondary" type="button" [disabled]="busy()" (click)="remove()">Eliminar carné</button>
+          <div class="form-actions"><button class="button button--secondary" type="button" [disabled]="busy()" (click)="remove()">Eliminar carné</button>
             <button class="button button--secondary" type="button" (click)="download('jpg')">Descargar JPG</button>
             <button class="button button--secondary" type="button" (click)="download('pdf')">Descargar PDF</button>
-            <button class="button button--primary" type="button" (click)="print()">Imprimir carné</button></div>
+            <button class="button button--primary" type="button" (click)="print()">Imprimir carné</button>
+            <button class="button button--secondary" type="button" (click)="close()">Cerrar</button></div>
         }
       </div>
     </div>`,
