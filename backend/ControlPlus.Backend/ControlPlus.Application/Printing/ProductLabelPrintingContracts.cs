@@ -20,7 +20,18 @@ public sealed record ProductLabelLineRequest(Guid ProductId, int Quantity);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CreateProductLabelJobRequest(Guid ProfileId,
-    IReadOnlyCollection<ProductLabelLineRequest> Lines);
+    IReadOnlyCollection<ProductLabelLineRequest> Lines, Guid? SourcePurchaseId = null);
+
+public sealed record ProductLabelReceiptLineDto(ProductLabelProductDto Product,
+    int ReceivedQuantity, int PendingQuantity);
+
+public sealed record ProductLabelReceiptDto(Guid PurchaseId, string VisibleNumber,
+    string SupplierName, DateTimeOffset ReceivedAtUtc, int PendingLabelCount,
+    IReadOnlyCollection<ProductLabelReceiptLineDto> Lines);
+
+public sealed record ProductLabelQueueItemDto(Guid JobId, Guid BatchId, Guid ProfileId,
+    string ProfileName, int LabelCount, string Status, DateTimeOffset RequestedAtUtc,
+    Guid? SourcePurchaseId, string? Error);
 
 public sealed record ProductLabelJobDto(Guid JobId, Guid BatchId, Guid ProfileId,
     string ProfileName, int LabelCount, string Status, DateTimeOffset RequestedAtUtc);
@@ -29,7 +40,7 @@ public sealed record ProductLabelPrintItem(Guid ProductId, string Name, decimal 
     string Barcode, int Quantity);
 
 public sealed record ProductLabelPrintPayload(int SchemaVersion,
-    IReadOnlyCollection<ProductLabelPrintItem> Items);
+    IReadOnlyCollection<ProductLabelPrintItem> Items, string? EstablishmentName = null);
 
 public sealed record ProductLabelPrintLayout(decimal? WidthMm, decimal? HeightMm,
     int? ResolutionDpi);
@@ -44,9 +55,10 @@ public static class ProductLabelPayloadCodec
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
-    public static byte[] Encode(IReadOnlyCollection<ProductLabelPrintItem> items) =>
+    public static byte[] Encode(IReadOnlyCollection<ProductLabelPrintItem> items,
+        string? establishmentName = null) =>
         Encoding.UTF8.GetBytes(JsonSerializer.Serialize(
-            new ProductLabelPrintPayload(CurrentSchemaVersion, items), JsonOptions));
+            new ProductLabelPrintPayload(CurrentSchemaVersion, items, establishmentName), JsonOptions));
 
     public static bool TryDecode(byte[] content, out ProductLabelPrintPayload? payload)
     {
@@ -77,4 +89,12 @@ public interface IProductLabelPrintingService
         CancellationToken cancellationToken = default);
     Task<Result<ProductLabelJobDto>> QueueAsync(ActorContext actor, string? idempotencyKey,
         CreateProductLabelJobRequest request, CancellationToken cancellationToken = default);
+    Task<Result<PagedResult<ProductLabelReceiptDto>>> ListReceiptsAsync(ActorContext actor,
+        PrintJobsQuery query, CancellationToken cancellationToken = default);
+    Task<Result<ProductLabelReceiptDto>> GetReceiptAsync(ActorContext actor, Guid purchaseId,
+        CancellationToken cancellationToken = default);
+    Task<Result<PagedResult<ProductLabelQueueItemDto>>> ListJobsAsync(ActorContext actor,
+        PrintJobsQuery query, CancellationToken cancellationToken = default);
+    Task<Result<ProductLabelQueueItemDto>> RetryAsync(ActorContext actor, Guid jobId,
+        CancellationToken cancellationToken = default);
 }

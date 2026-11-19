@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ControlPlus.Infrastructure.Printing;
 
-public sealed class ProductLabelPrintingService(
+public sealed partial class ProductLabelPrintingService(
     OfficialControlPlusDbContext db,
     IUserRepository users,
     IAuditRepository audit,
@@ -103,7 +103,7 @@ public sealed class ProductLabelPrintingService(
                 "Idempotency-Key es obligatorio y no puede superar 90 caracteres."));
         if (request is null || request.ProfileId == Guid.Empty || request.Lines is null ||
             request.Lines.Count is < 1 or > MaximumDistinctProducts ||
-            request.Lines.Any(line => line.ProductId == Guid.Empty || line.Quantity is < 1 or > MaximumLabels) ||
+            request.Lines.Any(line => line is null || line.ProductId == Guid.Empty || line.Quantity is < 1 or > MaximumLabels) ||
             request.Lines.Select(line => line.ProductId).Distinct().Count() != request.Lines.Count ||
             request.Lines.Sum(line => (long)line.Quantity) > MaximumLabels)
             return Result.Failure<ProductLabelJobDto>(ApplicationError.Validation(
@@ -124,6 +124,36 @@ public sealed class ProductLabelPrintingService(
                 return Result.Failure<ProductLabelJobDto>(ApplicationError.Conflict(
                     "La clave de idempotencia ya fue utilizada con otro lote de etiquetas."));
             return Result.Success(ToJob(existing, existingCount));
+        }
+        Compra? sourcePurchase = null;
+        if (request.SourcePurchaseId is Guid sourceId)
+        {
+            var locked = await db.Compra.FromSqlInterpolated(
+                $"SELECT * FROM compras.compra WHERE id = {sourceId} FOR UPDATE")
+                .ToArrayAsync(cancellationToken);
+            sourcePurchase = locked.SingleOrDefault();
+            if (sourcePurchase is null || sourcePurchase.InstalacionId != terminal.InstalacionId ||
+                sourcePurchase.Estado != "CONFIRMADA")
+                return Result.Failure<ProductLabelJobDto>(ApplicationError.Conflict(
+                    "La recepción debe estar confirmada y pertenecer a esta instalación."));
+            // A second request may have waited for the same receipt lock; replay it before
+            // checking remaining quantities, which the first request has already reserved.
+            var replay = await db.TrabajoImpresion.AsNoTracking()
+                .Include(job => job.DocumentoEmitido).Include(job => job.PerfilImpresora)
+                .SingleOrDefaultAsync(job => job.TerminalId == terminal.Id &&
+                    job.ClaveIdempotencia == storedKey, cancellationToken);
+            if (replay is not null)
+                return MatchesRequest(replay.DocumentoEmitido, request, out var replayCount)
+                    ? Result.Success(ToJob(replay, replayCount))
+                    : Result.Failure<ProductLabelJobDto>(ApplicationError.Conflict(
+                        "La clave de idempotencia ya fue utilizada con otro lote de etiquetas."));
+            await db.Entry(sourcePurchase).Collection(purchase => purchase.DetalleCompra).LoadAsync(cancellationToken);
+            var reserved = await ReservedQuantitiesAsync(sourceId, cancellationToken);
+            if (request.Lines.Any(line => line.Quantity > sourcePurchase.DetalleCompra
+                .Where(detail => detail.ProductoId == line.ProductId).Sum(detail => detail.Cantidad) -
+                reserved.GetValueOrDefault(line.ProductId)))
+                return Result.Failure<ProductLabelJobDto>(ApplicationError.Conflict(
+                    "La cantidad supera las etiquetas pendientes de esta recepción. Actualiza la lista."));
         }
         var profile = await db.PerfilImpresora.SingleOrDefaultAsync(candidate =>
             candidate.Id == request.ProfileId && candidate.TerminalId == terminal.Id && candidate.Activo &&
@@ -158,11 +188,16 @@ public sealed class ProductLabelPrintingService(
                 product.CodigoBarras!, line.Quantity));
         }
 
-        var content = ProductLabelPayloadCodec.Encode(items);
+        var establishmentName = await db.Instalacion.AsNoTracking()
+            .Where(candidate => candidate.Id == terminal.InstalacionId)
+            .Select(candidate => candidate.Establecimiento.NombreComercial).SingleAsync(cancellationToken);
+        var content = ProductLabelPayloadCodec.Encode(items, establishmentName);
         var snapshot = JsonSerializer.Serialize(new
         {
             schemaVersion = ProductLabelPayloadCodec.CurrentSchemaVersion,
             profileId = profile.Id,
+            sourcePurchaseId = request.SourcePurchaseId,
+            establishmentName,
             items = items.Select(item => new
             {
                 productId = item.ProductId, name = item.Name, retailPrice = item.RetailPrice,
@@ -178,8 +213,13 @@ public sealed class ProductLabelPrintingService(
         {
             Id = Guid.CreateVersion7(), InstalacionId = installation.Id, TerminalId = terminal.Id,
             EmitidoPorId = actor.UserId, TipoDocumento = "ETIQUETA_PRODUCTO",
-            EntidadTipo = "LOTE_ETIQUETAS_PRODUCTO", EntidadId = batchId,
-            VersionDocumento = 1, DatosSnapshot = snapshot,
+            EntidadTipo = sourcePurchase is null ? "LOTE_ETIQUETAS_PRODUCTO" : ReceiptLabelEntity,
+            EntidadId = request.SourcePurchaseId ?? batchId,
+            VersionDocumento = sourcePurchase is null ? 1 : 1 +
+                (await db.DocumentoEmitido.Where(candidate => candidate.InstalacionId == installation.Id &&
+                    candidate.TipoDocumento == "ETIQUETA_PRODUCTO" && candidate.EntidadId == sourcePurchase.Id)
+                    .Select(candidate => (int?)candidate.VersionDocumento).MaxAsync(cancellationToken) ?? 0),
+            DatosSnapshot = snapshot,
             PlantillaSnapshot = JsonSerializer.Serialize(new
             {
                 template.Id, template.Codigo, template.FormatoCodigo,
@@ -264,6 +304,9 @@ public sealed class ProductLabelPrintingService(
         {
             using var snapshot = JsonDocument.Parse(document.DatosSnapshot);
             var root = snapshot.RootElement;
+            var sourcePurchaseId = root.TryGetProperty("sourcePurchaseId", out var source) &&
+                source.ValueKind != JsonValueKind.Null ? source.GetGuid() : (Guid?)null;
+            if (sourcePurchaseId != request.SourcePurchaseId) return false;
             if (!string.Equals(SnapshotHash(document.DatosSnapshot), document.HashSnapshot,
                     StringComparison.Ordinal) ||
                 !root.TryGetProperty("profileId", out var profileValue) ||
@@ -341,7 +384,8 @@ public sealed class ProductLabelPrintingService(
             profile.AltoMm, profile.ResolucionDpi, profile.EsPredeterminada, templateName);
 
     private static ProductLabelJobDto ToJob(TrabajoImpresion job, int labelCount) =>
-        new(job.Id, job.DocumentoEmitido.EntidadId, job.PerfilImpresoraId,
+        new(job.Id, job.DocumentoEmitido.EntidadTipo == ReceiptLabelEntity
+                ? job.DocumentoEmitido.Id : job.DocumentoEmitido.EntidadId, job.PerfilImpresoraId,
             job.PerfilImpresora.Nombre, labelCount,
             job.Estado == "FALLIDO" ? "ERROR" : job.Estado,
             new DateTimeOffset(job.FechaSolicitud, TimeSpan.Zero));

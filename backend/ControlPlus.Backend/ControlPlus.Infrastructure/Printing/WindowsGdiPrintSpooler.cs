@@ -135,7 +135,7 @@ public sealed class WindowsGdiPrintSpooler : IPrintSpooler
             for (var copy = 0; copy < item.Quantity; copy++)
             {
                 if (StartPage(device) <= 0) throw new Win32Exception(Marshal.GetLastWin32Error());
-                DrawLabel(device, item, labelWidth, labelHeight, dpiY);
+                DrawLabel(device, item, payload.EstablishmentName, labelWidth, labelHeight, dpiY);
                 if (EndPage(device) <= 0) throw new Win32Exception(Marshal.GetLastWin32Error());
             }
 
@@ -153,7 +153,7 @@ public sealed class WindowsGdiPrintSpooler : IPrintSpooler
         }
     }
 
-    private static void DrawLabel(IntPtr device, ProductLabelPrintItem item,
+    private static void DrawLabel(IntPtr device, ProductLabelPrintItem item, string? establishmentName,
         int width, int height, int dpiY)
     {
         var margin = Math.Max(2, Math.Min(width, height) / 25);
@@ -162,11 +162,23 @@ public sealed class WindowsGdiPrintSpooler : IPrintSpooler
         var priceHeight = Math.Clamp(height / 7, Math.Max(10, dpiY * 9 / 72),
             Math.Max(12, dpiY * 18 / 72));
         SetBkMode(device, 1); // TRANSPARENT
-        DrawText(device, margin, margin,
+        var price = "$ " + decimal.Round(item.RetailPrice, 0, MidpointRounding.AwayFromZero)
+            .ToString("N0", ColombianCulture);
+        // Measure the actual selected font so the business and price never overlap.
+        var priceWidth = MeasureText(device, price, priceHeight, "Arial");
+        if (priceWidth > width - margin * 2)
+            throw new InvalidOperationException("El precio no cabe de forma legible en el ancho de la etiqueta.");
+        var priceX = width - margin - priceWidth;
+        DrawText(device, priceX, margin, price, priceHeight, 700, "Arial");
+        if (!string.IsNullOrWhiteSpace(establishmentName))
+        {
+            var business = FitText(establishmentName, Math.Max(0, priceX - margin * 2), titleHeight);
+            while (business.Length > 0 && MeasureText(device, business, titleHeight, "Arial") > priceX - margin * 2)
+                business = business.Length <= 2 ? "" : business[..^2] + "…";
+            DrawText(device, margin, margin, business, titleHeight, 700, "Arial");
+        }
+        DrawText(device, margin, margin + priceHeight + Math.Max(1, margin / 2),
             FitText(item.Name, width - margin * 2, titleHeight), titleHeight, 400, "Arial");
-        DrawText(device, margin, margin + titleHeight + Math.Max(1, margin / 2),
-            "$ " + decimal.Round(item.RetailPrice, 0, MidpointRounding.AwayFromZero)
-                .ToString("N0", ColombianCulture), priceHeight, 700, "Arial");
 
         var widths = Code128Encoder.Widths(item.Barcode);
         const int quietModules = 10;
@@ -200,9 +212,36 @@ public sealed class WindowsGdiPrintSpooler : IPrintSpooler
 
     private static string FitText(string text, int width, int fontHeight)
     {
+        if (width <= 0) return "";
         var maximum = Math.Max(1, width * 5 / Math.Max(1, fontHeight * 3));
         return text.Length <= maximum ? text : maximum == 1 ? "…" : text[..(maximum - 1)] + "…";
     }
+
+    private static int MeasureText(IntPtr device, string text, int height, string faceName)
+    {
+        var font = CreateFont(-height, 0, 0, 0, 700, 0, 0, 0, 0, 0, 0, 0, 0, faceName);
+        if (font == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+        var oldFont = SelectObject(device, font);
+        if (oldFont == IntPtr.Zero || oldFont == new IntPtr(-1))
+        {
+            DeleteObject(font);
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+        try
+        {
+            if (!GetTextExtentPoint32(device, text, text.Length, out var size))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            return size.Width;
+        }
+        finally { SelectObject(device, oldFont); DeleteObject(font); }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TextSize { public int Width; public int Height; }
+
+    [DllImport("gdi32.dll", EntryPoint = "GetTextExtentPoint32W", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetTextExtentPoint32(IntPtr device, string text, int length, out TextSize size);
 
     private static void DrawText(IntPtr device, int x, int y, string text,
         int height, int weight, string faceName)
