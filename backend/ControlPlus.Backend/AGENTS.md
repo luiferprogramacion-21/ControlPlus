@@ -744,4 +744,5 @@ El usuario pidió diez ajustes. Claude hizo estos seis; Codex hace la política 
   - el anterior era un dibujo fino con mucho margen y no se distinguía;
   - el instalador copia el ícono con un nombre que incluye su huella, porque Windows guarda en caché los íconos por ruta, y refresca la caché con `ie4uinit -show`;
   - borra también el `ControlPlus.url` antiguo del escritorio personal, que abría el navegador predeterminado (Brave en este equipo), sin la directiva de Edge y con el ícono viejo en caché;
-  - `index.html` pide `favicon.ico?v=20261120` para que Edge no use el ícono de Angular que tenía guardado.
+  - `index.html` pide `controlplus.ico?v=pos-20261120`. Edge guarda el ícono por dirección, así que **cada vez que cambie el ícono hay que cambiar esa dirección** (con `?v=` Edge siguió mostrando la C+ que tenía guardada);
+  - la directiva `PasswordManagerEnabled=0` impide guardar contraseñas nuevas, pero Edge sigue ofreciendo las que ya estaban guardadas: hay que borrarlas una vez en `edge://settings/passwords`.
