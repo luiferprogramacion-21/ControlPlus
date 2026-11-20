@@ -161,6 +161,13 @@ try {
     $screen = Wait-Http '/' 30
     if ($screen.Content -notmatch '<html') { throw 'La pantalla no respondió como HTML.' }
 
+    # ControlPlus corre en un equipo compartido de la tienda: Edge no debe ofrecer ni guardar las contraseñas
+    # del sistema. La directiva de equipo se vuelve a escribir en cada instalación para que la operación sea
+    # idempotente y para corregir cualquier valor anterior.
+    $edgePolicy = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+    New-Item -Path $edgePolicy -Force | Out-Null
+    New-ItemProperty -Path $edgePolicy -Name 'PasswordManagerEnabled' -PropertyType DWord -Value 0 -Force | Out-Null
+
     # Escritorio común de todos los usuarios: no depende de redirecciones de OneDrive del escritorio personal.
     # El ícono se copia a ProgramData para que el acceso no dependa de la carpeta que se reemplaza al actualizar.
     $iconFile = Join-Path $dataDir 'controlplus.ico'

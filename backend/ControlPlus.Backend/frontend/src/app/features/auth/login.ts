@@ -32,7 +32,7 @@ import { toastSignal } from '../../core/toast';
             @if (form.controls.userName.hasError('required')) { <mat-error>Escribe el usuario.</mat-error> }
           </mat-form-field>
           <mat-form-field appearance="outline"><mat-label>Contraseña</mat-label>
-            <input matInput type="password" formControlName="password" autocomplete="current-password">
+            <input matInput type="password" formControlName="password" autocomplete="off">
             @if (form.controls.password.hasError('required')) { <mat-error>Escribe la contraseña.</mat-error> }
           </mat-form-field>
           <button mat-flat-button type="submit" [disabled]="busy()">{{ busy() ? 'Ingresando…' : 'Iniciar sesión' }}</button>
@@ -57,10 +57,10 @@ import { toastSignal } from '../../core/toast';
               <input matInput formControlName="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" autofocus>
             </mat-form-field>
             <mat-form-field appearance="outline"><mat-label>Nueva contraseña (4 números)</mat-label>
-              <input matInput type="password" formControlName="newPassword" inputmode="numeric" autocomplete="new-password">
+              <input matInput type="password" formControlName="newPassword" inputmode="numeric" autocomplete="off">
             </mat-form-field>
             <mat-form-field appearance="outline"><mat-label>Repite la nueva contraseña</mat-label>
-              <input matInput type="password" formControlName="confirmPassword" inputmode="numeric" autocomplete="new-password">
+              <input matInput type="password" formControlName="confirmPassword" inputmode="numeric" autocomplete="off">
             </mat-form-field>
             <button mat-flat-button type="submit" [disabled]="busy()">{{ busy() ? 'Cambiando…' : 'Cambiar contraseña' }}</button>
             <button class="cp-login__link" type="button" (click)="view.set('request'); error.set('')">No me llegó el código</button>

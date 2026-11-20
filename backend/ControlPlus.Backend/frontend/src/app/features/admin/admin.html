@@ -97,11 +97,11 @@
           <p class="form-hint">Cada usuario tiene un solo rol base.</p>
         }
         @if (currentMode === 'password' && selected() && isSelf(selected()!)) {
-          <label class="field-label field-label--spaced" for="admin-current-password">Contraseña actual</label><input id="admin-current-password" class="text-field" type="password" name="currentPassword" [(ngModel)]="form.currentPassword" autocomplete="current-password" autofocus>
+      <label class="field-label field-label--spaced" for="admin-current-password">Contraseña actual</label><input id="admin-current-password" class="text-field" type="password" name="currentPassword" [(ngModel)]="form.currentPassword" autocomplete="off" autofocus>
         }
         @if (currentMode === 'create' || currentMode === 'password') {
-          <label class="field-label field-label--spaced" for="admin-password">{{ currentMode === 'create' ? 'Contraseña' : 'Nueva contraseña' }}</label><input id="admin-password" class="text-field" type="password" name="password" [(ngModel)]="form.password" inputmode="numeric" placeholder="4 números" autocomplete="new-password"><p class="form-hint">La contraseña es de 4 números, por ejemplo 4821. Evita 1234 o 0000.</p>
-          <label class="field-label field-label--spaced" for="admin-confirm">Confirmar contraseña</label><input id="admin-confirm" class="text-field" type="password" name="confirmPassword" [(ngModel)]="form.confirmPassword" inputmode="numeric" placeholder="4 números" autocomplete="new-password">
+      <label class="field-label field-label--spaced" for="admin-password">{{ currentMode === 'create' ? 'Contraseña' : 'Nueva contraseña' }}</label><input id="admin-password" class="text-field" type="password" name="password" [(ngModel)]="form.password" inputmode="numeric" placeholder="4 números" autocomplete="off"><p class="form-hint">La contraseña es de 4 números, por ejemplo 4821. Evita 1234 o 0000.</p>
+      <label class="field-label field-label--spaced" for="admin-confirm">Confirmar contraseña</label><input id="admin-confirm" class="text-field" type="password" name="confirmPassword" [(ngModel)]="form.confirmPassword" inputmode="numeric" placeholder="4 números" autocomplete="off">
         }
         @if (currentMode === 'password') { <p class="form-hint">Al cambiar la contraseña se registra la operación en la auditoría.</p> }
         @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
