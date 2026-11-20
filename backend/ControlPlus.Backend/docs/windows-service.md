@@ -12,6 +12,8 @@ Para que la tienda no dependa de abrir terminales, ControlPlus se instala como u
 - El servicio corre en entorno Production: no publica OpenAPI. No aplica migraciones al iniciar.
 - Los respaldos automáticos corren dentro del servicio, así que funcionan mientras el equipo esté encendido aunque nadie abra ControlPlus.
 
+La instalación local solo escucha en `http://localhost:5000`; `appsettings.Production.json` fija `HttpsRedirection:Enabled=false` para no intentar una redirección a un puerto HTTPS inexistente ni registrar la advertencia correspondiente. Si se prepara un despliegue con HTTPS, se debe habilitar explícitamente `HttpsRedirection:Enabled=true` (o `HttpsRedirection__Enabled=true` como variable de entorno) y configurar el certificado, el punto de escucha HTTPS y su puerto de redirección (`ASPNETCORE_HTTPS_PORT`). Activar la redirección por sí sola no crea un punto de escucha HTTPS. Cuando la opción no está definida, la redirección permanece habilitada.
+
 ## Instalar o actualizar
 
 Detener antes la API iniciada con `dotnet run` (Ctrl + C), porque usa el mismo puerto. Abrir **PowerShell como Administrador** con el mismo usuario de Windows que desarrolla (para que el instalador lea sus User Secrets):

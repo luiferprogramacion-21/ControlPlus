@@ -251,7 +251,11 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
     app.MapOpenApi().AllowAnonymous();
 }
 
-app.UseHttpsRedirection();
+// La instalación local desactiva esta opción; sin configuración explícita se conserva la redirección.
+if (app.Configuration.GetValue("HttpsRedirection:Enabled", true))
+{
+    app.UseHttpsRedirection();
+}
 // Pantalla compilada (Angular) en wwwroot cuando se instala como servicio; en desarrollo no hay wwwroot y se sigue
 // usando ng serve con su proxy.
 var hasFrontend = File.Exists(Path.Combine(app.Environment.WebRootPath ?? string.Empty, "index.html"));
