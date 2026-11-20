@@ -14,6 +14,8 @@ public sealed record TokenSubject(
     Guid UserId,
     string UserName,
     string DisplayName,
-    string SecurityStamp);
+    string SecurityStamp,
+    // Sesión iniciada con una contraseña que no cumple la regla vigente: solo puede cambiarla.
+    bool PasswordChangeRequired = false);
 
 public sealed record IssuedAccessToken(string AccessToken, DateTimeOffset ExpiresAtUtc);

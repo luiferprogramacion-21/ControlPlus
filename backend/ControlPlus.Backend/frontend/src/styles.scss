@@ -797,3 +797,9 @@ kbd { display: inline-block; min-width: 28px; padding: 2px 7px; border: 1px soli
 .module-heading:not(:has(button, a)) { display: none; }
 /* Qué sigue al terminar: el aviso ofrece el siguiente paso (core/toast.ts). */
 .toast__action { display: inline-block; margin-left: 8px; color: var(--cp-primary); font-weight: 700; text-decoration: underline; white-space: nowrap; }
+
+/* Tamaño libre de la pantalla (19 de noviembre de 2026). */
+.user-menu__scale { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; }
+.user-menu__scale strong { min-width: 56px; text-align: center; font-size: 15px; }
+.user-menu__step { width: 36px; height: 32px; border: 1px solid var(--cp-control-border); border-radius: 8px; background: var(--cp-surface); color: var(--cp-primary); font-size: 18px; font-weight: 700; cursor: pointer; }
+.user-menu__step:hover { background: var(--cp-primary-soft); border-color: var(--cp-primary); }

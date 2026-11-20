@@ -420,7 +420,7 @@ describe('Catalog: existencias iniciales', () => {
     expect(api.products).toHaveBeenCalledWith(expect.objectContaining({ search: 'Producto', categoryId: 'category', pageSize: 200 }));
     expect(component.createOutcomeUncertain()).toBe(true);
     expect(component.createErrorKind()).toBe('uncertain');
-    expect(component.error()).toContain('No se puede conectar con la API local.');
+    expect(component.error()).toContain('No se puede conectar con ControlPlus.');
     expect(api.createProduct).toHaveBeenCalledOnce();
   });
 

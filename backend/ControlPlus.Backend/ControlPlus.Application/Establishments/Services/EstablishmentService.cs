@@ -66,7 +66,7 @@ public sealed class EstablishmentService(
 
         var previous = Map(establishment);
         establishment.NombreComercial = request.CommercialName.Trim();
-        establishment.Identificacion = request.Identification.Trim();
+        establishment.Identificacion = Optional(request.Identification);
         establishment.Telefono = Optional(request.Phone);
         establishment.Direccion = Optional(request.Address);
         establishment.EncabezadoComprobante = Optional(request.ReceiptHeader);
@@ -102,8 +102,8 @@ public sealed class EstablishmentService(
             return ApplicationError.Validation("La versión esperada debe ser positiva.");
         if (InvalidRequired(request.CommercialName, 200))
             return ApplicationError.Validation("El nombre comercial es obligatorio y admite hasta 200 caracteres.");
-        if (InvalidRequired(request.Identification, 30))
-            return ApplicationError.Validation("El NIT o documento es obligatorio y admite hasta 30 caracteres.");
+        if (InvalidOptional(request.Identification, 30))
+            return ApplicationError.Validation("El NIT o documento admite hasta 30 caracteres.");
         if (InvalidOptional(request.Phone, 30))
             return ApplicationError.Validation("El teléfono admite hasta 30 caracteres.");
         if (InvalidOptional(request.Address, 300))

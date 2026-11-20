@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { SessionService } from '../../core/session.service';
+import { PASSWORD_CHANGE_ROUTE, SessionService } from '../../core/session.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { errorText } from '../../core/api';
 import { PasswordRecoveryApi } from './password-recovery-api';
@@ -32,7 +32,7 @@ import { toastSignal } from '../../core/toast';
             @if (form.controls.userName.hasError('required')) { <mat-error>Escribe el usuario.</mat-error> }
           </mat-form-field>
           <mat-form-field appearance="outline"><mat-label>Contraseña</mat-label>
-            <input matInput type="password" formControlName="password" autocomplete="current-password">
+            <input matInput type="password" formControlName="password" autocomplete="off">
             @if (form.controls.password.hasError('required')) { <mat-error>Escribe la contraseña.</mat-error> }
           </mat-form-field>
           <button mat-flat-button type="submit" [disabled]="busy()">{{ busy() ? 'Ingresando…' : 'Iniciar sesión' }}</button>
@@ -56,11 +56,11 @@ import { toastSignal } from '../../core/toast';
             <mat-form-field appearance="outline"><mat-label>Código del correo</mat-label>
               <input matInput formControlName="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" autofocus>
             </mat-form-field>
-            <mat-form-field appearance="outline"><mat-label>Nueva contraseña</mat-label>
-              <input matInput type="password" formControlName="newPassword" autocomplete="new-password">
+            <mat-form-field appearance="outline"><mat-label>Nueva contraseña (4 números)</mat-label>
+              <input matInput type="password" formControlName="newPassword" inputmode="numeric" autocomplete="off">
             </mat-form-field>
             <mat-form-field appearance="outline"><mat-label>Repite la nueva contraseña</mat-label>
-              <input matInput type="password" formControlName="confirmPassword" autocomplete="new-password">
+              <input matInput type="password" formControlName="confirmPassword" inputmode="numeric" autocomplete="off">
             </mat-form-field>
             <button mat-flat-button type="submit" [disabled]="busy()">{{ busy() ? 'Cambiando…' : 'Cambiar contraseña' }}</button>
             <button class="cp-login__link" type="button" (click)="view.set('request'); error.set('')">No me llegó el código</button>
@@ -138,8 +138,8 @@ export class Login {
     try {
       const { userName, password } = this.form.getRawValue();
       await this.session.login(userName.trim(), password);
-      await this.router.navigateByUrl(HOME_ROUTE);
-    } catch (e) { this.error.set(errorText(e)); }
+      await this.router.navigateByUrl(this.session.passwordChangeRequired() ? PASSWORD_CHANGE_ROUTE : HOME_ROUTE);
+    } catch (e) { this.error.set(this.loginError(e)); }
     finally { this.busy.set(false); }
   }
 
@@ -180,7 +180,13 @@ export class Login {
     } catch (e) { this.error.set(this.recoveryError(e)); }
     finally { this.busy.set(false); }
   }
-
+  /** Al ingresar, un 401 significa usuario o contraseña incorrectos (o usuario bloqueado), no una sesión vencida. */
+  private loginError(error: unknown): string {
+    if (error instanceof HttpErrorResponse && error.status === 401)
+      return 'Usuario o contraseña incorrectos. Recuerda que la contraseña es de 4 números. Tras 5 intentos fallidos el usuario se bloquea: usa «Olvidé mi contraseña».';
+    if (error instanceof HttpErrorResponse && error.status === 429) return 'Demasiados intentos. Espera un minuto y vuelve a intentarlo.';
+    return errorText(error);
+  }
   /** 503: correo no configurado o sin conexión (el servidor explica qué hacer); 429: demasiados intentos. */
   private recoveryError(error: unknown): string {
     if (error instanceof HttpErrorResponse && error.status === 503 && typeof error.error?.title === 'string') return error.error.title;

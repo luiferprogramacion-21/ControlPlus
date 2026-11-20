@@ -1,5 +1,6 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
+import { readableCode } from '../../core/readable-code';
 import { firstValueFrom } from 'rxjs';
 import { AuthorizationBody, authorizationContext } from '../../core/api';
 import { Page } from '../../core/api';
@@ -77,12 +78,23 @@ export interface PrintJob { id: string; saleId: string; copyType: 'ORIGINAL' | '
 export interface SaleReprintRequest { requestId: string; saleId: string; requestedAtUtc: string; status: string; }
 
 /** Texto para el usuario. «IMPRESO» solo indica que la cola de Windows aceptó el trabajo, no que haya salido papel. */
+/** Estado de impresión en palabras (sin códigos en mayúsculas). */
+export function printStatusLabel(status: string | null | undefined): string {
+  switch (status) {
+    case 'PENDIENTE': return 'Pendiente';
+    case 'IMPRIMIENDO': return 'Imprimiendo';
+    case 'IMPRESO': return 'Impreso';
+    case 'ERROR': return 'Error';
+    default: return status ? readableCode(status) : '';
+  }
+}
+
 export function printJobStatusText(job: Pick<PrintJob, 'status' | 'error'>): string {
   switch (job.status) {
-    case 'PENDIENTE': return 'Esperando envío a la cola.';
-    case 'IMPRIMIENDO': return job.error ? 'Resultado incierto: revisa la cola de la impresora antes de pedir otra copia.' : 'Envío en curso.';
-    case 'IMPRESO': return 'Aceptado por la cola de Windows.';
-    case 'ERROR': return 'La cola rechazó el trabajo o falló la verificación.';
+    case 'PENDIENTE': return 'Esperando turno para imprimir.';
+    case 'IMPRIMIENDO': return job.error ? 'No se sabe si salió: mira la impresora antes de pedir otra copia.' : 'Envío en curso.';
+    case 'IMPRESO': return 'La impresora lo recibió.';
+    case 'ERROR': return 'No se pudo imprimir. Revisa la impresora (papel, encendida, cable).';
     default: return job.status;
   }
 }

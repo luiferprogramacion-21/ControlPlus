@@ -9,7 +9,7 @@ import { Supplier, SuppliersApi } from './suppliers-api';
 describe('Proveedores: confirmación de cambio de estado', () => {
   const supplier: Supplier = { id: 's1', name: 'Distribuidora', documentType: 'NIT', documentNumber: '00123',
     phone: null, address: null, email: null, observations: null, isActive: true, version: 3 };
-  const api = { status: vi.fn(), list: vi.fn() };
+  const api = { status: vi.fn(), list: vi.fn(), create: vi.fn(), update: vi.fn() };
   const open = vi.fn();
   let canManage: boolean;
   let component: Suppliers;
@@ -20,6 +20,7 @@ describe('Proveedores: confirmación de cambio de estado', () => {
     closed = new Subject<boolean | undefined>();
     open.mockReturnValue({ afterClosed: () => closed, close: (value: boolean) => { closed.next(value); closed.complete(); } });
     api.status.mockResolvedValue({ ...supplier, isActive: false, version: 4 });
+    api.create.mockResolvedValue({ ...supplier, documentType: null, documentNumber: null });
     api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
     TestBed.configureTestingModule({ providers: [
       { provide: SuppliersApi, useValue: api },
@@ -58,5 +59,14 @@ describe('Proveedores: confirmación de cambio de estado', () => {
     const pending = component.toggle(supplier);
     TestBed.resetTestingModule(); await pending;
     expect(api.status).not.toHaveBeenCalled();
+  });
+
+  it('crea un proveedor sin NIT y normaliza ambos campos como nulos', async () => {
+    component.create(); component.form.name = 'Proveedor sin NIT';
+    component.form.documentType = ' '; component.form.documentNumber = '';
+    await component.save();
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Proveedor sin NIT', documentType: null, documentNumber: null,
+    }));
   });
 });

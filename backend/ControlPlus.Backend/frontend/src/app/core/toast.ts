@@ -70,7 +70,7 @@ export function toastSignal(kind: ToastKind | ((message: string) => ToastKind) =
 
 /** Para avisos de estado (impresión, reimpresión): son error si hablan de un fallo o de un resultado incierto. */
 export const statusKind = (message: string): ToastKind =>
-  /error|no se pud|no se puede|incierto|falló|fallo|sin conexión|no tienes|rechaz/i.test(message) ? 'error' : 'success';
+  /error|no se pud|no se puede|no se sabe|incierto|falló|fallo|sin conexión|no tienes|rechaz/i.test(message) ? 'error' : 'success';
 
 @Component({
   selector: 'cp-toast-host',

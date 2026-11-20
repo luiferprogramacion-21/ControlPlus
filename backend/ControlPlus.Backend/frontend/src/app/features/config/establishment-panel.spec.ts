@@ -24,16 +24,16 @@ describe('Datos del establecimiento', () => {
     expect(fixture.nativeElement.querySelector('input[type="email"]')).toBeNull();
   });
 
-  it('guarda los opcionales vacíos como nulos y adopta la nueva versión', async () => {
+  it('guarda el NIT y los demás opcionales vacíos como nulos y adopta la nueva versión', async () => {
     const { component } = await open();
     update.mockResolvedValue({ ...saved, commercialName: 'Nuevo nombre', phone: '555', version: 3 });
-    component.commercialName = ' Nuevo nombre '; component.phone = ' 555 '; component.address = '';
+    component.commercialName = ' Nuevo nombre '; component.identification = ' '; component.phone = ' 555 '; component.address = '';
     await component.save();
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ commercialName: 'Nuevo nombre', phone: '555', address: null, expectedVersion: 2 }));
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ commercialName: 'Nuevo nombre', identification: null, phone: '555', address: null, expectedVersion: 2 }));
     expect(component.current()?.version).toBe(3); expect(component.notice()).toContain('Datos guardados');
   });
 
-  it('no envía nombre ni NIT vacíos', async () => {
+  it('no envía el nombre comercial vacío', async () => {
     const { component } = await open(); component.commercialName = ' ';
     await component.save(); expect(update).not.toHaveBeenCalled(); expect(component.error()).toContain('nombre comercial');
   });

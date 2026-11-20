@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ControlPlus.Infrastructure.Persistence.Migrations;
 
 [DbContext(typeof(ControlPlusDbContext))]
-[Migration("20261119040000_CashInventoryCorrectionsV1")]
+[Migration("20261120030000_CashInventoryCorrectionsV1")]
 public sealed class CashInventoryCorrectionsV1 : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder) => migrationBuilder.Sql("""

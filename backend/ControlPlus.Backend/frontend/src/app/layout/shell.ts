@@ -77,6 +77,11 @@ function readCollapsed(): boolean { try { return localStorage.getItem(COLLAPSED_
           @if (userMenuOpen()) {
             <div class="user-menu" id="user-menu" role="menu" aria-label="Opciones de la cuenta" (keydown.escape)="closeUserMenuAndFocus()">
               <p class="user-menu__heading" id="display-scale-heading"><cp-icon name="text-size" /><span>Tamaño de la pantalla</span></p>
+              <div class="user-menu__scale" role="group" aria-label="Tamaño libre">
+                <button class="user-menu__step" type="button" (click)="displayScale.decrease()" aria-label="Más pequeño (Ctrl −)" title="Más pequeño (Ctrl −)">−</button>
+                <strong aria-live="polite">{{ displayScale.percent() }}</strong>
+                <button class="user-menu__step" type="button" (click)="displayScale.increase()" aria-label="Más grande (Ctrl +)" title="Más grande (Ctrl +)">+</button>
+              </div>
               <div role="group" aria-labelledby="display-scale-heading">
                 @for (option of displayScale.options; track option.value) {
                   <button class="user-menu__option" type="button" role="menuitemradio" [attr.aria-checked]="displayScale.scale() === option.value" (click)="displayScale.set(option.value)">
@@ -128,6 +133,7 @@ export class Shell {
     { keys: 'Tab', action: 'Pasar al siguiente campo (Mayús+Tab, al anterior).' },
     { keys: 'Doble clic', action: 'Abrir una fila de una lista.' },
     { keys: 'F1', action: 'Ver esta lista de atajos.' },
+    { keys: 'Ctrl + / Ctrl −', action: 'Agrandar o achicar la pantalla (Ctrl 0 vuelve a 125 %).' },
     { keys: 'F2', action: 'Punto de venta: buscar o escanear un producto.' },
     { keys: 'F3', action: 'Punto de venta: buscar o crear el cliente.' },
     { keys: 'F4', action: 'Punto de venta: cambiar la cantidad.' },
@@ -135,6 +141,7 @@ export class Shell {
     { keys: 'F6', action: 'Punto de venta: poner la venta en espera para atender a otro cliente.' },
     { keys: 'F7', action: 'Punto de venta: ver las ventas en espera y retomar una.' },
     { keys: 'F9', action: 'Punto de venta: cobrar y confirmar la venta.' },
+    { keys: 'Alt+1 a Alt+4', action: 'Al cobrar: sumar un billete de 10.000, 20.000, 50.000 o 100.000 (Alt+E exacto, Alt+B borrar).' },
   ];
   private readonly host = inject(ElementRef<HTMLElement>);
   readonly boundedWorkspace = signal(false);
@@ -168,7 +175,14 @@ export class Shell {
   /** F1, como la ayuda de Windows: muestra los atajos del teclado. */
   @HostListener('document:keydown', ['$event'])
   onHelpKey(event: KeyboardEvent): void {
-    if (event.key !== 'F1' || event.ctrlKey || event.altKey || event.metaKey) return;
+    // Tamaño libre como en Windows: Ctrl + agranda, Ctrl − achica y Ctrl 0 vuelve a 125 %.
+    if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+      if (event.key === '+' || event.key === '=') { event.preventDefault(); this.displayScale.increase(); }
+      else if (event.key === '-') { event.preventDefault(); this.displayScale.decrease(); }
+      else if (event.key === '0') { event.preventDefault(); this.displayScale.reset(); }
+      return;
+    }
+    if (event.key !== 'F1' || event.altKey || event.metaKey) return;
     event.preventDefault();
     this.openShortcuts();
   }

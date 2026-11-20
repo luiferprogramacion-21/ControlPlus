@@ -188,8 +188,10 @@ public sealed class SuppliersApiFlowTests : IAsyncLifetime
             new Dictionary<string, object?> { ["isActive"] = false, ["expectedVersion"] = supplier.Version,
                 ["usuarioModificacionId"] = users.Admin.User.Id }), HttpStatusCode.BadRequest, "validation.failed");
         var updated = await ReadAsync<SupplierDto>(await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}",
-            new UpdateSupplierRequest("NIT", "FILTER-1", "Alfa nueva", null, null, null, null, supplier.Version)), HttpStatusCode.OK);
+            new UpdateSupplierRequest(null, null, "Alfa nueva", null, null, null, null, supplier.Version)), HttpStatusCode.OK);
         Assert.Equal(2, updated.Version);
+        Assert.Null(updated.DocumentType);
+        Assert.Null(updated.DocumentNumber);
         await ProblemAsync(await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}",
             new UpdateSupplierRequest("NIT", "FILTER-1", "Obsoleto", null, null, null, null, supplier.Version)), HttpStatusCode.Conflict, "concurrency.conflict");
         var inactive = await ReadAsync<SupplierDto>(await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}/status",

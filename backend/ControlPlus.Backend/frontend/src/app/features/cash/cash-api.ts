@@ -32,6 +32,10 @@ export class CashApi {
   }
   movements(): Promise<Page<CashMovement>> { return firstValueFrom(this.http.get<Page<CashMovement>>('/api/cash/movements', { params: { page: 1, pageSize: 50 } })); }
   drawerStatus(): Promise<CashDrawerStatus> { return firstValueFrom(this.http.get<CashDrawerStatus>('/api/cash/drawer/status')); }
+  /** Abre el cajón al pulsar «Cobrar» (19 de noviembre de 2026); una clave por intento de cobro. */
+  openDrawerForCheckout(idempotencyKey: string): Promise<{ status: string; message?: string | null }> {
+    return firstValueFrom(this.http.post<{ status: string; message?: string | null }>('/api/cash/drawer/checkout', null, { headers: new HttpHeaders({ 'Idempotency-Key': idempotencyKey }) }));
+  }
   openDrawer(reason: string, idempotencyKey: string): Promise<CashDrawerOpenResult> {
     return firstValueFrom(this.http.post<CashDrawerOpenResult>('/api/cash/drawer/open', { reason }, { headers: new HttpHeaders({ 'Idempotency-Key': idempotencyKey }) }));
   }

@@ -138,7 +138,7 @@ export class Credits implements OnInit {
     this.error.set(''); this.cancellationTarget.set(payment); this.cancellationReasonId = ''; this.cancellationObservation = ''; this.pendingCancellation = null;
     try {
       this.cancellationReasons.set(await this.api.paymentCancellationReasons());
-      if (!this.cancellationReasons().length) { this.error.set('No hay motivos activos del catálogo ANULACION_PAGO.'); this.cancellationTarget.set(null); return; }
+      if (!this.cancellationReasons().length) { this.error.set('No hay motivos para anular pagos. Pide al Administrador que los cree en Configuración.'); this.cancellationTarget.set(null); return; }
       this.cancellingPayment.set(true);
     } catch (e) { this.cancellationTarget.set(null); this.error.set(errorText(e)); }
   }

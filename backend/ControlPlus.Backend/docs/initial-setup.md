@@ -18,14 +18,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup\Initialize-C
 
 El script pide, en este orden:
 
-1. Nombre del negocio y su NIT o documento.
+1. Nombre del negocio y, si lo tiene, su NIT o documento. El NIT es opcional: pulsa Enter para omitirlo.
 2. Usuario y nombre completo del Administrador.
 3. Datos de la instalación, la terminal y la caja. Traen valores sugeridos: «PRINCIPAL», «001», «CAJA-01» y «Caja principal».
 4. La contraseña del Administrador, oculta y dos veces.
 
 La clave maestra se toma de `C:\ProgramData\ControlPlus\api-secrets.json`, que escribe el instalador del servicio. Si ese archivo no está, el script la pide oculta.
 
-Los datos también pueden darse como parámetros (`-EstablishmentName`, `-Identification`, `-AdminUserName`, `-AdminDisplayName`, `-InstallationCode`, `-InstallationSerial`, `-TerminalCode`, `-TerminalName`, `-CashRegisterCode`, `-CashRegisterName`, `-ApiUrl`). Para automatizar, las dos claves pueden darse en `CONTROLPLUS_SETUP_MASTER_KEY` y `CONTROLPLUS_SETUP_ADMIN_PASSWORD`. Nunca se muestran ni se guardan.
+Los datos también pueden darse como parámetros (`-EstablishmentName`, `-Identification`, `-AdminUserName`, `-AdminDisplayName`, `-InstallationCode`, `-InstallationSerial`, `-TerminalCode`, `-TerminalName`, `-CashRegisterCode`, `-CashRegisterName`, `-ApiUrl`). `-Identification ''` omite el NIT sin abrir una pregunta interactiva. Para automatizar, las dos claves pueden darse en `CONTROLPLUS_SETUP_MASTER_KEY` y `CONTROLPLUS_SETUP_ADMIN_PASSWORD`. Nunca se muestran ni se guardan.
 
 ## Qué hace
 

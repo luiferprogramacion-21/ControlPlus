@@ -17,7 +17,7 @@ describe('Aviso del cajón de dinero', () => {
   it('explica cada resultado; solo el envío aceptado es un aviso de éxito', () => {
     expect(cashDrawerNotice('ENVIADO')).toContain('Comprueba');
     expect(statusKind(cashDrawerNotice('ENVIADO'))).toBe('success');
-    expect(cashDrawerNotice('FALLIDO')).toContain('apertura manual en Caja');
+    expect(cashDrawerNotice('FALLIDO')).toContain('lo abra desde Caja');
     expect(statusKind(cashDrawerNotice('FALLIDO'))).toBe('error');
     expect(statusKind(cashDrawerNotice('INCIERTO'))).toBe('error');
     expect(cashDrawerNotice(null)).toBe('');

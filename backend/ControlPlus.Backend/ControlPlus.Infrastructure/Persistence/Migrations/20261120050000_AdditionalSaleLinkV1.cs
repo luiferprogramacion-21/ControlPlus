@@ -8,7 +8,7 @@ namespace ControlPlus.Infrastructure.Persistence.Migrations;
 /// adicional enlazada a la venta de origen. La venta original no se modifica.
 /// </summary>
 [DbContext(typeof(ControlPlusDbContext))]
-[Migration("20261119060000_AdditionalSaleLinkV1")]
+[Migration("20261120050000_AdditionalSaleLinkV1")]
 public sealed class AdditionalSaleLinkV1 : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder) => migrationBuilder.Sql("""

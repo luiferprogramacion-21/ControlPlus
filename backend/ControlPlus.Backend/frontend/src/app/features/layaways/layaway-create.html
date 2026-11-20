@@ -39,7 +39,7 @@
     } @else if (rules()) {
       <p class="form-hint">No hay un plazo predeterminado: elige la fecha límite del apartado.</p>
     } @else {
-      <p class="form-hint">Si la dejas vacía, el servidor aplica el plazo configurado.</p>
+      <p class="form-hint">Si la dejas vacía, se usa el plazo configurado.</p>
     }
 
     <h3>Pago inicial</h3>
@@ -52,7 +52,7 @@
         }
       </p>
     } @else {
-      <p class="form-hint">El servidor exige el pago inicial mínimo configurado (20 % por defecto).</p>
+      <p class="form-hint">Se exige el pago inicial mínimo configurado (20 % por defecto).</p>
     }
     <cp-payment-methods [drafts]="drafts" mode="payment" idPrefix="create" />
     <div class="layaway-totals"><span>Pago inicial <strong>{{ money(initialPayment) }}</strong></span><span class="layaway-change">Cambio <strong>{{ money(change) }}</strong></span></div>

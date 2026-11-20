@@ -16,12 +16,12 @@ const cash = { hasOpenShift: true, requiresPreviousShiftClosure: false, requires
 describe('Sales: punto de venta de contado', () => {
   let component: Sales;
   let perms: string[];
-  const products = vi.fn(); const confirm = vi.fn(); const state = vi.fn(); const requestReprint = vi.fn(); const receipt = vi.fn(); const print = vi.fn(); const printingStatus = vi.fn(); const printJobs = vi.fn(); const retryPrintJob = vi.fn();
+  const products = vi.fn(); const confirm = vi.fn(); const state = vi.fn(); const requestReprint = vi.fn(); const receipt = vi.fn(); const print = vi.fn(); const printingStatus = vi.fn(); const printJobs = vi.fn(); const retryPrintJob = vi.fn(); const openDrawerForCheckout = vi.fn();
   beforeEach(() => {
-    perms = ['SALES.CREATE', 'SALES.REPRINT', 'CUSTOMERS.BASIC_MANAGE']; localStorage.removeItem('controlplus.sales.autoPrint'); vi.useFakeTimers(); vi.clearAllMocks(); state.mockResolvedValue(cash); print.mockResolvedValue(undefined); printingStatus.mockResolvedValue({ hasActiveProfile: false, profileName: null, columns: null }); printJobs.mockResolvedValue({ items: [] });
+    perms = ['SALES.CREATE', 'SALES.REPRINT', 'CUSTOMERS.BASIC_MANAGE']; localStorage.removeItem('controlplus.sales.autoPrint'); vi.useFakeTimers(); vi.clearAllMocks(); state.mockResolvedValue(cash); openDrawerForCheckout.mockResolvedValue({ status: 'ENVIADO' }); print.mockResolvedValue(undefined); printingStatus.mockResolvedValue({ hasActiveProfile: false, profileName: null, columns: null }); printJobs.mockResolvedValue({ items: [] });
     TestBed.configureTestingModule({ providers: [
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
-      { provide: SalesApi, useValue: { confirm, requestReprint, receipt, printingStatus, printJobs, retryPrintJob } }, { provide: CashApi, useValue: { state } }, { provide: CatalogApi, useValue: { products } },
+      { provide: SalesApi, useValue: { confirm, requestReprint, receipt, printingStatus, printJobs, retryPrintJob } }, { provide: CashApi, useValue: { state, openDrawerForCheckout } }, { provide: CatalogApi, useValue: { products } },
       { provide: AuthorizationDialog, useValue: { open: vi.fn() } }, { provide: TicketPrinter, useValue: { print } },
       { provide: SessionService, useValue: { has: (p: string) => perms.includes(p), hasRole: (...c: string[]) => c.includes('CAJERO'), user: () => ({ id: USER, userName: 'cajero', displayName: 'Cajero Uno', roles: ['CAJERO'] }) } },
     ] });
@@ -108,6 +108,25 @@ describe('Sales: punto de venta de contado', () => {
       expect(component.checkoutMode()).toBe(true);
       expect([component.cashApplied, component.cashReceived, component.remaining, component.change]).toEqual([50000, 50000, 0, 0]);
       expect(component.canConfirm).toBe(true);
+    });
+    it('los billetes suman: el primero reemplaza y los siguientes se agregan', () => {
+      component.startCheckout();
+      component.addCashBill(50000); component.addCashBill(50000);
+      expect([component.cashReceived, component.change]).toEqual([100000, 50000]);
+      component.typeCashReceived(60000); component.addCashBill(20000);
+      expect(component.cashReceived).toBe(20000);
+      component.clearCashReceived();
+      expect(component.cashReceived).toBe(0);
+    });
+    it('abre el cajón al pulsar Cobrar una sola vez por venta y solo avisa si falla', async () => {
+      component.startCheckout(); await vi.advanceTimersByTimeAsync(0);
+      component.checkoutMode.set(false); component.startCheckout(); await vi.advanceTimersByTimeAsync(0);
+      expect(openDrawerForCheckout).toHaveBeenCalledTimes(2);
+      expect(openDrawerForCheckout.mock.calls[0][0]).toBe(openDrawerForCheckout.mock.calls[1][0]);
+      expect(component.error()).toBe('');
+      openDrawerForCheckout.mockResolvedValueOnce({ status: 'FALLIDO' });
+      component.checkoutMode.set(false); component.startCheckout(); await vi.advanceTimersByTimeAsync(0);
+      expect(component.error()).toContain('Cajón');
     });
     it('si el cliente entrega más, el cambio es la diferencia', () => {
       component.startCheckout(); component.onCashReceived(100000);
@@ -215,7 +234,7 @@ describe('Sales: punto de venta de contado', () => {
       expect(print).not.toHaveBeenCalled();
       expect(requestReprint).not.toHaveBeenCalled();
       expect(component.printed()).toBe(true);
-      expect(component.reprintMessage()).toContain('PENDIENTE');
+      expect(component.reprintMessage()).toContain('Pendiente');
     });
     it('sigue el ticket pendiente hasta que la cola lo acepta', async () => {
       printingStatus.mockResolvedValue({ hasActiveProfile: true, profileName: 'Caja', columns: 32 });
@@ -228,7 +247,7 @@ describe('Sales: punto de venta de contado', () => {
       expect(component.lastJobStatus()).toBe('PENDIENTE');
       await vi.advanceTimersByTimeAsync(1500);
       expect(component.lastJobStatus()).toBe('IMPRESO');
-      expect(component.reprintMessage()).toContain('Aceptado por la cola de Windows');
+      expect(component.reprintMessage()).toContain('La impresora lo recibió');
       const calls = printJobs.mock.calls.length;
       await vi.advanceTimersByTimeAsync(6000);
       expect(printJobs.mock.calls.length).toBe(calls);

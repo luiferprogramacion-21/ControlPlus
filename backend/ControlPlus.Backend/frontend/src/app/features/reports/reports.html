@@ -1,6 +1,6 @@
 <section class="module-page reports-page">
   <section class="panel module-panel">
-    <div class="module-heading"><div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="reports" /></span><div><h2>Reportes</h2><p>Análisis con filtros procesados desde el servidor.</p></div></div></div>
+    <div class="module-heading"><div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="reports" /></span><div><h2>Reportes</h2><p>Ventas, caja e inventario por fechas.</p></div></div></div>
 
     <form class="report-filters" (submit)="$event.preventDefault(); apply()" novalidate>
       <div><label class="field-label" for="report-from">Desde</label><input id="report-from" class="text-field" type="date" name="from" [(ngModel)]="from" [attr.aria-invalid]="rangeIssue ? 'true' : null" /></div>

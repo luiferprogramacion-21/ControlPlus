@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Application.Security.Ports;
+using ControlPlus.Application.Security.Services;
 using ControlPlus.Infrastructure.Persistence;
 using ControlPlus.Infrastructure.Persistence.Official;
 using ControlPlus.Tests;
@@ -80,7 +81,12 @@ public sealed class PasswordRecoveryApiTests : IAsyncLifetime
         Assert.Equal(generic, (await withoutEmail.Content.ReadFromJsonAsync<PasswordRecoveryRequestedDto>())!.Message);
         Assert.Empty(_email.Sent);
 
-        Assert.Equal(HttpStatusCode.Accepted, (await RequestAsync(client, CashierName.ToUpperInvariant())).StatusCode);
+        var sent = await RequestAsync(client, CashierName.ToUpperInvariant());
+        Assert.Equal(HttpStatusCode.Accepted, sent.StatusCode);
+        // Con correo, la respuesta dice a cuál llegó, tapado a medias (20 de noviembre de 2026).
+        var sentMessage = (await sent.Content.ReadFromJsonAsync<PasswordRecoveryRequestedDto>())!.Message;
+        Assert.Contains(PasswordRecoveryService.MaskEmail(CashierEmail), sentMessage);
+        Assert.DoesNotContain(CashierEmail, sentMessage);
         var mail = Assert.Single(_email.Sent);
         Assert.Equal(CashierEmail, mail.To);
         Assert.DoesNotContain(_cashierPassword, mail.Body);

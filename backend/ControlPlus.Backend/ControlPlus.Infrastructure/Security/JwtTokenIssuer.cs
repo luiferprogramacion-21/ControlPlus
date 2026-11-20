@@ -9,6 +9,9 @@ namespace ControlPlus.Infrastructure.Security;
 public static class JwtClaimTypes
 {
     public const string SecurityStamp = "security_stamp";
+    /// <summary>Presente con valor <see cref="PasswordChangeRequiredValue"/> cuando la sesión debe cambiar la contraseña.</summary>
+    public const string PasswordChange = "pwd_change";
+    public const string PasswordChangeRequiredValue = "required";
 }
 
 public sealed class JwtTokenIssuer(IOptions<JwtOptions> options, IClock clock) : ITokenIssuer
@@ -30,6 +33,8 @@ public sealed class JwtTokenIssuer(IOptions<JwtOptions> options, IClock clock) :
             new(JwtClaimTypes.SecurityStamp, subject.SecurityStamp),
             new(JwtRegisteredClaimNames.Jti, Guid.CreateVersion7().ToString("D"))
         };
+        if (subject.PasswordChangeRequired)
+            claims.Add(new Claim(JwtClaimTypes.PasswordChange, JwtClaimTypes.PasswordChangeRequiredValue));
 
         var descriptor = new SecurityTokenDescriptor
         {

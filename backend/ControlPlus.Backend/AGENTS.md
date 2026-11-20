@@ -655,8 +655,8 @@ El usuario pidió abrir el cajón monedero a través de la impresora de recibos.
 
 - **Cómo se abre:** el sistema manda `ESC p` como un trabajo RAW de Windows, aparte del ticket. Se configuran el pin (2 o 5) y la duración del pulso y de la pausa (pares, de 20 a 500 ms). «ENVIADO» significa que Windows aceptó la orden, no que el cajón se abrió.
 - **Viene desactivado.** Solo el Administrador con `CONFIGURATION.MANAGE` lo habilita, en Configuración → Impresión → **Cajón**, sobre el perfil predeterminado de recibos o híbrido (`PUT /api/printing/profiles/{id}/drawer`).
+- **Venta de contado (decisión del 19 de noviembre de 2026):** el cajón se abre al pulsar **Cobrar**, antes de confirmar (`POST /api/cash/drawer/checkout`, permiso `SALES.CREATE`, `Idempotency-Key` por venta: un segundo «Cobrar» de la misma venta no lo reabre). Confirmar la venta ya no lo abre.
 - **Apertura automática:** una sola vez por operación, al confirmar con efectivo:
-  - venta;
   - abono a crédito;
   - apartado nuevo y abono a apartado;
   - devolución de apartado;
@@ -697,6 +697,20 @@ El usuario pidió poder dejar ventas en espera y aprobó hacerlo antes de la ins
 
 El usuario aprobó implementar las correcciones operativas propuestas en `docs/operational-corrections.md`: «Corregir un error» con opciones válidas, motivo, resumen antes/después y autorización vigente. Incluye quitar/reducir productos de ventas confirmadas sin reemplazo, historial/comprobante de correcciones, abonos y productos de apartados antes de entrega, movimientos manuales de caja, ajustes de inventario, revisión de cierres, recepciones reversibles, ventas adicionales vinculadas y corrección de medios de pago. Los documentos originales se conservan; los efectos se registran como correcciones vinculadas, en el turno actual cuando hay dinero. El plazo y la jerarquía de autorizaciones existentes se conservan. La aprobación incluye preparar migraciones compensatorias y ensayarlas en bases temporales; la activación real corresponde al operador con respaldo y preflight/postflight. No accede el agente a `controlplus`.
 
+### Decisión del 19 de noviembre de 2026: contraseñas de 4 números
+
+El usuario pidió contraseñas de 4 números **para todos los roles, incluido el Administrador**, y que quien tenga una contraseña anterior **deba cambiarla al entrar**.
+
+- **Regla:** `Security:PasswordFormat = PIN4` (en `appsettings.Production.json`, que usa el servicio instalado).
+  - Toda contraseña nueva debe ser exactamente 4 dígitos: crear usuario, restablecerla, recuperarla por correo, primer Administrador y recuperación del Administrador inicial.
+  - Sin la regla (desarrollo y pruebas) se acepta cualquiera no vacía.
+- **Entrar con una anterior:**
+  - sigue sirviendo, pero el token lleva `pwd_change=required`;
+  - un filtro devuelve 403 `password.change_required` a toda la API salvo `/api/auth/password-change`, `/api/auth/me` y `/api/auth/refresh`;
+  - la pantalla `/cambiar-contrasena` pide la actual y la nueva;
+  - el cambio rota el sello de seguridad y devuelve una sesión sin la marca. Sin migración.
+- Siguen el bloqueo tras 5 intentos fallidos y la autorización con carné. El CI genera la contraseña del Administrador de las pruebas de navegador con 4 números.
+
 ### Reglas del reparto
 
 - Cada agente toca solo los archivos de sus tareas. Las zonas compartidas son:
@@ -707,3 +721,41 @@ El usuario aprobó implementar las correcciones operativas propuestas en `docs/o
 - Toda pantalla nueva sigue su maqueta; lo que no tenga maqueta (M) se aprueba antes con el usuario.
 - Si una tarea necesita migración (por ejemplo, el correo del establecimiento), detenerse y pedir aprobación. La activación la hace el operador con script, respaldo, preflight y postflight, como las anteriores.
 - No acceder a `controlplus` desde el agente.
+
+### Decisión del 19 de noviembre de 2026: ajustes de mostrador
+
+El usuario pidió diez ajustes. Claude hizo estos seis; Codex hace la política del navegador, el ícono, el NIT opcional y el ticket con recibido y cambio.
+
+- **Billetes que suman:** en el cobro, el primer toque de un billete pone su valor y los siguientes suman. Atajos: Alt+1 a Alt+4 (10.000, 20.000, 50.000, 100.000), Alt+E (exacto) y Alt+B (borrar). Escribir a mano reinicia la suma.
+- **Tamaño libre:** de 80 % a 200 % en pasos de 5 %, con − y + en el menú del usuario y Ctrl +, Ctrl − y Ctrl 0. Siguen las tres opciones fijas.
+- **Sin aviso del cajón** en la pantalla de venta terminada.
+- **Base mayor que cero** para abrir la caja. La regla está solo en la pantalla, porque las pruebas de la API abren turnos con 0.
+- **Cajón al pulsar Cobrar** (ver «Cajón de dinero»). Si el cajón está desactivado, la respuesta es `DESACTIVADO` y no se escribe nada. La pantalla solo avisa si el resultado es FALLIDO o INCIERTO.
+- **Carné legible en la impresora de tickets:**
+  - el código nuevo tiene 40 dígitos (128 bits), antes 58;
+  - el carné se imprime a 70 × 50 mm en el rollo de 80 mm, con barras fijas de 0,25 mm (2 puntos a 203 dpi), sin que el navegador lo escale;
+  - antes la página de 85,6 mm se encogía y las barras quedaban más finas que un punto, por eso el lector no las leía;
+  - los carnés ya emitidos siguen siendo válidos, porque se compara su huella;
+  - el campo del carné en Caja acepta Enter, que es lo que envía el lector.
+- **NIT opcional (Codex):**
+  - el establecimiento ya no exige NIT; la migración `20261119020000_OptionalEstablishmentIdentificationV1` (historial 29 → 30) quita el NOT NULL de `configuracion.establecimiento.identificacion`;
+  - el operador la aplica antes de instalar, con `scripts/optional-nit/Invoke-Activation.ps1 -UsePostgresCredential` (servicio detenido, respaldo, preflight y postflight que verifica que los datos del establecimiento no cambian);
+  - el NIT del proveedor ya era opcional en la base, solo cambió la pantalla.
+- **Ticket (Codex):** muestra Total, Recibido y Devuelta, también en las reimpresiones.
+- **Contraseñas en Edge (Codex):** el instalador escribe la directiva de equipo `HKLM\SOFTWARE\Policies\Microsoft\Edge\PasswordManagerEnabled = 0`, y los campos de contraseña usan `autocomplete="off"`.
+- **Ícono del escritorio (20 de noviembre de 2026):**
+  - el ícono es el dibujo del POS (caja y recibo con el chulo naranja), recortado y ampliado para que ocupe casi todo el cuadro, sobre un fondo blanco redondeado con borde azul (16 a 256 px); el usuario lo prefirió a una «C+»;
+  - el anterior era un dibujo fino con mucho margen y no se distinguía;
+  - el instalador copia el ícono con un nombre que incluye su huella, porque Windows guarda en caché los íconos por ruta, y refresca la caché con `ie4uinit -show`;
+  - borra también el `ControlPlus.url` antiguo del escritorio personal, que abría el navegador predeterminado (Brave en este equipo), sin la directiva de Edge y con el ícono viejo en caché;
+  - `index.html` pide `controlplus.ico?v=pos-20261120`. Edge guarda el ícono por dirección, así que **cada vez que cambie el ícono hay que cambiar esa dirección** (con `?v=` Edge siguió mostrando la C+ que tenía guardada);
+  - la directiva `PasswordManagerEnabled=0` impide guardar contraseñas nuevas, pero Edge sigue ofreciendo las que ya estaban guardadas: hay que borrarlas una vez en `edge://settings/passwords`.
+- **Mensaje al ingresar (20 de noviembre de 2026):** el 401 del login mostraba «La sesión expiró» (texto genérico de `errorText`). Ahora `login.ts` dice «Usuario o contraseña incorrectos», recuerda los 4 números y avisa que 5 intentos bloquean al usuario. El servidor responde igual a contraseña errada y a usuario bloqueado, a propósito.
+- **Lenguaje sencillo en pantalla (20 de noviembre de 2026):** el usuario pidió quitar todo texto técnico que no entiende.
+  - Fuera: API, servidor, cola de Windows, controlador, UUID, Idempotency, Code 128 y los códigos de permiso como `SALES.CREATE`.
+  - Los códigos internos en mayúsculas se muestran en palabras con `core/readable-code.ts`; los estados de impresión, con `printStatusLabel`.
+  - La auditoría muestra los detalles como «Campo: valor», sin JSON ni identificadores.
+  - `errorText` cambia por un mensaje claro cualquier mensaje del servidor con términos técnicos.
+  - `statusKind` reconoce «No se sabe» como aviso de error.
+  - **Regla:** todo texto nuevo en pantalla va en palabras de tienda.
+- **Correo tapado en la recuperación (20 de noviembre de 2026):** al enviar el código, la respuesta dice a qué correo llegó, por ejemplo `lu•••21@gm•••.com` (`PasswordRecoveryService.MaskEmail`).

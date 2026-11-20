@@ -24,7 +24,7 @@ public sealed partial class SalesApiFlowTests
     /// </summary>
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task CashDrawer_OpensOncePerCashSale_NeverOnReplayReprintOrElectronic_AndManualNeedsReason()
+    public async Task CashDrawer_OpensOncePerCheckout_NotOnConfirmReprintOrElectronic_AndManualNeedsReason()
     {
         Assert.StartsWith("controlplus_test_",
             new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()).Database);
@@ -43,9 +43,8 @@ public sealed partial class SalesApiFlowTests
             HttpStatusCode.Created);
         var request = CashRequest(scenario.Products.Standard, 1, 1_000m);
 
-        var whileDisabled = await PostSaleAsync(client, "drawer-disabled", request);
-        var disabledSale = await ReadAsync<SaleDto>(whileDisabled, HttpStatusCode.Created);
-        Assert.False(whileDisabled.Headers.Contains(DrawerHeader));
+        Assert.Equal("DESACTIVADO", (await ReadAsync<CashDrawerOpenResultDto>(
+            await CheckoutAsync(client, Guid.NewGuid().ToString()), HttpStatusCode.OK)).Status);
 
         var enabled = await ReadAsync<PrintProfileDto>(await client.PutAsJsonAsync(
             $"/api/printing/profiles/{profile.Id}/drawer",
@@ -53,11 +52,16 @@ public sealed partial class SalesApiFlowTests
         Assert.True(enabled.DrawerEnabled);
         Assert.Equal(2, enabled.DrawerPin);
 
+        // Decisión del 19 de noviembre de 2026: el cajón abre al pulsar «Cobrar», una vez por intento de cobro.
+        var checkoutKey = Guid.NewGuid().ToString();
+        var opened = await ReadAsync<CashDrawerOpenResultDto>(await CheckoutAsync(client, checkoutKey), HttpStatusCode.OK);
+        Assert.Equal("ENVIADO", opened.Status);
+        Assert.Equal(opened.AttemptId, (await ReadAsync<CashDrawerOpenResultDto>(
+            await CheckoutAsync(client, checkoutKey), HttpStatusCode.OK)).AttemptId);
+        // Confirmar la venta ya no abre el cajón otra vez.
         var first = await PostSaleAsync(client, "drawer-sale", request);
         var sale = await ReadAsync<SaleDto>(first, HttpStatusCode.Created);
-        Assert.Equal("ENVIADO", Assert.Single(first.Headers.GetValues(DrawerHeader)));
-        var replay = await ReadAsync<SaleDto>(await PostSaleAsync(client, "drawer-sale", request), HttpStatusCode.Created);
-        Assert.Equal(sale.Id, replay.Id);
+        Assert.False(first.Headers.Contains(DrawerHeader));
 
         var electronic = await PostSaleAsync(client, "drawer-transfer", new ConfirmSaleRequest(
             null, [new(scenario.Products.Standard, 1, "MINORISTA")], null, null,
@@ -75,11 +79,12 @@ public sealed partial class SalesApiFlowTests
         using var raceB = CreateClient(scenario.Admin.AccessToken);
         var race = await Task.WhenAll(
             PostSaleAsync(raceA, "drawer-race-a", request),
-            PostSaleAsync(raceB, "drawer-race-b", request));
-        Assert.All(race, response => Assert.Equal(HttpStatusCode.Created, response.StatusCode));
+            CheckoutAsync(raceB, Guid.NewGuid().ToString()));
+        Assert.Equal(HttpStatusCode.Created, race[0].StatusCode);
+        Assert.Equal(HttpStatusCode.OK, race[1].StatusCode);
 
         var sender = (FakeCashDrawerPulseSender)_factory!.Services.GetRequiredService<ICashDrawerPulseSender>();
-        Assert.Equal(3, sender.Pulses.Count);
+        Assert.Equal(2, sender.Pulses.Count);
         Assert.All(sender.Pulses, pulse =>
         {
             Assert.Equal("COLA_CAJON", pulse.Queue);
@@ -89,15 +94,15 @@ public sealed partial class SalesApiFlowTests
         {
             var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
             var attempts = await db.AperturaCajon.AsNoTracking().ToArrayAsync();
-            Assert.Equal(3, attempts.Length);
+            Assert.Equal(2, attempts.Length);
             Assert.All(attempts, attempt =>
             {
-                Assert.Equal("VENTA", attempt.TipoOperacion);
+                Assert.Equal("COBRO", attempt.TipoOperacion);
                 Assert.Equal("ENVIADO", attempt.Estado);
                 Assert.Equal(profile.Id, attempt.PerfilImpresoraId);
             });
-            Assert.Contains(attempts, attempt => attempt.OperacionId == sale.Id);
-            Assert.DoesNotContain(attempts, attempt => attempt.OperacionId == disabledSale.Id);
+            Assert.Contains(attempts, attempt => attempt.OperacionId == Guid.Parse(checkoutKey));
+            Assert.DoesNotContain(attempts, attempt => attempt.OperacionId == sale.Id);
         }
 
         var status = await ReadAsync<CashDrawerStatusDto>(
@@ -116,7 +121,14 @@ public sealed partial class SalesApiFlowTests
         using var cashier = CreateClient(scenario.Cashier.AccessToken);
         Assert.Equal(HttpStatusCode.Forbidden,
             (await OpenDrawerAsync(cashier, Guid.NewGuid().ToString(), "Sin permiso")).StatusCode);
-        Assert.Equal(4, sender.Pulses.Count);
+        Assert.Equal(3, sender.Pulses.Count);
+    }
+
+    private static async Task<HttpResponseMessage> CheckoutAsync(HttpClient client, string idempotencyKey)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, "/api/cash/drawer/checkout");
+        message.Headers.Add("Idempotency-Key", idempotencyKey);
+        return await client.SendAsync(message);
     }
 
     private static async Task<HttpResponseMessage> OpenDrawerAsync(HttpClient client, string idempotencyKey, string reason)

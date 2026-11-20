@@ -236,6 +236,6 @@ describe('Cajón de dinero en Caja', () => {
     await screen.move();
     expect(api.movement).toHaveBeenCalledWith('incomes', 5000, 'Base', null);
     expect(screen.notice()).toBe('Movimiento registrado.');
-    expect(screen.drawerNotice()).toContain('no se pudo enviar la orden');
+    expect(screen.drawerNotice()).toContain('no se pudo abrir');
   });
 });

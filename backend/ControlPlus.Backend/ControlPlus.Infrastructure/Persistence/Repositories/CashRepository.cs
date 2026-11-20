@@ -32,17 +32,20 @@ public sealed class EfCashTransactionManager(OfficialControlPlusDbContext dbCont
 }
 
 /// <summary>
-/// Produces an opaque, Code 128-compatible value with 192 bits of entropy, written as a 58-digit decimal number so a
+/// Produces an opaque, Code 128-compatible value with 128 bits of entropy, written as a 40-digit decimal number so a
 /// scanner reads it in Code 128 subset C (two digits per symbol: about 40 % shorter than hexadecimal, so the bars stay
-/// wide enough on a card). The caller is responsible for returning it only once and persisting only its hash.
+/// wide enough on a card). Since 19 November 2026 it is 40 digits (was 58 with 192 bits): the card is printed on the 80 mm
+/// receipt roll and 58 digits forced bars thinner than one dot of the thermal head. Cards already issued keep working (only
+/// the hash is compared). The caller is responsible for returning it only once and persisting only its hash.
 /// </summary>
 public sealed class Code128CredentialTokenGenerator : ICredentialTokenGenerator
 {
-    private const int EntropyBytes = 24;
+    private const int EntropyBytes = 16;
+    private const int Digits = 40;
 
     public string Generate() =>
         new System.Numerics.BigInteger(RandomNumberGenerator.GetBytes(EntropyBytes), isUnsigned: true, isBigEndian: true)
-            .ToString().PadLeft(58, '0');
+            .ToString().PadLeft(Digits, '0');
 }
 
 public sealed partial class EfCashRepository(OfficialControlPlusDbContext dbContext) : ICashRepository

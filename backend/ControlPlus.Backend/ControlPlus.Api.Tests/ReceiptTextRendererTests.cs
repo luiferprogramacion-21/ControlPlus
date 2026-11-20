@@ -24,7 +24,8 @@ public sealed class ReceiptTextRendererTests
         Assert.Contains("TOTAL", text, StringComparison.Ordinal);
         Assert.Contains("18.000", text, StringComparison.Ordinal);
         Assert.Contains("Efectivo", text, StringComparison.Ordinal);
-        Assert.Contains("Cambio", text, StringComparison.Ordinal);
+        Assert.Contains("Recibido", text, StringComparison.Ordinal);
+        Assert.Contains("Devuelta", text, StringComparison.Ordinal);
         Assert.Contains("Ticket de venta", text, StringComparison.Ordinal);
         Assert.Contains("¡Gracias por su compra!", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Atendió:", text, StringComparison.Ordinal);
@@ -78,6 +79,24 @@ public sealed class ReceiptTextRendererTests
         Assert.Contains("Vuelva pronto", output);
         Assert.DoesNotContain("Pie actual", output);
         Assert.DoesNotContain("Descuento", output);
+    }
+
+    [Fact]
+    public void Render_ReprintKeepsCashReceivedAndChange()
+    {
+        var receipt = new SaleReceiptDto(Guid.CreateVersion7(), "V-REPRINT-CASH",
+            new DateTimeOffset(2026, 11, 19, 18, 0, 0, TimeSpan.Zero), new DateOnly(2026, 11, 19),
+            "CONTADO", "CONFIRMADA", 48000m, 0m, 48000m, 2000m, [],
+            [new SaleReceiptPaymentDto("EFECTIVO", 48000m, 50000m, 2000m)]);
+
+        var output = Encoding.UTF8.GetString(ReceiptTextRenderer.Render(receipt, "Baratísimo", 32, true));
+
+        Assert.Contains("REIMPRESIÓN", output);
+        Assert.Contains("TOTAL", output);
+        Assert.Contains("Recibido", output);
+        Assert.Contains("$ 50.000", output);
+        Assert.Contains("Devuelta", output);
+        Assert.Contains("$ 2.000", output);
     }
 
     [Theory]

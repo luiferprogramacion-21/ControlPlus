@@ -1,4 +1,5 @@
 import { groupedNumber, NumberInput } from '../../shared/number-input';
+import { readableCode } from '../../core/readable-code';
 import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe } from '@angular/common';
@@ -20,6 +21,7 @@ import { CashCorrections } from './cash-corrections';
   styleUrl: './cash.scss',
 })
 export class Cash implements OnInit {
+  readonly readableCode = readableCode;
   readonly api = inject(CashApi);
   private readonly authorization = inject(AuthorizationDialog);
   private readonly confirmations = inject(ConfirmationDialog);
@@ -175,7 +177,8 @@ export class Cash implements OnInit {
   get isAdministrator(): boolean { return typeof this.session.hasRole === 'function' && this.session.hasRole('ADMINISTRADOR'); }
   private resetReasons(): void { this.reasons.set(null); this.reasonsError.set(''); this.reasonId = ''; }
   async open(): Promise<void> {
-    if (!this.validMoney(this.initialAmount, true) || this.busy()) return;
+    // Decisión del 19 de noviembre de 2026: la caja no se abre con base $0.
+    if (!this.validMoney(this.initialAmount) || this.busy()) { if (!this.busy()) this.error.set('Escribe el fondo inicial: la caja no se abre con $0.'); return; }
     if (this.session.has('CASH.SHIFT_MANAGE')) {
       await this.run(async () => { await this.api.open(this.initialAmount, this.openObservations.trim() || null, undefined, this.openModeFor()); this.openMode = null; this.notice.set('Turno abierto.'); await this.refresh(); });
       return;

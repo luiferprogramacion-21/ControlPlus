@@ -11,7 +11,7 @@ Decisión del 18 de noviembre de 2026 (AGENTS.md, «Decisión del 18 de noviembr
 ## Cómo funciona
 
 1. En la pantalla de ingreso, **«¿Olvidaste tu contraseña?»**. El usuario escribe su usuario y pulsa «Enviar código».
-2. Si el usuario existe, está activo y no está bloqueado, y tiene correo, ControlPlus le envía un **código de 6 números**. La pantalla responde siempre lo mismo, para no revelar quién tiene cuenta o correo.
+2. Si el usuario existe, está activo y no está bloqueado, y tiene correo, ControlPlus le envía un **código de 6 números**. Si no hay a quién enviarlo, la pantalla responde un mensaje genérico. Cuando sí lo envía, muestra el correo tapado a medias (`lu•••21@gm•••.com`, decisión del 20 de noviembre de 2026) para que el usuario sepa cuál revisar; eso revela que la cuenta existe, y se aceptó porque el ingreso es local, en la tienda.
 3. El usuario escribe el código y su nueva contraseña dos veces. El cambio:
    - pone en cero los intentos fallidos;
    - **cierra todas sus sesiones**;
@@ -62,7 +62,7 @@ Otro proveedor: indique `-SmtpHost` y `-SmtpPort` (STARTTLS) y, si el usuario de
 
 - `PasswordRecoveryCodesTests` (Infrastructure, sin base de datos): validez de 10 a 15 minutos, un código por usuario y sello, formato.
 - `PasswordRecoveryApiTests` (con base de datos, correo simulado):
-  - usuario inexistente o sin correo reciben la misma respuesta y ningún correo;
+  - usuario inexistente o sin correo reciben la misma respuesta genérica y ningún correo; con correo, la respuesta incluye el correo tapado (`MaskEmail`);
   - el código llega solo al correo del usuario;
   - un código equivocado cuenta como intento;
   - el correcto cambia la contraseña, cierra las sesiones y no se puede reutilizar;

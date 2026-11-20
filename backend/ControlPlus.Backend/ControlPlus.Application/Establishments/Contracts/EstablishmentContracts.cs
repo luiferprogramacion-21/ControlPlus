@@ -7,7 +7,7 @@ namespace ControlPlus.Application.Establishments.Contracts;
 /// <summary>Datos visibles del establecimiento activo usados por la interfaz y los documentos.</summary>
 public sealed record EstablishmentDto(
     string CommercialName,
-    string Identification,
+    string? Identification,
     string? Phone,
     string? Address,
     string? ReceiptHeader,
@@ -17,7 +17,7 @@ public sealed record EstablishmentDto(
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record UpdateEstablishmentRequest(
     [property: JsonRequired] string CommercialName,
-    [property: JsonRequired] string Identification,
+    string? Identification,
     string? Phone,
     string? Address,
     string? ReceiptHeader,

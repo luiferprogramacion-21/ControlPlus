@@ -214,7 +214,6 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
                 """
                 {
                   "establishmentName": "Comercio ficticio",
-                  "establishmentIdentification": "900000000-1",
                   "installationCode": "INSTALL-TEST",
                   "installationSerial": "SER0000001",
                   "terminalCode": "TERM-TEST",
@@ -232,6 +231,9 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Null((await db.Establecimiento.AsNoTracking().SingleAsync()).Identificacion);
     }
 
     [Fact]

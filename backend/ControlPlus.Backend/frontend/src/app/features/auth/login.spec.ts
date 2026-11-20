@@ -15,6 +15,7 @@ describe('Login: pantalla de llegada', () => {
   let permissions: string[] = [];
   const session = {
     login: vi.fn().mockResolvedValue(undefined),
+    passwordChangeRequired: vi.fn().mockReturnValue(false),
     has: (permission: string) => permissions.includes(permission),
     hasRole: (...codes: string[]) => codes.includes(role),
   };
@@ -41,6 +42,19 @@ describe('Login: pantalla de llegada', () => {
     }
     expect(session.login).toHaveBeenCalledWith('cajero', 'clave');
     expect(state).not.toHaveBeenCalled();
+  });
+
+  it('con usuario o contraseña incorrectos no dice que la sesión expiró', async () => {
+    session.login.mockRejectedValueOnce(new HttpErrorResponse({ status: 401 }));
+    const component = await submit();
+    expect(component.error()).toContain('Usuario o contraseña incorrectos');
+    expect(component.error()).not.toContain('expiró');
+  });
+
+  it('quien entra con una contraseña que no es de 4 números va a cambiarla', async () => {
+    session.passwordChangeRequired.mockReturnValueOnce(true);
+    await submit();
+    expect(navigateByUrl).toHaveBeenLastCalledWith('/cambiar-contrasena');
   });
 
   it('si el inicio de sesión falla no navega y muestra el error', async () => {

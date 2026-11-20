@@ -16,6 +16,7 @@ public sealed class AuthenticationService : IAuthenticationService
     private readonly IAuditRepository _auditRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IClock _clock;
+    private readonly IPasswordPolicy _passwordPolicy;
     private readonly ILoginAttemptCoordinator _loginAttemptCoordinator;
 
     public AuthenticationService(
@@ -26,8 +27,10 @@ public sealed class AuthenticationService : IAuthenticationService
         IAuditRepository auditRepository,
         IUnitOfWork unitOfWork,
         IClock clock,
-        ILoginAttemptCoordinator loginAttemptCoordinator)
+        ILoginAttemptCoordinator loginAttemptCoordinator,
+        IPasswordPolicy? passwordPolicy = null)
     {
+        _passwordPolicy = passwordPolicy ?? PasswordPolicy.Free;
         _userRepository = userRepository;
         _roleRepository = roleRepository;
         _passwordHasher = passwordHasher;
@@ -56,7 +59,7 @@ public sealed class AuthenticationService : IAuthenticationService
             return Result.Failure<UserDto>(displayName.Error!);
         }
 
-        var password = SecurityInput.RequiredPassword(request.Password);
+        var password = SecurityInput.NewPassword(request.Password, _passwordPolicy);
         if (password.IsFailure)
         {
             return Result.Failure<UserDto>(password.Error!);
@@ -209,17 +212,46 @@ public sealed class AuthenticationService : IAuthenticationService
             cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await IssueAsync(user.Id, cancellationToken);
+        // Contraseña de 4 números: quien entra con una anterior debe cambiarla antes de usar el sistema.
+        return await IssueAsync(user.Id, !_passwordPolicy.IsCompliant(password), cancellationToken);
     }
 
-    public async Task<Result<AuthenticationResult>> RenewAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<Result<AuthenticationResult>> RenewAsync(Guid userId, bool passwordChangeRequired = false,
+        CancellationToken cancellationToken = default)
     {
         if (userId == Guid.Empty)
             return Result.Failure<AuthenticationResult>(ApplicationError.Unauthorized());
-        return await IssueAsync(userId, cancellationToken);
+        return await IssueAsync(userId, passwordChangeRequired, cancellationToken);
     }
 
-    private async Task<Result<AuthenticationResult>> IssueAsync(Guid userId, CancellationToken cancellationToken)
+    public async Task<Result<AuthenticationResult>> ChangeRequiredPasswordAsync(Guid userId,
+        ChangeRequiredPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (userId == Guid.Empty) return Result.Failure<AuthenticationResult>(ApplicationError.Unauthorized());
+        var current = SecurityInput.RequiredPassword(request.CurrentPassword, "contraseña actual");
+        if (current.IsFailure) return Result.Failure<AuthenticationResult>(current.Error!);
+        var newPassword = SecurityInput.NewPassword(request.NewPassword, _passwordPolicy, "nueva contraseña");
+        if (newPassword.IsFailure) return Result.Failure<AuthenticationResult>(newPassword.Error!);
+        if (string.Equals(current.Value, newPassword.Value, StringComparison.Ordinal))
+            return Result.Failure<AuthenticationResult>(ApplicationError.Validation("La nueva contraseña debe ser distinta de la actual."));
+
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
+        if (user is null || !user.IsActive) return Result.Failure<AuthenticationResult>(ApplicationError.Unauthorized());
+        if (!_passwordHasher.Verify(current.Value!, user.PasswordHash))
+            return Result.Failure<AuthenticationResult>(SecurityErrors.IncorrectCurrentPassword);
+
+        var now = _clock.UtcNow;
+        user.ChangePasswordHash(_passwordHasher.Hash(newPassword.Value!), now);
+        await _userRepository.UpdateAsync(user, cancellationToken);
+        await AuditWriter.WriteAsync(_auditRepository, _clock, user.Id, AuditAction.PasswordChanged, nameof(User), user.Id,
+            new { user.UserName, ChangedBySelf = true, Reason = "formato_4_numeros" }, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return await IssueAsync(user.Id, false, cancellationToken);
+    }
+
+    private async Task<Result<AuthenticationResult>> IssueAsync(Guid userId, bool passwordChangeRequired,
+        CancellationToken cancellationToken)
     {
         var authorization = await _userRepository.GetAuthorizationSnapshotAsync(userId, cancellationToken);
         if (authorization is null || authorization.HighestRoleLevel == RoleLevel.None)
@@ -232,7 +264,8 @@ public sealed class AuthenticationService : IAuthenticationService
             authorization.UserId,
             authorization.UserName,
             authorization.DisplayName,
-            authorization.SecurityStamp));
+            authorization.SecurityStamp,
+            passwordChangeRequired));
 
         return Result.Success(new AuthenticationResult(
             token.AccessToken,
@@ -242,7 +275,8 @@ public sealed class AuthenticationService : IAuthenticationService
                 authorization.UserName,
                 authorization.DisplayName,
                 authorization.RoleCodes,
-            authorization.PermissionCodes)));
+            authorization.PermissionCodes),
+            passwordChangeRequired));
     }
 
     public async Task<Result> RecoverInitialAdministratorAsync(
@@ -257,7 +291,7 @@ public sealed class AuthenticationService : IAuthenticationService
             return Result.Failure(userName.Error!);
         }
 
-        var newPassword = SecurityInput.RequiredPassword(request.NewPassword, "nueva contraseña");
+        var newPassword = SecurityInput.NewPassword(request.NewPassword, _passwordPolicy, "nueva contraseña");
         if (newPassword.IsFailure)
         {
             return Result.Failure(newPassword.Error!);

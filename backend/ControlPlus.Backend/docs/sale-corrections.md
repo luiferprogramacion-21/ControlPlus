@@ -40,7 +40,7 @@ La pantalla abre la impresión del navegador solo después de esa respuesta. No 
 
 ## Esquema y verificación
 
-La nueva compensatoria `20261119020000_SaleCorrectionsV1` sustituye exclusivamente `ventas.validar_liquidacion_cambio()`. Respecto al SQL oficial solo elimina la condición que exigía líneas entregadas; exige las devueltas y conserva igualdad de totales, cobros, reembolsos y ajuste de crédito. No modifica migraciones publicadas, datos históricos, columnas o permisos. `Down` falla de forma explícita porque los retornos ya confirmados deben permanecer válidos.
+La nueva compensatoria `20261120010000_SaleCorrectionsV1` sustituye exclusivamente `ventas.validar_liquidacion_cambio()`. Respecto al SQL oficial solo elimina la condición que exigía líneas entregadas; exige las devueltas y conserva igualdad de totales, cobros, reembolsos y ajuste de crédito. No modifica migraciones publicadas, datos históricos, columnas o permisos. `Down` falla de forma explícita porque los retornos ya confirmados deben permanecer válidos.
 
 No ha sido aplicada por el agente a `controlplus`. La activación persistente corresponde al operador con respaldo, preflight y postflight, antes de desplegar código que permita quitar productos sin reemplazo.
 

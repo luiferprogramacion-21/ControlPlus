@@ -5,7 +5,7 @@ namespace ControlPlus.Infrastructure.Persistence.Migrations;
 
 /// <summary>Approved receipt correction: the original receipt stays immutable and a certified reversal restores the pending order.</summary>
 [DbContext(typeof(ControlPlusDbContext))]
-[Migration("20261119050000_PurchaseReceiptCorrectionsV1")]
+[Migration("20261120040000_PurchaseReceiptCorrectionsV1")]
 public sealed class PurchaseReceiptCorrectionsV1 : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)

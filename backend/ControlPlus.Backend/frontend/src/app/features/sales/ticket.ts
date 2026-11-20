@@ -49,6 +49,11 @@ export function buildTicketHtml(receipt: SaleReceipt, extras: TicketExtras = {},
     : `<tr><td>Subtotal</td><td class="r">${cop(receipt.grossSubtotal)}</td></tr>${discountRow}`;
   const payments = receipt.payments.map(payment =>
     `<tr><td>${escapeHtml(METHOD_NAMES[payment.methodCode] ?? payment.methodCode)}</td><td class="r">${cop(payment.appliedAmount)}</td></tr>`).join('');
+  const cashPayments = receipt.payments.filter(payment => payment.methodCode === 'EFECTIVO' && typeof payment.receivedAmount === 'number');
+  const cashReceived = cashPayments.length ? cashPayments.reduce((sum, payment) => sum + payment.receivedAmount!, 0) : null;
+  const cashSettlement = cashReceived === null ? '' :
+    `<tr><td>Recibido</td><td class="r">${cop(cashReceived)}</td></tr>` +
+    `<tr><td>Devuelta</td><td class="r">${cop(receipt.change)}</td></tr>`;
   const businessName = receipt.establishmentName?.trim() || 'Baratísimo';
   const businessData = [receipt.establishmentIdentification ? `NIT: ${receipt.establishmentIdentification}` : '',
     receipt.establishmentAddress ?? '', receipt.establishmentPhone ? `Tel: ${receipt.establishmentPhone}` : '']
@@ -69,7 +74,7 @@ ${extras.operator ? `<p>Atendió: ${escapeHtml(extras.operator)}</p>` : ''}${ext
 <hr><table>${lines}</table><hr>
 <table>${summary}
 <tr class="total"><td>TOTAL</td><td class="r">${cop(receipt.total)}</td></tr></table>
-${receipt.payments.length ? `<hr><table>${payments}${receipt.change > 0 ? `<tr><td>Cambio</td><td class="r">${cop(receipt.change)}</td></tr>` : ''}</table>` : `<hr><p class="c">Venta a crédito${dueDate}</p>`}
+${receipt.payments.length ? `<hr><table>${payments}${cashSettlement}</table>` : `<hr><p class="c">Venta a crédito${dueDate}</p>`}
 <hr><p class="c">${footer}</p></body></html>`;
 }
 

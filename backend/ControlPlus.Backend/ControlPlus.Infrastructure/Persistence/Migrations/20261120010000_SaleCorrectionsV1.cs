@@ -5,7 +5,7 @@ namespace ControlPlus.Infrastructure.Persistence.Migrations;
 
 /// <summary>Allows a correction that returns original sale items without a replacement. Keeps all settlement guards.</summary>
 [DbContext(typeof(ControlPlusDbContext))]
-[Migration("20261119020000_SaleCorrectionsV1")]
+[Migration("20261120010000_SaleCorrectionsV1")]
 public sealed class SaleCorrectionsV1 : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder) => migrationBuilder.Sql("""

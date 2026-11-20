@@ -25,8 +25,10 @@ public sealed partial class PasswordRecoveryService(
     IClock clock,
     ILoginAttemptCoordinator loginAttemptCoordinator,
     IEmailSender emailSender,
-    IPasswordRecoveryCodes codes) : IPasswordRecoveryService
+    IPasswordRecoveryCodes codes,
+    IPasswordPolicy? passwordPolicy = null) : IPasswordRecoveryService
 {
+    private readonly IPasswordPolicy _passwordPolicy = passwordPolicy ?? PasswordPolicy.Free;
     private static readonly ApplicationError NotConfigured = new("email.not_configured",
         "La recuperación por correo no está configurada. Pida al Administrador que restablezca su contraseña.");
     private static readonly ApplicationError DeliveryFailed = new("email.delivery_failed",
@@ -77,7 +79,25 @@ public sealed partial class PasswordRecoveryService(
         await AuditWriter.WriteAsync(auditRepository, clock, user.Id, AuditAction.PasswordRecoveryRequested,
             nameof(User), user.Id, new { user.UserName }, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return Result.Success(response);
+        // Decisión del 20 de noviembre de 2026: el usuario ve a qué correo llegó el código, tapado a medias, para
+        // reconocer cuál revisar. Revela que la cuenta existe; se aceptó porque el ingreso es local, en la tienda.
+        return Result.Success(new PasswordRecoveryRequestedDto(
+            $"Enviamos un código al correo {MaskEmail(user.Email)}. Revise ese correo: el código vale {minutes} minutos."));
+    }
+
+    /// <summary>«luiferprogramacion21@gmail.com» → «lu•••21@gm•••.com»: lo justo para reconocerlo.</summary>
+    public static string MaskEmail(string email)
+    {
+        var at = email.LastIndexOf('@');
+        if (at <= 0 || at == email.Length - 1) return "•••";
+        var local = email[..at];
+        var domain = email[(at + 1)..];
+        var maskedLocal = local.Length <= 4 ? local[..1] + "•••" : local[..2] + "•••" + local[^2..];
+        var dot = domain.LastIndexOf('.');
+        var name = dot > 0 ? domain[..dot] : domain;
+        var suffix = dot > 0 ? domain[dot..] : "";
+        var maskedDomain = (name.Length <= 2 ? name[..1] : name[..2]) + "•••" + suffix;
+        return maskedLocal + "@" + maskedDomain;
     }
 
     public async Task<Result> ConfirmAsync(PasswordRecoveryConfirmRequest request, CancellationToken cancellationToken = default)
@@ -87,7 +107,7 @@ public sealed partial class PasswordRecoveryService(
         if (userName.IsFailure) return Result.Failure(userName.Error!);
         var code = request.Code?.Trim() ?? string.Empty;
         if (!SixDigits().IsMatch(code)) return Result.Failure(ApplicationError.Validation("El código tiene 6 números."));
-        var password = SecurityInput.RequiredPassword(request.NewPassword, "nueva contraseña");
+        var password = SecurityInput.NewPassword(request.NewPassword, _passwordPolicy, "nueva contraseña");
         if (password.IsFailure) return Result.Failure(password.Error!);
 
         return await loginAttemptCoordinator.ExecuteAsync(

@@ -1,9 +1,11 @@
 import { Routes } from '@angular/router';
-import { catalogGuard, cashGuard, salesGuard, salesHistoryGuard, inventoryGuard, customersGuard, creditsGuard, suppliersGuard, purchasesGuard, purchaseReceiptsGuard, reportsGuard, dashboardGuard, adminGuard, supportGuard, configGuard, layawaysGuard, productLabelsGuard, sessionGuard } from './core/guards';
+import { catalogGuard, cashGuard, salesGuard, salesHistoryGuard, inventoryGuard, customersGuard, creditsGuard, suppliersGuard, purchasesGuard, purchaseReceiptsGuard, reportsGuard, dashboardGuard, adminGuard, supportGuard, configGuard, layawaysGuard, productLabelsGuard, sessionGuard, passwordChangeGuard } from './core/guards';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'operacion/inicio' },
   { path: 'ingresar', loadComponent: () => import('./features/auth/login').then(m => m.Login), title: 'Ingresar | ControlPlus' },
+  // Contraseñas de 4 números (19 de noviembre de 2026): una sesión con una contraseña anterior solo puede cambiarla.
+  { path: 'cambiar-contrasena', canActivate: [passwordChangeGuard], loadComponent: () => import('./features/auth/change-password').then(m => m.ChangePassword), title: 'Cambiar contraseña | ControlPlus' },
   {
     path: 'operacion',
     loadComponent: () => import('./layout/shell').then(m => m.Shell),

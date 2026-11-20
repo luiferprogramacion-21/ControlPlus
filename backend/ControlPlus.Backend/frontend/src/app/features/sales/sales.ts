@@ -10,7 +10,7 @@ import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { CatalogApi, Product } from '../catalog/catalog-api';
 import { CashApi, CashState } from '../cash/cash-api';
-import { CustomerCreditRisk, HeldSale, NO_SALE_DRAFT, Sale, SaleDraft, SaleDraftInput, SaleInput, SalesApi, SalePaymentInput, PrintJob, PrintJobStatus } from './sales-api';
+import { CustomerCreditRisk, HeldSale, NO_SALE_DRAFT, Sale, SaleDraft, SaleDraftInput, SaleInput, SalesApi, SalePaymentInput, PrintJob, PrintJobStatus, printStatusLabel } from './sales-api';
 import { Customer } from '../customers/customers-api';
 import { CustomerPicker } from '../customers/customer-picker';
 import { buildTicketHtml, TicketPrinter } from './ticket';
@@ -75,6 +75,10 @@ export class Sales implements OnInit, OnDestroy {
   cashReceived = 0;
   /** Billetes rápidos al cobrar en efectivo. */
   readonly CASH_BILLS = [10_000, 20_000, 50_000, 100_000];
+  /** Billetes rápidos que suman (19 de noviembre de 2026): el primero reemplaza el exacto y los siguientes se suman. */
+  private billsAdding = false;
+  /** Una clave por venta: pulsar «Cobrar» otra vez (tras volver al carrito) no reabre el cajón. */
+  private drawerCheckoutKey: string | null = null;
   transferApplied = 0;
   transferReference = '';
   nequiApplied = 0;
@@ -274,6 +278,7 @@ export class Sales implements OnInit, OnDestroy {
 
   /** Deja la pantalla lista para otro cliente sin tocar las ventas guardadas. */
   private clearCart(): void {
+    this.drawerCheckoutKey = null;
     this.cart.set([]); this.results.set([]); this.selectedProductId.set(null);
     this.generalDiscount = null; this.discountReason = ''; this.customerId = ''; this.customers.set([]); this.dueDate = '';
     this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.saleType.set('CONTADO');
@@ -445,6 +450,16 @@ export class Sales implements OnInit, OnDestroy {
     const [only] = this.activePayments();
     if (this.activePayments().length === 1) this.setAmount(only, only === 'EFECTIVO' && this.cashReceived > 0 ? Math.min(Number(this.cashReceived), this.estimate) : this.estimate);
   }
+  /** Un billete rápido: el primero reemplaza lo recibido; pulsarlo otra vez (o pulsar otro) lo suma. */
+  addCashBill(bill: number): void {
+    if (this.locked) return;
+    this.onCashReceived(this.billsAdding ? Number(this.cashReceived || 0) + bill : bill);
+    this.billsAdding = true;
+  }
+  clearCashReceived(): void { if (!this.locked) { this.billsAdding = false; this.onCashReceived(0); } }
+  exactCash(): void { if (!this.locked) { this.billsAdding = false; this.useRemaining('EFECTIVO'); } }
+  /** Escribir en el campo empieza de nuevo: el siguiente billete reemplaza. */
+  typeCashReceived(value: number): void { this.billsAdding = false; this.onCashReceived(value); }
   onCashReceived(value: number): void {
     this.cashReceived = Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
     this.cashApplied = Math.min(this.cashReceived, this.estimate);
@@ -477,6 +492,18 @@ export class Sales implements OnInit, OnDestroy {
     if (this.saleType() === 'CREDITO') void this.checkCreditRisk();
     this.checkoutMode.set(true);
     this.focusField('cash-received', 'credit-due-date');
+    if (this.saleType() === 'CONTADO') void this.openDrawerForCheckout();
+  }
+  /** El cajón se abre al pulsar «Cobrar» (decisión del 19 de noviembre de 2026). Solo avisa si falla. */
+  private async openDrawerForCheckout(): Promise<void> {
+    try {
+      this.drawerCheckoutKey ??= crypto.randomUUID();
+      const result = await this.cash.openDrawerForCheckout(this.drawerCheckoutKey);
+      if (result.status === 'FALLIDO' || result.status === 'INCIERTO')
+        this.error.set(result.status === 'FALLIDO'
+          ? 'Cajón: no se pudo abrir. Revisa la impresora y el cable; la venta se puede cobrar igual.'
+          : 'Cajón: no se pudo confirmar la apertura. Revisa el cajón; la venta se puede cobrar igual.');
+    } catch { /* El cajón nunca impide cobrar. */ }
   }
   /** Consulta si el cliente está moroso o supera su cupo con esta venta (aviso siempre; bloqueo si está activo). */
   async checkCreditRisk(): Promise<CustomerCreditRisk | null> {
@@ -739,6 +766,7 @@ export class Sales implements OnInit, OnDestroy {
   }
   cancelSale(): void {
     if (this.locked) return;
+    this.drawerCheckoutKey = null;
     this.cart.set([]); this.results.set([]); this.selectedProductId.set(null); this.generalDiscount = null; this.discountReason = '';
     this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.sourceSale.set(null);
     this.showCancel.set(false); this.feedbackKind.set('info'); this.feedback.set('Venta cancelada. No se registró ningún cobro.'); this.focusSearch();
@@ -762,6 +790,13 @@ export class Sales implements OnInit, OnDestroy {
     if (this.checkoutMode()) {
       if (event.key === 'Escape') { event.preventDefault(); this.returnToSale(); }
       if (event.key === 'F9') { event.preventDefault(); void this.confirm(); }
+      // Billetes rápidos: Alt+1 a Alt+4, Alt+E exacto y Alt+B borrar lo recibido.
+      if (event.altKey && this.activePayments().includes('EFECTIVO')) {
+        const bill = { '1': 0, '2': 1, '3': 2, '4': 3 }[event.key];
+        if (bill !== undefined) { event.preventDefault(); this.addCashBill(this.CASH_BILLS[bill]); }
+        else if (event.key.toLowerCase() === 'e') { event.preventDefault(); this.exactCash(); }
+        else if (event.key.toLowerCase() === 'b') { event.preventDefault(); this.clearCashReceived(); }
+      }
       return;
     }
     const target = event.target instanceof HTMLElement ? event.target : null;
@@ -883,7 +918,7 @@ export class Sales implements OnInit, OnDestroy {
       this.draftId = null; this.sourceSale.set(null);
       this.drawerStatus.set(result.drawerStatus ?? null);
       this.receipt.set(meta); this.showDetail.set(false); this.reprintMessage.set(''); this.printed.set(false); this.lastJobStatus.set(null); this.sale.set(result);
-      this.pending = null; this.cart.set([]); this.results.set([]); this.selectedProductId.set(null); this.cashApplied = this.cashReceived = this.transferApplied = this.nequiApplied = 0; this.generalDiscount = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.activePayments.set(['EFECTIVO']); this.checkoutMode.set(false);
+      this.pending = null; this.drawerCheckoutKey = null; this.cart.set([]); this.results.set([]); this.selectedProductId.set(null); this.cashApplied = this.cashReceived = this.transferApplied = this.nequiApplied = 0; this.generalDiscount = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.activePayments.set(['EFECTIVO']); this.checkoutMode.set(false);
       this.focusField('new-sale');
       // La venta ya está confirmada: un fallo de impresión no la afecta y se puede reintentar con el botón.
       setTimeout(() => void this.printSaleTicket(true));
@@ -922,7 +957,7 @@ export class Sales implements OnInit, OnDestroy {
           return;
         }
         if (!automatic && reprint && latest?.status === 'IMPRIMIENDO') {
-          this.reprintMessage.set('Resultado incierto: revisa la cola de Windows antes de solicitar otra copia.');
+          this.reprintMessage.set('No se sabe si salió: mira la impresora antes de pedir otra copia.');
           return;
         }
         if (!automatic && reprint && latest?.status === 'ERROR') {
@@ -946,7 +981,7 @@ export class Sales implements OnInit, OnDestroy {
       if (existing) {
         this.printed.set(true);
         this.lastJobStatus.set(existing.status);
-        this.reprintMessage.set(`Ticket: ${existing.status}. Revisa la cola de Windows antes de solicitar otra copia.`);
+        this.reprintMessage.set(`Ticket: ${printStatusLabel(existing.status)}. Mira la impresora antes de pedir otra copia.`);
         return;
       }
       if (automatic && !this.autoPrint()) return;
@@ -956,7 +991,7 @@ export class Sales implements OnInit, OnDestroy {
         const queued = (await this.api.printJobs(sale.id)).items.at(-1);
         if (queued?.copyType === 'REIMPRESION') {
           this.lastJobStatus.set(queued.status);
-          this.reprintMessage.set(`Reimpresión: ${queued.status}. Consulta la cola de Windows.`);
+          this.reprintMessage.set(`Reimpresión: ${printStatusLabel(queued.status)}. Mira la impresora.`);
           return;
         }
       }
@@ -969,7 +1004,7 @@ export class Sales implements OnInit, OnDestroy {
     finally { this.busy.set(false); }
   }
   private printJobMessage(job: Pick<PrintJob, 'copyType' | 'status'>): string {
-    return `${job.copyType === 'REIMPRESION' ? 'Reimpresión' : 'Ticket'}: ${job.status}. ${job.status === 'IMPRESO' ? 'Aceptado por la cola de Windows.' : ''}`;
+    return `${job.copyType === 'REIMPRESION' ? 'Reimpresión' : 'Ticket'}: ${printStatusLabel(job.status)}. ${job.status === 'IMPRESO' ? 'La impresora lo recibió.' : ''}`;
   }
   /** Sigue el trabajo hasta que la cola lo acepte o falle, para no dejar «PENDIENTE» en pantalla después de imprimir. */
   private async watchPrintJob(saleId: string, jobId: string): Promise<void> {

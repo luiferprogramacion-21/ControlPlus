@@ -43,7 +43,7 @@ describe('PrintSettings', () => {
   it('crea el perfil con los límites del contrato y avisa que la cola no se verifica', async () => {
     const c = await create(); c.form = { ...base, name: ' Recibos caja ', systemQueueName: ' COLA ', columns: 24, makeDefault: false }; await c.save();
     expect(api.createPrintProfile).toHaveBeenCalledWith({ ...base, name: 'Recibos caja', systemQueueName: 'COLA', columns: 24, makeDefault: false });
-    expect(c.notice()).toContain('No se comprobó');
+    expect(c.notice()).toContain('Revisa que el nombre');
   });
   it('crea un perfil híbrido con tamaño de etiqueta', async () => {
     const c = await create(); c.form = { name: 'Híbrida', systemQueueName: 'COLA', columns: 32, makeDefault: true, printerType: 'HIBRIDA', labelWidthMm: 50, labelHeightMm: 30, resolutionDpi: 203 };
@@ -95,7 +95,7 @@ describe('PrintSettings', () => {
       confirmAction.mockResolvedValue(true); await c.saveDrawer();
       expect(api.updatePrintProfileDrawer).toHaveBeenCalledWith('p1', { enabled: true, pin: 2, pulseOnMs: 100, pulseOffMs: 100, expectedVersion: 3 });
       expect(c.drawerEditing()).toBeNull();
-      expect(c.notice()).toContain('no confirma que el cajón se abrió');
+      expect(c.notice()).toContain('Haz una prueba');
     });
 
     it('rechaza tiempos impares o fuera de rango', async () => {

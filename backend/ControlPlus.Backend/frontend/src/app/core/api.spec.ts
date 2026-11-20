@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { authInterceptor, authorizationContext, errorText } from './api';
+import { authInterceptor, authorizationContext, errorText, TECHNICAL_FALLBACK } from './api';
 import { SessionService } from './session.service';
 
 describe('Intercepción de autorización', () => {
@@ -45,5 +45,14 @@ describe('Intercepción de autorización', () => {
     await renewal;
     expect(session.touch).toHaveBeenCalledTimes(1);
     http.verify();
+  });
+});
+
+describe('Mensajes técnicos del servidor', () => {
+  it('no muestra al usuario mensajes escritos para programadores', () => {
+    const technical = new HttpErrorResponse({ status: 400, error: { title: 'purchaseId debe ser un UUID válido.' } });
+    expect(errorText(technical)).toBe(TECHNICAL_FALLBACK);
+    const plain = new HttpErrorResponse({ status: 409, error: { title: 'La venta ya fue anulada.' } });
+    expect(errorText(plain)).toBe('La venta ya fue anulada.');
   });
 });

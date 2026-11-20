@@ -21,10 +21,14 @@ Cada persona tiene **un solo rol**. Lo que ves en el menú depende de él: si un
 
 ## 1.1 Ingresar y salir
 
-1. Abre ControlPlus con el acceso directo del escritorio. Se abre en su propia ventana, como un programa, con su ícono en la barra de tareas (también funciona en el navegador, en `http://localhost:5000`).
+1. Abre ControlPlus con el acceso directo del escritorio. Se abre en su propia ventana, como un programa, con su ícono en la barra de tareas (también funciona en el navegador, en `http://localhost:5000`). El ícono es el **dibujo de la caja con el recibo** sobre fondo blanco con borde azul. Para verlo más grande en el escritorio: clic derecho en el escritorio → **Ver** → **Iconos grandes**. Usa siempre ese acceso: en otro navegador, como Brave o Chrome, el navegador puede ofrecer guardar la contraseña.
 2. Escribe tu **usuario** y tu **contraseña** y pulsa Ingresar.
 3. Llegas a **Inicio**: una pantalla con botones grandes de lo que más haces (Vender, Abrir caja, Cerrar caja, Cambiar o devolver, Recibir abono, Nuevo apartado, Buscar producto, Recibir mercancía…) y el estado de la caja. Solo aparecen las tareas que tu rol permite; si la caja está cerrada, **Abrir caja** va primero. Puedes volver a Inicio desde el menú en cualquier momento.
 4. Para salir, usa el botón de salir de la barra superior.
+
+**La contraseña es de 4 números** (por ejemplo 4821), para todos. Elige una que no sea fácil de adivinar: no uses 1234, 0000 ni tu año de nacimiento.
+
+**Si tu contraseña anterior no es de 4 números**, todavía te deja entrar, pero enseguida aparece **«Cambia tu contraseña»**: escribe la actual y la nueva de 4 números (dos veces). Hasta cambiarla no puedes usar el sistema.
 
 **Cuidado con tu contraseña.** Tras **5 intentos fallidos** tu usuario se bloquea. Lo reactiva una persona con un rol superior (el Administrador).
 
@@ -34,7 +38,7 @@ Cada persona tiene **un solo rol**. Lo que ves en el menú depende de él: si un
 
 Nadie cambia su propia contraseña desde dentro del sistema. Hay dos caminos:
 
-- **Por correo (lo más rápido):** en la pantalla de ingreso pulsa **«¿Olvidaste tu contraseña?»**, escribe tu usuario y el sistema envía un **código de 6 números** al correo que el Administrador registró en tu usuario. Escribe el código y tu contraseña nueva. El código vale unos 10 minutos. Equivocarte con el código cuenta como intento fallido.
+- **Por correo (lo más rápido):** en la pantalla de ingreso pulsa **«¿Olvidaste tu contraseña?»**, escribe tu usuario y el sistema envía un **código de 6 números** al correo que el Administrador registró en tu usuario. La pantalla te muestra a qué correo lo envió, tapado a medias (por ejemplo `lu•••21@gm•••.com`), para que sepas cuál revisar. Escribe el código y tu contraseña nueva de 4 números. El código vale unos 10 minutos. Equivocarte con el código cuenta como intento fallido.
   - Necesita que tu usuario tenga correo registrado y que el computador tenga Internet en ese momento.
 - **Con el Administrador:** él te pone una contraseña nueva desde Administración → Usuarios. Es la salida cuando no tienes correo o no hay Internet.
 
@@ -48,7 +52,7 @@ Nadie cambia su propia contraseña desde dentro del sistema. Hay dos caminos:
   - **Compras:** Compras y Proveedores.
   - **Sistema:** Configuración y Administración.
 - Arriba aparece el nombre de la tienda y tu nombre.
-- **Tamaño de la pantalla.** Toca tu nombre abajo en el menú y elige **Normal (100 %)**, **Grande (125 %)** o **Muy grande (150 %)**. Agranda todo a la vez: letras, botones, campos y tablas. Viene en Grande y cada computador recuerda su tamaño.
+- **Tamaño de la pantalla.** Toca tu nombre abajo en el menú y elige **Normal (100 %)**, **Grande (125 %)** o **Muy grande (150 %)**, o ajústalo a tu gusto con los botones **−** y **+** (de 80 % a 200 %, de 5 en 5). También con el teclado: **Ctrl +** agranda, **Ctrl −** achica y **Ctrl 0** vuelve a 125 %. Agranda todo a la vez: letras, botones, campos y tablas. Viene en Grande y cada computador recuerda su tamaño.
 - **Ventanas.** Los formularios se abren en ventanas como las de Windows: la **X** de arriba a la derecha o **Esc** cierran sin guardar, y abajo a la derecha están primero el botón de la acción (Guardar, Aceptar…) y al final **Cancelar**.
 
 - **Listas.** Buscan mientras escribes y los filtros se aplican al elegirlos; no hace falta pulsar Buscar. Si una lista está vacía, ahí mismo aparece el botón para crear el primero (por ejemplo **Nuevo cliente**).
@@ -97,6 +101,8 @@ Es una tarjeta con un **código de barras** (Code 128) a nombre de una persona. 
 
 El Administrador lo emite en Administración → Usuarios → **Carné**. Si se pierde, se emite otro y el anterior deja de servir. El sistema guarda solo una huella del código, no el código.
 
+**Imprimir carné** lo saca en la **impresora de tickets** (rollo de 80 mm), con barras del grosor que la impresora térmica marca nítido; recórtalo por la línea punteada y, si puedes, plastifícalo. Para imprimirlo en otra impresora usa **Descargar PDF** o **Descargar JPG**. Los carnés impresos antes del 19 de noviembre de 2026 en la impresora de tickets salían con barras demasiado finas: si el lector no los lee, **emite uno nuevo**.
+
 ## 1.6 Si algo no funciona
 
 | Qué ves | Qué hacer |
@@ -124,7 +130,7 @@ El Administrador lo emite en Administración → Usuarios → **Carné**. Si se 
 
 Menú **Caja** → bloque **Apertura de caja**.
 
-1. Escribe el **fondo inicial** (el efectivo con el que empiezas). Puede ser cero.
+1. Escribe el **fondo inicial** (el efectivo con el que empiezas). Debe ser **mayor que cero**: la caja no se abre con base $0.
 2. Elige la **modalidad del turno**:
    - **Turno individual** (viene marcado): una sola persona abre, vende y cierra. Todas las ventas quedan a su nombre.
    - **Turno compartido**: varias personas se turnan en el mismo mostrador. Cada una se identifica con su carné antes de cada venta.
@@ -164,7 +170,8 @@ En cada producto de la venta, **−** y **+** cambian la cantidad y la **×** lo
 
 Se puede pagar con **Efectivo, Transferencia o Nequi**, solos o combinados:
 
-- **Efectivo exacto** llena el valor justo.
+- **Efectivo exacto** llena el valor justo (atajo **Alt+E**).
+- **Botones de billetes** (10.000, 20.000, 50.000 y 100.000, atajos **Alt+1** a **Alt+4**): el primer toque pone ese billete y cada toque siguiente **suma** otro. Dos toques en 50.000 = $100.000. **Borrar** (Alt+B) deja el recibido en cero. Si escribes el valor a mano, el siguiente billete vuelve a empezar la cuenta.
 - **+ Pago mixto** agrega otro medio. El sistema calcula solo lo que falta (**Usar saldo pendiente**).
 - En **Transferencia y Nequi** la referencia es opcional.
 - En efectivo escribe lo que **recibes** del cliente. El **Cambio** aparece grande: es lo que devuelves.
@@ -179,10 +186,10 @@ Se puede pagar con **Efectivo, Transferencia o Nequi**, solos o combinados:
 
 **El cajón de dinero** (si el Administrador lo conectó a la impresora, ver 4.7):
 
-- Se abre solo al confirmar una operación **con efectivo**: venta, abono, apartado, devolución o cambio con efectivo y movimiento de caja. Se abre **una sola vez** por operación.
-- **No** se abre si se paga solo con Transferencia o Nequi, ni al reimprimir un ticket.
-- Debajo del total aparece un aviso del cajón. «Windows aceptó la orden» significa que la impresora recibió la orden; mira que el cajón se haya abierto.
-- Si no se abrió, la venta **ya está registrada**. No la repitas: pide a un Supervisor que lo abra desde **Caja** (ver 3.3).
+- En una **venta de contado** se abre al pulsar **Cobrar** (F9), antes de confirmar, para que recibas el dinero y des el cambio. Cobras, **cierras el cajón con la mano** (el sistema no lo puede cerrar) y al confirmar sale el ticket. Si vuelves a pulsar Cobrar en la misma venta no se vuelve a abrir.
+- En abonos, apartados, devoluciones o cambios con efectivo y movimientos de caja se abre al confirmar, **una sola vez** por operación.
+- **No** se abre al reimprimir un ticket.
+- Si el cajón no abre al pulsar Cobrar, aparece un aviso; puedes cobrar igual y pedir a un Supervisor que lo abra desde **Caja** (ver 3.3).
 
 ## 2.7 Ventas en espera y ventas sin terminar
 
@@ -379,7 +386,7 @@ El Administrador es responsable de que el sistema sea confiable: configura el ne
 ## 4.1 Primer día: lista de verificación
 
 1. **Instalación inicial** (una sola vez): crea el primer Administrador con la clave maestra y deja lista la caja. Está en `docs/initial-setup.md`.
-2. **Configuración → Establecimiento:** nombre comercial, NIT, teléfono, dirección y los textos de encabezado y pie del ticket.
+2. **Configuración → Establecimiento:** nombre comercial, NIT opcional, teléfono, dirección y los textos de encabezado y pie del ticket.
 3. **Administración → Usuarios:** crea los Supervisores y Cajeros (ver 4.2), con su **correo** para que puedan recuperar la contraseña.
 4. **Carné** para quienes lo necesiten (turno compartido o autorizaciones rápidas).
 5. **Catálogo:** categorías con su abreviatura, y productos con precios, existencias y costos.
@@ -391,7 +398,7 @@ El Administrador es responsable de que el sistema sea confiable: configura el ne
 
 Administración → **Usuarios**.
 
-- **Nuevo usuario:** nombre, usuario, **correo** (opcional pero recomendado), **rol** (Cajero, Supervisor o Administrador) y contraseña inicial.
+- **Nuevo usuario:** nombre, usuario, **correo** (opcional pero recomendado), **rol** (Cajero, Supervisor o Administrador) y contraseña inicial de **4 números**.
 - **Abrir ficha:** abre una sola ventana con pestañas:
   - **Datos:** nombre y correo.
   - **Rol:** cambia el rol de la persona. Sus sesiones abiertas se cierran.
@@ -433,7 +440,7 @@ Menú **Configuración**, con cuatro pestañas. La numeración de documentos y l
 
 | Pestaña | Para qué sirve |
 | --- | --- |
-| **Establecimiento** | Nombre comercial, NIT o documento, teléfono, dirección y los textos de encabezado y pie del ticket. |
+| **Establecimiento** | Nombre comercial, NIT o documento opcional, teléfono, dirección y los textos de encabezado y pie del ticket. |
 | **Caja y turnos** | Modalidad predeterminada: individual o compartido (solo sin turno abierto). |
 | **Cambios, apartados y créditos** | Plazo de cambios de producto (15 días), pago inicial mínimo de apartados (20 %, se puede apagar; siempre al menos $1), plazo límite de apartados (15 días), plazo sugerido de los créditos (1 a 90 días) y **mínimo mayorista** (12 unidades). También el **bloqueo de créditos a morosos y de cupo excedido**: si lo activas, solo tú puedes autorizar una excepción. |
 | **Impresión** | Perfiles de impresora y cola de impresión (ver 4.7). |
@@ -459,13 +466,13 @@ La tabla **Cola de impresión** muestra cada trabajo y su estado. **Reintentar**
 2. Configuración → **Impresión** → botón **Cajón** en la fila del perfil **predeterminado de recibos**.
 3. Marca **Permitir apertura desde esta impresora**. Deja **Pin 2**, **Pulso activo 100 ms** y **Pausa 100 ms**. Pulsa **Guardar** y confirma.
 4. **Prueba:** abre la caja y, en Caja → **Cajón de dinero**, escribe «Prueba» como motivo y pulsa **Abrir cajón**. Si no abre, vuelve a la configuración del cajón, cambia a **Pin 5** y prueba de nuevo. Si tampoco abre, revisa el cable y el voltaje del cajón.
-5. Haz una venta pequeña **en efectivo**: el cajón debe abrirse una sola vez. Reimprime el ticket y haz otra con **Nequi**: ninguna de las dos debe abrirlo.
+5. Empieza una venta pequeña y pulsa **Cobrar**: el cajón debe abrirse una sola vez. Confírmala y reimprime el ticket: la reimpresión no debe abrirlo.
 
 Para dejar de usarlo, desmarca **Permitir apertura** y guarda. Un perfil de etiquetas no puede abrir el cajón.
 
 ## 4.8 Proveedores y compras
 
-- **Proveedores:** solo tú los creas, editas e inactivas. El documento (NIT o cédula) no se puede repetir.
+- **Proveedores:** solo tú los creas, editas e inactivas. El documento (NIT o cédula) es opcional; si lo informas, debes escribir tipo y número, y no se puede repetir. Al editar puedes retirar ambos datos.
 - **Compras y pedidos:** además de lo del Supervisor (3.10), tú puedes **anular una compra** ya confirmada (completa, con motivo), **anular un pedido** y **Cerrar con pendientes** un pedido cuyo faltante ya no va a llegar.
 - **Anular una compra** resta lo que había entrado al inventario y devuelve el costo anterior. No se puede si el producto ya tuvo movimientos posteriores.
 

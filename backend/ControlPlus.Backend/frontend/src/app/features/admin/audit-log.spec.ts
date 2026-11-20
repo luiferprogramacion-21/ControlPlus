@@ -75,7 +75,7 @@ describe('Auditoría', () => {
     const button = fixture.nativeElement.querySelector('.table-action') as HTMLButtonElement;
     button.click(); fixture.detectChanges();
     const detail = text(fixture);
-    expect(detail).toContain('total');
+    expect(detail).toContain('Total');
     expect(detail).toContain('5.000');
     expect(fixture.componentInstance.detailRows(record({ details: 'texto libre' }))).toEqual([{ field: 'Detalle', value: 'texto libre' }]);
   });
@@ -88,13 +88,15 @@ describe('Auditoría', () => {
       lines: [{ quantity: 2000, amount: -1234.5 }], productIds: [1234, 5678], note: 'Pedido 1234567' });
     const event = record({ details });
     const rows = Object.fromEntries(fixture.componentInstance.detailRows(event).map(row => [row.field, row.value]));
-    expect(rows['total']).toBe('1.234.567,5');
-    expect(rows['totalPaid']).toBe('12.345');
-    expect(rows['quantity']).toBe('1.250');
-    expect(JSON.parse(rows['after'])).toEqual({ unitCost: '1.234,5678', stock: '10.000', productId: 'p-00001234', expectedVersion: 1000 });
-    expect(JSON.parse(rows['lines'])).toEqual([{ quantity: '2.000', amount: '-1.234,5' }]);
-    expect(JSON.parse(rows['productIds'])).toEqual([1234, 5678]);
-    expect(rows).toMatchObject({ version: '1234', documentNumber: '1234567', productCode: '00001234', phone: '3101234567', occurredOn: '2026-11-19', note: 'Pedido 1234567' });
+    expect(rows['Total']).toBe('1.234.567,5');
+    expect(rows['Total pagado']).toBe('12.345');
+    expect(rows['Cantidad']).toBe('1.250');
+    // Sin llaves, comillas ni identificadores internos.
+    expect(rows['Después']).toBe('Unitario costo: 1.234,5678 · Existencias: 10.000');
+    expect(rows['Productos']).toBe('Cantidad: 2.000 · Monto: -1.234,5');
+    expect(rows['Product ids']).toBeUndefined();
+    expect(rows['Version']).toBeUndefined();
+    expect(rows).toMatchObject({ 'Documento número': '1234567', 'Producto código': '00001234', 'Teléfono': '3101234567', 'Occurred fecha': '2026-11-19', 'Nota': 'Pedido 1234567' });
     expect(event.details).toBe(details);
     expect(fixture.componentInstance.detailRows(record({ details: '1234.5' }))).toEqual([{ field: 'Detalle', value: '1.234,5' }]);
   });

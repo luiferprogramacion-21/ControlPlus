@@ -161,10 +161,23 @@ try {
     $screen = Wait-Http '/' 30
     if ($screen.Content -notmatch '<html') { throw 'La pantalla no respondió como HTML.' }
 
+    # ControlPlus corre en un equipo compartido de la tienda: Edge no debe ofrecer ni guardar las contraseñas
+    # del sistema. La directiva de equipo se vuelve a escribir en cada instalación para que la operación sea
+    # idempotente y para corregir cualquier valor anterior.
+    $edgePolicy = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+    New-Item -Path $edgePolicy -Force | Out-Null
+    New-ItemProperty -Path $edgePolicy -Name 'PasswordManagerEnabled' -PropertyType DWord -Value 0 -Force | Out-Null
+
     # Escritorio común de todos los usuarios: no depende de redirecciones de OneDrive del escritorio personal.
     # El ícono se copia a ProgramData para que el acceso no dependa de la carpeta que se reemplaza al actualizar.
-    $iconFile = Join-Path $dataDir 'controlplus.ico'
-    Copy-Item -LiteralPath (Join-Path $installDir 'wwwroot\controlplus.ico') -Destination $iconFile -Force
+    # El nombre lleva la huella del ícono (20 de noviembre de 2026): Windows guarda en caché los íconos por ruta, así
+    # que con el mismo nombre seguía mostrando el anterior después de actualizar.
+    $iconSource = Join-Path $installDir 'wwwroot\controlplus.ico'
+    $iconHash = (Get-FileHash -LiteralPath $iconSource -Algorithm SHA256).Hash.Substring(0, 8).ToLowerInvariant()
+    $iconFile = Join-Path $dataDir "controlplus-$iconHash.ico"
+    Copy-Item -LiteralPath $iconSource -Destination $iconFile -Force
+    Get-ChildItem -LiteralPath $dataDir -Filter 'controlplus*.ico' -File |
+        Where-Object { $_.FullName -ne $iconFile } | Remove-Item -Force -ErrorAction SilentlyContinue
     $desktop = [Environment]::GetFolderPath('CommonDesktopDirectory')
     $urlShortcut = Join-Path $desktop 'ControlPlus.url'
     # Abrir como un programa (decisión del 19 de noviembre de 2026): con Microsoft Edge el acceso abre ControlPlus
@@ -189,10 +202,21 @@ try {
         $link.Description = 'ControlPlus, punto de venta'
         $link.Save()
         if (Test-Path -LiteralPath $urlShortcut) { Remove-Item -LiteralPath $urlShortcut -Force }
+        # Acceso web antiguo en el escritorio personal (instalaciones del 15 de noviembre de 2026): abre el navegador
+        # predeterminado, que no recibe la directiva de Edge ni el modo aplicación. Solo se quita si apunta a ControlPlus.
+        $personalUrl = Join-Path ([Environment]::GetFolderPath('Desktop')) 'ControlPlus.url'
+        if ((Test-Path -LiteralPath $personalUrl) -and
+            ((Get-Content -LiteralPath $personalUrl -Raw) -match '(?m)^URL=http://(localhost|127\.0\.0\.1):\d+/?\s*$')) {
+            Remove-Item -LiteralPath $personalUrl -Force
+        }
     }
     else {
         [IO.File]::WriteAllText($urlShortcut, "[InternetShortcut]`r`nURL=$url/`r`nIconFile=$iconFile`r`nIconIndex=0`r`n", (New-Object Text.UTF8Encoding($false)))
     }
+
+    # Refresca la caché de íconos del escritorio para que el acceso muestre el ícono nuevo sin reiniciar.
+    $iconRefresh = Join-Path $env:SystemRoot 'System32\ie4uinit.exe'
+    if (Test-Path -LiteralPath $iconRefresh) { Start-Process -FilePath $iconRefresh -ArgumentList '-show' -WindowStyle Hidden -Wait -ErrorAction SilentlyContinue }
 
     Write-Host 'CONTROLPLUS_SERVICE_OK'
     Write-Host "ControlPlus corre como servicio y abre en $url (acceso directo en el escritorio)."

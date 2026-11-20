@@ -45,6 +45,17 @@ function Read-Value([string]$Current, [string]$Prompt, [int]$MaxLength) {
     return $value
 }
 
+function Read-OptionalValue([string]$Current, [string]$Prompt, [int]$MaxLength, [bool]$PromptWhenEmpty) {
+    $value = $Current
+    if ($PromptWhenEmpty -and [string]::IsNullOrWhiteSpace($value)) {
+        $value = Read-Host "$Prompt (opcional; Enter para omitir)"
+    }
+    if ([string]::IsNullOrWhiteSpace($value)) { return $null }
+    $value = $value.Trim()
+    if ($value.Length -gt $MaxLength) { throw "«$Prompt» admite hasta $MaxLength caracteres." }
+    return $value
+}
+
 function ConvertFrom-Secure([Security.SecureString]$Secure) {
     $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Secure)
     try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
@@ -102,7 +113,7 @@ try {
 
     # 3. Datos del negocio y del Administrador
     $EstablishmentName = Read-Value $EstablishmentName 'Nombre del negocio' 200
-    $Identification = Read-Value $Identification 'NIT o documento del negocio' 30
+    $Identification = Read-OptionalValue $Identification 'NIT o documento del negocio' 30 (-not $PSBoundParameters.ContainsKey('Identification'))
     $AdminUserName = Read-Value $AdminUserName 'Usuario del Administrador (para iniciar sesión)' 100
     $AdminDisplayName = Read-Value $AdminDisplayName 'Nombre completo del Administrador' 200
     $InstallationCode = Read-Value $InstallationCode 'Código de la instalación' 50
@@ -114,8 +125,8 @@ try {
 
     $password = $env:CONTROLPLUS_SETUP_ADMIN_PASSWORD
     if ([string]::IsNullOrEmpty($password)) {
-        $password = ConvertFrom-Secure (Read-Host 'Contraseña del Administrador (oculta)' -AsSecureString)
-        $confirmation = ConvertFrom-Secure (Read-Host 'Repita la contraseña (oculta)' -AsSecureString)
+        $password = ConvertFrom-Secure (Read-Host 'Contraseña del Administrador: 4 números (oculta)' -AsSecureString)
+        $confirmation = ConvertFrom-Secure (Read-Host 'Repita los 4 números (oculta)' -AsSecureString)
         if ($password -cne $confirmation) { $confirmation = $null; throw 'Las contraseñas no coinciden. No se cambió nada.' }
         $confirmation = $null
     }

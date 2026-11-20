@@ -30,7 +30,7 @@ export function code128Values(text: string): number[] {
   const values = [START_B];
   for (const char of text) {
     const code = char.charCodeAt(0);
-    if (code < 32 || code > 126) throw new Error('El código contiene un carácter que Code 128 no admite.');
+    if (code < 32 || code > 126) throw new Error('El código tiene un carácter que no se puede poner en el código de barras.');
     values.push(code - 32);
   }
   const checksum = values.reduce((sum, value, index) => sum + value * (index === 0 ? 1 : index), 0) % 103;

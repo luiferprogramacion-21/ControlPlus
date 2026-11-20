@@ -40,9 +40,8 @@ public sealed class SalesController(
         var result = await salesService.ConfirmAsync(actor, idempotencyKey, request, cancellationToken);
         if (result.IsSuccess)
         {
-            if (result.Value!.Payments.Any(x => x.MethodCode == "EFECTIVO" && x.AppliedAmount > 0))
-                await CashDrawerControllerDispatch.TryOpenAsync(drawer, actor,
-                    CashDrawerOperationKind.Sale, result.Value.Id, Response, logger, cancellationToken);
+            // Decisión del 19 de noviembre de 2026: el cajón de una venta se abre al pulsar «Cobrar»
+            // (POST /api/cash/drawer/checkout), no al confirmarla.
             try { await printing.QueueOriginalAsync(result.Value!.Id, cancellationToken); }
             catch (Exception exception)
             {

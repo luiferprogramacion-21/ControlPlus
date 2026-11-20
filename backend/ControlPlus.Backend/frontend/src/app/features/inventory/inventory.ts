@@ -1,4 +1,5 @@
 import { groupedNumber, NumberInput } from '../../shared/number-input';
+import { readableCode } from '../../core/readable-code';
 import { A11yModule } from '@angular/cdk/a11y';
 import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
@@ -17,6 +18,7 @@ import { WindowSheet } from '../../shared/window-sheet';
 import { HelpTip } from '../../shared/help-tip';
 @Component({ selector: 'cp-inventory', imports: [WindowSheet, HelpTip, NumberInput, DecimalPipe, A11yModule, FormsModule, MatPaginatorModule, DatePipe, Icon], templateUrl: './inventory.html', styleUrls: ['../directory.scss', './inventory.scss'] })
 export class Inventory implements OnInit {
+  readonly readableCode = readableCode;
   private readonly api = inject(InventoryApi);
   private readonly authorization = inject(AuthorizationDialog);
   private readonly confirmation = inject(ConfirmationDialog);
