@@ -786,3 +786,9 @@ Cierra la entrega 5 de las correcciones operativas: «corregir los medios de pag
   - **Arreglo:** los dos validadores se pausan solo durante el relleno.
   - **Para reanudar:** el activador acepta partir de 30 o de 31.
   - **Diagnóstico:** el migrador ahora informa el error de PostgreSQL (código, mensaje, tabla, restricción y línea), sin datos de conexión.
+- **Activación real acreditada (20 de noviembre de 2026):** `OPERATIONAL_CORRECTIONS_ACTIVATION_OK` en `C:\Users\luife\ControlPlus-Backups\OperationalCorrections-20261120T153905Z-39e9569f73f54430917638754e5f08f1`.
+  - Historial 31 → 35. Se reanudó tras el primer intento y el arreglo de los validadores.
+  - Respaldo previo SHA-256 `9EAFB0B92144A9BCEE13B49112C8610F5B463606F10032BEB1B7399FD0FBF50C`.
+  - Postflight conforme: esquema, relleno, llaves `RESTRICT`, permisos y huellas de ventas, pagos, apartados, sus productos y caja idénticas.
+  - Servicio instalado (`CONTROLPLUS_SERVICE_OK`) y el operador confirmó que todo funciona.
+  - **No repetir ninguna de las cinco migraciones ni ejecutar Down.**
