@@ -713,7 +713,7 @@ export class Sales implements OnInit, OnDestroy {
     const quantity = this.cart().find(line => line.product.id === product.id)?.quantity ?? 1;
     this.feedbackKind.set('success');
     this.feedback.set(`${product.name} agregado. Cantidad actual: ${groupedNumber(quantity)}.`);
-    this.focusSearch();
+    this.focusField(`quantity-${product.id}`);
     this.scrollToLine(product.id);
   }
   remove(id: string): void {
