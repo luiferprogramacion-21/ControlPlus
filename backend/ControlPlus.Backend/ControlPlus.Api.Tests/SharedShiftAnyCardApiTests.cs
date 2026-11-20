@@ -27,6 +27,7 @@ public sealed partial class SalesApiFlowTests
         var state = await ReadAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
         Assert.Equal(session.Id, state.OwnOperatorSession?.Id);
         Assert.False(string.IsNullOrWhiteSpace(state.ActiveOperatorName));
+        Assert.Equal("CAJERO", state.ActiveOperatorRole);
 
         // Still logged in as the Administrator, the sale belongs to the cashier and uses up her session.
         var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "shared-any-card-sale",

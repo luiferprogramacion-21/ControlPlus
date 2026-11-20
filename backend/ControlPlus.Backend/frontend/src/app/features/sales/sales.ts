@@ -330,7 +330,15 @@ export class Sales implements OnInit, OnDestroy {
   get discounts(): number { return this.generalDiscount ? discountAmount(this.subtotal, this.generalDiscount) : this.cart().reduce((sum, line) => sum + this.lineDiscount(line), 0); }
   lineDiscount(line: CartLine): number { return discountAmount(this.price(line) * line.quantity, line.discount); }
   describeDiscount = describeDiscount;
-  get maxDiscount(): number { return maxDiscountPercent(this.session.hasRole('ADMINISTRADOR'), this.session.hasRole('SUPERVISOR')); }
+  /**
+   * In a shared shift the seller is whoever passed their card (20 November 2026), so their role, not the logged-in
+   * user's, decides the discount limit and whether a discount or wholesale price needs another person's authorization.
+   */
+  private sellerHasRole(...codes: string[]): boolean {
+    const role = this.cashState()?.requiresOperatorSession ? this.cashState()?.activeOperatorRole : null;
+    return role ? codes.includes(role) : this.session.hasRole(...codes);
+  }
+  get maxDiscount(): number { return maxDiscountPercent(this.sellerHasRole('ADMINISTRADOR'), this.sellerHasRole('SUPERVISOR')); }
   get estimate(): number { return Math.max(0, this.subtotal - this.discounts); }
   get applied(): number { return this.activePayments().reduce((sum, method) => sum + this.paymentAmount(method), 0); }
   get remaining(): number { return this.estimate - this.applied; }
@@ -556,7 +564,7 @@ export class Sales implements OnInit, OnDestroy {
   }
   // --- authorization of concessions (discount / wholesale price) ------------------------------
   /** A Cajero always needs the authorization of a Supervisor or Administrador for a discount or the wholesale price. */
-  get isCashier(): boolean { return !this.session.hasRole('ADMINISTRADOR', 'SUPERVISOR'); }
+  get isCashier(): boolean { return !this.sellerHasRole('ADMINISTRADOR', 'SUPERVISOR'); }
   get needsConcessionAuthorization(): boolean { return this.isCashier && (this.discounts > 0 || this.hasWholesale); }
   /** Shows the authorization window and keeps the verified credentials for the sale; true when they were accepted. */
   private async authorizeConcession(kind: 'DISCOUNT' | 'WHOLESALE', detail: string): Promise<boolean> {

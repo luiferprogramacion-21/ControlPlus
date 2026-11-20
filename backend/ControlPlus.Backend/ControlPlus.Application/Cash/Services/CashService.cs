@@ -113,6 +113,12 @@ public sealed partial class CashService(
                 .OrderByDescending(session => session.UsuarioId == actor.UserId).FirstOrDefault()
             : null;
         var operatorName = ownSession is null ? null : (await userRepository.GetByIdAsync(ownSession.UsuarioId, cancellationToken))?.DisplayName;
+        // The seller's role decides whether a discount or wholesale price needs authorization, not the logged-in user's.
+        var operatorRole = ownSession is null ? null
+            : (await userRepository.GetAuthorizationSnapshotAsync(ownSession.UsuarioId, cancellationToken))?.HighestRoleLevel switch
+            {
+                RoleLevel.Administrador => "ADMINISTRADOR", RoleLevel.Supervisor => "SUPERVISOR", RoleLevel.Cajero => "CAJERO", _ => null,
+            };
         var responsibleName = shift?.ModoOperacion == CashConstants.IndividualMode && shift.UsuarioResponsableId is Guid responsibleId
             ? (await userRepository.GetByIdAsync(responsibleId, cancellationToken))?.DisplayName
             : null;
@@ -123,11 +129,12 @@ public sealed partial class CashService(
                 OwnOperatorSession = ownSession is null ? null : Map(ownSession),
                 OpenShiftResponsibleName = responsibleName,
                 ActiveOperatorName = operatorName,
+                ActiveOperatorRole = operatorRole,
             });
 
         return Result.Success(new CashStateDto(null, null, null, null, false, null,
             cash is not null, shift is not null, shared,
-            ownSession is null ? null : Map(ownSession), responsibleName, operatorName));
+            ownSession is null ? null : Map(ownSession), responsibleName, operatorName, operatorRole));
     }
 
     public async Task<Result<CashRegisterDto>> ConfigureCashRegisterAsync(

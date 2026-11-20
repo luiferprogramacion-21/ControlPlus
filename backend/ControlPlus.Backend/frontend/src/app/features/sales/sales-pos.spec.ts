@@ -30,6 +30,16 @@ describe('Sales: punto de venta de contado', () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it('en turno compartido decide con el rol de quien pasó el carné, no con el de la sesión abierta', () => {
+    // Sesión abierta de un Cajero y carné activo de una Supervisora: vende la Supervisora.
+    component.cashState.set({ ...cash, requiresOperatorSession: true, ownOperatorSession: { id: 's1', state: 'ACTIVA' }, activeOperatorRole: 'SUPERVISOR' });
+    expect(component.isCashier).toBe(false);
+    expect(component.maxDiscount).toBe(20);
+    component.cashState.set({ ...cash, requiresOperatorSession: true, ownOperatorSession: { id: 's2', state: 'ACTIVA' }, activeOperatorRole: 'CAJERO' });
+    expect(component.isCashier).toBe(true);
+    expect(component.maxDiscount).toBe(5);
+  });
+
   describe('búsqueda con sugerencias', () => {
     it('sugiere mientras se escribe, sin esperar Enter, y no busca con un solo carácter', async () => {
       products.mockResolvedValue({ items: [product()] });

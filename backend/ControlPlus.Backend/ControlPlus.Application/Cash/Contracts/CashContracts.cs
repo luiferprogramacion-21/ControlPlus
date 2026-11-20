@@ -46,7 +46,9 @@ public sealed record CashStateDto(
     // (decisión del 18 de noviembre de 2026). Solo el nombre: no revela montos ni identificadores.
     string? OpenShiftResponsibleName = null,
     // Nombre de quien pasó su carné en el turno compartido (20 de noviembre de 2026): la venta queda a su nombre.
-    string? ActiveOperatorName = null);
+    string? ActiveOperatorName = null,
+    // Rol de quien pasó el carné (CAJERO, SUPERVISOR o ADMINISTRADOR): decide si el descuento o el mayorista piden autorización.
+    string? ActiveOperatorRole = null);
 
 public sealed record ConfigureCashRegisterRequest(string Code, string Name);
 
