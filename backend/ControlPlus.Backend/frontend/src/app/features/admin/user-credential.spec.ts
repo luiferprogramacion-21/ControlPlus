@@ -177,11 +177,11 @@ describe('Carné de operador', () => {
     expect(text.slice(first, first + 7)).toBe('1 0 obj');
   });
 
-  it('el código impreso cabe en el rollo de 80 mm con barras de 0,25 mm', () => {
-    const token = '1234567890'.repeat(4);
+  it('el código impreso cabe en el rollo de 80 mm con barras de 0,375 mm', () => {
+    const token = '1234567890'.repeat(2) + '12';
     const svg = printedBarcodeSvg(token, 69);
     const width = Number(/width="([0-9.]+)mm"/.exec(svg)![1]);
-    expect(width).toBeCloseTo(68.75, 2);
+    expect(width).toBeCloseTo(66, 2);
     expect(svg).toContain('height="14mm"');
     const longer = printedBarcodeSvg('1234567890'.repeat(5) + '12345678', 69);
     expect(Number(/width="([0-9.]+)mm"/.exec(longer)![1])).toBeLessThanOrEqual(69.0001);

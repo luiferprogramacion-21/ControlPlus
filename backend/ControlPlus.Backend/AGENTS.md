@@ -793,3 +793,7 @@ Cierra la entrega 5 de las correcciones operativas: «corregir los medios de pag
   - Servicio instalado (`CONTROLPLUS_SERVICE_OK`) y el operador confirmó que todo funciona.
   - **No repetir ninguna de las cinco migraciones ni ejecutar Down.**
 - **Verificación local de los cambios de Codex (20 de noviembre de 2026):** Codex hizo `7bdf439` (sin redirección HTTPS en la instalación local) y `530154e` (consultas divididas con lectura coherente). El operador ejecutó `scripts/Run-LocalTests.ps1` sobre `530154e`: las tres suites terminaron con salida 0, API 745/745 y ninguna prueba fallida ni omitida. Esa versión ya está instalada en la tienda.
+- **Carné y etiquetas legibles (20 de noviembre de 2026):** en la tienda, el lector láser Honeywell Voyager MS9520 leía las etiquetas pero el carné no (ni pitaba).
+  - **Causa:** con barras de 2 puntos, la cabeza térmica cerraba los espacios.
+  - **Carné:** el código nuevo tiene 22 dígitos (72 bits) y se imprime con barras de 0,375 mm (3 puntos), unos 66 mm de ancho. Los carnés de 40 o 58 dígitos siguen siendo válidos, porque se compara la huella, pero hay que reemitirlos para imprimirlos legibles.
+  - **Etiquetas:** sin alto configurado en el perfil, cada etiqueta usaba todo el alto de página que informa el controlador del rollo y salía estirada. Ahora mide 40 mm; un alto configurado sigue mandando.

@@ -101,6 +101,8 @@ public sealed class WindowsGdiPrintSpooler : IPrintSpooler
         }
     }
 
+    private const decimal DefaultLabelHeightMm = 40m;
+
     private static void SubmitLabels(string queueName, ProductLabelPrintPayload payload,
         ProductLabelPrintLayout layout, string documentName)
     {
@@ -127,9 +129,10 @@ public sealed class WindowsGdiPrintSpooler : IPrintSpooler
             var labelWidth = layout.WidthMm is decimal width
                 ? Math.Min(pageWidth, Math.Max(1, (int)decimal.Round(width * dpiX / 25.4m)))
                 : pageWidth;
-            var labelHeight = layout.HeightMm is decimal height
-                ? Math.Min(pageHeight, Math.Max(1, (int)decimal.Round(height * dpiY / 25.4m)))
-                : pageHeight;
+            // Without a configured height (a receipt roll), the driver reports a page as tall as a sheet and every label
+            // stretched to fill it (20 November 2026). A label is then 40 mm tall; a configured height still wins.
+            var labelHeight = Math.Min(pageHeight, Math.Max(1,
+                (int)decimal.Round((layout.HeightMm ?? DefaultLabelHeightMm) * dpiY / 25.4m)));
 
             foreach (var item in payload.Items)
             for (var copy = 0; copy < item.Quantity; copy++)

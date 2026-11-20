@@ -11,8 +11,11 @@ const escape = (value: string): string => value.replace(/[&<>"']/g, c => ({ '&':
  */
 export const PRINTED_CARD_WIDTH_MM = 70;
 export const PRINTED_CARD_HEIGHT_MM = 50;
-/** Narrowest bar: 0.25 mm = 2 dots at 203 dpi (the usual 10 mil). Never scaled, so every bar prints sharp. */
-export const PRINTED_MODULE_MM = 0.25;
+/**
+ * Narrowest bar: 0.375 mm = 3 dots at 203 dpi (20 November 2026; it was 2 dots). A thermal head spreads each bar a little
+ * and with 2-dot bars the spaces closed up, so the store's laser scanner did not even beep. Never scaled by the browser.
+ */
+export const PRINTED_MODULE_MM = 0.375;
 /** Blank margin each side of the bars: at least 10 modules, as Code 128 requires. */
 const QUIET_MODULES = 10;
 
