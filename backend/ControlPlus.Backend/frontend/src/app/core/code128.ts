@@ -52,5 +52,5 @@ export function code128Svg(text: string, moduleWidth = 2, height = 60): string {
     x += width;
   });
   const total = (x + quiet) * moduleWidth;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${height}" style="display:block;width:100%;height:auto" role="img" aria-label="Código de barras Code 128" shape-rendering="crispEdges" fill="#000">${bars}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${height}" style="display:block;width:100%;height:auto" role="img" aria-label="Código de barras" shape-rendering="crispEdges" fill="#000">${bars}</svg>`;
 }

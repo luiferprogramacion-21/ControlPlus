@@ -17,9 +17,11 @@ El sistema usa un trabajo Windows `RAW` separado del ticket y envía `ESC p` con
 
 ## Migración controlada
 
-`20261119010000_CashDrawerV1` agrega cuatro columnas a `configuracion.perfil_impresora` y la tabla `caja.apertura_cajon`; avanza el historial **27 → 28**. El mismo activador aplica a continuación `20261119013000_HeldSalesV1` (ventas en espera, ver `docs/sale-drafts.md`), así que el historial queda en **29** después de `20261116020000_CreditInstallmentsV1`. El agente no ha accedido a `controlplus` ni aplicado la migración. El operador solo la ejecuta tras CI verde y prueba de migración en una base temporal `controlplus_test_*`. El equipo físico se revisa antes de habilitar el perfil.
+El operador confirmó `CASH_DRAWER_ACTIVATION_OK` el 19 de noviembre de 2026. La activación aplicó `20261119010000_CashDrawerV1` y `20261119013000_HeldSalesV1`; el historial quedó en **29**, después de `20261116020000_CreditInstallmentsV1`. El respaldo y la evidencia están en `ControlPlus-Backups\CashDrawer-*`.
 
-Desde PowerShell 5.1 **como Administrador**, en `C:\ControlPlus\backend\ControlPlus.Backend`:
+**No volver a ejecutar el activador, repetir esas migraciones ni ejecutar `Down` en esta instalación.** La confirmación acredita la actualización del esquema; la compatibilidad y apertura del cajón físico siguen pendientes de la prueba de tienda descrita abajo. Los comandos de activación siguientes solo aplican a otra instalación cuyo preflight confirme que aún tiene el historial 27 y ambas migraciones pendientes.
+
+Para una instalación distinta que cumpla esas precondiciones, desde PowerShell 5.1 **como Administrador**, en `C:\ControlPlus\backend\ControlPlus.Backend`:
 
 ```powershell
 git pull --ff-only
