@@ -386,7 +386,7 @@ El Administrador es responsable de que el sistema sea confiable: configura el ne
 ## 4.1 Primer día: lista de verificación
 
 1. **Instalación inicial** (una sola vez): crea el primer Administrador con la clave maestra y deja lista la caja. Está en `docs/initial-setup.md`.
-2. **Configuración → Establecimiento:** nombre comercial, NIT, teléfono, dirección y los textos de encabezado y pie del ticket.
+2. **Configuración → Establecimiento:** nombre comercial, NIT opcional, teléfono, dirección y los textos de encabezado y pie del ticket.
 3. **Administración → Usuarios:** crea los Supervisores y Cajeros (ver 4.2), con su **correo** para que puedan recuperar la contraseña.
 4. **Carné** para quienes lo necesiten (turno compartido o autorizaciones rápidas).
 5. **Catálogo:** categorías con su abreviatura, y productos con precios, existencias y costos.
@@ -440,7 +440,7 @@ Menú **Configuración**, con cuatro pestañas. La numeración de documentos y l
 
 | Pestaña | Para qué sirve |
 | --- | --- |
-| **Establecimiento** | Nombre comercial, NIT o documento, teléfono, dirección y los textos de encabezado y pie del ticket. |
+| **Establecimiento** | Nombre comercial, NIT o documento opcional, teléfono, dirección y los textos de encabezado y pie del ticket. |
 | **Caja y turnos** | Modalidad predeterminada: individual o compartido (solo sin turno abierto). |
 | **Cambios, apartados y créditos** | Plazo de cambios de producto (15 días), pago inicial mínimo de apartados (20 %, se puede apagar; siempre al menos $1), plazo límite de apartados (15 días), plazo sugerido de los créditos (1 a 90 días) y **mínimo mayorista** (12 unidades). También el **bloqueo de créditos a morosos y de cupo excedido**: si lo activas, solo tú puedes autorizar una excepción. |
 | **Impresión** | Perfiles de impresora y cola de impresión (ver 4.7). |
@@ -472,7 +472,7 @@ Para dejar de usarlo, desmarca **Permitir apertura** y guarda. Un perfil de etiq
 
 ## 4.8 Proveedores y compras
 
-- **Proveedores:** solo tú los creas, editas e inactivas. El documento (NIT o cédula) no se puede repetir.
+- **Proveedores:** solo tú los creas, editas e inactivas. El documento (NIT o cédula) es opcional; si lo informas, debes escribir tipo y número, y no se puede repetir. Al editar puedes retirar ambos datos.
 - **Compras y pedidos:** además de lo del Supervisor (3.10), tú puedes **anular una compra** ya confirmada (completa, con motivo), **anular un pedido** y **Cerrar con pendientes** un pedido cuyo faltante ya no va a llegar.
 - **Anular una compra** resta lo que había entrado al inventario y devuelve el costo anterior. No se puede si el producto ya tuvo movimientos posteriores.
 

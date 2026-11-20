@@ -4,7 +4,7 @@ namespace ControlPlus.Application.Security.Contracts;
 
 public sealed record SetupFirstAdministratorRequest(
     [Required, MaxLength(200)] string EstablishmentName,
-    [Required, MaxLength(30)] string EstablishmentIdentification,
+    [MaxLength(30)] string? EstablishmentIdentification,
     [Required, MaxLength(50)] string InstallationCode,
     [Required, MaxLength(10)] string InstallationSerial,
     [Required, MaxLength(50)] string TerminalCode,

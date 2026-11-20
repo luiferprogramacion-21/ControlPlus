@@ -9,7 +9,7 @@ public partial class Establecimiento
 
     public string NombreComercial { get; set; } = null!;
 
-    public string Identificacion { get; set; } = null!;
+    public string? Identificacion { get; set; }
 
     public string? Direccion { get; set; }
 

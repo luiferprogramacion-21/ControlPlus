@@ -25,7 +25,7 @@ public sealed class InstallationBootstrapper(OfficialControlPlusDbContext dbCont
         {
             Id = Guid.CreateVersion7(),
             NombreComercial = Required(request.EstablishmentName, nameof(request.EstablishmentName)),
-            Identificacion = Required(request.EstablishmentIdentification, nameof(request.EstablishmentIdentification)),
+            Identificacion = Optional(request.EstablishmentIdentification),
             ZonaHoraria = "America/Bogota",
             PorcentajeMinimoApartado = 20m,
             DiasLimiteApartado = 15,
@@ -105,6 +105,9 @@ public sealed class InstallationBootstrapper(OfficialControlPlusDbContext dbCont
         string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("A non-empty installation value is required.", name)
             : value.Trim();
+
+    private static string? Optional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static Guid DeterministicInventoryReasonId(Guid establishmentId, string code)
     {

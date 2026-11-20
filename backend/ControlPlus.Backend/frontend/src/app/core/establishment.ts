@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 
 export interface Establishment {
   commercialName: string;
-  identification: string;
+  identification: string | null;
   phone: string | null;
   address: string | null;
   receiptHeader: string | null;
@@ -14,7 +14,7 @@ export interface Establishment {
 
 export interface EstablishmentUpdate {
   commercialName: string;
-  identification: string;
+  identification: string | null;
   phone: string | null;
   address: string | null;
   receiptHeader: string | null;

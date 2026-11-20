@@ -100,10 +100,10 @@ public sealed class SalesSettingsApiTests : IAsyncLifetime
         SetBearer(client, admin);
         var updated = await ReadAsync<EstablishmentDto>(await client.PutAsJsonAsync(
             "/api/establishment", new UpdateEstablishmentRequest(
-                "Tienda Central", "901234567-8", "3150000000", "Ocaña, Norte de Santander",
+                "Tienda Central", "   ", "3150000000", "Ocaña, Norte de Santander",
                 "Compra local", "Gracias por su compra", visible.Version)), HttpStatusCode.OK);
         Assert.Equal("Tienda Central", updated.CommercialName);
-        Assert.Equal("901234567-8", updated.Identification);
+        Assert.Null(updated.Identification);
         Assert.True(updated.Version > visible.Version);
 
         SetBearer(client, supervisor);
@@ -120,6 +120,7 @@ public sealed class SalesSettingsApiTests : IAsyncLifetime
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var establishment = await db.Establecimiento.AsNoTracking().SingleAsync();
+        Assert.Null(establishment.Identificacion);
         Assert.Equal("3150000000", establishment.Telefono);
         Assert.Equal("Compra local", establishment.EncabezadoComprobante);
         Assert.Equal("Gracias por su compra", establishment.PieComprobante);

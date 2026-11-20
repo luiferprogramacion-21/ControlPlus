@@ -16,7 +16,7 @@ import { toastSignal } from '../../core/toast';
         <form class="establishment-form" (submit)="$event.preventDefault(); save()">
           <div class="form-grid form-grid--two">
             <label class="field-label" for="business-name">Nombre comercial<input id="business-name" class="text-field" name="businessName" maxlength="200" [(ngModel)]="commercialName" autocomplete="organization"></label>
-            <label class="field-label" for="business-nit">NIT o documento<input id="business-nit" class="text-field" name="businessNit" maxlength="30" [(ngModel)]="identification"></label>
+            <label class="field-label" for="business-nit">NIT o documento <span>(opcional)</span><input id="business-nit" class="text-field" name="businessNit" maxlength="30" [(ngModel)]="identification"></label>
             <label class="field-label" for="business-phone">Teléfono <span>(opcional)</span><input id="business-phone" class="text-field" name="businessPhone" maxlength="30" [(ngModel)]="phone" autocomplete="tel"></label>
             <label class="field-label" for="business-address">Dirección <span>(opcional)</span><input id="business-address" class="text-field" name="businessAddress" maxlength="300" [(ngModel)]="address" autocomplete="street-address"></label>
           </div>
@@ -64,13 +64,12 @@ export class EstablishmentPanel implements OnInit {
 
   validation(): string {
     if (!this.commercialName.trim()) return 'El nombre comercial es obligatorio.';
-    if (!this.identification.trim()) return 'El NIT o documento es obligatorio.';
     return '';
   }
 
   changed(saved: Establishment): boolean {
     return this.commercialName.trim() !== saved.commercialName ||
-      this.identification.trim() !== saved.identification ||
+      this.optional(this.identification) !== saved.identification ||
       this.optional(this.phone) !== saved.phone || this.optional(this.address) !== saved.address ||
       this.optional(this.receiptHeader) !== saved.receiptHeader ||
       this.optional(this.receiptFooter) !== saved.receiptFooter;
@@ -84,7 +83,7 @@ export class EstablishmentPanel implements OnInit {
     this.saving.set(true); this.error.set(''); this.notice.set('');
     try {
       this.apply(await this.establishment.update({
-        commercialName: this.commercialName.trim(), identification: this.identification.trim(),
+        commercialName: this.commercialName.trim(), identification: this.optional(this.identification),
         phone: this.optional(this.phone), address: this.optional(this.address),
         receiptHeader: this.optional(this.receiptHeader), receiptFooter: this.optional(this.receiptFooter),
         expectedVersion: saved.version,
@@ -97,7 +96,7 @@ export class EstablishmentPanel implements OnInit {
   }
 
   private apply(value: Establishment): void {
-    this.current.set(value); this.commercialName = value.commercialName; this.identification = value.identification;
+    this.current.set(value); this.commercialName = value.commercialName; this.identification = value.identification ?? '';
     this.phone = value.phone ?? ''; this.address = value.address ?? '';
     this.receiptHeader = value.receiptHeader ?? ''; this.receiptFooter = value.receiptFooter ?? '';
   }
