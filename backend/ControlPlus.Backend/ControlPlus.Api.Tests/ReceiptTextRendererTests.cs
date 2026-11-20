@@ -82,6 +82,28 @@ public sealed class ReceiptTextRendererTests
     }
 
     [Fact]
+    public void Render_NequiAndMixedPayments_ShowMethodReceivedAndChange()
+    {
+        // 20 November 2026: every paid ticket says how it was paid and always shows Recibido and Devuelta.
+        var nequi = new SaleReceiptDto(Guid.CreateVersion7(), "V-NEQUI",
+            new DateTimeOffset(2026, 11, 20, 18, 0, 0, TimeSpan.Zero), new DateOnly(2026, 11, 20),
+            "CONTADO", "CONFIRMADA", 30000m, 0m, 30000m, 0m, [],
+            [new SaleReceiptPaymentDto("NEQUI", 30000m, null, 0m)]);
+        var single = Encoding.UTF8.GetString(ReceiptTextRenderer.Render(nequi, "Baratísimo", 32, false));
+        Assert.Contains("Medio de pago", single);
+        Assert.Contains("Nequi", single);
+        Assert.Matches(@"Recibido\s+\$ 30\.000", single);
+        Assert.Matches(@"Devuelta\s+\$ 0", single);
+
+        var mixed = nequi with { Payments = [new SaleReceiptPaymentDto("EFECTIVO", 20000m, 50000m, 30000m),
+            new SaleReceiptPaymentDto("NEQUI", 10000m, null, 0m)], Change = 30000m };
+        var both = Encoding.UTF8.GetString(ReceiptTextRenderer.Render(mixed, "Baratísimo", 32, false));
+        Assert.Contains("Medios de pago", both);
+        Assert.Matches(@"Recibido\s+\$ 60\.000", both);
+        Assert.Matches(@"Devuelta\s+\$ 30\.000", both);
+    }
+
+    [Fact]
     public void Render_ReprintKeepsCashReceivedAndChange()
     {
         var receipt = new SaleReceiptDto(Guid.CreateVersion7(), "V-REPRINT-CASH",

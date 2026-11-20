@@ -74,15 +74,14 @@ public static class ReceiptTextRenderer
             if (receipt.DueDate is { } dueDate)
                 AppendCentered(text, $"Vence: {dueDate:dd/MM/yyyy}", columns);
         }
-        foreach (var payment in receipt.Payments)
-            AppendAmount(text, PaymentName(Clean(payment.MethodCode)), payment.AppliedAmount, columns);
-        var cashPayments = receipt.Payments
-            .Where(payment => string.Equals(payment.MethodCode, "EFECTIVO", StringComparison.OrdinalIgnoreCase) &&
-                              payment.ReceivedAmount is not null)
-            .ToArray();
-        if (cashPayments.Length > 0)
+        // 20 November 2026 (requested by the user): every paid ticket says how it was paid and always shows Recibido
+        // and Devuelta. Cash counts what the customer handed over; Nequi and transfers count their exact amount.
+        if (receipt.Payments.Count > 0)
         {
-            AppendAmount(text, "Recibido", cashPayments.Sum(payment => payment.ReceivedAmount!.Value), columns);
+            text.AppendLine(receipt.Payments.Count == 1 ? "Medio de pago" : "Medios de pago");
+            foreach (var payment in receipt.Payments)
+                AppendAmount(text, PaymentName(Clean(payment.MethodCode)), payment.AppliedAmount, columns);
+            AppendAmount(text, "Recibido", receipt.Payments.Sum(payment => payment.ReceivedAmount ?? payment.AppliedAmount), columns);
             AppendAmount(text, "Devuelta", receipt.Change, columns);
         }
         text.AppendLine();

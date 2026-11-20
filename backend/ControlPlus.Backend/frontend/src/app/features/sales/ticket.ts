@@ -49,10 +49,11 @@ export function buildTicketHtml(receipt: SaleReceipt, extras: TicketExtras = {},
     : `<tr><td>Subtotal</td><td class="r">${cop(receipt.grossSubtotal)}</td></tr>${discountRow}`;
   const payments = receipt.payments.map(payment =>
     `<tr><td>${escapeHtml(METHOD_NAMES[payment.methodCode] ?? payment.methodCode)}</td><td class="r">${cop(payment.appliedAmount)}</td></tr>`).join('');
-  const cashPayments = receipt.payments.filter(payment => payment.methodCode === 'EFECTIVO' && typeof payment.receivedAmount === 'number');
-  const cashReceived = cashPayments.length ? cashPayments.reduce((sum, payment) => sum + payment.receivedAmount!, 0) : null;
-  const cashSettlement = cashReceived === null ? '' :
-    `<tr><td>Recibido</td><td class="r">${cop(cashReceived)}</td></tr>` +
+  // 20 November 2026: how it was paid, and always Recibido and Devuelta (cash counts what was handed over).
+  const paymentTitle = `<tr><td colspan="2"><b>${receipt.payments.length === 1 ? 'Medio de pago' : 'Medios de pago'}</b></td></tr>`;
+  const received = receipt.payments.reduce((sum, payment) => sum + (typeof payment.receivedAmount === 'number' ? payment.receivedAmount : payment.appliedAmount), 0);
+  const cashSettlement =
+    `<tr><td>Recibido</td><td class="r">${cop(received)}</td></tr>` +
     `<tr><td>Devuelta</td><td class="r">${cop(receipt.change)}</td></tr>`;
   const businessName = receipt.establishmentName?.trim() || 'Baratísimo';
   const businessData = [receipt.establishmentIdentification ? `NIT: ${receipt.establishmentIdentification}` : '',
@@ -74,7 +75,7 @@ ${extras.operator ? `<p>Atendió: ${escapeHtml(extras.operator)}</p>` : ''}${ext
 <hr><table>${lines}</table><hr>
 <table>${summary}
 <tr class="total"><td>TOTAL</td><td class="r">${cop(receipt.total)}</td></tr></table>
-${receipt.payments.length ? `<hr><table>${payments}${cashSettlement}</table>` : `<hr><p class="c">Venta a crédito${dueDate}</p>`}
+${receipt.payments.length ? `<hr><table>${paymentTitle}${payments}${cashSettlement}</table>` : `<hr><p class="c">Venta a crédito${dueDate}</p>`}
 <hr><p class="c">${footer}</p></body></html>`;
 }
 
