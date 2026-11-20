@@ -139,10 +139,12 @@ public static class ControlledMigrationRunner
                 FailedExitCode,
                 $"Migration target '{safeTarget}' was cancelled.");
         }
-        catch
+        catch (Exception exception)
         {
-            // Deliberately omit exception details: provider errors can contain connection data.
-            return Failed(safeTarget);
+            // Only the PostgreSQL server's own error (code, message, table, constraint and PL/pgSQL line) is shown so the
+            // operator knows which rule failed (20 November 2026). Other exceptions keep their details hidden because a
+            // provider error can contain connection data.
+            return Failed(safeTarget, DescribeFailure(exception));
         }
     }
 
@@ -167,6 +169,23 @@ public static class ControlledMigrationRunner
     private static ControlledMigrationResult Rejected(string target, string reason) =>
         new(RejectedExitCode, $"Migration target '{target}' rejected: {reason}.");
 
-    private static ControlledMigrationResult Failed(string target) =>
-        new(FailedExitCode, $"Migration target '{target}' failed. No manual rollback was attempted.");
+    private static ControlledMigrationResult Failed(string target, string? reason = null) =>
+        new(FailedExitCode, $"Migration target '{target}' failed. No manual rollback was attempted." +
+            (reason is null ? "" : $" Cause: {reason}"));
+
+    internal static string DescribeFailure(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is Npgsql.PostgresException postgres)
+            {
+                var parts = new List<string> { $"PostgreSQL {postgres.SqlState}: {postgres.MessageText}" };
+                if (!string.IsNullOrWhiteSpace(postgres.TableName)) parts.Add($"table {postgres.SchemaName}.{postgres.TableName}");
+                if (!string.IsNullOrWhiteSpace(postgres.ConstraintName)) parts.Add($"constraint {postgres.ConstraintName}");
+                if (!string.IsNullOrWhiteSpace(postgres.Where)) parts.Add($"where {postgres.Where.ReplaceLineEndings(" | ")}");
+                return string.Join("; ", parts);
+            }
+        }
+        return exception.GetType().Name;
+    }
 }
