@@ -582,12 +582,17 @@ public sealed class UserManagementService : IUserManagementService
             permissions.AddRange(batch.Items);
             if (batch.Items.Count == 0 || permissions.Count >= batch.TotalCount) break;
         }
-        var rolePermissionIds = user.UserRoles
-            .Where(x => x.Role.IsActive)
-            .SelectMany(x => x.Role.RolePermissions)
-            .Where(x => x.Permission.IsActive)
-            .Select(x => x.PermissionId)
-            .ToHashSet();
+        var rolePermissionIds = new HashSet<Guid>();
+        foreach (var userRole in user.UserRoles)
+        {
+            // User reads load the role summary; only this configuration screen
+            // needs the full role template alongside the individual overrides.
+            var role = await _roleRepository.GetByIdAsync(userRole.Role.Id, cancellationToken);
+            if (role is not { IsActive: true }) continue;
+            rolePermissionIds.UnionWith(role.RolePermissions
+                .Where(link => link.Permission.IsActive)
+                .Select(link => link.PermissionId));
+        }
         var overrides = user.UsuarioPermiso.ToDictionary(x => x.PermisoId);
 
         var items = permissions.Select(permission =>

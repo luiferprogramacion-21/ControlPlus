@@ -60,8 +60,6 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
     private IQueryable<User> DetailedUsers => dbContext.Usuario
         .Include(user => user.UsuarioRolUsuario)
         .ThenInclude(userRole => userRole!.Rol)
-        .ThenInclude(role => role.RolPermiso)
-        .ThenInclude(rolePermission => rolePermission.Permiso)
         .Include(user => user.UsuarioPermiso)
         .ThenInclude(userPermission => userPermission.Permiso);
 
@@ -92,48 +90,43 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        var user = await DetailedUsers
-            .AsNoTracking()
-            .SingleOrDefaultAsync(candidate => candidate.Id == userId, cancellationToken);
+        // One statement keeps the security stamp, role and effective permissions in
+        // the same PostgreSQL snapshot, including inside the login coordinator's
+        // ReadCommitted transaction. EXISTS avoids multiplying role permissions by
+        // individual overrides, and a revocation always wins over a grant.
+        var user = await dbContext.Usuario.AsNoTracking()
+            .Where(candidate => candidate.Id == userId && candidate.Activo && candidate.BloqueoHasta == null)
+            .Select(candidate => new
+            {
+                candidate.Id,
+                candidate.NombreUsuario,
+                candidate.NombreCompleto,
+                candidate.SelloSeguridad,
+                Role = candidate.UsuarioRolUsuario != null && candidate.UsuarioRolUsuario.Rol.Activo
+                    ? candidate.UsuarioRolUsuario.Rol : null,
+                Permissions = dbContext.Permiso
+                    .Where(permission => permission.Activo &&
+                        ((candidate.UsuarioRolUsuario != null && candidate.UsuarioRolUsuario.Rol.Activo &&
+                          candidate.UsuarioRolUsuario.Rol.RolPermiso.Any(link => link.PermisoId == permission.Id)) ||
+                         candidate.UsuarioPermiso.Any(link => link.PermisoId == permission.Id &&
+                             link.Efecto == UserPermissionEffects.Grant)) &&
+                        !candidate.UsuarioPermiso.Any(link => link.PermisoId == permission.Id &&
+                            link.Efecto == UserPermissionEffects.Revoke))
+                    .Select(permission => new PermissionClaim(permission.Id, permission.Codigo, permission.Nombre))
+                    .ToArray()
+            })
+            .SingleOrDefaultAsync(cancellationToken);
 
-        if (user is null || !user.Activo || user.BloqueoHasta != null)
+        if (user is null)
         {
             return null;
         }
 
-        var activeRoles = user.UserRoles
-            .Select(userRole => userRole.Role)
-            .Where(role => role.Activo)
-            .OrderByDescending(role => role.Level)
-            .ThenBy(role => role.Code, StringComparer.Ordinal)
-            .ToArray();
-
-        var roles = activeRoles
-            .Select(role => new RoleClaim(role.Id, role.Code, role.Name, role.Level))
-            .ToArray();
-
-        var permissionsById = activeRoles
-            .SelectMany(role => role.RolePermissions)
-            .Select(rolePermission => rolePermission.Permission)
-            .Where(permission => permission.Activo)
-            .GroupBy(permission => permission.Id)
-            .ToDictionary(group => group.Key, group => group.First());
-
-        foreach (var userPermission in user.UsuarioPermiso.Where(x => x.Permiso.Activo))
-        {
-            if (userPermission.IsRevoked)
-            {
-                permissionsById.Remove(userPermission.PermisoId);
-            }
-            else if (userPermission.IsGranted)
-            {
-                permissionsById[userPermission.PermisoId] = userPermission.Permiso;
-            }
-        }
-
-        var permissions = permissionsById.Values
+        RoleClaim[] roles = user.Role is { } role
+            ? [new RoleClaim(role.Id, role.Code, role.Name, role.Level)]
+            : [];
+        var permissions = user.Permissions
             .OrderBy(permission => permission.Code, StringComparer.Ordinal)
-            .Select(permission => new PermissionClaim(permission.Id, permission.Code, permission.Name))
             .ToArray();
 
         var highestRoleLevel = roles.Length == 0
@@ -142,9 +135,9 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
 
         return new UserAuthorizationSnapshot(
             user.Id,
-            user.UserName,
-            user.DisplayName,
-            user.SecurityStamp,
+            user.NombreUsuario,
+            user.NombreCompleto,
+            user.SelloSeguridad,
             highestRoleLevel,
             roles,
             permissions);
@@ -196,6 +189,7 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
         var totalCount = await users.CountAsync(cancellationToken);
         var items = await users
             .OrderBy(user => user.NombreUsuario)
+            .ThenBy(user => user.Id)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToArrayAsync(cancellationToken);

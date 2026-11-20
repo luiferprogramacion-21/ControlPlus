@@ -1,4 +1,5 @@
 using System.Data;
+using System.Transactions;
 using ControlPlus.Application.Common;
 using ControlPlus.Application.Numbering;
 using ControlPlus.Application.Sales.Contracts;
@@ -7,6 +8,7 @@ using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Infrastructure.Persistence.Official;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using IsolationLevel = System.Data.IsolationLevel;
 
 namespace ControlPlus.Infrastructure.Persistence.Repositories;
 
@@ -218,11 +220,11 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
     }
 
     public Task<Venta?> GetSaleAsync(Guid saleId, CancellationToken cancellationToken = default) =>
-        dbContext.Venta.AsNoTracking()
+        ReadGraphAsync(dbContext.Venta.AsNoTracking()
             .Include(x => x.DetalleVenta)
             .Include(x => x.PagoVenta).ThenInclude(x => x.MetodoPago)
-            .Include(x => x.Credito)
-            .SingleOrDefaultAsync(x => x.Id == saleId, cancellationToken);
+            .Include(x => x.Credito),
+            (query, token) => query.SingleOrDefaultAsync(x => x.Id == saleId, token), cancellationToken);
 
     public Task<Venta?> GetReceiptSaleHeaderAsync(Guid saleId, CancellationToken cancellationToken = default) =>
         dbContext.Venta.AsNoTracking().SingleOrDefaultAsync(x => x.Id == saleId, cancellationToken);
@@ -267,12 +269,43 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
 
     public async Task<IReadOnlyCollection<CambioVenta>> GetChangesAsync(Guid saleId,
         CancellationToken cancellationToken = default) =>
-        await dbContext.CambioVenta.AsNoTracking()
+        await ReadGraphAsync(dbContext.CambioVenta.AsNoTracking()
             .Where(x => x.VentaId == saleId)
             .Include(x => x.DetalleCambioVenta)
             .Include(x => x.PagoCambioVenta).ThenInclude(x => x.MetodoPago)
-            .OrderBy(x => x.FechaHora).ThenBy(x => x.Id)
-            .ToArrayAsync(cancellationToken);
+            .OrderBy(x => x.FechaHora).ThenBy(x => x.Id),
+            (query, token) => query.ToArrayAsync(token), cancellationToken);
+
+    private async Task<TResult> ReadGraphAsync<TEntity, TResult>(
+        IQueryable<TEntity> query,
+        Func<IQueryable<TEntity>, CancellationToken, Task<TResult>> read,
+        CancellationToken cancellationToken) where TEntity : class
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // A receipt must not combine its header with payments from a later correction.
+        // Split queries therefore share a PostgreSQL snapshot. Never change or finish
+        // a caller's transaction; use one statement if its isolation is weaker.
+        if (dbContext.Database.CurrentTransaction is { } current)
+        {
+            var split = current.GetDbTransaction().IsolationLevel is
+                IsolationLevel.RepeatableRead or IsolationLevel.Serializable or IsolationLevel.Snapshot;
+            return await read(split ? query.AsSplitQuery() : query.AsSingleQuery(), cancellationToken);
+        }
+
+        if ((Transaction.Current ?? dbContext.Database.GetEnlistedTransaction()) is { } ambient)
+        {
+            var split = ambient.IsolationLevel is
+                System.Transactions.IsolationLevel.RepeatableRead or
+                System.Transactions.IsolationLevel.Serializable or System.Transactions.IsolationLevel.Snapshot;
+            return await read(split ? query.AsSplitQuery() : query.AsSingleQuery(), cancellationToken);
+        }
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead, cancellationToken);
+        var result = await read(query.AsSplitQuery(), cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
 
     public Task<bool> HasConfirmedChangesAsync(Guid saleId,
         CancellationToken cancellationToken = default) =>

@@ -1,5 +1,20 @@
 # Pruebas
 
+## HTTP local y consultas de usuarios y ventas (20 de noviembre de 2026)
+
+Validación local en `codex-rendimiento-local`, desde `4a2327c`, sin conexión a PostgreSQL, sin migraciones, sin instalar el servicio y sin ejecutar CI:
+
+- `dotnet build ControlPlus.Backend.slnx -c Release -m:1 /p:BuildInParallel=false /warnaserror --nologo`: 0 errores y 0 advertencias.
+- `dotnet test` en Release, con `--no-build --no-restore --filter "Category!=Integration"`: Domain **94/94**, API **244/244**, Infrastructure **49/49**; ninguna fallida ni omitida.
+- `npm.cmd test -- --watch=false`: **745/745** en 86 archivos.
+- `npm.cmd run build`: salida 0; conserva los avisos de presupuesto de `cash.scss` y `sales.scss`, archivos sin cambios en esta entrega.
+
+Las 23 regresiones nuevas son `HttpsRedirectionTests` (5), `UserEffectivePermissionsTests` (3), `SecurityRepositoryQueryTests` (6) y `SaleGraphQueryTests` (9). Las primeras prueban HTTP en el perfil Production local, HTTPS configurado y ausencia del aviso de redirección; las de permisos preservan la plantilla y las concesiones/revocaciones individuales. Las de repositorio usan el traductor real de Npgsql, elevan `MultipleCollectionIncludeWarning` a error y sustituyen el transporte por lectores en memoria: no abren una conexión a una base. Comprueban la forma del SQL, filtros, paginación y propiedad/aislamiento de las transacciones, no tiempos reales ni materialización de datos PostgreSQL.
+
+Los usuarios cargan el resumen del rol y sus excepciones, sin multiplicar estas por toda la plantilla. La autorización proyecta los permisos efectivos con `EXISTS`/`NOT EXISTS` en una sola sentencia para conservar una lectura coherente del sello de seguridad y los permisos. Solo la pantalla de configuración de permisos pide aparte la plantilla completa. El detalle e historial de venta dividen las colecciones dentro de una lectura `RepeatableRead`; si el llamador ya tiene una transacción, se respeta, y con aislamiento menor se conserva una sola sentencia. No se modifica el coordinador de intentos de ingreso ni se ocultan advertencias globalmente.
+
+No estaba disponible `CONTROLPLUS_TEST_ADMIN_CONNECTION`. La regresión de extremo a extremo con datos PostgreSQL queda pendiente, usando exclusivamente bases temporales `controlplus_test_*`: `SecurityApiFlowTests`, `SalesApiFlowTests`, `SaleChangePreparationApiTests`, `SaleChangeConfirmationApiTests`, `SaleCorrectionApiTests` y `SalePaymentCorrectionApiTests`. Estos resultados locales no acreditan actualización del servicio instalado ni mejora de latencia medida.
+
 ## Catálogo: activación cerrada y arranque preparado (2 de noviembre)
 
 Evidencia `CatalogActivation-54e8a95787bd408aa2e13e1ee8e47333` revisada:
