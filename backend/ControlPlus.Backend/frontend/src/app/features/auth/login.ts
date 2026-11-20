@@ -139,7 +139,7 @@ export class Login {
       const { userName, password } = this.form.getRawValue();
       await this.session.login(userName.trim(), password);
       await this.router.navigateByUrl(this.session.passwordChangeRequired() ? PASSWORD_CHANGE_ROUTE : HOME_ROUTE);
-    } catch (e) { this.error.set(errorText(e)); }
+    } catch (e) { this.error.set(this.loginError(e)); }
     finally { this.busy.set(false); }
   }
 
@@ -180,7 +180,13 @@ export class Login {
     } catch (e) { this.error.set(this.recoveryError(e)); }
     finally { this.busy.set(false); }
   }
-
+  /** Al ingresar, un 401 significa usuario o contraseña incorrectos (o usuario bloqueado), no una sesión vencida. */
+  private loginError(error: unknown): string {
+    if (error instanceof HttpErrorResponse && error.status === 401)
+      return 'Usuario o contraseña incorrectos. Recuerda que la contraseña es de 4 números. Tras 5 intentos fallidos el usuario se bloquea: usa «Olvidé mi contraseña».';
+    if (error instanceof HttpErrorResponse && error.status === 429) return 'Demasiados intentos. Espera un minuto y vuelve a intentarlo.';
+    return errorText(error);
+  }
   /** 503: correo no configurado o sin conexión (el servidor explica qué hacer); 429: demasiados intentos. */
   private recoveryError(error: unknown): string {
     if (error instanceof HttpErrorResponse && error.status === 503 && typeof error.error?.title === 'string') return error.error.title;

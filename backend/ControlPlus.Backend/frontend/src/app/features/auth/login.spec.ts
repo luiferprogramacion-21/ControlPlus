@@ -44,6 +44,13 @@ describe('Login: pantalla de llegada', () => {
     expect(state).not.toHaveBeenCalled();
   });
 
+  it('con usuario o contraseña incorrectos no dice que la sesión expiró', async () => {
+    session.login.mockRejectedValueOnce(new HttpErrorResponse({ status: 401 }));
+    const component = await submit();
+    expect(component.error()).toContain('Usuario o contraseña incorrectos');
+    expect(component.error()).not.toContain('expiró');
+  });
+
   it('quien entra con una contraseña que no es de 4 números va a cambiarla', async () => {
     session.passwordChangeRequired.mockReturnValueOnce(true);
     await submit();
