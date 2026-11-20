@@ -747,3 +747,11 @@ El usuario pidió diez ajustes. Claude hizo estos seis; Codex hace la política 
   - `index.html` pide `controlplus.ico?v=pos-20261120`. Edge guarda el ícono por dirección, así que **cada vez que cambie el ícono hay que cambiar esa dirección** (con `?v=` Edge siguió mostrando la C+ que tenía guardada);
   - la directiva `PasswordManagerEnabled=0` impide guardar contraseñas nuevas, pero Edge sigue ofreciendo las que ya estaban guardadas: hay que borrarlas una vez en `edge://settings/passwords`.
 - **Mensaje al ingresar (20 de noviembre de 2026):** el 401 del login mostraba «La sesión expiró» (texto genérico de `errorText`). Ahora `login.ts` dice «Usuario o contraseña incorrectos», recuerda los 4 números y avisa que 5 intentos bloquean al usuario. El servidor responde igual a contraseña errada y a usuario bloqueado, a propósito.
+- **Lenguaje sencillo en pantalla (20 de noviembre de 2026):** el usuario pidió quitar todo texto técnico que no entiende.
+  - Fuera: API, servidor, cola de Windows, controlador, UUID, Idempotency, Code 128 y los códigos de permiso como `SALES.CREATE`.
+  - Los códigos internos en mayúsculas se muestran en palabras con `core/readable-code.ts`; los estados de impresión, con `printStatusLabel`.
+  - La auditoría muestra los detalles como «Campo: valor», sin JSON ni identificadores.
+  - `errorText` cambia por un mensaje claro cualquier mensaje del servidor con términos técnicos.
+  - `statusKind` reconoce «No se sabe» como aviso de error.
+  - **Regla:** todo texto nuevo en pantalla va en palabras de tienda.
+- **Correo tapado en la recuperación (20 de noviembre de 2026):** al enviar el código, la respuesta dice a qué correo llegó, por ejemplo `lu•••21@gm•••.com` (`PasswordRecoveryService.MaskEmail`).

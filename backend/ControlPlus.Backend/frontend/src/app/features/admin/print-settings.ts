@@ -4,7 +4,7 @@ import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
-import { PrintJob, printJobStatusText, PrintProfile, SalesApi } from '../sales/sales-api';
+import { PrintJob, printJobStatusText, printStatusLabel, PrintProfile, SalesApi } from '../sales/sales-api';
 import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 import { WindowSheet } from '../../shared/window-sheet';
@@ -18,6 +18,7 @@ import { HelpTip } from '../../shared/help-tip';
   styleUrl: './print-settings.scss',
 })
 export class PrintSettings implements OnInit {
+  readonly printStatusLabel = printStatusLabel;
   private readonly api = inject(SalesApi);
   readonly number = groupedNumber;
   private readonly confirmations = inject(ConfirmationDialog);
@@ -80,7 +81,7 @@ export class PrintSettings implements OnInit {
       try {
         approved = await this.confirmations.confirm({
           title: 'Habilitar el cajón de dinero',
-          message: 'Al confirmar, las ventas con efectivo enviarán una orden de apertura a esta impresora. Verifica primero que el cajón y el cable sean compatibles con la salida RJ12 y que la cola de Windows corresponda a la impresora correcta.',
+          message: 'Al confirmar, el cajón se abrirá al pulsar «Cobrar» y en los pagos con efectivo. Antes, revisa que el cable del cajón esté conectado a la impresora (puerto DK o CASH DRAWER) y que esta sea la impresora de recibos.',
           confirmText: 'Habilitar cajón',
         }, this.destroyRef);
       } finally { this.confirming = false; }
@@ -94,7 +95,7 @@ export class PrintSettings implements OnInit {
     try {
       await this.api.updatePrintProfileDrawer(profile.id, { enabled, pin, pulseOnMs, pulseOffMs, expectedVersion: profile.version });
       this.drawerEditing.set(null);
-      this.notice.set(enabled ? 'Configuración guardada. La orden enviada a Windows no confirma que el cajón se abrió.' : 'Apertura de cajón desactivada para este perfil.');
+      this.notice.set(enabled ? 'Configuración guardada. Haz una prueba para comprobar que el cajón abre.' : 'Apertura de cajón desactivada para este perfil.');
       await this.reload();
     } catch (e) { this.formError.set(errorText(e)); }
     finally { this.drawerSaving.set(false); }
@@ -117,7 +118,7 @@ export class PrintSettings implements OnInit {
   validation(): string {
     const name = this.form.name.trim(), queue = this.form.systemQueueName.trim();
     if (!name || name.length > 150) return 'El nombre es obligatorio y admite hasta 150 caracteres.';
-    if (!queue || queue.length > 300) return 'El nombre de la cola de Windows es obligatorio y admite hasta 300 caracteres.';
+    if (!queue || queue.length > 300) return 'El nombre de la impresora es obligatorio y admite hasta 300 caracteres.';
     if (this.form.printerType !== 'ETIQUETAS' && (!Number.isInteger(this.form.columns) || this.form.columns < 24 || this.form.columns > 80)) return 'Las columnas deben ser un entero entre 24 y 80.';
     const dimensions = [this.form.labelWidthMm, this.form.labelHeightMm];
     if ((dimensions[0] == null) !== (dimensions[1] == null)) return 'Indica juntos el ancho y el alto de la etiqueta.';
@@ -139,7 +140,7 @@ export class PrintSettings implements OnInit {
         resolutionDpi: this.form.resolutionDpi,
       });
       this.creating.set(false);
-      this.notice.set('Perfil creado. No se comprobó que la cola exista en Windows; verifica el nombre antes de imprimir.');
+      this.notice.set('Perfil creado. Revisa que el nombre sea igual al de la impresora en Windows antes de imprimir.');
       await this.reload();
     } catch (e) { this.formError.set(errorText(e)); }
     finally { this.saving.set(false); }

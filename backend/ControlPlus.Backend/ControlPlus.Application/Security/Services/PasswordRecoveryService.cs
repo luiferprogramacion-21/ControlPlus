@@ -79,7 +79,25 @@ public sealed partial class PasswordRecoveryService(
         await AuditWriter.WriteAsync(auditRepository, clock, user.Id, AuditAction.PasswordRecoveryRequested,
             nameof(User), user.Id, new { user.UserName }, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return Result.Success(response);
+        // Decisión del 20 de noviembre de 2026: el usuario ve a qué correo llegó el código, tapado a medias, para
+        // reconocer cuál revisar. Revela que la cuenta existe; se aceptó porque el ingreso es local, en la tienda.
+        return Result.Success(new PasswordRecoveryRequestedDto(
+            $"Enviamos un código al correo {MaskEmail(user.Email)}. Revise ese correo: el código vale {minutes} minutos."));
+    }
+
+    /// <summary>«luiferprogramacion21@gmail.com» → «lu•••21@gm•••.com»: lo justo para reconocerlo.</summary>
+    public static string MaskEmail(string email)
+    {
+        var at = email.LastIndexOf('@');
+        if (at <= 0 || at == email.Length - 1) return "•••";
+        var local = email[..at];
+        var domain = email[(at + 1)..];
+        var maskedLocal = local.Length <= 4 ? local[..1] + "•••" : local[..2] + "•••" + local[^2..];
+        var dot = domain.LastIndexOf('.');
+        var name = dot > 0 ? domain[..dot] : domain;
+        var suffix = dot > 0 ? domain[dot..] : "";
+        var maskedDomain = (name.Length <= 2 ? name[..1] : name[..2]) + "•••" + suffix;
+        return maskedLocal + "@" + maskedDomain;
     }
 
     public async Task<Result> ConfirmAsync(PasswordRecoveryConfirmRequest request, CancellationToken cancellationToken = default)

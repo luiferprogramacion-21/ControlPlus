@@ -21,7 +21,7 @@ import { ConfirmationDialog } from '../../shared/confirmation-dialog';
           <ul>
             @for (permission of group.permissions; track permission.id) {
               <li><label><input type="checkbox" [checked]="granted().has(permission.id)" [disabled]="saving()" (change)="toggle(permission, $any($event.target))">
-                <span>{{ permission.name }} <small>({{ permission.code }})</small></span></label></li>
+                <span>{{ permission.name }}</span></label></li>
             }
           </ul>
         }

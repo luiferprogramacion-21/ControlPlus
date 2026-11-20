@@ -58,9 +58,9 @@ describe('SalesApi: impresión', () => {
     const queue = api.printQueue(); http.expectOne(r => r.url === '/api/printing/jobs').flush({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 }); await queue;
   });
   it('no presenta IMPRESO como salida física y distingue el resultado incierto', () => {
-    expect(printJobStatusText({ status: 'IMPRESO', error: null })).toContain('cola de Windows');
+    expect(printJobStatusText({ status: 'IMPRESO', error: null })).toContain('La impresora lo recibió');
     expect(printJobStatusText({ status: 'IMPRESO', error: null })).not.toMatch(/papel|físic/i);
     expect(printJobStatusText({ status: 'IMPRIMIENDO', error: null })).toBe('Envío en curso.');
-    expect(printJobStatusText({ status: 'IMPRIMIENDO', error: 'timeout' })).toContain('Resultado incierto');
+    expect(printJobStatusText({ status: 'IMPRIMIENDO', error: 'timeout' })).toContain('No se sabe si salió');
   });
 });

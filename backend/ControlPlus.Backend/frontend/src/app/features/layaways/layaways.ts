@@ -1,4 +1,5 @@
 import { groupedNumber } from '../../shared/number-input';
+import { readableCode } from '../../core/readable-code';
 import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -26,6 +27,7 @@ const STATE_LABELS: Record<string, string> = { ACTIVO: 'Activo', PAGADO: 'Pagado
   styleUrls: ['../directory.scss', './layaways.scss'],
 })
 export class Layaways implements OnInit {
+  readonly readableCode = readableCode;
   private readonly api = inject(LayawaysApi);
   private readonly confirmation = inject(ConfirmationDialog);
   private readonly owner = inject(DestroyRef);

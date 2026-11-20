@@ -179,7 +179,7 @@ export class ProductLabels implements OnInit {
     this.retryingJob.set(job.jobId);
     try {
       await this.api.retry(job.jobId);
-      this.notice.set('El mismo lote vuelve a la cola de impresión.');
+      this.notice.set('El mismo lote se envía otra vez a la impresora.');
       await this.showJobs(this.jobs()?.page ?? 1);
     } catch (error) { this.error.set(errorText(error)); }
     finally { this.retryingJob.set(null); }
@@ -202,7 +202,7 @@ export class ProductLabels implements OnInit {
     this.printing.set(true); this.error.set(''); this.notice.set('');
     try {
       const job = await this.api.queue(input, this.attempt.key);
-      this.notice.set(`${groupedNumber(job.labelCount)} etiqueta${job.labelCount === 1 ? '' : 's'} enviada${job.labelCount === 1 ? '' : 's'} a ${job.profileName}. “Impreso” confirmará que la cola de Windows aceptó el trabajo.`);
+      this.notice.set(`${groupedNumber(job.labelCount)} etiqueta${job.labelCount === 1 ? '' : 's'} enviada${job.labelCount === 1 ? '' : 's'} a ${job.profileName}. “Impreso” indicará que la impresora lo recibió.`);
       if (this.sourceReceipt()) { this.sourceReceipt.set(null); this.selected.set([]); this.receipts.set(null); }
       this.attempt = null;
     } catch (error) {

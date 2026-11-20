@@ -65,7 +65,7 @@
           <h3>Permisos de {{ role.name }}</h3>
           @for (group of permissionModules(role); track group.module) {
             <h4>{{ group.module }}</h4>
-            <ul>@for (permission of group.permissions; track permission.id) { <li>{{ permission.name }} <small>({{ permission.code }})</small></li> }</ul>
+            <ul>@for (permission of group.permissions; track permission.id) { <li>{{ permission.name }}</li> }</ul>
           } @empty { <p class="muted">Este rol no tiene permisos asignados.</p> }
         </div>
         }

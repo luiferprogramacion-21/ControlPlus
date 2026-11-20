@@ -39,8 +39,8 @@ describe('mensajes emergentes', () => {
   });
 
   it('los avisos de impresión son error solo si hablan de un fallo', () => {
-    expect(statusKind('Ticket: IMPRESO. Aceptado por la cola de Windows.')).toBe('success');
-    expect(statusKind('Resultado incierto: revisa la cola de Windows antes de solicitar otra copia.')).toBe('error');
+    expect(statusKind('Ticket: Impreso. La impresora lo recibió.')).toBe('success');
+    expect(statusKind('No se sabe si salió: mira la impresora antes de pedir otra copia.')).toBe('error');
     expect(statusKind('No se pudo completar la operación.')).toBe('error');
   });
 });

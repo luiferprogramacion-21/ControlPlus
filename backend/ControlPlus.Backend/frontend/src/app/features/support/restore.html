@@ -53,9 +53,9 @@
           <p class="restore-kind">Tipo de acción</p>
           <div class="restore-actions">
             <button class="button button--secondary restore-choice is-active" type="button" disabled>Probar restauración</button>
-            <button class="button button--secondary restore-choice" type="button" disabled title="Reemplazar la base real se hace con la API detenida y un procedimiento propio.">Restaurar operación</button>
+            <button class="button button--secondary restore-choice" type="button" disabled title="Para reemplazar los datos reales hay que detener ControlPlus y seguir un procedimiento aparte.">Restaurar operación</button>
           </div>
-          <p class="field-hint">«Restaurar operación» reemplaza la base real y no está disponible desde la pantalla: se hace con la API detenida y un procedimiento documentado.</p>
+          <p class="field-hint">«Restaurar operación» reemplaza los datos reales y no se hace desde esta pantalla: hay que detener ControlPlus y seguir un procedimiento aparte, con ayuda de soporte.</p>
           @if (result(); as r) {
             <div class="inline-feedback" [class.inline-feedback--success]="r.result === 'EXITOSA'" [class.inline-feedback--error]="r.result !== 'EXITOSA'" role="status">
               @if (r.result === 'EXITOSA') { Prueba correcta: la copia se restauró en una base temporal, se verificó y se borró. Tardó {{ number(r.rtoObservedMinutes) }} min. }

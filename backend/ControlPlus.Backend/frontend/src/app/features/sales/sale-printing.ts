@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { errorText } from '../../core/api';
-import { SalesApi, printJobStatusText } from './sales-api';
+import { SalesApi, printJobStatusText, printStatusLabel } from './sales-api';
 import { buildTicketHtml, TicketPrinter } from './ticket';
 
 export interface ReprintOutcome { message: string; status: string | null; }
@@ -21,12 +21,12 @@ export class SalePrinting {
       if (status.hasActiveProfile) {
         let latest = (await this.api.printJobs(saleId)).items.at(-1);
         if (latest?.status === 'PENDIENTE') return { status: latest.status, message: 'El ticket sigue pendiente. Consulta el estado antes de solicitar otra copia.' };
-        if (latest?.status === 'IMPRIMIENDO') return { status: latest.status, message: 'Resultado incierto: revisa la cola de Windows antes de solicitar otra copia.' };
+        if (latest?.status === 'IMPRIMIENDO') return { status: latest.status, message: 'No se sabe si salió: mira la impresora antes de pedir otra copia.' };
         if (latest?.status === 'ERROR') await this.api.retryPrintJob(saleId, latest.id);
         else await this.api.requestReprint(saleId, crypto.randomUUID());
         latest = (await this.api.printJobs(saleId)).items.at(-1);
         return latest
-          ? { status: latest.status, message: `${latest.copyType === 'REIMPRESION' ? 'Reimpresión' : 'Ticket'}: ${latest.status}. ${printJobStatusText(latest)}` }
+          ? { status: latest.status, message: `${latest.copyType === 'REIMPRESION' ? 'Reimpresión' : 'Ticket'}: ${printStatusLabel(latest.status)}. ${printJobStatusText(latest)}` }
           : { status: null, message: 'La solicitud quedó registrada; consulta el estado de impresión.' };
       }
       await this.api.requestReprint(saleId, crypto.randomUUID());

@@ -33,7 +33,7 @@ interface Row extends EffectivePermission { module: string; }
             <ul>
               @for (row of group.rows; track row.id) {
                 <li [class.permission--exception]="row.source === 'INDIVIDUAL'">
-                  <span><strong>{{ row.name }}</strong> <small>({{ row.code }})</small><br>
+                  <span><strong>{{ row.name }}</strong><br>
                     <small>{{ row.granted ? 'Permitido' : 'No permitido' }} · {{ origin(row) }}</small></span>
                   <button class="table-action" type="button" [disabled]="saving()" (click)="toggle(row)">{{ row.granted ? 'Revocar' : 'Conceder' }}</button>
                 </li>

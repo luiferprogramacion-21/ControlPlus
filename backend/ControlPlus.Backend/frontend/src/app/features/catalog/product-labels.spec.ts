@@ -84,7 +84,7 @@ describe('Etiquetas de productos', () => {
     await component.showJobs(); fixture.detectChanges();
     const buttons = Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('button')).filter(button => button.textContent?.includes('Reintentar lote'));
     expect(buttons).toHaveLength(1);
-    expect(fixture.nativeElement.textContent).toContain('revisa la cola de Windows');
+    expect(fixture.nativeElement.textContent).toContain('revisa la impresora');
     await component.retryJob({ ...job, status: 'IMPRIMIENDO' }); expect(api.retry).not.toHaveBeenCalled();
     await component.retryJob(job); expect(api.retry).toHaveBeenCalledWith(job.jobId); expect(api.queue).not.toHaveBeenCalled();
   });

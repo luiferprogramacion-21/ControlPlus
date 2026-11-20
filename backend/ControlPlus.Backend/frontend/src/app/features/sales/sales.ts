@@ -10,7 +10,7 @@ import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { CatalogApi, Product } from '../catalog/catalog-api';
 import { CashApi, CashState } from '../cash/cash-api';
-import { CustomerCreditRisk, HeldSale, NO_SALE_DRAFT, Sale, SaleDraft, SaleDraftInput, SaleInput, SalesApi, SalePaymentInput, PrintJob, PrintJobStatus } from './sales-api';
+import { CustomerCreditRisk, HeldSale, NO_SALE_DRAFT, Sale, SaleDraft, SaleDraftInput, SaleInput, SalesApi, SalePaymentInput, PrintJob, PrintJobStatus, printStatusLabel } from './sales-api';
 import { Customer } from '../customers/customers-api';
 import { CustomerPicker } from '../customers/customer-picker';
 import { buildTicketHtml, TicketPrinter } from './ticket';
@@ -947,7 +947,7 @@ export class Sales implements OnInit, OnDestroy {
           return;
         }
         if (!automatic && reprint && latest?.status === 'IMPRIMIENDO') {
-          this.reprintMessage.set('Resultado incierto: revisa la cola de Windows antes de solicitar otra copia.');
+          this.reprintMessage.set('No se sabe si salió: mira la impresora antes de pedir otra copia.');
           return;
         }
         if (!automatic && reprint && latest?.status === 'ERROR') {
@@ -971,7 +971,7 @@ export class Sales implements OnInit, OnDestroy {
       if (existing) {
         this.printed.set(true);
         this.lastJobStatus.set(existing.status);
-        this.reprintMessage.set(`Ticket: ${existing.status}. Revisa la cola de Windows antes de solicitar otra copia.`);
+        this.reprintMessage.set(`Ticket: ${printStatusLabel(existing.status)}. Mira la impresora antes de pedir otra copia.`);
         return;
       }
       if (automatic && !this.autoPrint()) return;
@@ -981,7 +981,7 @@ export class Sales implements OnInit, OnDestroy {
         const queued = (await this.api.printJobs(sale.id)).items.at(-1);
         if (queued?.copyType === 'REIMPRESION') {
           this.lastJobStatus.set(queued.status);
-          this.reprintMessage.set(`Reimpresión: ${queued.status}. Consulta la cola de Windows.`);
+          this.reprintMessage.set(`Reimpresión: ${printStatusLabel(queued.status)}. Mira la impresora.`);
           return;
         }
       }
@@ -994,7 +994,7 @@ export class Sales implements OnInit, OnDestroy {
     finally { this.busy.set(false); }
   }
   private printJobMessage(job: Pick<PrintJob, 'copyType' | 'status'>): string {
-    return `${job.copyType === 'REIMPRESION' ? 'Reimpresión' : 'Ticket'}: ${job.status}. ${job.status === 'IMPRESO' ? 'Aceptado por la cola de Windows.' : ''}`;
+    return `${job.copyType === 'REIMPRESION' ? 'Reimpresión' : 'Ticket'}: ${printStatusLabel(job.status)}. ${job.status === 'IMPRESO' ? 'La impresora lo recibió.' : ''}`;
   }
   /** Sigue el trabajo hasta que la cola lo acepte o falle, para no dejar «PENDIENTE» en pantalla después de imprimir. */
   private async watchPrintJob(saleId: string, jobId: string): Promise<void> {

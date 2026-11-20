@@ -11,9 +11,9 @@ export function withCashDrawerStatus<T extends object>(response: HttpResponse<T>
 
 export function cashDrawerNotice(status?: CashDrawerDispatchStatus | null): string {
   switch (status) {
-    case 'ENVIADO': return 'Cajón: Windows aceptó la orden. Comprueba que se abrió.';
-    case 'FALLIDO': return 'Cajón: no se pudo enviar la orden. Revisa la impresora y pide una apertura manual en Caja.';
-    case 'INCIERTO': return 'Cajón: no se pudo confirmar el envío. Comprueba el cajón antes de pedir otra apertura.';
+    case 'ENVIADO': return 'Cajón: se envió la orden de abrir. Comprueba que se abrió.';
+    case 'FALLIDO': return 'Cajón: no se pudo abrir. Revisa la impresora y pide a un Supervisor que lo abra desde Caja.';
+    case 'INCIERTO': return 'Cajón: no se sabe si se abrió. Míralo antes de pedir que lo abran otra vez.';
     default: return '';
   }
 }

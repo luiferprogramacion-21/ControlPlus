@@ -10,6 +10,43 @@ import { AdminApi, AdminUser } from './admin-api';
 import { AUDIT_ACTION_GROUPS, auditActionLabel, auditActionModule } from './audit-actions';
 import { toastSignal } from '../../core/toast';
 import { groupedNumber } from '../../shared/number-input';
+import { readableCode } from '../../core/readable-code';
+
+/** Internal identifiers mean nothing to the reader of the log (20 November 2026): they are left out of the detail. */
+const HIDDEN_FIELD = /(^id$|Id$|Ids$|^ids$|_id$|correlation|version|Version|stamp|Stamp|hash|Hash|key$|Key$)/;
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const WORDS: Record<string, string> = {
+  total: 'total', paid: 'pagado', quantity: 'cantidad', amount: 'monto', reason: 'motivo', before: 'antes', after: 'después',
+  lines: 'productos', line: 'producto', product: 'producto', products: 'productos', price: 'precio', cost: 'costo', unit: 'unitario',
+  stock: 'existencias', name: 'nombre', code: 'código', document: 'documento', number: 'número', phone: 'teléfono', date: 'fecha',
+  on: 'fecha', at: 'hora', note: 'nota', user: 'usuario', customer: 'cliente', sale: 'venta', payment: 'pago', payments: 'pagos',
+  method: 'medio', change: 'cambio', received: 'recibido', balance: 'saldo', status: 'estado', state: 'estado', type: 'tipo',
+  observation: 'observación', discount: 'descuento', initial: 'inicial', final: 'final', previous: 'anterior', new: 'nuevo',
+  expected: 'esperado', counted: 'contado', difference: 'diferencia', mode: 'modalidad', role: 'rol', email: 'correo',
+  display: 'visible', fragment: 'fragmento', format: 'formato', expires: 'vence', issued: 'emitido', pin: 'pin',
+};
+
+/** «totalPaid» → «Total pagado», «FragmentoVisible» → «Fragmento visible». */
+function fieldLabel(field: string): string {
+  const words = field.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').toLowerCase().split(' ').filter(Boolean)
+    .map(word => WORDS[word] ?? word);
+  const text = words.join(' ');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Objects and lists as plain text («Cantidad: 2 · Monto: 1.000»), without braces or quotes. */
+function plainText(value: unknown): string {
+  if (value === null || value === undefined) return '—';
+  if (Array.isArray(value)) return value.map(plainText).join(' | ');
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([key, item]) => !HIDDEN_FIELD.test(key) && !(typeof item === 'string' && GUID.test(item)))
+      .map(([key, item]) => `${fieldLabel(key)}: ${plainText(item)}`).join(' · ');
+  }
+  if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+  if (typeof value === 'string') return readableCode(value);
+  return String(value);
+}
 
 /** Localize measured values for display, keeping identifiers and concurrency versions literal. */
 function displayAuditValue(value: unknown, field = ''): unknown {
@@ -138,11 +175,11 @@ export class AuditLog implements OnInit {
     try {
       const parsed: unknown = JSON.parse(record.details);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return Object.entries(parsed as Record<string, unknown>).map(([field, value]) => ({
-          field, value: value === null ? '—' : typeof value === 'object' ? JSON.stringify(displayAuditValue(value, field)) : String(displayAuditValue(value, field)),
-        }));
+        return Object.entries(parsed as Record<string, unknown>)
+          .filter(([field, value]) => !HIDDEN_FIELD.test(field) && !(typeof value === 'string' && GUID.test(value)))
+          .map(([field, value]) => ({ field: fieldLabel(field), value: plainText(displayAuditValue(value, field)) }));
       }
-      return [{ field: 'Detalle', value: typeof parsed === 'number' ? groupedNumber(parsed) : JSON.stringify(displayAuditValue(parsed)) }];
+      return [{ field: 'Detalle', value: typeof parsed === 'number' ? groupedNumber(parsed) : plainText(displayAuditValue(parsed)) }];
     } catch { return [{ field: 'Detalle', value: record.details }]; }
   }
 }

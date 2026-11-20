@@ -121,7 +121,7 @@ describe('SalesHistory: historial y anulación', () => {
     it('IMPRESO se informa como aceptado por la cola, no como salida en papel', async () => {
       const component = await create(); api.printJobs.mockResolvedValue({ items: [job('IMPRESO')], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 });
       await component.print(summary);
-      expect(component.notice()).toContain('Aceptado por la cola de Windows'); expect(component.notice()).toContain('no confirma');
+      expect(component.notice()).toContain('La impresora lo recibió'); expect(component.notice()).toContain('no confirma');
     });
     it('sin trabajo en cola avisa que falta un perfil', async () => {
       const component = await create(); await component.print(summary); expect(component.notice()).toContain('perfil de impresora');

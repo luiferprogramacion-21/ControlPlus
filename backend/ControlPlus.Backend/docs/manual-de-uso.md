@@ -38,7 +38,7 @@ Cada persona tiene **un solo rol**. Lo que ves en el menú depende de él: si un
 
 Nadie cambia su propia contraseña desde dentro del sistema. Hay dos caminos:
 
-- **Por correo (lo más rápido):** en la pantalla de ingreso pulsa **«¿Olvidaste tu contraseña?»**, escribe tu usuario y el sistema envía un **código de 6 números** al correo que el Administrador registró en tu usuario. Escribe el código y tu contraseña nueva de 4 números. El código vale unos 10 minutos. Equivocarte con el código cuenta como intento fallido.
+- **Por correo (lo más rápido):** en la pantalla de ingreso pulsa **«¿Olvidaste tu contraseña?»**, escribe tu usuario y el sistema envía un **código de 6 números** al correo que el Administrador registró en tu usuario. La pantalla te muestra a qué correo lo envió, tapado a medias (por ejemplo `lu•••21@gm•••.com`), para que sepas cuál revisar. Escribe el código y tu contraseña nueva de 4 números. El código vale unos 10 minutos. Equivocarte con el código cuenta como intento fallido.
   - Necesita que tu usuario tenga correo registrado y que el computador tenga Internet en ese momento.
 - **Con el Administrador:** él te pone una contraseña nueva desde Administración → Usuarios. Es la salida cuando no tienes correo o no hay Internet.
 

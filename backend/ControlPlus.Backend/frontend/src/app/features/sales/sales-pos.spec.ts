@@ -234,7 +234,7 @@ describe('Sales: punto de venta de contado', () => {
       expect(print).not.toHaveBeenCalled();
       expect(requestReprint).not.toHaveBeenCalled();
       expect(component.printed()).toBe(true);
-      expect(component.reprintMessage()).toContain('PENDIENTE');
+      expect(component.reprintMessage()).toContain('Pendiente');
     });
     it('sigue el ticket pendiente hasta que la cola lo acepta', async () => {
       printingStatus.mockResolvedValue({ hasActiveProfile: true, profileName: 'Caja', columns: 32 });
@@ -247,7 +247,7 @@ describe('Sales: punto de venta de contado', () => {
       expect(component.lastJobStatus()).toBe('PENDIENTE');
       await vi.advanceTimersByTimeAsync(1500);
       expect(component.lastJobStatus()).toBe('IMPRESO');
-      expect(component.reprintMessage()).toContain('Aceptado por la cola de Windows');
+      expect(component.reprintMessage()).toContain('La impresora lo recibió');
       const calls = printJobs.mock.calls.length;
       await vi.advanceTimersByTimeAsync(6000);
       expect(printJobs.mock.calls.length).toBe(calls);
