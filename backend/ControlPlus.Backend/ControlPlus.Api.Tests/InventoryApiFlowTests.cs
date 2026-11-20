@@ -24,7 +24,7 @@ using Xunit;
 
 namespace ControlPlus.Api.Tests;
 
-public sealed class InventoryApiFlowTests : IAsyncLifetime
+public sealed partial class InventoryApiFlowTests : IAsyncLifetime
 {
     private const string AdminUser = "inventory.admin.test";
     private const string AdminPassword = "Inventory-Admin-Test-2026!";

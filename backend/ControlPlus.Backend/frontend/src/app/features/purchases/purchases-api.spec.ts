@@ -19,4 +19,17 @@ describe('PurchasesApi', () => {
     request.flush({ ...purchase, status: 'ANULADA' });
     await task;
   });
+  it('prepara y corrige una recepción con las dos versiones y autorización transitoria', async () => {
+    const purchase = { id: 'purchase', version: 8, orderId: 'order' } as Purchase;
+    const preparationTask = api.correctionPreparation(purchase.id);
+    http.expectOne('/api/purchases/purchase/correction-preparation').flush({ purchaseId: 'purchase', purchaseVersion: 8, orderId: 'order', orderVersion: 5, canReverse: true, blockReason: null, unitsToRemove: 3, originalTotal: 4200 });
+    const preparation = await preparationTask;
+    const correctionTask = api.correctReceipt(purchase, preparation, 'correction-key', 'reason', 'Factura duplicada', 'admin', 'clave');
+    const request = http.expectOne('/api/purchases/purchase/correct-receipt');
+    expect(request.request.headers.get('Idempotency-Key')).toBe('correction-key');
+    expect(request.request.context.get(authorizationAttempt)).toBe(true);
+    expect(request.request.body).toEqual({ expectedVersion: 8, expectedOrderVersion: 5, reasonId: 'reason', observation: 'Factura duplicada', authorization: { userName: 'admin', password: 'clave' } });
+    request.flush({ ...purchase, status: 'ANULADA', version: 9 });
+    expect((await correctionTask).status).toBe('ANULADA');
+  });
 });

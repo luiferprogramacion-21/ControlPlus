@@ -83,6 +83,7 @@
             <a class="button button--primary" routerLink="/operacion/etiquetas" [queryParams]="{ compra: purchase.id }">Imprimir etiquetas recibidas</a>
           }
           @if (purchase.status === 'CONFIRMADA' && !purchase.orderId && canCancel) { <button class="button button--secondary button--danger" type="button" (click)="startCancel()">Anular compra</button> }
+          @if (purchase.status === 'CONFIRMADA' && purchase.orderId && canCancel) { <button class="button button--secondary" type="button" [disabled]="loading()" (click)="startReceiptCorrection()">{{ loading() ? 'Revisando…' : 'Corregir recepción' }}</button> }
           <button class="button button--secondary" type="button" (click)="selectedPurchase.set(null)">Cerrar</button>
         </div>
       </section>
@@ -111,6 +112,34 @@
 
   @if (cancelling()) {
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="cancel-purchase-title"><div class="module-form-sheet__backdrop" (click)="cancelling.set(false)"></div><form class="panel panel--padded module-form" (submit)="$event.preventDefault(); cancelPurchase()"><div class="panel-heading"><h2 id="cancel-purchase-title">Anular compra</h2></div><label class="field-label" for="cancel-reason">Motivo</label><select id="cancel-reason" class="text-field" name="reason" [(ngModel)]="cancelReasonId"><option value="">Seleccionar motivo</option>@for (reason of reasons(); track reason.id) { <option [value]="reason.id">{{ reason.name }}</option> }</select><label class="field-label field-label--spaced" for="cancel-note">Observación</label><textarea id="cancel-note" class="text-field" name="note" [(ngModel)]="cancelObservation"></textarea>@if (error()) { <p class="field-error">{{ error() }}</p> }<div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">Anular compra</button><button class="button button--secondary" type="button" (click)="cancelling.set(false)">Cancelar</button></div></form></div>
+  }
+  @if (correctingReceipt() && correctionPreparation(); as correction) {
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="receipt-correction-title">
+      <div class="module-form-sheet__backdrop" (click)="closeReceiptCorrection()"></div>
+      <form class="panel panel--padded module-form module-form--wide correction-dialog" (submit)="$event.preventDefault(); submitReceiptCorrection()">
+        <div class="panel-heading"><h2 id="receipt-correction-title">Corregir recepción</h2><p>Compra {{ selectedPurchase()?.visibleNumber || 'confirmada' }}</p></div>
+        @if (correction.canReverse) {
+          <p class="correction-intro">Revisa cómo quedará el pedido antes de confirmar.</p>
+          <div class="correction-summary" aria-label="Resumen antes y después">
+            <section><span class="correction-summary__eyebrow">Así quedó</span><strong>{{ correction.unitsToRemove | number:'1.0-0' }} unidades recibidas</strong><small>Entraron a existencias y dejaron de estar pendientes.</small><b>Total de la recepción: {{ correction.originalTotal | number:'1.0-2' }}</b></section>
+            <span class="correction-summary__arrow" aria-hidden="true">→</span>
+            <section class="correction-summary__after"><span class="correction-summary__eyebrow">Así quedará</span><strong>{{ correction.unitsToRemove | number:'1.0-0' }} unidades pendientes</strong><small>Se retirarán de existencias y podrán recibirse de nuevo.</small><b>La recepción quedará anulada.</b></section>
+          </div>
+          <label class="field-label field-label--spaced" for="receipt-correction-reason">Motivo</label>
+          <select id="receipt-correction-reason" class="text-field" name="correctionReason" [(ngModel)]="correctionReasonId"><option value="">Seleccionar motivo</option>@for (reason of reasons(); track reason.id) { <option [value]="reason.id">{{ reason.name }}</option> }</select>
+          <label class="field-label field-label--spaced" for="receipt-correction-note">Observación {{ correctionReasonIsOther ? '(obligatoria para Otro)' : '(opcional)' }}</label>
+          <textarea id="receipt-correction-note" class="text-field" name="correctionNote" [(ngModel)]="correctionObservation" maxlength="500"></textarea>
+        } @else {
+          <div class="notice notice--warning correction-blocked"><strong>Esta recepción no se puede deshacer automáticamente.</strong><span>{{ correction.blockReason }}</span></div>
+          <p class="correction-guidance">Conserva esta compra y revisa las existencias y los costos antes de hacer un ajuste.</p>
+        }
+        @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+        <div class="form-actions">
+          @if (correction.canReverse) { <button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Corrigiendo…' : 'Autorizar y corregir' }}</button> }
+          <button class="button button--secondary" type="button" (click)="closeReceiptCorrection()">Cerrar</button>
+        </div>
+      </form>
+    </div>
   }
   @if (askingPurchaseKind()) {
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="purchase-kind-title"><div class="module-form-sheet__backdrop" (click)="askingPurchaseKind.set(false)"></div>
