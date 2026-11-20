@@ -76,7 +76,15 @@ public static class ReceiptTextRenderer
         }
         foreach (var payment in receipt.Payments)
             AppendAmount(text, PaymentName(Clean(payment.MethodCode)), payment.AppliedAmount, columns);
-        if (receipt.Change > 0) AppendAmount(text, "Cambio", receipt.Change, columns);
+        var cashPayments = receipt.Payments
+            .Where(payment => string.Equals(payment.MethodCode, "EFECTIVO", StringComparison.OrdinalIgnoreCase) &&
+                              payment.ReceivedAmount is not null)
+            .ToArray();
+        if (cashPayments.Length > 0)
+        {
+            AppendAmount(text, "Recibido", cashPayments.Sum(payment => payment.ReceivedAmount!.Value), columns);
+            AppendAmount(text, "Devuelta", receipt.Change, columns);
+        }
         text.AppendLine();
         var footer = receipt.ReceiptFooter ?? establishment.ReceiptFooter;
         if (string.IsNullOrWhiteSpace(footer)) AppendCentered(text, "¡Gracias por su compra!", columns);
