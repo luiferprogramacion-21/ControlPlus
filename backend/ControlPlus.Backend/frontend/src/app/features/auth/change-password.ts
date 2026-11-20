@@ -27,13 +27,13 @@ export const PIN_PATTERN = /^\d{4}$/;
           <span class="cp-login__accent" aria-hidden="true"></span>
           <p class="cp-login__hint">Ahora la contraseña es de <strong>4 números</strong>, por ejemplo 4821. Elige una que no sea fácil de adivinar (no uses 1234 ni 0000) y no la compartas.</p>
           <mat-form-field appearance="outline"><mat-label>Contraseña actual</mat-label>
-              <input matInput type="password" formControlName="currentPassword" autocomplete="off" autofocus>
+            <input matInput type="password" formControlName="currentPassword" autocomplete="off" autofocus>
           </mat-form-field>
           <mat-form-field appearance="outline"><mat-label>Nueva contraseña (4 números)</mat-label>
-              <input matInput type="password" formControlName="newPassword" inputmode="numeric" maxlength="4" autocomplete="off">
+            <input matInput type="password" formControlName="newPassword" inputmode="numeric" maxlength="4" autocomplete="off">
           </mat-form-field>
           <mat-form-field appearance="outline"><mat-label>Repite la nueva contraseña</mat-label>
-              <input matInput type="password" formControlName="confirmPassword" inputmode="numeric" maxlength="4" autocomplete="off">
+            <input matInput type="password" formControlName="confirmPassword" inputmode="numeric" maxlength="4" autocomplete="off">
           </mat-form-field>
           <button mat-flat-button type="submit" [disabled]="busy()">{{ busy() ? 'Cambiando…' : 'Cambiar contraseña' }}</button>
           @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }

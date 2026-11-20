@@ -733,3 +733,9 @@ El usuario pidió diez ajustes. Claude hizo estos seis; Codex hace la política 
   - antes la página de 85,6 mm se encogía y las barras quedaban más finas que un punto, por eso el lector no las leía;
   - los carnés ya emitidos siguen siendo válidos, porque se compara su huella;
   - el campo del carné en Caja acepta Enter, que es lo que envía el lector.
+- **NIT opcional (Codex):**
+  - el establecimiento ya no exige NIT; la migración `20261119020000_OptionalEstablishmentIdentificationV1` (historial 29 → 30) quita el NOT NULL de `configuracion.establecimiento.identificacion`;
+  - el operador la aplica antes de instalar, con `scripts/optional-nit/Invoke-Activation.ps1 -UsePostgresCredential` (servicio detenido, respaldo, preflight y postflight que verifica que los datos del establecimiento no cambian);
+  - el NIT del proveedor ya era opcional en la base, solo cambió la pantalla.
+- **Ticket (Codex):** muestra Total, Recibido y Devuelta, también en las reimpresiones.
+- **Contraseñas en Edge (Codex):** el instalador escribe la directiva de equipo `HKLM\SOFTWARE\Policies\Microsoft\Edge\PasswordManagerEnabled = 0`, y los campos de contraseña usan `autocomplete="off"`.
