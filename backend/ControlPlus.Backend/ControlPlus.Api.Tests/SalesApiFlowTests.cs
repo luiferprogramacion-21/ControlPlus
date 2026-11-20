@@ -623,7 +623,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
 
     [Fact]
     [Trait("Category", "Integration")]
-    public async Task SharedSale_RejectsMissingClosedAndOtherOperatorsSession()
+    public async Task SharedSale_RejectsMissingAndClosedSession_AndSellsAsTheActiveCardOwner()
     {
         using var client = CreateClient();
         var scenario = await BootstrapAsync(client);
@@ -642,9 +642,12 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
 
         var otherCredential = await IssueCredentialAsync(client, scenario.Admin.AccessToken, scenario.Users.SecondCashier.Id);
         _ = await StartSessionAsync(client, scenario.SecondCashier.AccessToken, otherCredential);
+        // Since 20 November 2026 the active card decides who sells: logged in as the first cashier, the sale is the
+        // second cashier's, whose card session is active on the terminal.
         SetBearer(client, scenario.Cashier.AccessToken);
-        await AssertProblemAsync(await PostSaleAsync(
-            client, "other-operator-session", CashRequest(scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Conflict);
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(
+            client, "other-operator-session", CashRequest(scenario.Products.Standard, 1, 1_000m)), HttpStatusCode.Created);
+        Assert.Equal(scenario.Users.SecondCashier.Id, sale.UserId);
     }
 
     [Fact]
