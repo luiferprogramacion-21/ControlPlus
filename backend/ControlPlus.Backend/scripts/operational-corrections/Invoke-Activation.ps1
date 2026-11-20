@@ -74,7 +74,9 @@ try {
     Invoke-Checked $psql ($psqlArgs + @('-f',$preflight)) $pre `
         (Join-Path $evidence 'preflight.err') 'Preflight'
     $preLines = @(Get-Content -LiteralPath $pre)
-    if ($preLines -cnotcontains "history|30|$previous" -or
+    # Punto de partida: 30 (nada aplicado) o 31 (ventas ya aplicadas en el primer intento del 20 de noviembre de 2026).
+    $startLine = @($preLines | Where-Object { $_ -in @("history|30|$previous", 'history|31|20261120010000_SaleCorrectionsV1') })
+    if ($startLine.Count -ne 1 -or
         $preLines -cnotcontains 'clients|0' -or
         $preLines -cnotcontains 'schema|PENDING' -or
         $preLines -cnotcontains 'OPERATIONAL_CORRECTIONS_PREFLIGHT_OK') {
@@ -99,7 +101,7 @@ try {
     Invoke-Checked $psql ($psqlArgs + @('-f',$preflight)) $preAfter `
         (Join-Path $evidence 'preflight-after-backup.err') 'Preflight posterior al respaldo'
     $preAfterLines = @(Get-Content -LiteralPath $preAfter)
-    if ($preAfterLines -cnotcontains "history|30|$previous" -or
+    if ($preAfterLines -cnotcontains $startLine[0] -or
         $preAfterLines -cnotcontains 'clients|0' -or
         $preAfterLines -cnotcontains 'schema|PENDING' -or
         @($fingerprint | Where-Object { $preAfterLines -cnotcontains $_ }).Count -ne 0) {
@@ -134,7 +136,7 @@ try {
         throw 'El postflight no acreditó historia, tablas nuevas, permisos y conservación de los datos.'
     }
     [ordered]@{status='OPERATIONAL_CORRECTIONS_ACTIVATION_OK';target=$target;
-        historyBefore=30;historyAfter=35;backup=$dump;backupSha256=$backupHash;
+        historyBefore=[int]($startLine[0].Split('|')[1]);historyAfter=35;backup=$dump;backupSha256=$backupHash;
         utc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json |
         Set-Content -LiteralPath (Join-Path $evidence 'result.json') -Encoding UTF8
     Write-Host ('OPERATIONAL_CORRECTIONS_ACTIVATION_OK; evidence=' + $evidence)

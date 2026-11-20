@@ -9,7 +9,14 @@ public sealed class LayawayCorrectionsV1 : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder) => migrationBuilder.Sql("""
         ALTER TABLE ventas.apartado ADD COLUMN total_original numeric(18,0);
+        -- The backfill only copies the total. The layaway validators (deferred constraint triggers) would otherwise queue
+        -- one event per existing layaway, and PostgreSQL refuses the ALTER TABLE below while events are pending (found on
+        -- the store's database on 20 November 2026; the empty test databases had no layaways). They are paused just for it.
+        ALTER TABLE ventas.apartado DISABLE TRIGGER tg_apartado_validar_totales_cabecera;
+        ALTER TABLE ventas.apartado DISABLE TRIGGER tg_apartado_validar_reembolso_cabecera;
         UPDATE ventas.apartado SET total_original = total;
+        ALTER TABLE ventas.apartado ENABLE TRIGGER tg_apartado_validar_totales_cabecera;
+        ALTER TABLE ventas.apartado ENABLE TRIGGER tg_apartado_validar_reembolso_cabecera;
         ALTER TABLE ventas.apartado ALTER COLUMN total_original SET NOT NULL;
         ALTER TABLE ventas.apartado DROP CONSTRAINT ck_apartado_montos;
         ALTER TABLE ventas.apartado ADD CONSTRAINT ck_apartado_montos CHECK (

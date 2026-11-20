@@ -1,9 +1,15 @@
 \set ON_ERROR_STOP on
 BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
-SELECT CASE WHEN count(*) = 30
-  AND max("MigrationId") = '20261119020000_OptionalEstablishmentIdentificationV1'
-  AND count(*) FILTER (WHERE "MigrationId" LIKE '20261120%') = 0
-  THEN 'history|30|20261119020000_OptionalEstablishmentIdentificationV1' ELSE 'history|INVALID' END
+-- Resumable (20 November 2026): the first attempt on the store applied SaleCorrectionsV1 (history 31) and stopped at the
+-- second migration. Both starting points are accepted; nothing else of the activation exists in either.
+SELECT CASE
+  WHEN count(*) = 30 AND max("MigrationId") = '20261119020000_OptionalEstablishmentIdentificationV1'
+    AND count(*) FILTER (WHERE "MigrationId" LIKE '20261120%') = 0
+  THEN 'history|30|20261119020000_OptionalEstablishmentIdentificationV1'
+  WHEN count(*) = 31 AND max("MigrationId") = '20261120010000_SaleCorrectionsV1'
+    AND count(*) FILTER (WHERE "MigrationId" LIKE '20261120%') = 1
+  THEN 'history|31|20261120010000_SaleCorrectionsV1'
+  ELSE 'history|INVALID' END
 FROM public."__EFMigrationsHistory";
 SELECT 'clients|' || count(*) FROM pg_stat_activity
 WHERE datname = current_database() AND pid <> pg_backend_pid();

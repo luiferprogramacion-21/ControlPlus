@@ -36,6 +36,13 @@ public sealed class OperationalCorrectionsActivationTests : IAsyncLifetime
         var fingerprints = before.Where(line => line.Split('|')[0] is "sales" or "payments" or "layaways" or "layaway_lines" or "cash").ToArray();
         Assert.Equal(5, fingerprints.Length);
 
+        // Resumable: after the first migration (as happened on the store) the preflight still accepts the start.
+        await migrator.MigrateAsync("20261120010000_SaleCorrectionsV1");
+        var resumed = await RunAsync("Preflight.sql");
+        Assert.Contains("history|31|20261120010000_SaleCorrectionsV1", resumed);
+        Assert.Contains("schema|PENDING", resumed);
+        Assert.All(fingerprints, line => Assert.Contains(line, resumed));
+
         await migrator.MigrateAsync(Target);
         var after = await RunAsync("Postflight.sql");
         Assert.Contains($"history|35|{Target}", after);
