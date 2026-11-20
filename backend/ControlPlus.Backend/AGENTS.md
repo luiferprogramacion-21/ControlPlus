@@ -792,3 +792,4 @@ Cierra la entrega 5 de las correcciones operativas: «corregir los medios de pag
   - Postflight conforme: esquema, relleno, llaves `RESTRICT`, permisos y huellas de ventas, pagos, apartados, sus productos y caja idénticas.
   - Servicio instalado (`CONTROLPLUS_SERVICE_OK`) y el operador confirmó que todo funciona.
   - **No repetir ninguna de las cinco migraciones ni ejecutar Down.**
+- **Verificación local de los cambios de Codex (20 de noviembre de 2026):** Codex hizo `7bdf439` (sin redirección HTTPS en la instalación local) y `530154e` (consultas divididas con lectura coherente). El operador ejecutó `scripts/Run-LocalTests.ps1` sobre `530154e`: las tres suites terminaron con salida 0, API 745/745 y ninguna prueba fallida ni omitida. Esa versión ya está instalada en la tienda.
