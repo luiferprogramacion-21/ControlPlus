@@ -22,6 +22,7 @@ public sealed class CashDrawerController(CurrentActorContextResolver actorResolv
     }
 
     /// <summary>Al pulsar «Cobrar» en el punto de venta (decisión del 19 de noviembre de 2026).</summary>
+    [OperatorScoped]
     [HttpPost("checkout")]
     [PermissionAuthorize(PermissionCodes.SalesCreate)]
     [ProducesResponseType<CashDrawerOpenResultDto>(StatusCodes.Status200OK)]

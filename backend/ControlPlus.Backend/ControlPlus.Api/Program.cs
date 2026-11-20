@@ -209,6 +209,7 @@ builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<ICurrentUserSessionValidator, CurrentUserSessionValidator>();
 builder.Services.AddScoped<IPermissionChecker, PermissionChecker>();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentActorContextResolver>();
 builder.Services.Configure<BootstrapOptions>(builder.Configuration.GetSection(BootstrapOptions.SectionName));
 builder.Services.AddSingleton<BootstrapAccessValidator>();

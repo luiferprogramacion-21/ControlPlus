@@ -11,6 +11,7 @@ namespace ControlPlus.Api.Controllers;
 /// los carritos sin terminar del usuario en el turno abierto.
 /// </summary>
 [Route("api/sales/drafts")]
+[OperatorScoped(IncludeReads = true)]
 public sealed class SaleDraftsController(
     CurrentActorContextResolver actorContextResolver,
     ISaleDraftService drafts) : ApiControllerBase(actorContextResolver)

@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ControlPlus.Api.Controllers;
 
 [Route("api/credits")]
+[OperatorScoped]
 public sealed class CreditsController(CurrentActorContextResolver actorContextResolver,
     ICreditsService credits, ICashDrawerService drawer,
     ILogger<CreditsController> logger) : ApiControllerBase(actorContextResolver)

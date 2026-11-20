@@ -106,10 +106,13 @@ public sealed partial class CashService(
         // En turno compartido todos, también quien administra la caja, venden con su sesión de operador:
         // RequiresOperatorSession indica que el turno la exige; OwnOperatorSession, si ya está activa.
         var shared = shift?.ModoOperacion == CashConstants.SharedMode;
+        // Since 20 November 2026 any employee's card opens the terminal's session, so the active session is reported
+        // whoever it belongs to, with the name of the person selling.
         var ownSession = shared
             ? (await repository.ListActiveOperatorSessionsAsync(shift!.Id, cancellationToken))
-                .FirstOrDefault(session => session.UsuarioId == actor.UserId)
+                .OrderByDescending(session => session.UsuarioId == actor.UserId).FirstOrDefault()
             : null;
+        var operatorName = ownSession is null ? null : (await userRepository.GetByIdAsync(ownSession.UsuarioId, cancellationToken))?.DisplayName;
         var responsibleName = shift?.ModoOperacion == CashConstants.IndividualMode && shift.UsuarioResponsableId is Guid responsibleId
             ? (await userRepository.GetByIdAsync(responsibleId, cancellationToken))?.DisplayName
             : null;
@@ -119,11 +122,12 @@ public sealed partial class CashService(
                 RequiresOperatorSession = shared,
                 OwnOperatorSession = ownSession is null ? null : Map(ownSession),
                 OpenShiftResponsibleName = responsibleName,
+                ActiveOperatorName = operatorName,
             });
 
         return Result.Success(new CashStateDto(null, null, null, null, false, null,
             cash is not null, shift is not null, shared,
-            ownSession is null ? null : Map(ownSession), responsibleName));
+            ownSession is null ? null : Map(ownSession), responsibleName, operatorName));
     }
 
     public async Task<Result<CashRegisterDto>> ConfigureCashRegisterAsync(
@@ -610,15 +614,34 @@ public sealed partial class CashService(
         if (shift is null) return Result.Failure<OperatorSessionDto>(ApplicationError.NotFound("un turno abierto"));
         if (shift.ModoOperacion != CashConstants.SharedMode)
             return Result.Failure<OperatorSessionDto>(ApplicationError.Conflict("Las sesiones rápidas solo están disponibles en turnos compartidos."));
+        // Decision of 20 November 2026: in a shared shift ANY employee's card opens the session, whoever is logged in on the
+        // terminal; the session (and the sale it unlocks) belongs to the card's owner. The scanned token identifies the
+        // credential by its visible last digits and its slow hash.
+        var now = clock.UtcNow;
+        var token = request.CredentialToken.Trim();
+        var fragment = token[^Math.Min(8, token.Length)..];
+        Guid? ownerId = null;
+        foreach (var candidate in await repository.ListActiveCredentialsAsync(cancellationToken))
+        {
+            if (candidate.FragmentoVisible != fragment || candidate.FormatoCodigo != "CODE128" ||
+                (candidate.FechaVencimiento is not null && candidate.FechaVencimiento <= now.UtcDateTime) ||
+                !passwordHasher.Verify(token, candidate.TokenHash)) continue;
+            ownerId = candidate.UsuarioId;
+            break;
+        }
         // A Serializable transaction may have waited on the shift using an older snapshot.
         // Lock the credential too: a revocation committed during that wait must abort the stale
         // start with a concurrency conflict, rather than create a session from its old ACTIVA row.
-        var credential = await repository.GetActiveCredentialForUserAsync(actor.UserId, cancellationToken, forUpdate: true);
-        var now = clock.UtcNow;
+        var credential = ownerId is Guid owner
+            ? await repository.GetActiveCredentialForUserAsync(owner, cancellationToken, forUpdate: true)
+            : null;
         if (credential is null || credential.FormatoCodigo != "CODE128" ||
             (credential.FechaVencimiento is not null && credential.FechaVencimiento <= now.UtcDateTime) ||
-            !passwordHasher.Verify(request.CredentialToken, credential.TokenHash))
-            return Result.Failure<OperatorSessionDto>(ApplicationError.Unauthorized("La credencial de operador es inválida, está inactiva o venció."));
+            !passwordHasher.Verify(token, credential.TokenHash))
+            return Result.Failure<OperatorSessionDto>(ApplicationError.Unauthorized("El carné no es válido, fue reemplazado o venció."));
+        // The owner must be an active, unlocked user (the snapshot excludes inactive and locked accounts).
+        if (await userRepository.GetAuthorizationSnapshotAsync(credential.UsuarioId, cancellationToken) is null)
+            return Result.Failure<OperatorSessionDto>(ApplicationError.Unauthorized("El dueño de este carné está inactivo o bloqueado."));
         if (await repository.GetActiveOperatorSessionForUpdateAsync(shift.TerminalId, cancellationToken) is not null)
             return Result.Failure<OperatorSessionDto>(ApplicationError.Conflict("La terminal ya tiene una sesión de operador activa."));
 
@@ -626,13 +649,13 @@ public sealed partial class CashService(
         var session = new SesionOperador
         {
             Id = Guid.CreateVersion7(), TurnoCajaId = shift.Id, TerminalId = shift.TerminalId,
-            UsuarioId = actor.UserId, CredencialUsuarioId = credential.Id,
+            UsuarioId = credential.UsuarioId, CredencialUsuarioId = credential.Id,
             FechaInicio = now.UtcDateTime, FechaUltimoUso = now.UtcDateTime,
             Estado = CashConstants.ActiveSessionState, CorrelacionId = correlationId
         };
         await repository.AddOperatorSessionAsync(session, cancellationToken);
         await AuditWriter.WriteCashAsync(auditRepository, clock, actor.UserId, AuditAction.OperatorSessionStarted,
-            nameof(SesionOperador), session.Id, new { session.TurnoCajaId, session.TerminalId, credential.FragmentoVisible },
+            nameof(SesionOperador), session.Id, new { session.TurnoCajaId, session.TerminalId, credential.FragmentoVisible, OperatorUserId = session.UsuarioId },
             correlationId, null, session.Id, session.TerminalId, null, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

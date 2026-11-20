@@ -13,6 +13,7 @@ namespace ControlPlus.Api.Controllers;
 /// </summary>
 [Route("api/layaways")]
 [PermissionAuthorize(PermissionCodes.LayawayManage)]
+[OperatorScoped]
 public sealed class LayawayPaymentCorrectionsController(CurrentActorContextResolver resolver,
     ILayawayPaymentCancellationService service, ILayawayProductCorrectionService products) : ApiControllerBase(resolver)
 {

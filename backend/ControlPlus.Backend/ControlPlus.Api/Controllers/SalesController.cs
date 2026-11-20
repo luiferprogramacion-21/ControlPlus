@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ControlPlus.Api.Controllers;
 
 [Route("api/sales")]
+[OperatorScoped]
 public sealed class SalesController(
     CurrentActorContextResolver actorContextResolver,
     ISalesService salesService,

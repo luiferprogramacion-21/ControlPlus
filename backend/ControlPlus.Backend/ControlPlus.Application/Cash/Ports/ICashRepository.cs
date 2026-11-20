@@ -58,6 +58,8 @@ public interface ICashRepository
 
     Task<Usuario?> GetUserForUpdateAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<CredencialUsuario>> ListActiveCredentialsAsync(CancellationToken cancellationToken = default);
+    /// <summary>User of the active card session of the open shared shift, if any (read only, no lock).</summary>
+    Task<Guid?> GetActiveSharedOperatorUserIdAsync(CancellationToken cancellationToken = default);
     Task<CredencialUsuario?> GetActiveCredentialForUserAsync(Guid userId, CancellationToken cancellationToken = default, bool forUpdate = false);
     Task AddCredentialAsync(CredencialUsuario credential, CancellationToken cancellationToken = default);
 

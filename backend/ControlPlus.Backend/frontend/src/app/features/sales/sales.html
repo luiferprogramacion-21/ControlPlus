@@ -80,7 +80,7 @@
       <section class="panel panel--padded operator-lock__main" aria-labelledby="operator-lock-title">
         <span class="operator-lock__icon" aria-hidden="true"></span>
         <h2 id="operator-lock-title">Escanee el carné del empleado</h2>
-        <p class="muted">Pase su carné por el lector. Sesión de {{ session.user()?.displayName }}.</p>
+        <p class="muted">Pase su carné por el lector. La venta queda a nombre de quien pase el carné.</p>
         <form class="operator-lock__form" (submit)="$event.preventDefault(); unlock()">
           <label class="sr-only" for="operator-credential">Carné de operador</label>
           <input id="operator-credential" class="text-field" type="password" name="operatorCredential" autocomplete="off" placeholder="Esperando código de barras…" [(ngModel)]="operatorCredential" [disabled]="unlocking()">
@@ -96,7 +96,7 @@
   } @else if (!checkoutMode()) {
     <div class="pos-grid">
       <section class="panel pos-main">
-        <div class="pos-heading"><div><h2>{{ saleType() === 'CREDITO' ? 'Nueva venta a crédito' : 'Nueva venta' }}</h2><p><strong>Operador: {{ session.user()?.displayName }}</strong>@if (cashState()?.currentShift?.openedAtUtc; as openedAt) { · Caja abierta desde {{ openedAt | date:'shortTime' }} }</p></div><span class="badge badge--info">{{ cashState()?.requiresOperatorSession ? 'Turno compartido' : 'Turno individual' }}</span></div>
+        <div class="pos-heading"><div><h2>{{ saleType() === 'CREDITO' ? 'Nueva venta a crédito' : 'Nueva venta' }}</h2><p><strong>Operador: {{ cashState()?.activeOperatorName || session.user()?.displayName }}</strong>@if (cashState()?.currentShift?.openedAtUtc; as openedAt) { · Caja abierta desde {{ openedAt | date:'shortTime' }} }</p></div><span class="badge badge--info">{{ cashState()?.requiresOperatorSession ? 'Turno compartido' : 'Turno individual' }}</span></div>
 
         <div class="search-area">
           <form class="scanner" (submit)="$event.preventDefault(); find()">

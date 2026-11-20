@@ -139,7 +139,7 @@ Menú **Caja** → bloque **Apertura de caja**.
 
 Si quedó **una caja abierta del día anterior**, el sistema te lo avisa: hay que cerrarla (contando el efectivo) antes de abrir otra.
 
-**En turno compartido**, antes de vender cada persona se identifica: en el punto de venta aparece **«Escanee el carné del empleado»**. Escanea tu propio carné (el de la persona que inició sesión). Cada venta confirmada **cierra esa sesión** y el punto de venta se bloquea para el siguiente. Si el carné no sirve (ajeno, vencido o dañado), el sistema lo explica y **no te saca del sistema**.
+**En turno compartido**, antes de vender cada persona se identifica: en el punto de venta aparece **«Escanee el carné del empleado»**. Cualquier empleado pasa **su propio carné**, sin cerrar la sesión que esté abierta en el computador: **la venta queda a nombre de quien pasó el carné** y solo puede hacer lo que su rol permite. Arriba, en «Operador», aparece quién está vendiendo. Cada venta confirmada **cierra esa sesión** y el punto de venta se bloquea para el siguiente. Si el carné no sirve (ajeno, vencido o dañado), el sistema lo explica y **no te saca del sistema**.
 
 ## 2.3 Vender de contado
 

@@ -44,7 +44,9 @@ public sealed record CashStateDto(
     OperatorSessionDto? OwnOperatorSession,
     // Nombre de quien tiene abierto un turno individual, para explicar por qué otro usuario no puede vender
     // (decisión del 18 de noviembre de 2026). Solo el nombre: no revela montos ni identificadores.
-    string? OpenShiftResponsibleName = null);
+    string? OpenShiftResponsibleName = null,
+    // Nombre de quien pasó su carné en el turno compartido (20 de noviembre de 2026): la venta queda a su nombre.
+    string? ActiveOperatorName = null);
 
 public sealed record ConfigureCashRegisterRequest(string Code, string Name);
 

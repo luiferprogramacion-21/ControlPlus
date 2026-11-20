@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ControlPlus.Api.Controllers;
 
 [Route("api/layaways/{layawayId:guid}/cancellation")]
+[OperatorScoped]
 public sealed class LayawayCancellationController(CurrentActorContextResolver actorContextResolver,
     ILayawayCancellationService cancellation, ICashDrawerService drawer,
     ILogger<LayawayCancellationController> logger) : ApiControllerBase(actorContextResolver)

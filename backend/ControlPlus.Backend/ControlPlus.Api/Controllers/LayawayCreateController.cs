@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ControlPlus.Api.Controllers;
 
 [Route("api/layaways")]
+[OperatorScoped]
 public sealed class LayawayCreateController(
     CurrentActorContextResolver actorContextResolver,
     ILayawayCreateService layaways, ICashDrawerService drawer,

@@ -137,6 +137,7 @@ public sealed class CashController(
             : FromResult(await cashService.ListMovementsAsync(actor, query, cancellationToken), Ok);
     }
 
+    [OperatorScoped]
     [HttpPost("movements/incomes")]
     [PermissionAuthorize(PermissionCodes.CashMovementsManage)]
     [Consumes("application/json")]
@@ -151,6 +152,7 @@ public sealed class CashController(
         CancellationToken cancellationToken) =>
         await RegisterMovementAsync(request, cashService.RegisterIncomeAsync, cancellationToken);
 
+    [OperatorScoped]
     [HttpPost("movements/expenses")]
     [PermissionAuthorize(PermissionCodes.CashMovementsManage)]
     [Consumes("application/json")]
@@ -165,6 +167,7 @@ public sealed class CashController(
         CancellationToken cancellationToken) =>
         await RegisterMovementAsync(request, cashService.RegisterExpenseAsync, cancellationToken);
 
+    [OperatorScoped]
     [HttpPost("movements/cash-drops")]
     [PermissionAuthorize(PermissionCodes.CashMovementsManage)]
     [Consumes("application/json")]
@@ -288,6 +291,7 @@ public sealed class CashController(
         return FromResult(result, session => StatusCode(StatusCodes.Status201Created, session));
     }
 
+    [OperatorScoped]
     [HttpPost("operator-sessions/{sessionId:guid}/close")]
     [PermissionAuthorize(PermissionCodes.CashOwnRead)]
     [ProducesResponseType<OperatorSessionDto>(StatusCodes.Status200OK)]

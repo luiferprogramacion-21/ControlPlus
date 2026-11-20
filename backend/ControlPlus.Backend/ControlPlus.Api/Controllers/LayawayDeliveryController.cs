@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ControlPlus.Api.Controllers;
 
 [Route("api/layaways/{layawayId:guid}/delivery")]
+[OperatorScoped]
 public sealed class LayawayDeliveryController(CurrentActorContextResolver actorContextResolver,
     ILayawayDeliveryService delivery) : ApiControllerBase(actorContextResolver)
 {

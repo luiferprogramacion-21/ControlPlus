@@ -21,13 +21,15 @@ export function drawCredentialCard(canvas: HTMLCanvasElement, card: CredentialCa
   ctx.textAlign = 'left';
   ctx.font = `bold ${3.9 * s}px Arial, Helvetica, sans-serif`; ctx.fillText(card.displayName, 5 * s, 19 * s, (CARD_WIDTH_MM - 10) * s);
   ctx.font = `${2.8 * s}px Arial, Helvetica, sans-serif`; ctx.fillText(`${card.roleName} · ${card.userName}`, 5 * s, 23.5 * s, (CARD_WIDTH_MM - 10) * s);
-  // Barcode: the widest module size that fits between the margins (with a quiet zone), bars 15 mm tall.
+  // Barcode (20 November 2026): the scanner read the printed PDF only sometimes. The quiet zone was 2.5 mm, half of the
+  // 10 modules Code 128 needs, and fractional bar widths came out with gray edges. Now each bar is a whole number of pixels
+  // (6 px = 0.5 mm, like the thermal card), with 10 blank modules each side, centred; narrower only if a code does not fit.
   const widths = code128Widths(card.token);
-  const total = widths.reduce((sum, width) => sum + width, 0);
-  const quiet = 2.5; const available = CARD_WIDTH_MM - 10 - 2 * quiet;
-  const module = available / total;
-  let x = 5 + quiet;
-  widths.forEach((width, index) => { if (index % 2 === 0) ctx.fillRect(x * s, 27.5 * s, width * module * s, 15 * s); x += width * module; });
+  const total = widths.reduce((sum, width) => sum + width, 0) + 20;
+  const modulePx = Math.max(1, Math.min(Math.round(0.5 * s), Math.floor((CARD_WIDTH_MM - 6) * s / total)));
+  let x = Math.round((canvas.width - total * modulePx) / 2) + 10 * modulePx;
+  ctx.fillStyle = '#000';
+  widths.forEach((width, index) => { if (index % 2 === 0) ctx.fillRect(x, Math.round(27.5 * s), width * modulePx, Math.round(15 * s)); x += width * modulePx; });
   ctx.textAlign = 'center'; ctx.font = `${2.4 * s}px Arial, Helvetica, sans-serif`; ctx.fillText(`…${card.fragment}`, (CARD_WIDTH_MM / 2) * s, 48.5 * s);
   return true;
 }
@@ -65,7 +67,7 @@ export class CredentialCardExporter {
   async jpeg(card: CredentialCard): Promise<Blob> {
     const canvas = document.createElement('canvas');
     if (!drawCredentialCard(canvas, card)) throw new Error('El navegador no puede dibujar la imagen.');
-    return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('No se pudo generar la imagen.')), 'image/jpeg', 0.95));
+    return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('No se pudo generar la imagen.')), 'image/jpeg', 1));
   }
   async pdf(card: CredentialCard): Promise<Blob> {
     const image = await this.jpeg(card);

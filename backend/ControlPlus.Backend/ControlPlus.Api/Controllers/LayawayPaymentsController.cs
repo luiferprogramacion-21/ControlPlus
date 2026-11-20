@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ControlPlus.Api.Controllers;
 
 [Route("api/layaways/{layawayId:guid}/payments")]
+[OperatorScoped]
 public sealed class LayawayPaymentsController(CurrentActorContextResolver actorContextResolver,
     ILayawayPaymentService payments, ICashDrawerService drawer,
     ILogger<LayawayPaymentsController> logger) : ApiControllerBase(actorContextResolver)

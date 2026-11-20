@@ -800,3 +800,17 @@ Cierra la entrega 5 de las correcciones operativas: «corregir los medios de pag
   - **Revisión del mismo día (opción A del usuario):** en la tienda las etiquetas solo se leían con barras de unos 4 puntos (etiqueta de 80 × 30 mm), y el carné con 3 puntos tampoco se leyó. Ahora el código del carné se imprime a lo largo del rollo: barras horizontales de 0,5 mm (4 puntos) y 40 mm de largo. Con 22 dígitos mide unos 88 mm y la tarjeta queda más alta. Se lee girando el carné. Cualquier carné anterior también cabe con ese grosor, solo más largo. Si esto no funciona, el siguiente paso aprobado es la opción B: código de 14 dígitos en la tarjeta de 70 × 50 mm.
   - **Opción B (mismo día; la A tampoco se leyó):** el código nuevo tiene 14 dígitos, dos mitades uniformes de 7 (unos 46 bits), casi el largo de la etiqueta `CP000016` que el lector sí lee. Se imprime de lado a lado en la tarjeta de 70 × 50 mm, con barras de 0,5 mm (4 puntos) y unos 66 mm de ancho. Un código anterior más largo se sigue imprimiendo a lo largo del rollo con el mismo grosor. Que la A fallara con barras de 4 puntos apunta a un límite de largo del código configurado en el lector. Si la B tampoco se lee, revisar la configuración de longitud de Code 128 del MS9520 con las hojas de programación de Honeywell.
   - **Resultado y tamaño (mismo día):** el operador confirmó que los carnés nuevos de 14 dígitos **sí se leen**. A pedido suyo, el carné térmico se agrandó al máximo que permite el rollo, 71 × 54 mm (altura de tarjeta de crédito), con letras más grandes. El tamaño exacto de tarjeta de crédito, 85,6 × 54 mm, es el PDF descargable impreso a 100 % en una impresora normal.
+
+### Decisión del 20 de noviembre de 2026: en turno compartido vende cualquier carné
+
+El usuario aprobó que, en turno compartido, **cualquier empleado venda pasando su propio carné**, sin cerrar la sesión abierta en el computador. Antes cada carné solo servía para quien había iniciado sesión.
+
+- **Iniciar sesión con el carné:** `POST /api/cash/operator-sessions` identifica el carné por sus últimos dígitos y su huella, y la sesión queda a nombre de su dueño. Su dueño debe estar activo y no bloqueado.
+- **Quién actúa:** mientras esa sesión está activa en la terminal, las operaciones marcadas con `[OperatorScoped]` actúan como el dueño del carné. Las cambia `CurrentActorContextResolver`.
+  - Operaciones marcadas: ventas y sus correcciones, ventas en espera (también lecturas), abonos de crédito, apartados, movimientos de caja, cerrar la sesión de operador y abrir el cajón al cobrar.
+  - Se registran a su nombre y se validan con su rol, sus permisos y sus límites.
+  - Las lecturas, Configuración, apertura y cierre del turno siguen como el usuario que inició sesión.
+- **Estado del turno:** `/api/cash/state` informa la sesión activa de la terminal, sea de quien sea, y `activeOperatorName`. El punto de venta muestra «Operador: …».
+- **Base de datos:** sin migración. La base ya exige que la sesión, el carné y el actor de la venta sean de la misma persona.
+- **Prueba:** `SharedShiftAnyCardApiTests`. El Administrador tiene la sesión abierta, la cajera pasa su carné y la venta queda a nombre de la cajera.
+- **PDF del carné (mismo día):** a veces no se leía. Su margen blanco era de 2,5 mm y Code 128 pide 10 módulos. Ahora las barras ocupan píxeles enteros (0,5 mm), el margen es de 10 módulos y el JPEG se guarda con calidad 1.

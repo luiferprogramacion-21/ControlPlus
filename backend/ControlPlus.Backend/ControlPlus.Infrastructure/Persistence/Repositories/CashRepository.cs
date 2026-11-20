@@ -419,6 +419,16 @@ public sealed partial class EfCashRepository(OfficialControlPlusDbContext dbCont
         return rows.SingleOrDefault();
     }
 
+    public async Task<Guid?> GetActiveSharedOperatorUserIdAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.SesionOperador.AsNoTracking()
+            .Where(session => session.Estado == CashConstants.ActiveSessionState &&
+                session.TurnoCaja.Estado == "ABIERTA" &&
+                session.TurnoCaja.ModoOperacion == CashConstants.SharedMode &&
+                session.TerminalId == session.TurnoCaja.TerminalId)
+            .OrderByDescending(session => session.FechaInicio)
+            .Select(session => (Guid?)session.UsuarioId)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyCollection<CredencialUsuario>> ListActiveCredentialsAsync(
         CancellationToken cancellationToken = default) =>
         await dbContext.CredencialUsuario
