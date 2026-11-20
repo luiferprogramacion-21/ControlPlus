@@ -130,7 +130,8 @@ public sealed class LayawayCorrectionsV1 : Migration
         CREATE FUNCTION ventas.validar_correccion_apartado() RETURNS trigger LANGUAGE plpgsql AS $f$
         DECLARE cid uuid; c ventas.correccion_apartado%ROWTYPE; refunded numeric;
         BEGIN
-          cid := CASE WHEN TG_TABLE_NAME='correccion_apartado' THEN NEW.id ELSE NEW.correccion_id END;
+          -- IF, not CASE: PL/pgSQL resolves every field of a CASE, and each table has only one of them.
+          IF TG_TABLE_NAME='correccion_apartado' THEN cid := NEW.id; ELSE cid := NEW.correccion_id; END IF;
           SELECT * INTO c FROM ventas.correccion_apartado WHERE id=cid;
           SELECT coalesce(sum(valor),0) INTO refunded FROM ventas.reembolso_correccion_apartado WHERE correccion_id=cid;
           IF refunded<>c.reembolso OR NOT EXISTS(SELECT 1 FROM seguridad.autorizacion_operacion a
