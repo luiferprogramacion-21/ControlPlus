@@ -20,7 +20,7 @@ describe('ticket', () => {
   });
   it('muestra número, total, descuento, medio de pago, recibido y devuelta', () => {
     const html = buildTicketHtml({ ...receipt, establishmentName: 'Tienda Central', establishmentIdentification: '900-1', establishmentPhone: '555', establishmentAddress: 'Ocaña', receiptHeader: 'Compra local', receiptFooter: 'Vuelva pronto' }, { operator: 'Cajero Uno', customer: 'Ana' });
-    for (const text of ['VTA-001-000010', 'TOTAL', '$ 50.000', '-$ 5.000', 'Efectivo', 'Recibido', '$ 60.000', 'Devuelta', '$ 10.000', 'Atendió: Cajero Uno', 'Cliente: Ana', 'Ticket de venta', 'Tienda Central', 'NIT: 900-1', 'Ocaña', 'Compra local', 'Vuelva pronto']) expect(html).toContain(text);
+    for (const text of ['VTA-001-000010', 'TOTAL', '$ 50.000', '-$ 5.000', 'Medio de pago: Efectivo', 'Recibido', '$ 60.000', 'Devuelta', '$ 10.000', 'Atendió: Cajero Uno', 'Cliente: Ana', 'Ticket de venta', 'Tienda Central', 'NIT: 900-1', 'Ocaña', 'Compra local', 'Vuelva pronto']) expect(html).toContain(text);
   });
   it('nunca muestra IVA, aunque la venta antigua lo tenga guardado', () => {
     const html = buildTicketHtml({ ...receipt, vatPercentage: 19, taxableBaseTotal: 42017, vatTotal: 7983 });

@@ -78,9 +78,15 @@ public static class ReceiptTextRenderer
         // and Devuelta. Cash counts what the customer handed over; Nequi and transfers count their exact amount.
         if (receipt.Payments.Count > 0)
         {
-            text.AppendLine(receipt.Payments.Count == 1 ? "Medio de pago" : "Medios de pago");
-            foreach (var payment in receipt.Payments)
-                AppendAmount(text, PaymentName(Clean(payment.MethodCode)), payment.AppliedAmount, columns);
+            // One method: its name only, since its amount is the TOTAL above (the user's layout). Mixed: each amount.
+            if (receipt.Payments.Count == 1)
+                AppendBlock(text, "Medio de pago: " + PaymentName(Clean(receipt.Payments.First().MethodCode)), columns, centered: false);
+            else
+            {
+                text.AppendLine("Medios de pago:");
+                foreach (var payment in receipt.Payments)
+                    AppendAmount(text, PaymentName(Clean(payment.MethodCode)), payment.AppliedAmount, columns);
+            }
             AppendAmount(text, "Recibido", receipt.Payments.Sum(payment => payment.ReceivedAmount ?? payment.AppliedAmount), columns);
             AppendAmount(text, "Devuelta", receipt.Change, columns);
         }
