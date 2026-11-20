@@ -32,7 +32,7 @@ public sealed class EfCashTransactionManager(OfficialControlPlusDbContext dbCont
 }
 
 /// <summary>
-/// Produces an opaque, Code 128-compatible value with 72 bits of entropy, written as a 22-digit decimal number so a
+/// Produces an opaque, Code 128-compatible value of 14 random digits (about 46 bits; 22 earlier on 20 November) so a
 /// scanner reads it in Code 128 subset C (two digits per symbol: about 40 % shorter than hexadecimal, so the bars stay
 /// wide enough on a card). Since 20 November 2026 it is 22 digits (40 on 19 November, 58 before): printed on the 80 mm
 /// receipt roll with 0.375 mm bars (3 thermal dots), because 2-dot bars spread when the head heats and a laser scanner
@@ -42,12 +42,15 @@ public sealed class EfCashTransactionManager(OfficialControlPlusDbContext dbCont
 /// </summary>
 public sealed class Code128CredentialTokenGenerator : ICredentialTokenGenerator
 {
-    private const int EntropyBytes = 9;
-    private const int Digits = 22;
+    // 14 digits (option B, 20 November 2026): about the length of the product labels the store's laser scanner reads, so
+    // the card prints across with 4-dot bars. 10^14 uniform values (about 46 bits); guessing one online is still out of
+    // reach and every attempt is checked against the slow hash of an active credential with the same last digits.
 
-    public string Generate() =>
-        new System.Numerics.BigInteger(RandomNumberGenerator.GetBytes(EntropyBytes), isUnsigned: true, isBigEndian: true)
-            .ToString().PadLeft(Digits, '0');
+    // Two independent uniform halves of 7 digits each.
+    public string Generate() => Half() + Half();
+
+    private static string Half() =>
+        RandomNumberGenerator.GetInt32(0, 10_000_000).ToString("D7", System.Globalization.CultureInfo.InvariantCulture);
 }
 
 public sealed partial class EfCashRepository(OfficialControlPlusDbContext dbContext) : ICashRepository

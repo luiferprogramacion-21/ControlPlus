@@ -8,7 +8,7 @@ public sealed record ResolvedAuthorizerCredential(Guid CredentialId, string User
 /// <summary>Identifies the authorizer behind a scanned Code 128 operator credential.</summary>
 public interface IAuthorizerCredentialResolver
 {
-    /// <summary>The active, unexpired credential whose token matches, or null. A random token of at least 72 bits, checked against its slow hash, needs no lockout counter.</summary>
+    /// <summary>The active, unexpired credential whose token matches, or null. A random token of at least 46 bits, checked against its slow hash, needs no lockout counter.</summary>
     Task<ResolvedAuthorizerCredential?> ResolveAsync(string token, CancellationToken cancellationToken = default);
 
     /// <summary>

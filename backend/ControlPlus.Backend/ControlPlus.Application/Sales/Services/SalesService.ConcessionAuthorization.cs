@@ -55,7 +55,7 @@ public sealed partial class SalesService
 
     /// <summary>
     /// Finds and verifies the second user of an authorization, by user name and password or by the scanned Code 128 credential
-    /// (random token of at least 72 bits checked against its hash, so no lockout counter: an unknown token only leaves a rejection event). Requires a strictly higher role
+    /// (random token of at least 46 bits checked against its hash, so no lockout counter: an unknown token only leaves a rejection event). Requires a strictly higher role
     /// than the requester; the caller still checks the permission it needs. Returns a null authorizer when it must answer 403;
     /// a failed secret is recorded (and saved) here.
     /// </summary>

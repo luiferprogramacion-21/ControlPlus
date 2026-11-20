@@ -177,17 +177,23 @@ describe('Carné de operador', () => {
     expect(text.slice(first, first + 7)).toBe('1 0 obj');
   });
 
-  it('el código va a lo largo del rollo con barras de 0,5 mm (4 puntos), como las etiquetas que el lector sí lee', () => {
-    const token = '1234567890'.repeat(2) + '12';
-    const svg = printedBarcodeSvg(token);
-    // 22 dígitos: 156 módulos + 20 de margen = 176 × 0,5 mm.
-    expect(Number(/height="([0-9.]+)mm"/.exec(svg)![1])).toBeCloseTo(88, 2);
-    expect(svg).toContain('width="40mm"');
-    const bars = [...svg.matchAll(/height="([0-9.]+)"\/>/g)].map(m => Number(m[1]));
+  it('el carné de 14 números va de lado a lado con barras de 0,5 mm (4 puntos), como las etiquetas que el lector sí lee', () => {
+    const svg = printedBarcodeSvg('12345678901234');
+    // 14 dígitos: 112 módulos + 20 de margen = 132 × 0,5 mm = 66 mm, cabe en los 69 mm del carné.
+    expect(Number(/width="([0-9.]+)mm"/.exec(svg)![1])).toBeCloseTo(66, 2);
+    expect(svg).toContain('height="16mm"');
+    const bars = [...svg.matchAll(/ width="([0-9.]+)" height="16"\/>/g)].map(m => Number(m[1]));
     expect(Math.min(...bars)).toBeCloseTo(0.5, 4);
-    // Un carné anterior más largo conserva el grosor: solo el carné se hace más alto.
-    const older = printedBarcodeSvg('1234567890'.repeat(5) + '12345678');
+    expect(buildCredentialCardHtml({ businessName: 'N', displayName: 'L', userName: 'l', roleName: 'C', token: '12345678901234', fragment: '78901234' }))
+      .not.toContain('gire el carné');
+  });
+
+  it('un carné anterior más largo va a lo largo, con el mismo grosor de barra', () => {
+    const older = printedBarcodeSvg('1234567890'.repeat(2) + '12');
+    expect(older).toContain('width="40mm"');
     expect(Math.min(...[...older.matchAll(/height="([0-9.]+)"\/>/g)].map(m => Number(m[1])))).toBeCloseTo(0.5, 4);
+    expect(buildCredentialCardHtml({ businessName: 'N', displayName: 'L', userName: 'l', roleName: 'C', token: '1234567890'.repeat(2) + '12', fragment: '34567812' }))
+      .toContain('gire el carné');
   });
 
   it('la tarjeta solo contiene los datos necesarios', () => {

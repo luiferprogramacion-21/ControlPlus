@@ -6,42 +6,54 @@ const escape = (value: string): string => value.replace(/[&<>"']/g, c => ({ '&':
 
 /** The card is printed on the 80 mm roll of the receipt printer (72 mm printable). */
 export const PRINTED_CARD_WIDTH_MM = 70;
+export const PRINTED_CARD_HEIGHT_MM = 50;
 /**
- * Narrowest bar: 0.5 mm = 4 dots at 203 dpi (20 November 2026, option A chosen by the user). At the store, product labels
- * read only when their bars had about 4 dots (an 80 × 30 mm label); with 2 or 3 dots the thermal head closes the spaces and
- * the laser scanner (Honeywell Voyager MS9520) does not even beep. At 4 dots the card code does not fit across the roll, so
- * it is printed lengthwise and the card is turned to scan it. Never scaled by the browser.
+ * Narrowest bar: 0.5 mm = 4 dots at 203 dpi (20 November 2026). At the store, product labels read only with bars of about
+ * 4 dots; with 2 or 3 dots the thermal head closes the spaces and the laser scanner (Honeywell Voyager MS9520) does not
+ * even beep. Never scaled by the browser.
  */
 export const PRINTED_MODULE_MM = 0.5;
-/** Width of the bars across the roll: wide, so the scanner's line easily crosses all of them. */
-const BAR_LENGTH_MM = 40;
 /** Blank margin each side of the bars: at least 10 modules, as Code 128 requires. */
 const QUIET_MODULES = 10;
+/** Space for the bars across the card. */
+const BARCODE_SPACE_MM = PRINTED_CARD_WIDTH_MM - 1;
+
+const modulesOf = (token: string): number => code128Widths(token).reduce((sum, width) => sum + width, 0) + 2 * QUIET_MODULES;
+
+/** True when the code fits across the card with 4-dot bars (the 14-digit cards issued since 20 November 2026 do). */
+export function fitsAcross(token: string): boolean { return modulesOf(token) * PRINTED_MODULE_MM <= BARCODE_SPACE_MM; }
 
 /**
- * Code 128 SVG with a fixed size in millimetres (no scaling by the browser), printed lengthwise: the bars are horizontal and
- * follow one another down the roll, so the code can be as long as it needs at 4 dots per bar.
+ * Code 128 SVG with a fixed size in millimetres (no scaling by the browser). Across the card when it fits (option B, chosen
+ * by the user on 20 November 2026: a 14-digit code, about the length of the product labels the scanner reads). An older,
+ * longer card code is printed lengthwise instead (option A), so it keeps the same 4-dot bars and only the card grows.
  */
-export function printedBarcodeSvg(token: string, barLengthMm = BAR_LENGTH_MM, moduleMm = PRINTED_MODULE_MM): string {
+export function printedBarcodeSvg(token: string, barHeightMm = 16): string {
   const widths = code128Widths(token);
-  const modules = widths.reduce((sum, width) => sum + width, 0) + 2 * QUIET_MODULES;
-  let y = QUIET_MODULES * moduleMm; let bars = '';
+  const total = modulesOf(token) * PRINTED_MODULE_MM;
+  const across = total <= BARCODE_SPACE_MM;
+  const length = across ? barHeightMm : 40;
+  let position = QUIET_MODULES * PRINTED_MODULE_MM; let bars = '';
   widths.forEach((width, index) => {
-    if (index % 2 === 0) bars += `<rect x="0" y="${y.toFixed(4)}" width="${barLengthMm}" height="${(width * moduleMm).toFixed(4)}"/>`;
-    y += width * moduleMm;
+    const size = (width * PRINTED_MODULE_MM).toFixed(4);
+    if (index % 2 === 0) bars += across
+      ? `<rect x="${position.toFixed(4)}" y="0" width="${size}" height="${length}"/>`
+      : `<rect x="0" y="${position.toFixed(4)}" width="${length}" height="${size}"/>`;
+    position += width * PRINTED_MODULE_MM;
   });
-  const total = (modules * moduleMm).toFixed(4);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${barLengthMm}mm" height="${total}mm" viewBox="0 0 ${barLengthMm} ${total}" role="img" aria-label="Código de barras del carné" shape-rendering="crispEdges" fill="#000">${bars}</svg>`;
+  const [w, h] = across ? [total.toFixed(4), String(length)] : [String(length), total.toFixed(4)];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}" role="img" aria-label="Código de barras del carné" shape-rendering="crispEdges" fill="#000">${bars}</svg>`;
 }
 
-/** Card for the 80 mm receipt printer with the barcode the reader scans, printed lengthwise. */
+/** Card for the 80 mm receipt printer with the barcode the reader scans. */
 export function buildCredentialCardHtml(card: CredentialCard): string {
+  const across = fitsAcross(card.token);
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Carné ${escape(card.userName)}</title>
 <style>
   @page { size: 80mm auto; margin: 3mm 5mm; }
   * { box-sizing: border-box; }
   body { margin: 0; width: ${PRINTED_CARD_WIDTH_MM}mm; font-family: Arial, Helvetica, sans-serif; color: #000; }
-  .card { width: ${PRINTED_CARD_WIDTH_MM}mm; padding: 3mm 0; display: flex; flex-direction: column; gap: 3mm; border: 0.3mm dashed #000; }
+  .card { width: ${PRINTED_CARD_WIDTH_MM}mm; ${across ? `height: ${PRINTED_CARD_HEIGHT_MM}mm; justify-content: space-between;` : 'gap: 3mm;'} padding: 3mm 0; display: flex; flex-direction: column; border: 0.3mm dashed #000; }
   header, .person { padding: 0 3mm; }
   header { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; }
   header strong { font-size: 12pt; }
@@ -55,6 +67,6 @@ export function buildCredentialCardHtml(card: CredentialCard): string {
 </style></head><body><div class="card">
   <header><strong>${escape(card.businessName)}</strong><span>Carné de operador</span></header>
   <p class="person"><b>${escape(card.displayName)}</b><small>${escape(card.roleName)} · ${escape(card.userName)}</small></p>
-  <div class="barcode">${printedBarcodeSvg(card.token)}<small>…${escape(card.fragment)} · gire el carné para leerlo</small></div>
+  <div class="barcode">${printedBarcodeSvg(card.token)}<small>…${escape(card.fragment)}${across ? '' : ' · gire el carné para leerlo'}</small></div>
 </div></body></html>`;
 }
