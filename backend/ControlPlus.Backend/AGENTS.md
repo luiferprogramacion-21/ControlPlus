@@ -778,3 +778,4 @@ Cierra la entrega 5 de las correcciones operativas: «corregir los medios de pag
 - **Auditoría:** `SalePaymentsCorrected` (139) y `SalePaymentCorrectionAuthorizationRejected` (140).
 - **Pantalla:** Historial de ventas → Corregir venta → «Corregir medio de pago» (`sale-payment-correction.ts`).
 - **Prueba:** `SalePaymentCorrectionApiTests`. Pasa de efectivo a Nequi, repite la solicitud y anula después; la caja vuelve a 0.
+- **Activación de correcciones operativas (20 de noviembre de 2026):** `scripts/operational-corrections/Invoke-Activation.ps1 -UsePostgresCredential` aplica las cinco migraciones (historial 30 → 35). Detalle en `docs/operational-corrections.md`; `OperationalCorrectionsActivationTests` valida el preflight y el postflight. Codex integró la pantalla «Corregir recepción» y las pruebas de apartados, inventario y compras (`030df83`).
