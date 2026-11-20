@@ -740,7 +740,7 @@ El usuario pidió diez ajustes. Claude hizo estos seis; Codex hace la política 
 - **Ticket (Codex):** muestra Total, Recibido y Devuelta, también en las reimpresiones.
 - **Contraseñas en Edge (Codex):** el instalador escribe la directiva de equipo `HKLM\SOFTWARE\Policies\Microsoft\Edge\PasswordManagerEnabled = 0`, y los campos de contraseña usan `autocomplete="off"`.
 - **Ícono del escritorio (20 de noviembre de 2026):**
-  - el ícono nuevo es una «C» blanca con un «+» naranja sobre azul, que ocupa todo el cuadro (16 a 256 px);
+  - el ícono es el dibujo del POS (caja y recibo con el chulo naranja), recortado y ampliado para que ocupe casi todo el cuadro, sobre un fondo blanco redondeado con borde azul (16 a 256 px); el usuario lo prefirió a una «C+»;
   - el anterior era un dibujo fino con mucho margen y no se distinguía;
   - el instalador copia el ícono con un nombre que incluye su huella, porque Windows guarda en caché los íconos por ruta, y refresca la caché con `ie4uinit -show`;
   - borra también el `ControlPlus.url` antiguo del escritorio personal, que abría el navegador predeterminado (Brave en este equipo), sin la directiva de Edge y con el ícono viejo en caché;

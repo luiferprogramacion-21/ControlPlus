@@ -21,7 +21,7 @@ Cada persona tiene **un solo rol**. Lo que ves en el menú depende de él: si un
 
 ## 1.1 Ingresar y salir
 
-1. Abre ControlPlus con el acceso directo del escritorio. Se abre en su propia ventana, como un programa, con su ícono en la barra de tareas (también funciona en el navegador, en `http://localhost:5000`). El ícono es una **C blanca con un + naranja** sobre azul. Para verlo más grande en el escritorio: clic derecho en el escritorio → **Ver** → **Iconos grandes**. Usa siempre ese acceso: en otro navegador, como Brave o Chrome, el navegador puede ofrecer guardar la contraseña.
+1. Abre ControlPlus con el acceso directo del escritorio. Se abre en su propia ventana, como un programa, con su ícono en la barra de tareas (también funciona en el navegador, en `http://localhost:5000`). El ícono es el **dibujo de la caja con el recibo** sobre fondo blanco con borde azul. Para verlo más grande en el escritorio: clic derecho en el escritorio → **Ver** → **Iconos grandes**. Usa siempre ese acceso: en otro navegador, como Brave o Chrome, el navegador puede ofrecer guardar la contraseña.
 2. Escribe tu **usuario** y tu **contraseña** y pulsa Ingresar.
 3. Llegas a **Inicio**: una pantalla con botones grandes de lo que más haces (Vender, Abrir caja, Cerrar caja, Cambiar o devolver, Recibir abono, Nuevo apartado, Buscar producto, Recibir mercancía…) y el estado de la caja. Solo aparecen las tareas que tu rol permite; si la caja está cerrada, **Abrir caja** va primero. Puedes volver a Inicio desde el menú en cualquier momento.
 4. Para salir, usa el botón de salir de la barra superior.
