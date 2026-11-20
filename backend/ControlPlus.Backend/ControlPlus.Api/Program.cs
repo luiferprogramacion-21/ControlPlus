@@ -145,19 +145,10 @@ builder.Services.AddOpenApi(options =>
     options.AddDocumentTransformer<ControlPlusOpenApiSecurityTransformer>();
     options.AddSchemaTransformer<OptionalProductInternalCodeSchemaTransformer>();
 });
-builder.Services.AddProblemDetails(options =>
-{
-    // Only in the test environment: an unexpected error (500) carries its real cause, so a failed test in CI
-    // says what broke. The installed service never shows it.
-    if (builder.Environment.IsEnvironment("Testing"))
-        options.CustomizeProblemDetails = context =>
-        {
-            if (context.Exception is { } exception)
-                context.ProblemDetails.Detail = exception.GetBaseException().Message;
-        };
-});
+builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ConcurrencyExceptionHandler>();
 builder.Services.AddExceptionHandler<CashMoneyExceptionHandler>();
+builder.Services.AddExceptionHandler<TestingExceptionDetailHandler>();
 
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddSecurityInfrastructure(builder.Configuration);
