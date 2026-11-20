@@ -655,8 +655,8 @@ El usuario pidió abrir el cajón monedero a través de la impresora de recibos.
 
 - **Cómo se abre:** el sistema manda `ESC p` como un trabajo RAW de Windows, aparte del ticket. Se configuran el pin (2 o 5) y la duración del pulso y de la pausa (pares, de 20 a 500 ms). «ENVIADO» significa que Windows aceptó la orden, no que el cajón se abrió.
 - **Viene desactivado.** Solo el Administrador con `CONFIGURATION.MANAGE` lo habilita, en Configuración → Impresión → **Cajón**, sobre el perfil predeterminado de recibos o híbrido (`PUT /api/printing/profiles/{id}/drawer`).
+- **Venta de contado (decisión del 19 de noviembre de 2026):** el cajón se abre al pulsar **Cobrar**, antes de confirmar (`POST /api/cash/drawer/checkout`, permiso `SALES.CREATE`, `Idempotency-Key` por venta: un segundo «Cobrar» de la misma venta no lo reabre). Confirmar la venta ya no lo abre.
 - **Apertura automática:** una sola vez por operación, al confirmar con efectivo:
-  - venta;
   - abono a crédito;
   - apartado nuevo y abono a apartado;
   - devolución de apartado;
@@ -717,3 +717,19 @@ El usuario pidió contraseñas de 4 números **para todos los roles, incluido el
 - Toda pantalla nueva sigue su maqueta; lo que no tenga maqueta (M) se aprueba antes con el usuario.
 - Si una tarea necesita migración (por ejemplo, el correo del establecimiento), detenerse y pedir aprobación. La activación la hace el operador con script, respaldo, preflight y postflight, como las anteriores.
 - No acceder a `controlplus` desde el agente.
+
+### Decisión del 19 de noviembre de 2026: ajustes de mostrador
+
+El usuario pidió diez ajustes. Claude hizo estos seis; Codex hace la política del navegador, el ícono, el NIT opcional y el ticket con recibido y cambio.
+
+- **Billetes que suman:** en el cobro, el primer toque de un billete pone su valor y los siguientes suman. Atajos: Alt+1 a Alt+4 (10.000, 20.000, 50.000, 100.000), Alt+E (exacto) y Alt+B (borrar). Escribir a mano reinicia la suma.
+- **Tamaño libre:** de 80 % a 200 % en pasos de 5 %, con − y + en el menú del usuario y Ctrl +, Ctrl − y Ctrl 0. Siguen las tres opciones fijas.
+- **Sin aviso del cajón** en la pantalla de venta terminada.
+- **Base mayor que cero** para abrir la caja. La regla está solo en la pantalla, porque las pruebas de la API abren turnos con 0.
+- **Cajón al pulsar Cobrar** (ver «Cajón de dinero»). Si el cajón está desactivado, la respuesta es `DESACTIVADO` y no se escribe nada. La pantalla solo avisa si el resultado es FALLIDO o INCIERTO.
+- **Carné legible en la impresora de tickets:**
+  - el código nuevo tiene 40 dígitos (128 bits), antes 58;
+  - el carné se imprime a 70 × 50 mm en el rollo de 80 mm, con barras fijas de 0,25 mm (2 puntos a 203 dpi), sin que el navegador lo escale;
+  - antes la página de 85,6 mm se encogía y las barras quedaban más finas que un punto, por eso el lector no las leía;
+  - los carnés ya emitidos siguen siendo válidos, porque se compara su huella;
+  - el campo del carné en Caja acepta Enter, que es lo que envía el lector.

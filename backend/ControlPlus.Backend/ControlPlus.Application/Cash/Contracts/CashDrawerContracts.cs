@@ -29,6 +29,13 @@ public interface ICashDrawerService
         CancellationToken ct = default);
     Task<Result<CashDrawerOpenResultDto>> OpenManualAsync(ActorContext actor,
         Guid idempotencyId, OpenCashDrawerRequest request, CancellationToken ct = default);
+    /// <summary>
+    /// Decisión del 19 de noviembre de 2026: el cajón se abre al pulsar «Cobrar», antes de confirmar la venta. Lo pide
+    /// quien vende con turno abierto; queda registrado como COBRO con la clave de ese intento de cobro.
+    /// Con el cajón apagado no escribe nada y responde DESACTIVADO.
+    /// </summary>
+    Task<Result<CashDrawerOpenResultDto>> OpenForCheckoutAsync(ActorContext actor, Guid checkoutId,
+        CancellationToken ct = default);
     Task<CashDrawerOpenResultDto?> TryOpenAutomaticAsync(ActorContext actor,
         CashDrawerOperationKind kind, Guid operationId, CancellationToken ct = default);
 }

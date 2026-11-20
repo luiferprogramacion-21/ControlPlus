@@ -4,7 +4,7 @@ import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 import { TicketPrinter } from '../sales/ticket';
 import { EstablishmentService } from '../../core/establishment';
 import { AdminApi, AdminUser, IssuedCredential, OperatorCredential } from './admin-api';
-import { buildCredentialCardHtml } from './credential-card';
+import { buildCredentialCardHtml, printedBarcodeSvg } from './credential-card';
 import { buildPdfFromJpeg, CredentialCardExporter } from './credential-card-export';
 import { UserCredential } from './user-credential';
 
@@ -117,7 +117,7 @@ describe('Carné de operador', () => {
     const html = print.mock.calls[0][0] as string;
     expect(html).toContain('Ana &lt;Supervisora&gt;');
     expect(html).toContain('<svg');
-    expect(html).toContain('size: 85.6mm 54mm');
+    expect(html).toContain('size: 80mm auto');
     expect(component.notice()).toContain('impresión');
   });
 
@@ -175,6 +175,16 @@ describe('Carné de operador', () => {
     expect(text.slice(startxref, startxref + 4)).toBe('xref');
     const first = Number(/xref\n0 6\n0000000000 65535 f \n(\d{10})/.exec(text)![1]);
     expect(text.slice(first, first + 7)).toBe('1 0 obj');
+  });
+
+  it('el código impreso cabe en el rollo de 80 mm con barras de 0,25 mm', () => {
+    const token = '1234567890'.repeat(4);
+    const svg = printedBarcodeSvg(token, 69);
+    const width = Number(/width="([0-9.]+)mm"/.exec(svg)![1]);
+    expect(width).toBeCloseTo(68.75, 2);
+    expect(svg).toContain('height="14mm"');
+    const longer = printedBarcodeSvg('1234567890'.repeat(5) + '12345678', 69);
+    expect(Number(/width="([0-9.]+)mm"/.exec(longer)![1])).toBeLessThanOrEqual(69.0001);
   });
 
   it('la tarjeta solo contiene los datos necesarios', () => {

@@ -21,6 +21,24 @@ public sealed class CashDrawerController(CurrentActorContextResolver actorResolv
         return actor is null ? MissingActor() : FromResult(await drawer.GetStatusAsync(actor, ct), Ok);
     }
 
+    /// <summary>Al pulsar «Cobrar» en el punto de venta (decisión del 19 de noviembre de 2026).</summary>
+    [HttpPost("checkout")]
+    [PermissionAuthorize(PermissionCodes.SalesCreate)]
+    [ProducesResponseType<CashDrawerOpenResultDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> OpenForCheckout(
+        [FromHeader(Name = "Idempotency-Key"), Required] string idempotencyKey, CancellationToken ct)
+    {
+        var actor = await GetActorAsync(ct);
+        if (actor is null) return MissingActor();
+        if (!Guid.TryParse(idempotencyKey, out var checkoutId))
+            return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
+            {
+                ["Idempotency-Key"] = ["La clave del cobro debe ser un UUID."]
+            }));
+        return FromResult(await drawer.OpenForCheckoutAsync(actor, checkoutId, ct), Ok);
+    }
+
     /// <summary>Un Supervisor o Administrador solicita un pulso con motivo. Windows solo confirma el envío.</summary>
     [HttpPost("open")]
     [PermissionAuthorize(PermissionCodes.CashShiftManage)]

@@ -91,6 +91,28 @@ public sealed class CashDrawerService(
         return Result.Success(result);
     }
 
+    private const string CheckoutType = "COBRO";
+
+    public async Task<Result<CashDrawerOpenResultDto>> OpenForCheckoutAsync(ActorContext actor, Guid checkoutId,
+        CancellationToken ct = default)
+    {
+        var auth = await users.GetAuthorizationSnapshotAsync(actor.UserId, ct);
+        if (auth is null) return Result.Failure<CashDrawerOpenResultDto>(ApplicationError.Unauthorized());
+        if (!auth.PermissionCodes.Contains(PermissionCodes.SalesCreate, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<CashDrawerOpenResultDto>(ApplicationError.Forbidden());
+        if (checkoutId == Guid.Empty)
+            return Result.Failure<CashDrawerOpenResultDto>(ApplicationError.Validation("La clave del cobro debe ser un UUID."));
+        var terminal = await GetActiveTerminalAsync(ct);
+        var shift = terminal is null ? null : await db.TurnoCaja.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.TerminalId == terminal.Id && x.Estado == "ABIERTA", ct);
+        if (shift is null) return Result.Failure<CashDrawerOpenResultDto>(
+            ApplicationError.Conflict("Abre un turno de caja antes de cobrar."));
+        var profile = await GetDefaultReceiptProfileAsync(shift.TerminalId, ct);
+        if (profile?.CajonHabilitado != true || profile.CajonPin is not (2 or 5))
+            return Result.Success(new CashDrawerOpenResultDto(Guid.Empty, "DESACTIVADO", "El cajón no está habilitado."));
+        return Result.Success(await ReserveAndSendAsync(actor.UserId, CheckoutType, checkoutId, shift, profile, null, ct));
+    }
+
     public async Task<CashDrawerOpenResultDto?> TryOpenAutomaticAsync(ActorContext actor,
         CashDrawerOperationKind kind, Guid operationId, CancellationToken ct = default)
     {
