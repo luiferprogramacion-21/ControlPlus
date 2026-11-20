@@ -177,14 +177,17 @@ describe('Carné de operador', () => {
     expect(text.slice(first, first + 7)).toBe('1 0 obj');
   });
 
-  it('el código impreso cabe en el rollo de 80 mm con barras de 0,375 mm', () => {
+  it('el código va a lo largo del rollo con barras de 0,5 mm (4 puntos), como las etiquetas que el lector sí lee', () => {
     const token = '1234567890'.repeat(2) + '12';
-    const svg = printedBarcodeSvg(token, 69);
-    const width = Number(/width="([0-9.]+)mm"/.exec(svg)![1]);
-    expect(width).toBeCloseTo(66, 2);
-    expect(svg).toContain('height="14mm"');
-    const longer = printedBarcodeSvg('1234567890'.repeat(5) + '12345678', 69);
-    expect(Number(/width="([0-9.]+)mm"/.exec(longer)![1])).toBeLessThanOrEqual(69.0001);
+    const svg = printedBarcodeSvg(token);
+    // 22 dígitos: 156 módulos + 20 de margen = 176 × 0,5 mm.
+    expect(Number(/height="([0-9.]+)mm"/.exec(svg)![1])).toBeCloseTo(88, 2);
+    expect(svg).toContain('width="40mm"');
+    const bars = [...svg.matchAll(/height="([0-9.]+)"\/>/g)].map(m => Number(m[1]));
+    expect(Math.min(...bars)).toBeCloseTo(0.5, 4);
+    // Un carné anterior más largo conserva el grosor: solo el carné se hace más alto.
+    const older = printedBarcodeSvg('1234567890'.repeat(5) + '12345678');
+    expect(Math.min(...[...older.matchAll(/height="([0-9.]+)"\/>/g)].map(m => Number(m[1])))).toBeCloseTo(0.5, 4);
   });
 
   it('la tarjeta solo contiene los datos necesarios', () => {
