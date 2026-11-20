@@ -323,4 +323,23 @@ public sealed class SalesController(
         return actor is null ? MissingActor() : FromResult(await salesService.CancelAsync(actor, saleId,
             idempotencyKey, request, cancellationToken), Ok);
     }
+
+    /// <summary>Corrige los medios de pago de una venta de contado del turno abierto, sin cambiar su total.</summary>
+    [HttpPost("{saleId:guid}/payment-correction")]
+    [PermissionAuthorize(PermissionCodes.SalesVoid)]
+    [Consumes("application/json")]
+    [ProducesResponseType<CorrectSalePaymentsDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> CorrectPayments(Guid saleId,
+        [FromHeader(Name = "Idempotency-Key"), Required] string idempotencyKey,
+        [FromBody] CorrectSalePaymentsRequest request, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await salesService.CorrectPaymentsAsync(actor, saleId,
+            idempotencyKey, request, cancellationToken), Ok);
+    }
 }

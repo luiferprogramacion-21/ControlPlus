@@ -211,7 +211,7 @@ public sealed partial class SalesService
         }
         else
         {
-            var payments = sale.PagoVenta.ToArray();
+            var payments = sale.PagoVenta.Where(x => x.Estado == "APLICADO").ToArray();
             if (payments.Length == 0 || payments.Any(x => x.Estado != "APLICADO" || x.MovimientoCajaId is null) ||
                 payments.Sum(x => x.ValorAplicado) != sale.Total ||
                 payments.Select(x => x.MovimientoCajaId).Distinct().Count() != 1)
@@ -340,7 +340,7 @@ public sealed partial class SalesService
         }
         if (originalCash is not null)
         {
-            foreach (var payment in sale.PagoVenta)
+            foreach (var payment in sale.PagoVenta.Where(x => x.Estado == "APLICADO"))
             {
                 payment.Estado = "ANULADO";
                 payment.UsuarioAnulacionId = actor.UserId;

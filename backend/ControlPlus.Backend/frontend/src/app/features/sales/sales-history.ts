@@ -9,8 +9,9 @@ import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
-import { CancelSaleInput, ConfirmedChange, printJobStatusText, SaleCancellationReason, SaleDetail, SalesApi, SaleSummary } from './sales-api';
+import { CancelSaleInput, ConfirmedChange, CorrectedPayments, printJobStatusText, SaleCancellationReason, SaleDetail, SalesApi, SaleSummary } from './sales-api';
 import { SaleChange } from './sale-change';
+import { paymentCorrectionNotice, SalePaymentCorrection } from './sale-payment-correction';
 import { SalePrinting } from './sale-printing';
 import { statusKind, toastSignal } from '../../core/toast';
 import { cashDrawerNotice } from '../../shared/cash-drawer-feedback';
@@ -23,7 +24,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
 
 @Component({
   selector: 'cp-sales-history',
-  imports: [WindowSheet, A11yModule, CurrencyPipe, DatePipe, DecimalPipe, FormsModule, MatPaginatorModule, RouterLink, Icon, SaleChange],
+  imports: [WindowSheet, A11yModule, CurrencyPipe, DatePipe, DecimalPipe, FormsModule, MatPaginatorModule, RouterLink, Icon, SaleChange, SalePaymentCorrection],
   templateUrl: './sales-history.html',
   styleUrls: ['../directory.scss', './sales-history.scss'],
 })
@@ -45,6 +46,7 @@ export class SalesHistory implements OnInit {
   readonly saving = signal(false);
   readonly cancelling = signal(false);
   readonly changing = signal(false);
+  readonly correctingPayments = signal(false);
   readonly correcting = signal(false);
   readonly correctionMode = signal<'remove' | 'exchange'>('remove');
   readonly changes = signal<ConfirmedChange[]>([]);
@@ -120,6 +122,15 @@ export class SalesHistory implements OnInit {
     } catch (error) { this.error.set(errorText(error)); }
     finally { this.printingCorrection.set(null); }
   }
+  /** Solo ventas de contado confirmadas; el servidor confirma además que sean del turno abierto. */
+  canCorrectPayments(sale: SaleDetail): boolean { return this.canCancel(sale) && !sale.creditId && sale.payments.length > 0; }
+  beginPaymentCorrection(): void { this.correcting.set(false); this.correctingPayments.set(true); }
+  async paymentsCorrected(result: CorrectedPayments): Promise<void> {
+    this.correctingPayments.set(false);
+    this.notice.set(paymentCorrectionNotice(result));
+    try { this.detail.set(await this.api.detail(result.saleId)); } catch { this.detail.set(null); }
+    await this.reload();
+  }
   async changeDone(change: ConfirmedChange): Promise<void> {
     this.changing.set(false);
     this.notice.set(`Corrección ${change.visibleNumber} registrada. Variación ${this.money(change.difference)}.`);
@@ -173,7 +184,7 @@ export class SalesHistory implements OnInit {
     this.printMessage.set(outcome.message); if (outcome.status) this.printStatus.set(outcome.status);
     this.reprinting.set(false);
   }
-  closeDetail(): void { this.detail.set(null); this.cancelling.set(false); this.correcting.set(false); this.changing.set(false); this.changes.set([]); this.pending = null; }
+  closeDetail(): void { this.detail.set(null); this.cancelling.set(false); this.correcting.set(false); this.changing.set(false); this.correctingPayments.set(false); this.changes.set([]); this.pending = null; }
 
   async startCancel(): Promise<void> {
     this.correcting.set(false);

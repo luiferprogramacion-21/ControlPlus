@@ -142,5 +142,7 @@ public enum AuditAction
     CashMovementCorrected = 135,
     CashClosureReviewed = 136,
     CashCorrectionAuthorizationRejected = 137,
-    InventoryAdjustmentCorrected = 138
+    InventoryAdjustmentCorrected = 138,
+    SalePaymentsCorrected = 139,
+    SalePaymentCorrectionAuthorizationRejected = 140
 }

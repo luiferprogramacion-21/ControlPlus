@@ -1041,7 +1041,7 @@ public sealed partial class SalesService(
     private static SaleSummaryDto MapSummary(Venta sale) => new(
         sale.Id, VisibleNumber(sale), sale.UsuarioId, sale.ClienteId, Utc(sale.FechaHora),
         sale.FechaOperativa, sale.Total, sale.Estado, sale.TipoVenta,
-        sale.PagoVenta.OrderBy(x => x.MetodoPago?.OrdenVisual ?? int.MaxValue)
+        sale.PagoVenta.Where(x => x.Estado == "APLICADO").OrderBy(x => x.MetodoPago?.OrdenVisual ?? int.MaxValue)
             .Select(x => x.MetodoPago?.Nombre ?? x.MetodoPagoId.ToString()).Distinct().ToArray());
 
     private static SaleDto Map(Venta sale) => new(
@@ -1061,14 +1061,14 @@ public sealed partial class SalesService(
         sale.SubtotalBruto,
         sale.DescuentoTotal,
         sale.Total,
-        sale.PagoVenta.Sum(x => x.Cambio),
+        sale.PagoVenta.Where(x => x.Estado == "APLICADO").Sum(x => x.Cambio),
         sale.Estado,
         sale.Version,
         sale.DetalleVenta.OrderBy(x => x.ProductoId).Select(x => new SaleLineDto(
             x.Id, x.ProductoId, x.CodigoProducto, x.NombreProducto, x.UnidadMedida, x.Cantidad,
             x.TipoPrecio, x.PrecioUnitario, x.OrigenDescuento, x.TipoDescuento,
             x.PorcentajeDescuento, x.ValorDescuento, x.SubtotalBruto, x.SubtotalNeto)).ToArray(),
-        sale.PagoVenta.OrderBy(x => x.MetodoPago.OrdenVisual).Select(x => new SalePaymentDto(
+        sale.PagoVenta.Where(x => x.Estado == "APLICADO").OrderBy(x => x.MetodoPago.OrdenVisual).Select(x => new SalePaymentDto(
             x.Id, x.MetodoPago.Codigo, x.MetodoPago.Nombre, x.ValorAplicado, x.ValorRecibido, x.Cambio, x.Referencia)).ToArray(),
         sale.Credito?.Id,
         sale.VentaOrigenId);

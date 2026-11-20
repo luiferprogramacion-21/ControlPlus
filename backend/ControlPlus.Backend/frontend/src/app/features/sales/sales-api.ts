@@ -43,6 +43,9 @@ export interface SalePaymentLine { id: string; methodCode: string; methodName: s
 export interface SaleDetail { id: string; visibleNumber: string; occurredAtUtc: string; operatingDate: string; grossSubtotal: number; discountTotal: number; total: number; change: number; state: string; version: number; creditId: string | null; sourceSaleId?: string | null; lines: SaleLine[]; payments: SalePaymentLine[]; }
 export interface SaleCancellationReason { id: string; code: string; name: string; displayOrder: number; }
 export interface CancelSaleInput { expectedVersion: number; reasonId: string; observation: string | null; authorization?: AuthorizationBody; }
+export interface CorrectPaymentsInput { expectedVersion: number; reasonId: string; observation: string | null; payments: SalePaymentInput[]; authorization?: AuthorizationBody; }
+/** cashDifference: cuánto cambia el efectivo esperado en la caja (negativo si pasó a Nequi o transferencia). */
+export interface CorrectedPayments { saleId: string; visibleNumber: string; version: number; payments: SalePaymentLine[]; cashDifference: number; }
 export interface CancelSaleResult { saleId: string; visibleNumber: string; state: string; version: number; saleType: string; reversedAmount: number; }
 
 export interface ChangeLineAvailability { saleLineId: string; productId: string; productCode: string; productName: string; soldQuantity: number; returnedQuantity: number; remainingQuantity: number; }
@@ -134,6 +137,9 @@ export class SalesApi {
   cancellationReasons(): Promise<SaleCancellationReason[]> { return firstValueFrom(this.http.get<SaleCancellationReason[]>('/api/sales/cancellation-reasons')); }
   cancel(saleId: string, input: CancelSaleInput, key: string): Promise<CancelSaleResult> {
     return firstValueFrom(this.http.post<CancelSaleResult>(`/api/sales/${saleId}/cancel`, input, { headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined }));
+  }
+  correctPayments(saleId: string, input: CorrectPaymentsInput, key: string): Promise<CorrectedPayments> {
+    return firstValueFrom(this.http.post<CorrectedPayments>(`/api/sales/${saleId}/payment-correction`, input, { headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined }));
   }
   /** Busca por su número la venta a la que se le hará un cambio de productos. */
   findChangeSale(visibleNumber: string): Promise<ChangePreparation> { return firstValueFrom(this.http.get<ChangePreparation>('/api/sales/change-search', { params: { visibleNumber } })); }

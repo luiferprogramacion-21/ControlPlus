@@ -29,7 +29,8 @@ export const AUDIT_ACTION_GROUPS: AuditActionGroup[] = [
   } },
   { module: 'Ventas', actions: {
     SaleConfirmed: 'Venta confirmada', SaleCancelled: 'Venta anulada', SaleChanged: 'Cambio de venta', SaleReprintRequested: 'Reimpresión de tiquete',
-    SaleCancellationAuthorizationRejected: 'Autorización de anulación rechazada', SaleChangeAuthorizationRejected: 'Autorización de cambio rechazada',
+    SaleCancellationAuthorizationRejected: 'Autorización de anulación rechazada',
+    SalePaymentsCorrected: 'Medio de pago corregido', SalePaymentCorrectionAuthorizationRejected: 'Autorización de corrección de pago rechazada', SaleChangeAuthorizationRejected: 'Autorización de cambio rechazada',
     SaleDiscountAuthorizationRejected: 'Autorización de descuento rechazada', SaleCancellationReasonsInitialized: 'Motivos de anulación completados',
     SaleChangePolicyUpdated: 'Política de cambios modificada', SalesSettingsUpdated: 'Mínimo mayorista modificado',
     SalesDocumentNumberingCreated: 'Numeración de ventas creada', SalesDocumentNumberingUpdated: 'Numeración de ventas modificada',

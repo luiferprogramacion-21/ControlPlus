@@ -759,3 +759,22 @@ El usuario pidió diez ajustes. Claude hizo estos seis; Codex hace la política 
   - `statusKind` reconoce «No se sabe» como aviso de error.
   - **Regla:** todo texto nuevo en pantalla va en palabras de tienda.
 - **Correo tapado en la recuperación (20 de noviembre de 2026):** al enviar el código, la respuesta dice a qué correo llegó, por ejemplo `lu•••21@gm•••.com` (`PasswordRecoveryService.MaskEmail`).
+
+### Corrección del medio de pago (20 de noviembre de 2026)
+
+Cierra la entrega 5 de las correcciones operativas: «corregir los medios de pago mediante una operación trazable que conserve la venta y el total cobrado». **No necesita migración.**
+
+- **API:** `POST /api/sales/{id}/payment-correction` (permiso `SALES.VOID`, `Idempotency-Key`). Los motivos son los de anulación de venta; cada uno se enlaza con su par de `ANULACION_PAGO`.
+- **Autorización:** el Administrador se autoriza a sí mismo; un Supervisor necesita la de un Administrador.
+- **Alcance:** solo ventas de contado confirmadas **del turno abierto**. La base exige que el actor de un pago nuevo sea válido para el turno de la venta, y además un turno cerrado no se reescribe; para eso está «Revisar cierre».
+- **Cómo funciona:**
+  - los pagos vigentes pasan a `ANULADO`, con motivo y autorización;
+  - su movimiento de caja se revierte (`REVERSO_PAGO`);
+  - un movimiento `INGRESO`/`VENTA` nuevo lleva los pagos correctos;
+  - es el mismo modelo de reverso que ya entienden el arqueo y el flujo de caja, así que el efectivo esperado por medio queda cuadrado;
+  - si el efectivo pasa a Nequi o transferencia, la caja debe tener ese efectivo esperado.
+- **Ajustes por la corrección:** una venta puede tener ahora pagos anulados. La anulación de venta, el detalle (`SaleDto`) y la búsqueda del movimiento de caja usan solo los pagos `APLICADO`.
+- **Límite:** la reimpresión del ticket sigue mostrando el pago original, porque el ticket es una copia fija del momento de la venta. La corrección queda en la auditoría y en el aviso.
+- **Auditoría:** `SalePaymentsCorrected` (139) y `SalePaymentCorrectionAuthorizationRejected` (140).
+- **Pantalla:** Historial de ventas → Corregir venta → «Corregir medio de pago» (`sale-payment-correction.ts`).
+- **Prueba:** `SalePaymentCorrectionApiTests`. Pasa de efectivo a Nequi, repite la solicitud y anula después; la caja vuelve a 0.

@@ -18,7 +18,7 @@
   </section>
 
   @if (detail(); as d) {
-    <div class="module-form-sheet sale-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="sale-detail-title" [cdkTrapFocus]="!changing() && !cancelling() && !correcting()" [cdkTrapFocusAutoCapture]="true" (keydown.escape)="$event.stopPropagation(); closeDetail()">
+    <div class="module-form-sheet sale-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="sale-detail-title" [cdkTrapFocus]="!changing() && !cancelling() && !correcting() && !correctingPayments()" [cdkTrapFocusAutoCapture]="true" (keydown.escape)="$event.stopPropagation(); closeDetail()">
       <div class="module-form-sheet__backdrop" (click)="closeDetail()"></div>
       <section class="panel panel--padded module-form sales-history-detail">
         <div class="sale-detail__heading"><h2 id="sale-detail-title">Venta {{ d.visibleNumber }}</h2><p>{{ d.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }} · {{ label(d.state) }}{{ d.creditId ? ' · a crédito' : '' }}</p></div>
@@ -77,9 +77,11 @@
         <button class="button button--secondary" type="button" (click)="beginCorrection('exchange')">Cambiar un producto por otro</button>
         <a class="button button--secondary" routerLink="/operacion/ventas" [queryParams]="{ ventaOrigen: d.id, numeroOrigen: d.visibleNumber }">Olvidé cobrar un producto · venta adicional</a>
       }
+      @if (canCorrectPayments(d)) { <button class="button button--secondary" type="button" (click)="beginPaymentCorrection()">Corregir medio de pago (por ejemplo, pagaron por Nequi y quedó en efectivo)</button> }
       @if (canCancel(d)) { <button class="button button--secondary sale-cancel-action" type="button" (click)="startCancel()">Anular la venta completa</button> }
-    </div><p class="form-hint">Se conservan el documento original y sus correcciones. Cambiar el medio de pago requiere una corrección de pagos; quitar mercancía no sirve para reclasificar un pago.</p><div class="form-actions"><button class="button button--secondary" type="button" (click)="correcting.set(false)">Volver</button></div></section></div>
+    </div><p class="form-hint">Se conservan el documento original y sus correcciones. El medio de pago se corrige solo en ventas del turno abierto.</p><div class="form-actions"><button class="button button--secondary" type="button" (click)="correcting.set(false)">Volver</button></div></section></div>
   }
+  @if (correctingPayments() && detail(); as d) { <cp-sale-payment-correction [sale]="d" (corrected)="paymentsCorrected($event)" (closed)="correctingPayments.set(false)" /> }
   @if (changing() && detail(); as d) { <cp-sale-change [sale]="d" [mode]="correctionMode()" (changed)="changeDone($event)" (closed)="changing.set(false)" /> }
 
   @if (cancelling() && detail(); as d) {

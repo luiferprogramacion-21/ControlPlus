@@ -198,6 +198,16 @@ public sealed record CancelSaleRequest([property: JsonRequired] long ExpectedVer
     [property: JsonRequired] Guid ReasonId, string? Observation,
     SaleCreditAuthorizationRequest? Authorization = null);
 
+/// <summary>Correct payment methods of a confirmed cash sale of the open shift (same total, new methods).</summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CorrectSalePaymentsRequest([property: JsonRequired] long ExpectedVersion,
+    [property: JsonRequired] Guid ReasonId, string? Observation,
+    IReadOnlyCollection<SalePaymentRequest> Payments, SaleCreditAuthorizationRequest? Authorization = null);
+
+/// <summary>CashDifference: change in the cash expected in the drawer (negative when cash moved to Nequi or transfer).</summary>
+public sealed record CorrectSalePaymentsDto(Guid SaleId, string VisibleNumber, long Version, Guid CorrelationId,
+    IReadOnlyCollection<SalePaymentDto> Payments, decimal CashDifference);
+
 public sealed record SaleCancellationReasonDto(Guid Id, string Code, string Name, int DisplayOrder);
 
 public sealed record CancelSaleDto(Guid SaleId, string VisibleNumber, string State, long Version,
@@ -273,4 +283,6 @@ public interface ISalesService
         ActorContext actor, CancellationToken cancellationToken = default);
     Task<Result<CancelSaleDto>> CancelAsync(ActorContext actor, Guid saleId, string idempotencyKey,
         CancelSaleRequest request, CancellationToken cancellationToken = default);
+    Task<Result<CorrectSalePaymentsDto>> CorrectPaymentsAsync(ActorContext actor, Guid saleId, string idempotencyKey,
+        CorrectSalePaymentsRequest request, CancellationToken cancellationToken = default);
 }

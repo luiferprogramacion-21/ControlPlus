@@ -382,7 +382,7 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
 
     public Task<MovimientoCaja?> GetOriginalSaleCashMovementAsync(Guid saleId,
         CancellationToken cancellationToken = default) =>
-        dbContext.MovimientoCaja.AsNoTracking().SingleOrDefaultAsync(x => x.PagoVenta.Any(p => p.VentaId == saleId),
+        dbContext.MovimientoCaja.AsNoTracking().SingleOrDefaultAsync(x => x.PagoVenta.Any(p => p.VentaId == saleId && p.Estado == "APLICADO"),
             cancellationToken);
 
     public Task<bool> HasCashReversalAsync(Guid movementId, CancellationToken cancellationToken = default) =>
