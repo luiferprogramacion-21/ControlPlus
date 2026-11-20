@@ -24,7 +24,7 @@ using Xunit;
 
 namespace ControlPlus.Api.Tests;
 
-public sealed class PurchasesApiFlowTests : IAsyncLifetime
+public sealed partial class PurchasesApiFlowTests : IAsyncLifetime
 {
     private const string AdminName = "purchases.admin.test";
     private const string SupervisorName = "purchases.supervisor.test";

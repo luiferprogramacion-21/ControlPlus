@@ -35,4 +35,6 @@ public interface IPurchaseRepository
     Task<bool> HasReversalAsync(Guid movementId, CancellationToken ct = default);
     Task<Usuario?> GetUserForUpdateAsync(Guid id, CancellationToken ct = default);
     Task AddAuthorizationAsync(AutorizacionOperacion authorization, CancellationToken ct = default);
+    Task AddReceiptCorrectionAsync(CorreccionRecepcion correction, CancellationToken ct = default) =>
+        throw new NotSupportedException("Receipt correction persistence is not configured.");
 }

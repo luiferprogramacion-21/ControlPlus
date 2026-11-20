@@ -30,6 +30,7 @@ export class SaleChange implements OnInit {
   private readonly authorization = inject(AuthorizationDialog);
   private readonly session = inject(SessionService);
   readonly sale = input.required<SaleDetail>();
+  readonly mode = input<'remove' | 'exchange'>('exchange');
   readonly changed = output<ConfirmedChange>();
   readonly closed = output<void>();
   readonly prep = signal<ChangePreparation | null>(null);
@@ -43,6 +44,7 @@ export class SaleChange implements OnInit {
   readonly money = money;
   search = '';
   choice: ChangeTreatment | '' = '';
+  reason = 'Producto cobrado por error';
   drafts: PaymentDraft[] = [emptyDraft()];
   private pending: Pending | null = null;
 
@@ -128,11 +130,13 @@ export class SaleChange implements OnInit {
 
   validation(): string {
     const prep = this.prep(); if (!prep) return 'La venta no está lista para un cambio.';
-    if (!prep.canStartChange) return prep.withinDeadline ? 'Esta venta no admite cambios.' : `El plazo para cambios venció el ${prep.changeDeadline}.`;
+    if (!prep.canStartChange) return prep.blockedReason || (prep.withinDeadline ? 'Esta venta no admite cambios.' : `El plazo para cambios venció el ${prep.changeDeadline}.`);
     const returned = this.returning().filter(line => Number(line.quantity) > 0);
     if (!returned.length) return 'Indica al menos un producto devuelto.';
     for (const line of returned) if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) > line.remaining) return `La cantidad devuelta de ${line.name} debe ser un entero hasta ${groupedNumber(line.remaining)}.`;
-    if (!this.delivering().length) return 'Agrega al menos un producto entregado.';
+    if (returned.some(line => !line.resellable)) return 'Solo se puede reponer mercancía en buen estado. Pide al Administrador revisar un producto dañado.';
+    if (this.mode() === 'remove' && !this.reason.trim()) return 'Selecciona el motivo de la corrección.';
+    if (this.mode() === 'exchange' && !this.delivering().length) return 'Agrega al menos un producto entregado o elige Quitar producto.';
     for (const line of this.delivering()) {
       if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) < 1) return `La cantidad de ${line.product.name} debe ser un entero mayor que cero.`;
       if (Number(line.quantity) > this.reachable(line.product)) return `No hay existencias suficientes de ${line.product.name}.`;
@@ -155,6 +159,7 @@ export class SaleChange implements OnInit {
       returned: this.returning().filter(l => Number(l.quantity) > 0).map(l => ({ saleLineId: l.saleLineId, quantity: Number(l.quantity), resellable: l.resellable })),
       delivered: this.delivering().map(l => ({ productId: l.product.id, quantity: Number(l.quantity), priceType: l.priceType })),
       treatment: s.treatment, payments,
+      ...(this.mode() === 'remove' ? { reason: this.reason.trim() } : {}),
     };
   }
 
@@ -164,8 +169,8 @@ export class SaleChange implements OnInit {
     this.error.set('');
     const prep = this.prep()!; const s = this.settlement;
     await this.authorization.open({
-      title: 'Autorizar cambio de productos',
-      description: 'Los productos devueltos vuelven al inventario, los entregados salen y la diferencia se liquida. La venta original no cambia. Esta acción no se puede deshacer.',
+      title: this.mode() === 'remove' ? 'Confirmar corrección de la venta' : 'Autorizar cambio de productos',
+      description: this.mode() === 'remove' ? 'Las unidades seleccionadas vuelven al inventario y se devuelve el cobro o se reduce la deuda. Se conserva la venta original y se registra esta corrección con su propio número.' : 'Los productos devueltos vuelven al inventario, los entregados salen y la diferencia se liquida. La venta original no cambia. Esta acción no se puede deshacer.',
       detail: `${prep.visibleNumber} · devuelto ${money(this.totalReturned)} · entregado ${money(this.totalDelivered)} · diferencia ${money(this.difference)}${s.creditAdjustment ? ` · crédito ${money(s.creditAdjustment)}` : ''}`,
       operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
       onError: message => this.error.set(message),

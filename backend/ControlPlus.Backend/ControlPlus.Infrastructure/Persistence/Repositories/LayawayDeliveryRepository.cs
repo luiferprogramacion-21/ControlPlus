@@ -19,6 +19,6 @@ public sealed class EfLayawayDeliveryRepository(OfficialControlPlusDbContext dbC
     // Lines are historical snapshots; read them only after locking their header.
     public async Task<IReadOnlyCollection<DetalleApartado>> GetLinesAsync(
         Guid id, CancellationToken cancellationToken = default) =>
-        await dbContext.DetalleApartado.AsNoTracking().Where(x => x.ApartadoId == id)
+        await dbContext.DetalleApartado.AsNoTracking().Where(x => x.ApartadoId == id && x.Vigente)
             .OrderBy(x => x.ProductoId).ThenBy(x => x.Id).ToArrayAsync(cancellationToken);
 }

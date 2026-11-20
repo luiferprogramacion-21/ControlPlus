@@ -63,6 +63,7 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<ILayawayPaymentRepository, EfLayawayPaymentRepository>();
         services.AddScoped<ILayawayDeliveryRepository, EfLayawayDeliveryRepository>();
         services.AddScoped<ILayawayCancellationRepository, EfLayawayCancellationRepository>();
+        services.AddScoped<ILayawayPaymentCorrectionRepository, EfLayawayPaymentCorrectionRepository>();
         services.AddScoped<IPurchaseRepository, EfPurchaseRepository>();
         services.AddScoped<IPurchaseOrderRepository, EfPurchaseOrderRepository>();
         services.AddSingleton<ICredentialTokenGenerator, Code128CredentialTokenGenerator>();

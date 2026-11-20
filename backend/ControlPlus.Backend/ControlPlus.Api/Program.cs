@@ -200,6 +200,10 @@ builder.Services.AddScoped<ILayawaySettingsService, LayawaySettingsService>();
 builder.Services.AddScoped<ILayawayPaymentService, LayawayPaymentService>();
 builder.Services.AddScoped<ILayawayDeliveryService, LayawayDeliveryService>();
 builder.Services.AddScoped<ILayawayCancellationService, LayawayCancellationService>();
+// Correcciones operativas (decisión del 19 de noviembre de 2026): anular un abono y corregir productos de un apartado.
+builder.Services.AddScoped<LayawayPaymentCancellationService>();
+builder.Services.AddScoped<ILayawayPaymentCancellationService>(provider => provider.GetRequiredService<LayawayPaymentCancellationService>());
+builder.Services.AddScoped<ILayawayProductCorrectionService>(provider => provider.GetRequiredService<LayawayPaymentCancellationService>());
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<ICurrentUserSessionValidator, CurrentUserSessionValidator>();

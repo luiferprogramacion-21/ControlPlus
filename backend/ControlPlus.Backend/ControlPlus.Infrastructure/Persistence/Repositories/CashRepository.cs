@@ -48,7 +48,7 @@ public sealed class Code128CredentialTokenGenerator : ICredentialTokenGenerator
             .ToString().PadLeft(Digits, '0');
 }
 
-public sealed class EfCashRepository(OfficialControlPlusDbContext dbContext) : ICashRepository
+public sealed partial class EfCashRepository(OfficialControlPlusDbContext dbContext) : ICashRepository
 {
     public async Task<Instalacion?> GetActiveInstallationForUpdateAsync(
         CancellationToken cancellationToken = default)

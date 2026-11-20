@@ -1,5 +1,6 @@
 <section class="prototype-operation cash-page">
   <div class="module-heading"><div><h2>{{ closingMode() ? 'Cerrar caja' : 'Caja' }}</h2><p>{{ closingMode() ? 'Cuenta el efectivo y cierra el turno' : state()?.currentShift ? (state()?.requiresPreviousShiftClosure ? 'Turno anterior pendiente de cierre' : 'Turno abierto') : 'Apertura de turno' }}</p></div><div class="cash-heading-actions">@if (state()?.hasOpenShift && session.has('CASH.SHIFT_MANAGE')) { <button class="button button--secondary" type="button" (click)="closeStep.set(1); closingMode.set(!closingMode())">{{ closingMode() ? 'Volver al turno' : 'Cerrar caja' }}</button> }<button class="button button--secondary" type="button" (click)="refresh()" [disabled]="loading() || busy()">Actualizar</button></div></div>
+  <cp-cash-corrections [state]="state()" [movements]="movements()" (corrected)="refresh()" />
   @if (loading()) { <p class="field-hint" role="status">Cargando información de caja…</p> }
   @if (state(); as cash) {
     @if (!cash.isConfigured) {

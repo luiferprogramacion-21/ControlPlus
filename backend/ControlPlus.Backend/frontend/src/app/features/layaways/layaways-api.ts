@@ -50,10 +50,22 @@ export interface CreatedLayaway extends CashDrawerDispatch {
   change: number; state: string; version: number; lines: CreatedLayawayLine[]; payments: unknown[];
 }
 export interface RefundInput { methodCode: LayawayPaymentInput['methodCode']; amount: number; reference: string | null; }
+/** Corrección de productos de un apartado sin entregar: las líneas finales; 0 o ausente quita el producto. */
+export interface LayawayProductCorrectionInput {
+  expectedVersion: number; reason: string; lines: { productId: string; quantity: number }[]; refunds: RefundInput[];
+  authorization?: LayawayAuthorization;
+}
+export interface LayawayProductCorrection {
+  id: string; layawayId: string; version: number; previousTotal: number; total: number; previousBalance: number;
+  balance: number; refunded: number; reason: string; occurredAtUtc: string; correlationId: string;
+}
 export interface CancelLayawayInput {
   expectedVersion: number; refundAmount: number; refunds: RefundInput[]; reasonId: string | null; observation: string | null; authorization?: LayawayAuthorization;
 }
 export interface LayawayPaymentResult extends CashDrawerDispatch { layawayId: string; balance: number; state: string; version: number; correlationId: string; change: number; payments: unknown[]; }
+export interface LayawayPaymentCancellationReason { id: string; code: string; name: string; displayOrder: number; }
+export interface CancelLayawayPaymentInput { expectedVersion: number; reasonId: string; observation: string | null; authorization?: LayawayAuthorization; }
+export interface CancelLayawayPaymentResult { layawayId: string; balance: number; state: string; version: number; reversedAmount: number; correlationId: string; cancelledPaymentIds: string[]; }
 
 @Injectable({ providedIn: 'root' })
 export class LayawaysApi {
@@ -65,6 +77,18 @@ export class LayawaysApi {
     return firstValueFrom(this.http.get<Page<Layaway>>('/api/layaways', { params }));
   }
   get(id: string): Promise<LayawayDetail> { return firstValueFrom(this.http.get<LayawayDetail>(`/api/layaways/${id}`)); }
+  paymentCancellationReasons(): Promise<LayawayPaymentCancellationReason[]> {
+    return firstValueFrom(this.http.get<LayawayPaymentCancellationReason[]>('/api/layaways/payment-cancellation-reasons'));
+  }
+  /** Corrige los productos de un apartado sin entregar (decisión del 19 de noviembre de 2026). */
+  correctProducts(layaway: Layaway, input: LayawayProductCorrectionInput, key: string): Promise<LayawayProductCorrection> {
+    return firstValueFrom(this.http.post<LayawayProductCorrection>(`/api/layaways/${layaway.id}/product-corrections`, input,
+      { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
+  }
+  cancelPayment(layaway: Layaway, paymentId: string, input: CancelLayawayPaymentInput, key: string): Promise<CancelLayawayPaymentResult> {
+    return firstValueFrom(this.http.post<CancelLayawayPaymentResult>(`/api/layaways/${layaway.id}/payments/${paymentId}/cancel`, input,
+      { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
+  }
   async applyPayment(layaway: Layaway, payments: LayawayPaymentInput[], key: string): Promise<LayawayPaymentResult> {
     const response = await firstValueFrom(this.http.post<LayawayPaymentResult>(`/api/layaways/${layaway.id}/payments`,
       { expectedVersion: layaway.version, payments },

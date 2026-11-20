@@ -2,7 +2,7 @@
   <div class="module-heading"><div class="module-heading__title"><span class="module-heading__icon"><cp-icon name="catalog" /></span><div><h2>Historial de ventas</h2><p>{{ listsAll ? 'Todas las ventas' : 'Tus ventas' }}</p></div></div><a class="button button--secondary" routerLink="/operacion/ventas">Volver a Ventas</a></div>
   @if (error()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="reload()">Actualizar</button></div> }
   <section class="panel module-panel">
-    <div class="module-toolbar"><div><h3>Ventas registradas</h3><p class="muted">Consulta una venta para ver su detalle{{ session.has('SALES.VOID') ? ' o anularla' : '' }}.</p></div><div class="history-toolbar-actions">@if (session.has('SALES.CREATE')) { <button class="button button--primary" type="button" (click)="startChangeSearch()">Cambio de productos</button> }<button class="table-action" type="button" (click)="reload()">Actualizar</button></div></div>
+    <div class="module-toolbar"><div><h3>Ventas registradas</h3><p class="muted">Abre la venta para consultar su detalle o corregir un error.</p></div><div class="history-toolbar-actions">@if (session.has('SALES.CREATE')) { <button class="button button--primary" type="button" (click)="startChangeSearch()">Corregir venta</button> }<button class="table-action" type="button" (click)="reload()">Actualizar</button></div></div>
     @if (loading()) { <p class="muted" role="status">Cargando ventas…</p> }
     <div class="table-wrap module-table-wrap"><table><thead><tr><th>Venta</th><th>Fecha</th><th>Pago</th><th class="align-right">Total</th><th>Estado</th><th class="align-right">Acciones</th></tr></thead><tbody>
       @for (sale of result()?.items ?? []; track sale.id) {
@@ -18,16 +18,30 @@
   </section>
 
   @if (detail(); as d) {
-    <div class="module-form-sheet sale-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="sale-detail-title" [cdkTrapFocus]="!changing() && !cancelling()" [cdkTrapFocusAutoCapture]="true" (keydown.escape)="$event.stopPropagation(); closeDetail()">
+    <div class="module-form-sheet sale-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="sale-detail-title" [cdkTrapFocus]="!changing() && !cancelling() && !correcting() && !correctingPayments()" [cdkTrapFocusAutoCapture]="true" (keydown.escape)="$event.stopPropagation(); closeDetail()">
       <div class="module-form-sheet__backdrop" (click)="closeDetail()"></div>
       <section class="panel panel--padded module-form sales-history-detail">
         <div class="sale-detail__heading"><h2 id="sale-detail-title">Venta {{ d.visibleNumber }}</h2><p>{{ d.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }} · {{ label(d.state) }}{{ d.creditId ? ' · a crédito' : '' }}</p></div>
         <div class="sale-summary">
           <div><span>Subtotal</span><strong>{{ d.grossSubtotal | currency:'COP':'symbol':'1.0-0' }}</strong></div>
           <div><span>Descuento</span><strong>{{ d.discountTotal | currency:'COP':'symbol':'1.0-0' }}</strong></div>
-          <div><span>Total</span><strong>{{ d.total | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+          <div><span>Total original</span><strong>{{ d.total | currency:'COP':'symbol':'1.0-0' }}</strong></div>
           <div><span>Cambio entregado</span><strong>{{ d.change | currency:'COP':'symbol':'1.0-0' }}</strong></div>
         </div>
+        <h3>Correcciones de esta venta</h3>
+        @if (changesLoading()) { <p class="muted" role="status">Consultando correcciones…</p> }
+        @if (changesError()) { <p class="field-error">{{ changesError() }} <button class="link-button" type="button" (click)="loadChanges(d.id)">Reintentar</button></p> }
+        <div class="sale-detail-list">
+          @for (change of changes(); track change.id) {
+            <div class="sale-correction-entry"><div class="sale-detail-row"><div class="sale-detail-row__description"><strong>{{ change.visibleNumber }}</strong><span>{{ change.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }} · {{ change.state === 'CONFIRMADO' ? (change.totalDelivered === 0 ? 'Productos retirados' : 'Cambio de productos') : 'Anulada' }}</span></div><strong>{{ change.difference | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+              @if (change.reason) { <p>Motivo: {{ change.reason }}</p> }
+              @for (line of change.details ?? []; track line.id) { <p>{{ line.type === 'DEVUELTO' ? 'Se quitó' : 'Se entregó' }} {{ line.quantity | number:'1.0-0' }} × {{ line.productName || line.productCode || 'Producto' }} · {{ line.netAmount | currency:'COP':'symbol':'1.0-0' }}</p> }
+              @if (change.creditAdjustment) { <p>{{ change.difference < 0 ? 'Deuda reducida' : 'Deuda aumentada' }}: {{ change.creditAdjustment | currency:'COP':'symbol':'1.0-0' }}</p> }
+              @if (session.has('SALES.REPRINT') && change.state === 'CONFIRMADO') { <button class="table-action" type="button" [disabled]="!!printingCorrection()" (click)="printCorrection(change)">Comprobante de corrección</button> }
+            </div>
+          } @empty { @if (!changesLoading() && !changesError()) { <p class="sale-detail-empty">Sin correcciones registradas.</p> } }
+        </div>
+        @if (!changesLoading() && !changesError() && changes().length) { <div class="sale-summary correction-summary"><div><span>Correcciones confirmadas</span><strong>{{ correctionTotal | currency:'COP':'symbol':'1.0-0' }}</strong></div><div><span>Total después de correcciones</span><strong>{{ (d.total + correctionTotal) | currency:'COP':'symbol':'1.0-0' }}</strong></div></div><p class="form-hint">Este es el valor comercial resultante, no el saldo del crédito. El ticket original se conserva.</p> }
         @if (printMessage() || printStatus()) { <p class="muted" role="status">{{ printMessage() || ('Último ticket: ' + printStatus()) }}</p> }
         <h3>Productos</h3>
         <div class="sale-detail-list">
@@ -49,15 +63,26 @@
         </div>
         <div class="sale-detail-actions">
           @if (canReprint(d)) { <button class="button button--secondary" type="button" [disabled]="reprinting() || saving()" (click)="reprint()">{{ printStatus() === 'ERROR' ? 'Reintentar ticket' : 'Reimprimir ticket' }}</button> }
-          @if (canChange(d)) { <button class="button button--secondary" type="button" [disabled]="saving()" (click)="changing.set(true)">Cambio de productos</button> }
-          @if (canCancel(d)) { <button class="button button--secondary sale-cancel-action" type="button" [disabled]="saving()" (click)="startCancel()">Anular venta</button> }
+          @if (canChange(d) || canCancel(d)) { <button class="button button--secondary" type="button" [disabled]="saving()" (click)="correcting.set(true)">Corregir venta</button> }
           <button class="button button--primary sale-detail-close" type="button" autofocus (click)="closeDetail()">Cerrar</button>
         </div>
       </section>
     </div>
   }
 
-  @if (changing() && detail(); as d) { <cp-sale-change [sale]="d" (changed)="changeDone($event)" (closed)="changing.set(false)" /> }
+  @if (correcting() && detail(); as d) {
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="correct-sale-title"><div class="module-form-sheet__backdrop" (click)="correcting.set(false)"></div><section class="panel panel--padded module-form"><div class="panel-heading"><h2 id="correct-sale-title">Corregir venta {{ d.visibleNumber }}</h2><p>¿Qué pasó? Elige una opción y revisa el resultado antes de confirmar.</p></div><div class="sale-correction-options">
+      @if (canChange(d)) {
+        <button class="button button--secondary" type="button" (click)="beginCorrection('remove')">Quitar producto o reducir cantidad</button>
+        <button class="button button--secondary" type="button" (click)="beginCorrection('exchange')">Cambiar un producto por otro</button>
+        <a class="button button--secondary" routerLink="/operacion/ventas" [queryParams]="{ ventaOrigen: d.id, numeroOrigen: d.visibleNumber }">Olvidé cobrar un producto · venta adicional</a>
+      }
+      @if (canCorrectPayments(d)) { <button class="button button--secondary" type="button" (click)="beginPaymentCorrection()">Corregir medio de pago (por ejemplo, pagaron por Nequi y quedó en efectivo)</button> }
+      @if (canCancel(d)) { <button class="button button--secondary sale-cancel-action" type="button" (click)="startCancel()">Anular la venta completa</button> }
+    </div><p class="form-hint">Se conservan el documento original y sus correcciones. El medio de pago se corrige solo en ventas del turno abierto.</p><div class="form-actions"><button class="button button--secondary" type="button" (click)="correcting.set(false)">Volver</button></div></section></div>
+  }
+  @if (correctingPayments() && detail(); as d) { <cp-sale-payment-correction [sale]="d" (corrected)="paymentsCorrected($event)" (closed)="correctingPayments.set(false)" /> }
+  @if (changing() && detail(); as d) { <cp-sale-change [sale]="d" [mode]="correctionMode()" (changed)="changeDone($event)" (closed)="changing.set(false)" /> }
 
   @if (cancelling() && detail(); as d) {
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="sale-cancel-title"><div class="module-form-sheet__backdrop" (click)="cancelling.set(false)"></div>
@@ -76,7 +101,7 @@
   @if (findingChange()) {
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="find-change-title"><div class="module-form-sheet__backdrop" (click)="findingBusy() || findingChange.set(false)"></div>
       <form class="panel panel--padded module-form" (submit)="$event.preventDefault(); findChangeSale()">
-        <div class="panel-heading"><h2 id="find-change-title">Cambio de productos</h2><p>Escribe el número de la venta que aparece en el ticket.</p></div>
+        <div class="panel-heading"><h2 id="find-change-title">Corregir una venta</h2><p>Escribe el número de la venta que aparece en el ticket.</p></div>
         <label class="field-label" for="find-change-number">Número de la venta</label>
         <input id="find-change-number" class="text-field" name="changeNumber" [(ngModel)]="changeNumber" placeholder="Número que aparece en el ticket" autocomplete="off" autofocus [disabled]="findingBusy()">
         <p class="field-hint">El cliente puede cambiar productos dentro del plazo de cambios configurado.</p>

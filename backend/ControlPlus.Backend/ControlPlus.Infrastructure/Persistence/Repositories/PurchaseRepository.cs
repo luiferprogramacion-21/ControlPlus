@@ -145,6 +145,9 @@ public sealed class EfPurchaseRepository(OfficialControlPlusDbContext db) : IPur
     public Task AddAuthorizationAsync(AutorizacionOperacion authorization, CancellationToken ct = default) =>
         db.AutorizacionOperacion.AddAsync(authorization, ct).AsTask();
 
+    public Task AddReceiptCorrectionAsync(CorreccionRecepcion correction, CancellationToken ct = default) =>
+        db.Set<CorreccionRecepcion>().AddAsync(correction, ct).AsTask();
+
     private sealed class Transaction(IDbContextTransaction transaction) : IPurchaseTransaction
     {
         public Task CommitAsync(CancellationToken ct = default) => transaction.CommitAsync(ct);

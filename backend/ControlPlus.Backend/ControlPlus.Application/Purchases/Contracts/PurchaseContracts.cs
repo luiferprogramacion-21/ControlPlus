@@ -69,7 +69,12 @@ public sealed record CancelPurchaseRequest(
     [property: JsonRequired] long ExpectedVersion,
     [property: JsonRequired] Guid ReasonId,
     string? Observation,
-    CancelPurchaseAuthorizationRequest? Authorization = null);
+    CancelPurchaseAuthorizationRequest? Authorization = null,
+    long? ExpectedOrderVersion = null);
+
+public sealed record PurchaseCorrectionPreparationDto(Guid PurchaseId, long PurchaseVersion,
+    Guid? OrderId, long? OrderVersion, bool CanReverse, string? BlockReason,
+    int UnitsToRemove, decimal OriginalTotal);
 
 public sealed record PurchaseCancellationReasonDto(Guid Id, string Code, string Name, string? Description, int DisplayOrder);
 
@@ -88,6 +93,7 @@ public sealed record PurchaseSummaryDto(Guid Id, Guid SupplierId, string? Suppli
 
 public interface IPurchaseService
 {
+    Task<Result<PurchaseCorrectionPreparationDto>> PrepareCorrectionAsync(ActorContext actor, Guid id, CancellationToken ct = default);
     Task<Result<PagedResult<PurchaseSummaryDto>>> ListAsync(ActorContext actor, PurchaseListQuery query, CancellationToken ct = default);
     Task<Result<PurchaseDto>> GetAsync(ActorContext actor, Guid id, CancellationToken ct = default);
     Task<Result<PurchaseDto>> CreateAsync(ActorContext actor, CreatePurchaseRequest request, CancellationToken ct = default);

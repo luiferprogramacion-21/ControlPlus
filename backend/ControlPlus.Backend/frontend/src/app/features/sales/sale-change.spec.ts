@@ -22,10 +22,11 @@ describe('SaleChange: cambio de productos', () => {
   const dialog = { open: vi.fn(async (p: AuthorizationPrompt) => { prompt = p; dialogError = undefined; try { await p.run(roles.current.includes('ADMINISTRADOR') ? null : { userName: 'jefe', password: 'secreto' }); return true; } catch (e) { dialogError = e; return false; } }) };
   let changed: unknown[];
 
-  async function open(p = prep()) {
+  async function open(p = prep(), mode: 'remove' | 'exchange' = 'exchange') {
     api.changePreparation.mockResolvedValue(p);
     const fixture = TestBed.createComponent(SaleChange);
     fixture.componentRef.setInput('sale', sale);
+    fixture.componentRef.setInput('mode', mode);
     changed = []; fixture.componentInstance.changed.subscribe(x => changed.push(x));
     fixture.detectChanges(); await fixture.whenStable();
     return fixture.componentInstance;
@@ -58,6 +59,39 @@ describe('SaleChange: cambio de productos', () => {
     const c = await open();
     expect(c.validation()).toContain('devuelto');
     c.returning()[0].quantity = 1; expect(c.validation()).toContain('entregado');
+  });
+
+  it('quita solo una parte del producto sin reemplazo y devuelve el cobro con motivo y versión', async () => {
+    const c = await open(prep(), 'remove');
+    c.returning()[0].quantity = 1; c.drafts[0].appliedAmount = 10000;
+    expect(c.validation()).toBe('');
+    await c.confirm();
+    expect(api.confirmChange.mock.calls[0][1]).toMatchObject({ expectedSaleVersion: 4,
+      returned: [{ saleLineId: 'l1', quantity: 1, resellable: true }], delivered: [], reason: 'Producto cobrado por error',
+      treatment: 'AUTO', payments: [{ methodCode: 'EFECTIVO', amount: 10000, receivedAmount: null, reference: null }] });
+    expect(prompt?.title).toBe('Confirmar corrección de la venta');
+  });
+
+  it('reduce la deuda abierta y devuelve únicamente el excedente sin simular un pago', async () => {
+    const c = await open(prep({ saleType: 'CREDITO', creditId: 'c1', creditVersion: 7, creditBalance: 20000 }), 'remove');
+    c.returning()[0].quantity = 1;
+    expect(c.creditResult).toBe(10000); expect(c.validation()).toBe('');
+    await c.confirm();
+    expect(api.confirmChange.mock.calls[0][1]).toMatchObject({ delivered: [], expectedCreditVersion: 7, payments: [] });
+    c.returning()[0].quantity = 3; c.drafts[0].appliedAmount = 10000;
+    expect(c.creditResult).toBe(0); expect(c.validation()).toBe('');
+    expect(c.settlement).toMatchObject({ creditAdjustment: -20000, cashAmount: 10000, mode: 'refund' });
+  });
+
+  it('explica crédito cerrado y mercancía no revendible; no confirma una corrección vacía o sin motivo', async () => {
+    const c = await open(prep(), 'remove');
+    expect(c.validation()).toContain('devuelto');
+    c.returning()[0].quantity = 1; c.returning()[0].resellable = false;
+    expect(c.validation()).toContain('buen estado');
+    c.returning()[0].resellable = true; c.reason = '';
+    expect(c.validation()).toContain('motivo');
+    const closed = await open(prep({ canStartChange: false, blockedReason: 'El crédito ya está pagado; pide revisión.' }), 'remove');
+    expect(closed.validation()).toContain('ya está pagado');
   });
 
   it('calcula el valor devuelto, el entregado y la diferencia', async () => {

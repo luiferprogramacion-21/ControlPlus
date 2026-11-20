@@ -693,6 +693,10 @@ El usuario pidió poder dejar ventas en espera y aprobó hacerlo antes de la ins
   - Sin `draftId` (contrato anterior), se cierra el más reciente solo si tiene los mismos productos y cantidades.
 - **API nueva:** `GET/POST /api/sales/drafts` y `GET/PUT/DELETE /api/sales/drafts/{id}`. Se conservan las rutas `/current`.
 
+### Decisión del 19 de noviembre de 2026: correcciones de operaciones
+
+El usuario aprobó implementar las correcciones operativas propuestas en `docs/operational-corrections.md`: «Corregir un error» con opciones válidas, motivo, resumen antes/después y autorización vigente. Incluye quitar/reducir productos de ventas confirmadas sin reemplazo, historial/comprobante de correcciones, abonos y productos de apartados antes de entrega, movimientos manuales de caja, ajustes de inventario, revisión de cierres, recepciones reversibles, ventas adicionales vinculadas y corrección de medios de pago. Los documentos originales se conservan; los efectos se registran como correcciones vinculadas, en el turno actual cuando hay dinero. El plazo y la jerarquía de autorizaciones existentes se conservan. La aprobación incluye preparar migraciones compensatorias y ensayarlas en bases temporales; la activación real corresponde al operador con respaldo y preflight/postflight. No accede el agente a `controlplus`.
+
 ### Decisión del 19 de noviembre de 2026: contraseñas de 4 números
 
 El usuario pidió contraseñas de 4 números **para todos los roles, incluido el Administrador**, y que quien tenga una contraseña anterior **deba cambiarla al entrar**.
@@ -755,3 +759,23 @@ El usuario pidió diez ajustes. Claude hizo estos seis; Codex hace la política 
   - `statusKind` reconoce «No se sabe» como aviso de error.
   - **Regla:** todo texto nuevo en pantalla va en palabras de tienda.
 - **Correo tapado en la recuperación (20 de noviembre de 2026):** al enviar el código, la respuesta dice a qué correo llegó, por ejemplo `lu•••21@gm•••.com` (`PasswordRecoveryService.MaskEmail`).
+
+### Corrección del medio de pago (20 de noviembre de 2026)
+
+Cierra la entrega 5 de las correcciones operativas: «corregir los medios de pago mediante una operación trazable que conserve la venta y el total cobrado». **No necesita migración.**
+
+- **API:** `POST /api/sales/{id}/payment-correction` (permiso `SALES.VOID`, `Idempotency-Key`). Los motivos son los de anulación de venta; cada uno se enlaza con su par de `ANULACION_PAGO`.
+- **Autorización:** el Administrador se autoriza a sí mismo; un Supervisor necesita la de un Administrador.
+- **Alcance:** solo ventas de contado confirmadas **del turno abierto**. La base exige que el actor de un pago nuevo sea válido para el turno de la venta, y además un turno cerrado no se reescribe; para eso está «Revisar cierre».
+- **Cómo funciona:**
+  - los pagos vigentes pasan a `ANULADO`, con motivo y autorización;
+  - su movimiento de caja se revierte (`REVERSO_PAGO`);
+  - un movimiento `INGRESO`/`VENTA` nuevo lleva los pagos correctos;
+  - es el mismo modelo de reverso que ya entienden el arqueo y el flujo de caja, así que el efectivo esperado por medio queda cuadrado;
+  - si el efectivo pasa a Nequi o transferencia, la caja debe tener ese efectivo esperado.
+- **Ajustes por la corrección:** una venta puede tener ahora pagos anulados. La anulación de venta, el detalle (`SaleDto`) y la búsqueda del movimiento de caja usan solo los pagos `APLICADO`.
+- **Límite:** la reimpresión del ticket sigue mostrando el pago original, porque el ticket es una copia fija del momento de la venta. La corrección queda en la auditoría y en el aviso.
+- **Auditoría:** `SalePaymentsCorrected` (139) y `SalePaymentCorrectionAuthorizationRejected` (140).
+- **Pantalla:** Historial de ventas → Corregir venta → «Corregir medio de pago» (`sale-payment-correction.ts`).
+- **Prueba:** `SalePaymentCorrectionApiTests`. Pasa de efectivo a Nequi, repite la solicitud y anula después; la caja vuelve a 0.
+- **Activación de correcciones operativas (20 de noviembre de 2026):** `scripts/operational-corrections/Invoke-Activation.ps1 -UsePostgresCredential` aplica las cinco migraciones (historial 30 → 35). Detalle en `docs/operational-corrections.md`; `OperationalCorrectionsActivationTests` valida el preflight y el postflight. Codex integró la pantalla «Corregir recepción» y las pruebas de apartados, inventario y compras (`030df83`).

@@ -9,7 +9,7 @@ import { Icon } from '../../layout/icon';
 import { CatalogApi, Product } from '../catalog/catalog-api';
 import { Supplier, SuppliersApi } from '../suppliers/suppliers-api';
 import { Order, OrderReason, OrderSummary, OrdersApi, ReceiptLine } from './orders-api';
-import { CancellationReason, Purchase, PurchaseInput, PurchaseLineInput, PurchaseSummary, PurchasesApi } from './purchases-api';
+import { CancellationReason, Purchase, PurchaseCorrectionPreparation, PurchaseInput, PurchaseLineInput, PurchaseSummary, PurchasesApi } from './purchases-api';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody } from '../../shared/authorization-dialog';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PurchaseOrderDocumentPrinter } from './purchase-order-document';
@@ -31,7 +31,7 @@ export class Purchases implements OnInit {
   private readonly orderDocument = inject(PurchaseOrderDocumentPrinter);
   private readonly route = inject(ActivatedRoute, { optional: true });
   readonly session = inject(SessionService); readonly purchases = signal<Page<PurchaseSummary> | null>(null); readonly orders = signal<Page<OrderSummary> | null>(null); readonly selectedPurchase = signal<Purchase | null>(null); readonly selectedOrder = signal<Order | null>(null); readonly suppliers = signal<Supplier[]>([]); readonly products = signal<Product[]>([]); readonly reasons = signal<CancellationReason[]>([]);
-  readonly loading = signal(false); readonly saving = signal(false); readonly error = toastSignal('error'); readonly notice = toastSignal('success'); readonly editing = signal(false); readonly receiving = signal(false); readonly cancelling = signal(false);
+  readonly loading = signal(false); readonly saving = signal(false); readonly error = toastSignal('error'); readonly notice = toastSignal('success'); readonly editing = signal(false); readonly receiving = signal(false); readonly cancelling = signal(false); readonly correctingReceipt = signal(false); readonly correctionPreparation = signal<PurchaseCorrectionPreparation | null>(null);
   readonly choosingReceipt = signal(false);
   readonly printingOrder = signal(false);
   readonly editingOrder = signal(false);
@@ -50,9 +50,10 @@ export class Purchases implements OnInit {
   orderSearch = ''; receiptOrderId = '';
   tab: 'purchases' | 'orders' = 'orders'; supplierId = ''; status = ''; invoiceDate = ''; supplierDocumentNumber = ''; page = 1; pageSize = 20;
   form: PurchaseInput = this.empty(); receipt: { supplierDocumentNumber: string | null; invoiceDate: string; vatMode: string; lines: ReceiptLine[] } = { supplierDocumentNumber: null, invoiceDate: currentColombiaDate(), vatMode: 'NO_DISCRIMINADO', lines: [] };
-  cancelReasonId = ''; cancelObservation = '';
+  cancelReasonId = ''; cancelObservation = ''; correctionReasonId = ''; correctionObservation = '';
   private requestId = 0;
   private pendingCancellation: { body: string; key: string } | null = null;
+  private pendingCorrection: { body: string; key: string } | null = null;
   private pendingReceipt: { body: string; key: string } | null = null;
   get canOrders(): boolean { return this.session.has('PURCHASE_ORDERS.MANAGE'); }
   get canWriteOrders(): boolean { return this.canOrders && this.session.has('SUPPLIERS.READ') && this.session.has('PRODUCTS.READ') && this.session.has('INVENTORY.READ') && this.session.hasRole('SUPERVISOR', 'ADMINISTRADOR'); }
@@ -66,6 +67,7 @@ export class Purchases implements OnInit {
   get canStartOrderClose(): boolean { const order = this.selectedOrder(); return this.canCloseOrder && !!order && (order.status === 'ENVIADO' || order.status === 'RECIBIDO_PARCIAL') && this.orderPendingTotal > 0; }
   get orderReasonIsOther(): boolean { return this.orderReasons().find(reason => reason.id === this.orderReasonId)?.code === 'OTRO'; }
   get canCancel(): boolean { return this.session.has('PURCHASES.CANCEL') && this.session.hasRole('ADMINISTRADOR'); }
+  get correctionReasonIsOther(): boolean { return this.reasons().find(reason => reason.id === this.correctionReasonId)?.code === 'OTRO'; }
   ngOnInit(): void {
     const configuredView = this.route?.snapshot.data['purchaseView'];
     this.view = configuredView === 'receipts' ? 'receipts' : this.canOrders ? 'orders' : 'purchases';
@@ -177,4 +179,40 @@ export class Purchases implements OnInit {
   async startCancel(): Promise<void> { if (!this.canCancel) return; this.error.set(''); try { this.reasons.set(await this.api.reasons()); this.cancelling.set(true); } catch (e) { this.error.set(errorText(e)); } }
   async cancelPurchase(): Promise<void> { const p = this.selectedPurchase(); if (!p || !this.canCancel || this.saving() || !this.cancelReasonId) { this.error.set('Selecciona un motivo de anulación.'); return; } if (this.reasons().find(r => r.id === this.cancelReasonId)?.code === 'OTRO' && !this.cancelObservation.trim()) { this.error.set('Describe el motivo de la anulación.'); return; } await this.authorization.open({ title: 'Autorizar anulación de compra', description: 'Se anulará completamente la compra confirmada y se revertirá su inventario cuando el contrato lo permita.', detail: `Compra ${p.visibleNumber} · versión ${p.version}`, operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: false, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'], onError: message => this.error.set(message), run: credentials => this.executeCancelPurchase(p, credentials) }); }
   private async executeCancelPurchase(p: Purchase, credentials: AuthorizationCredentials | null): Promise<void> { if (this.saving()) throw new Error('La anulación ya está en curso.'); const body = JSON.stringify({ id: p.id, version: p.version, reasonId: this.cancelReasonId, observation: this.cancelObservation.trim() || null }); if (this.pendingCancellation?.body !== body) this.pendingCancellation = { body, key: crypto.randomUUID() }; this.saving.set(true); this.error.set(''); try { this.selectedPurchase.set(credentials?.credentialToken ? await this.api.cancel(p, this.pendingCancellation.key, this.cancelReasonId, this.cancelObservation.trim() || null, null, null, credentials.credentialToken) : await this.api.cancel(p, this.pendingCancellation.key, this.cancelReasonId, this.cancelObservation.trim() || null, credentials?.userName ?? null, credentials?.password ?? null)); this.pendingCancellation = null; this.cancelling.set(false); this.notice.set('Compra anulada.'); await this.reload(); } catch (e) { if (this.isConflict(e)) this.pendingCancellation = null; this.error.set(errorText(e)); throw e; } finally { this.saving.set(false); } }
+  async startReceiptCorrection(): Promise<void> {
+    const purchase = this.selectedPurchase();
+    if (!purchase || purchase.status !== 'CONFIRMADA' || !purchase.orderId || !this.canCancel || this.saving()) return;
+    this.loading.set(true); this.error.set('');
+    try {
+      const preparation = await this.api.correctionPreparation(purchase.id);
+      this.correctionPreparation.set(preparation);
+      this.reasons.set(preparation.canReverse ? await this.api.reasons() : []);
+      this.correctionReasonId = ''; this.correctionObservation = ''; this.correctingReceipt.set(true);
+    } catch (e) { this.error.set(errorText(e)); }
+    finally { this.loading.set(false); }
+  }
+  closeReceiptCorrection(): void { if (this.saving()) return; this.correctingReceipt.set(false); this.correctionPreparation.set(null); }
+  async submitReceiptCorrection(): Promise<void> {
+    const purchase = this.selectedPurchase(); const preparation = this.correctionPreparation();
+    if (!purchase || !preparation || !preparation.canReverse || this.saving()) return;
+    if (!this.correctionReasonId) { this.error.set('Selecciona el motivo de la corrección.'); return; }
+    if (this.correctionReasonIsOther && !this.correctionObservation.trim()) { this.error.set('Describe el motivo de la corrección.'); return; }
+    if (this.correctionObservation.length > 500) { this.error.set('La observación supera 500 caracteres.'); return; }
+    await this.authorization.open({ title: 'Autorizar corrección de recepción', description: `Se retirarán ${groupedNumber(preparation.unitsToRemove)} unidades de esta recepción y volverán a quedar pendientes en el pedido.`, detail: `Compra ${purchase.visibleNumber ?? 'confirmada'} · Total ${groupedNumber(preparation.originalTotal)}`, operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: false, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'], onError: message => this.error.set(message), run: credentials => this.executeReceiptCorrection(purchase, preparation, credentials) });
+  }
+  private async executeReceiptCorrection(purchase: Purchase, preparation: PurchaseCorrectionPreparation, credentials: AuthorizationCredentials | null): Promise<void> {
+    if (this.saving()) throw new Error('La corrección ya está en curso.');
+    const body = JSON.stringify({ id: purchase.id, purchaseVersion: preparation.purchaseVersion, orderVersion: preparation.orderVersion, reasonId: this.correctionReasonId, observation: this.correctionObservation.trim() || null });
+    if (this.pendingCorrection?.body !== body) this.pendingCorrection = { body, key: crypto.randomUUID() };
+    this.saving.set(true); this.error.set('');
+    try {
+      const result = credentials?.credentialToken
+        ? await this.api.correctReceipt(purchase, preparation, this.pendingCorrection.key, this.correctionReasonId, this.correctionObservation.trim() || null, null, null, credentials.credentialToken)
+        : await this.api.correctReceipt(purchase, preparation, this.pendingCorrection.key, this.correctionReasonId, this.correctionObservation.trim() || null, credentials?.userName ?? null, credentials?.password ?? null);
+      this.selectedPurchase.set(result); this.pendingCorrection = null; this.correctingReceipt.set(false); this.correctionPreparation.set(null);
+      this.notice.set('Recepción corregida. Las cantidades volvieron a quedar pendientes en el pedido.');
+      await this.reload();
+    } catch (e) { if (this.isConflict(e)) this.pendingCorrection = null; this.error.set(errorText(e)); throw e; }
+    finally { this.saving.set(false); }
+  }
 }

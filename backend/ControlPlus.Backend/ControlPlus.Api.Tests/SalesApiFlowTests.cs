@@ -349,7 +349,12 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         "20261116020000_CreditInstallmentsV1",
         "20261119010000_CashDrawerV1",
         "20261119013000_HeldSalesV1",
-        "20261119020000_OptionalEstablishmentIdentificationV1"
+        "20261119020000_OptionalEstablishmentIdentificationV1",
+        "20261120010000_SaleCorrectionsV1",
+        "20261120020000_LayawayCorrectionsV1",
+        "20261120030000_CashInventoryCorrectionsV1",
+        "20261120040000_PurchaseReceiptCorrectionsV1",
+        "20261120050000_AdditionalSaleLinkV1"
     ];
 
     private readonly string _masterKey = RandomSecret(48);

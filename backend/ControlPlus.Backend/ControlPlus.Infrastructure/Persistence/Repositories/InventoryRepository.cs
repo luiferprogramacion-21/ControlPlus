@@ -167,4 +167,9 @@ public sealed class EfInventoryRepository(OfficialControlPlusDbContext dbContext
         OperacionIdempotente operation,
         CancellationToken cancellationToken = default) =>
         dbContext.OperacionIdempotente.AddAsync(operation, cancellationToken).AsTask();
+
+    public Task<bool> HasAdjustmentCorrectionAsync(Guid originalId, CancellationToken cancellationToken = default) =>
+        dbContext.Set<CorreccionMovimientoInventario>().AnyAsync(x => x.MovimientoOriginalId == originalId, cancellationToken);
+    public Task AddAdjustmentCorrectionAsync(CorreccionMovimientoInventario link, CancellationToken cancellationToken = default) =>
+        dbContext.Set<CorreccionMovimientoInventario>().AddAsync(link, cancellationToken).AsTask();
 }

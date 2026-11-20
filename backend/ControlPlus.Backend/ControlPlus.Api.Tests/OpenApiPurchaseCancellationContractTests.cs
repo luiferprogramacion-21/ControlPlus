@@ -57,7 +57,7 @@ public sealed class OpenApiPurchaseCancellationContractTests
         var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
         var request = schemas.GetProperty("CancelPurchaseRequest");
         var properties = request.GetProperty("properties");
-        Assert.Equal(new[] { "authorization", "expectedVersion", "observation", "reasonId" },
+        Assert.Equal(new[] { "authorization", "expectedOrderVersion", "expectedVersion", "observation", "reasonId" },
             properties.EnumerateObject().Select(x => x.Name).Order(StringComparer.Ordinal));
         if (request.TryGetProperty("required", out var required))
             Assert.DoesNotContain(required.EnumerateArray(), item => item.GetString() == "authorization");

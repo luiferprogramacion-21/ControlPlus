@@ -9,19 +9,22 @@ import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
-import { CancelSaleInput, ConfirmedChange, printJobStatusText, SaleCancellationReason, SaleDetail, SalesApi, SaleSummary } from './sales-api';
+import { CancelSaleInput, ConfirmedChange, CorrectedPayments, printJobStatusText, SaleCancellationReason, SaleDetail, SalesApi, SaleSummary } from './sales-api';
 import { SaleChange } from './sale-change';
+import { paymentCorrectionNotice, SalePaymentCorrection } from './sale-payment-correction';
 import { SalePrinting } from './sale-printing';
 import { statusKind, toastSignal } from '../../core/toast';
 import { cashDrawerNotice } from '../../shared/cash-drawer-feedback';
 import { WindowSheet } from '../../shared/window-sheet';
+import { TicketPrinter } from './ticket';
+import { buildCorrectionReceiptHtml } from './sale-correction-receipt';
 
 const STATE_LABELS: Record<string, string> = { CONFIRMADA: 'Confirmada', ANULADA: 'Anulada' };
 interface Pending { key: string; fingerprint: string; authorizerUserName: string | null; }
 
 @Component({
   selector: 'cp-sales-history',
-  imports: [WindowSheet, A11yModule, CurrencyPipe, DatePipe, DecimalPipe, FormsModule, MatPaginatorModule, RouterLink, Icon, SaleChange],
+  imports: [WindowSheet, A11yModule, CurrencyPipe, DatePipe, DecimalPipe, FormsModule, MatPaginatorModule, RouterLink, Icon, SaleChange, SalePaymentCorrection],
   templateUrl: './sales-history.html',
   styleUrls: ['../directory.scss', './sales-history.scss'],
 })
@@ -34,6 +37,7 @@ export class SalesHistory implements OnInit {
   private readonly api = inject(SalesApi);
   private readonly authorization = inject(AuthorizationDialog);
   private readonly printing = inject(SalePrinting);
+  private readonly ticketPrinter = inject(TicketPrinter);
   readonly session = inject(SessionService);
   readonly result = signal<Page<SaleSummary> | null>(null);
   readonly detail = signal<SaleDetail | null>(null);
@@ -42,6 +46,14 @@ export class SalesHistory implements OnInit {
   readonly saving = signal(false);
   readonly cancelling = signal(false);
   readonly changing = signal(false);
+  readonly correctingPayments = signal(false);
+  readonly correcting = signal(false);
+  readonly correctionMode = signal<'remove' | 'exchange'>('remove');
+  readonly changes = signal<ConfirmedChange[]>([]);
+  readonly changesLoading = signal(false);
+  readonly changesError = signal('');
+  readonly printingCorrection = signal<string | null>(null);
+  private correctionPrintKey: { changeId: string; key: string } | null = null;
   readonly printMessage = toastSignal(statusKind);
   /** Resultado de la orden al cajón cuando el cambio entregó o recibió efectivo; el cambio ya quedó registrado. */
   readonly drawerNotice = toastSignal(statusKind);
@@ -79,7 +91,7 @@ export class SalesHistory implements OnInit {
       const preparation = await this.api.findChangeSale(visibleNumber);
       const detail = await this.api.detail(preparation.saleId);
       if (!this.canChange(detail)) { this.findError.set(detail.state === 'ANULADA' ? 'Esa venta está anulada; no admite cambios.' : 'Esa venta no admite cambios.'); return; }
-      this.detail.set(detail); this.findingChange.set(false); this.changing.set(true);
+      this.detail.set(detail); this.findingChange.set(false); this.correcting.set(true); void this.loadChanges(detail.id);
     } catch (e) {
       this.findError.set(e instanceof HttpErrorResponse && e.status === 404 ? `No se encontró la venta ${visibleNumber}. Revisa el número del ticket.` : errorText(e));
     } finally { this.findingBusy.set(false); }
@@ -90,12 +102,41 @@ export class SalesHistory implements OnInit {
   canCancel(sale: SaleDetail): boolean { return sale.state === 'CONFIRMADA' && this.session.has('SALES.VOID') && this.session.hasRole('ADMINISTRADOR', 'SUPERVISOR'); }
   /** Any seller may start a change; a Cajero needs a higher-role authorizer. The server remains the authority. */
   canChange(sale: SaleDetail): boolean { return sale.state === 'CONFIRMADA' && this.session.has('SALES.CREATE'); }
+  beginCorrection(mode: 'remove' | 'exchange'): void { this.correcting.set(false); this.correctionMode.set(mode); this.changing.set(true); }
+  get correctionTotal(): number { return this.changes().filter(change => change.state === 'CONFIRMADO').reduce((sum, change) => sum + change.difference, 0); }
+  async loadChanges(saleId: string): Promise<void> {
+    this.changes.set([]); this.changesLoading.set(true); this.changesError.set('');
+    try { const rows = await this.api.changes(saleId); if (this.detail()?.id === saleId) this.changes.set(rows); }
+    catch (error) { if (this.detail()?.id === saleId) this.changesError.set(errorText(error)); }
+    finally { if (this.detail()?.id === saleId) this.changesLoading.set(false); }
+  }
+  async printCorrection(change: ConfirmedChange): Promise<void> {
+    const sale = this.detail(); if (!sale || this.printingCorrection() || !this.session.has('SALES.REPRINT')) return;
+    if (this.correctionPrintKey?.changeId !== change.id) this.correctionPrintKey = { changeId: change.id, key: crypto.randomUUID() };
+    this.printingCorrection.set(change.id); this.error.set('');
+    try {
+      const receipt = await this.api.correctionReceipt(sale.id, change.id, this.correctionPrintKey.key);
+      await this.ticketPrinter.print(buildCorrectionReceiptHtml(receipt));
+      this.correctionPrintKey = null;
+      this.notice.set('Comprobante de corrección preparado. Se abrió la impresión del navegador; revisa la salida en papel.');
+    } catch (error) { this.error.set(errorText(error)); }
+    finally { this.printingCorrection.set(null); }
+  }
+  /** Solo ventas de contado confirmadas; el servidor confirma además que sean del turno abierto. */
+  canCorrectPayments(sale: SaleDetail): boolean { return this.canCancel(sale) && !sale.creditId && sale.payments.length > 0; }
+  beginPaymentCorrection(): void { this.correcting.set(false); this.correctingPayments.set(true); }
+  async paymentsCorrected(result: CorrectedPayments): Promise<void> {
+    this.correctingPayments.set(false);
+    this.notice.set(paymentCorrectionNotice(result));
+    try { this.detail.set(await this.api.detail(result.saleId)); } catch { this.detail.set(null); }
+    await this.reload();
+  }
   async changeDone(change: ConfirmedChange): Promise<void> {
     this.changing.set(false);
-    this.notice.set(`Cambio ${change.visibleNumber} registrado. Diferencia ${this.money(change.difference)}.`);
+    this.notice.set(`Corrección ${change.visibleNumber} registrada. Variación ${this.money(change.difference)}.`);
     this.drawerNotice.set(cashDrawerNotice(change.drawerStatus));
     const id = this.detail()?.id;
-    try { if (id) this.detail.set(await this.api.detail(id)); } catch { this.detail.set(null); }
+    try { if (id) { this.detail.set(await this.api.detail(id)); await this.loadChanges(id); } } catch { this.detail.set(null); }
     await this.reload();
   }
   canPrint(sale: SaleSummary): boolean { return sale.state === 'CONFIRMADA' && this.session.has('SALES.REPRINT'); }
@@ -131,7 +172,7 @@ export class SalesHistory implements OnInit {
   async open(sale: SaleSummary): Promise<void> {
     this.notice.set(''); this.error.set('');
     this.printMessage.set(''); this.printStatus.set(null);
-    try { this.detail.set(await this.api.detail(sale.id)); } catch (e) { this.error.set(errorText(e)); return; }
+    try { this.detail.set(await this.api.detail(sale.id)); void this.loadChanges(sale.id); } catch (e) { this.error.set(errorText(e)); return; }
     this.printStatus.set(await this.printing.lastStatus(sale.id));
   }
   /** Reprinting needs the effective permission and a confirmed sale; it is always recorded. */
@@ -143,9 +184,10 @@ export class SalesHistory implements OnInit {
     this.printMessage.set(outcome.message); if (outcome.status) this.printStatus.set(outcome.status);
     this.reprinting.set(false);
   }
-  closeDetail(): void { this.detail.set(null); this.cancelling.set(false); this.pending = null; }
+  closeDetail(): void { this.detail.set(null); this.cancelling.set(false); this.correcting.set(false); this.changing.set(false); this.correctingPayments.set(false); this.changes.set([]); this.pending = null; }
 
   async startCancel(): Promise<void> {
+    this.correcting.set(false);
     this.formError.set(''); this.reasonId = ''; this.observation = ''; this.pending = null;
     try {
       this.reasons.set(await this.api.cancellationReasons());

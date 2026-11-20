@@ -339,6 +339,15 @@ Menú **Historial de ventas**: lista las ventas con sus pagos y productos. **Ver
    Para anular necesitas **tu caja abierta** (a tu nombre, o con tu sesión de operador en turno compartido): el reverso se registra en el turno abierto. Si hay que devolver efectivo, la caja debe tener con qué cubrirlo.
    Una venta **a crédito** solo se puede anular si su crédito está **intacto**, sin ningún abono.
 
+**Corregir el medio de pago** (por ejemplo, el cliente pagó por Nequi y quedó registrado en efectivo)
+
+1. Abre la venta → **Corregir venta** → **Corregir medio de pago**.
+2. Arriba ves cómo quedó registrada. Abajo pon cómo se pagó de verdad: usa **Todo por Nequi**, **Todo en efectivo** o **Todo por transferencia**, o reparte entre varios medios. La suma debe ser el **total de la venta**. La referencia de Nequi o transferencia es opcional.
+3. Elige el **motivo** y pide la autorización de un **Administrador**.
+4. La venta, sus productos y su total **no cambian**; solo el medio de pago. Al terminar, el aviso dice cuánto efectivo de más o de menos espera ahora la caja. Queda auditado.
+
+   Solo se puede en ventas del **turno abierto** y con tu caja abierta (o tu sesión de operador en turno compartido). Si el turno de la venta ya se cerró, ese cierre no se cambia: registra la diferencia con **Revisar cierre** en Caja.
+
 **Cambio de productos** (una venta ya hecha; no es una anulación)
 
 1. Abre **Cambios y devoluciones** en el menú (o **Cambiar o devolver** en Inicio, o en la venta recién terminada) y escribe el **número de la venta** que aparece en el ticket. También puedes abrir la venta en el historial → **Cambio de productos**.

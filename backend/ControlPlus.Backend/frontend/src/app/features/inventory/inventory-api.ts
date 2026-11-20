@@ -7,7 +7,7 @@ export interface Stock { productId: string; internalCode: string; barcode: strin
 export interface Movement { id: string; productId: string; productCode: string; productName: string; type: string; stockQuantity: number; previousStock: number; newStock: number; reservedQuantity: number; reasonName: string | null; observation: string | null; occurredAtUtc: string; previousAverageCost: number | null; newAverageCost: number | null; }
 export type StockStatusFilter = '' | 'DISPONIBLE' | 'STOCK_BAJO' | 'AGOTADO' | 'INACTIVO';
 export interface Reason { id: string; code: string; name: string; description: string | null; displayOrder: number; }
-export interface Adjustment { productId: string; quantityDelta: number; reasonId: string; expectedVersion: number; observation: string | null; authorization?: AuthorizationBody; }
+export interface Adjustment { productId: string; quantityDelta: number; reasonId: string; expectedVersion: number; observation: string | null; authorization?: AuthorizationBody; correctedMovementId?: string; }
 @Injectable({ providedIn: 'root' })
 export class InventoryApi {
   private readonly http = inject(HttpClient);

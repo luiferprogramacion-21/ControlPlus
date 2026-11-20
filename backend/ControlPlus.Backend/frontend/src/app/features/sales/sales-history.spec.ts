@@ -5,12 +5,14 @@ import { SessionService } from '../../core/session.service';
 import { AuthorizationDialog, AuthorizationPrompt } from '../../shared/authorization-dialog';
 import { SaleDetail, SalesApi } from './sales-api';
 import { SalesHistory } from './sales-history';
+import { TicketPrinter } from './ticket';
 
 const sale = (state = 'CONFIRMADA', version = 3): SaleDetail => ({ id: 's1', visibleNumber: 'VTA-1', occurredAtUtc: '', operatingDate: '', grossSubtotal: 10000, discountTotal: 0, total: 10000, change: 0, state, version, creditId: null, lines: [], payments: [] });
 const reasons = [{ id: 'r1', code: 'ERROR_REGISTRO', name: 'Error de registro', displayOrder: 1 }, { id: 'r2', code: 'OTRO', name: 'Otro', displayOrder: 3 }];
 
 describe('SalesHistory: historial y anulación', () => {
-  const api = { list: vi.fn(), detail: vi.fn(), cancellationReasons: vi.fn(), cancel: vi.fn(), printJobs: vi.fn(), requestReprint: vi.fn(), retryPrintJob: vi.fn() };
+  const api = { list: vi.fn(), detail: vi.fn(), changes: vi.fn(), correctionReceipt: vi.fn(), cancellationReasons: vi.fn(), cancel: vi.fn(), printJobs: vi.fn(), requestReprint: vi.fn(), retryPrintJob: vi.fn() };
+  const printer = { print: vi.fn() };
   let permissions: string[]; let roles: string[];
   const session = { user: () => ({ userName: 'admin' }), has: (code: string) => permissions.includes(code), hasRole: (...codes: string[]) => codes.some(code => roles.includes(code)) };
   let prompt: AuthorizationPrompt | null; let dialogError: unknown;
@@ -26,12 +28,13 @@ describe('SalesHistory: historial y anulación', () => {
   beforeEach(() => {
     vi.clearAllMocks(); prompt = null; dialogError = undefined; permissions = ['SALES.OWN_READ', 'SALES.VOID']; roles = ['ADMINISTRADOR'];
     api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    api.changes.mockResolvedValue([]); api.detail.mockResolvedValue(sale()); printer.print.mockResolvedValue(undefined);
     api.cancellationReasons.mockResolvedValue(reasons);
     api.cancel.mockResolvedValue({ visibleNumber: 'VTA-1', reversedAmount: 10000 });
     api.printJobs.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
     api.requestReprint.mockResolvedValue({ requestId: 'r', saleId: 's1', requestedAtUtc: '', status: 'SOLICITADA' });
     api.retryPrintJob.mockResolvedValue({});
-    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: SalesApi, useValue: api }, { provide: AuthorizationDialog, useValue: dialog }, { provide: SessionService, useValue: session }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: SalesApi, useValue: api }, { provide: TicketPrinter, useValue: printer }, { provide: AuthorizationDialog, useValue: dialog }, { provide: SessionService, useValue: session }] });
   });
 
   it('lista las ventas propias o todas según el permiso', async () => {
@@ -44,6 +47,30 @@ describe('SalesHistory: historial y anulación', () => {
     expect(component.paymentLabel({ saleType: 'CREDITO', paymentMethods: [] })).toBe('Crédito');
     expect(component.paymentLabel({ saleType: 'CONTADO', paymentMethods: ['Efectivo', 'Nequi'] })).toBe('Efectivo + Nequi');
     expect(component.paymentLabel({ saleType: 'CONTADO', paymentMethods: null })).toBe('—');
+  });
+
+  it('ofrece quitar, cambiar y venta adicional; el total resultante usa solo correcciones confirmadas', async () => {
+    permissions.push('SALES.CREATE');
+    const fixture = TestBed.createComponent(SalesHistory); fixture.detectChanges(); await fixture.whenStable();
+    const c = fixture.componentInstance; c.detail.set(sale()); c.correcting.set(true);
+    c.changes.set([{ id: 'a', saleId: 's1', visibleNumber: 'CAM-1', difference: -2000, totalReturned: 2000, totalDelivered: 0, treatment: 'DEVOLUCION', paidOrRefunded: 2000, creditAdjustment: 0, state: 'CONFIRMADO' },
+      { id: 'b', saleId: 's1', visibleNumber: 'CAM-2', difference: -5000, totalReturned: 5000, totalDelivered: 0, treatment: 'DEVOLUCION', paidOrRefunded: 5000, creditAdjustment: 0, state: 'ANULADO' }]);
+    fixture.detectChanges();
+    expect(c.correctionTotal).toBe(-2000);
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Quitar producto o reducir cantidad'); expect(text).toContain('Cambiar un producto por otro');
+    expect(text).toContain('venta adicional'); expect(text).toContain('Total después de correcciones');
+    c.beginCorrection('remove'); expect(c.correctionMode()).toBe('remove'); expect(c.correcting()).toBe(false); expect(c.changing()).toBe(true);
+  });
+
+  it('audita el comprobante antes de abrir impresión y conserva la clave si falla', async () => {
+    permissions.push('SALES.REPRINT'); const c = await create();
+    const correction = { id: 'a', saleId: 's1', visibleNumber: 'CAM-1', difference: -2000, totalReturned: 2000, totalDelivered: 0, treatment: 'DEVOLUCION', paidOrRefunded: 2000, creditAdjustment: 0, state: 'CONFIRMADO' };
+    api.correctionReceipt.mockRejectedValueOnce(new HttpErrorResponse({ status: 500 })).mockResolvedValue({ requestId: 'r', saleId: 's1', saleNumber: 'VTA-1', correction, establishmentName: 'Tienda' });
+    await c.printCorrection(correction); expect(printer.print).not.toHaveBeenCalled();
+    await c.printCorrection(correction);
+    expect(api.correctionReceipt.mock.calls[0][2]).toBe(api.correctionReceipt.mock.calls[1][2]);
+    expect(printer.print).toHaveBeenCalledWith(expect.stringContaining('CAM-1'));
   });
   it('muestra el detalle en una ventana modal y permite cerrarla', async () => {
     const fixture = TestBed.createComponent(SalesHistory);

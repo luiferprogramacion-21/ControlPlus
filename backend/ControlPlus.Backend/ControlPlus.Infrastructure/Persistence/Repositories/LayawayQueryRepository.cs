@@ -40,7 +40,7 @@ public sealed class EfLayawayQueryRepository(OfficialControlPlusDbContext dbCont
     public Task<Apartado?> GetAsync(Guid layawayId, Guid installationId, CancellationToken cancellationToken = default) =>
         dbContext.Apartado.AsNoTracking().AsSplitQuery()
             .Include(x => x.Cliente)
-            .Include(x => x.DetalleApartado)
+            .Include(x => x.DetalleApartado.Where(d => d.Vigente))
             .Include(x => x.PagoApartado).ThenInclude(x => x.MetodoPago)
             .Include(x => x.PagoApartado).ThenInclude(x => x.MovimientoCaja)
             .Include(x => x.ReembolsoApartado).ThenInclude(x => x.MetodoPago)

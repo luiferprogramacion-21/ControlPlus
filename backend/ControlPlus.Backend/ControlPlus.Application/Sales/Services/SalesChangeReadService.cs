@@ -53,11 +53,16 @@ public sealed partial class SalesService
         var withinDeadline = SaleChangeAvailability.IsWithinDeadline(localDate, sale.FechaLimiteCambio);
         var eligibleType = sale.TipoVenta == "CONTADO" ||
             sale.TipoVenta == "CREDITO" && sale.Credito is { Estado: "PENDIENTE" or "VENCIDO" };
+        var blockedReason = sale.Estado != "CONFIRMADA" ? "La venta está anulada; consulta su historial."
+            : !withinDeadline ? $"El plazo para corregir productos venció el {sale.FechaLimiteCambio:dd/MM/yyyy}."
+            : !eligibleType ? "El crédito ya está pagado o anulado. Esta venta requiere revisión del Administrador; no se modifica su saldo ni se simula un abono."
+            : !lines.Any(x => x.RemainingQuantity > 0) ? "Todos los productos originales ya se devolvieron. Los productos recibidos en un cambio anterior requieren revisión del Administrador."
+            : null;
         return Result.Success(new SaleChangePreparationDto(sale.Id, VisibleNumber(sale), sale.TipoVenta,
             sale.Estado, sale.Version, sale.FechaOperativa, sale.FechaLimiteCambio,
             localDate, withinDeadline,
             sale.Estado == "CONFIRMADA" && eligibleType && withinDeadline &&
             lines.Any(x => x.RemainingQuantity > 0), lines,
-            sale.Credito?.Id, sale.Credito?.Version, sale.Credito?.SaldoPendiente));
+            sale.Credito?.Id, sale.Credito?.Version, sale.Credito?.SaldoPendiente, blockedReason));
     }
 }
