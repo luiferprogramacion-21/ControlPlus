@@ -101,7 +101,7 @@ Es una tarjeta con un **código de barras** (Code 128) a nombre de una persona. 
 
 El Administrador lo emite en Administración → Usuarios → **Carné**. Si se pierde, se emite otro y el anterior deja de servir. El sistema guarda solo una huella del código, no el código.
 
-**Imprimir carné** lo saca en la **impresora de tickets** (rollo de 80 mm), en una tarjeta de 70 × 50 mm con barras gruesas que el lector láser sí lee. Recórtalo por la línea punteada y, si puedes, plastifícalo. Para imprimirlo en otra impresora usa **Descargar PDF** o **Descargar JPG**. Los carnés emitidos **antes del 20 de noviembre de 2026** tienen un código más largo que el lector puede no leer: **emite uno nuevo** desde la pestaña Carné (el anterior deja de servir).
+**Imprimir carné** lo saca en la **impresora de tickets** (rollo de 80 mm), en una tarjeta de 71 × 54 mm (lo más grande que cabe en el rollo; la altura de una tarjeta de crédito) con barras gruesas que el lector láser sí lee. Para el tamaño exacto de tarjeta de crédito (85,6 × 54 mm), usa **Descargar PDF** e imprímelo en una impresora normal en **tamaño real (100 %)**. Recórtalo por la línea punteada y, si puedes, plastifícalo. Para imprimirlo en otra impresora usa **Descargar PDF** o **Descargar JPG**. Los carnés emitidos **antes del 20 de noviembre de 2026** tienen un código más largo que el lector puede no leer: **emite uno nuevo** desde la pestaña Carné (el anterior deja de servir).
 
 ## 1.6 Si algo no funciona
 

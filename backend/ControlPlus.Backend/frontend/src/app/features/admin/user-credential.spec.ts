@@ -181,8 +181,8 @@ describe('Carné de operador', () => {
     const svg = printedBarcodeSvg('12345678901234');
     // 14 dígitos: 112 módulos + 20 de margen = 132 × 0,5 mm = 66 mm, cabe en los 69 mm del carné.
     expect(Number(/width="([0-9.]+)mm"/.exec(svg)![1])).toBeCloseTo(66, 2);
-    expect(svg).toContain('height="16mm"');
-    const bars = [...svg.matchAll(/ width="([0-9.]+)" height="16"\/>/g)].map(m => Number(m[1]));
+    expect(svg).toContain('height="18mm"');
+    const bars = [...svg.matchAll(/ width="([0-9.]+)" height="18"\/>/g)].map(m => Number(m[1]));
     expect(Math.min(...bars)).toBeCloseTo(0.5, 4);
     expect(buildCredentialCardHtml({ businessName: 'N', displayName: 'L', userName: 'l', roleName: 'C', token: '12345678901234', fragment: '78901234' }))
       .not.toContain('gire el carné');
