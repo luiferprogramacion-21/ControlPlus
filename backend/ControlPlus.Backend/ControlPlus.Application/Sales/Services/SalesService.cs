@@ -153,6 +153,8 @@ public sealed partial class SalesService(
                 (string.IsNullOrWhiteSpace(customer.TipoDocumento) || string.IsNullOrWhiteSpace(customer.NumeroDocumento)) &&
                 string.IsNullOrWhiteSpace(customer.Telefono))
                 return Result.Failure<SaleDto>(Validation("El cliente requiere documento completo o teléfono para crédito."));
+            if (input.SaleType == "CREDITO" && string.IsNullOrWhiteSpace(customer.Direccion))
+                return Result.Failure<SaleDto>(Validation("El cliente necesita dirección para venderle a crédito. Complétala en Clientes."));
         }
         else if (input.SaleType == "CREDITO")
             return Result.Failure<SaleDto>(Validation("El cliente es obligatorio para una venta a crédito."));

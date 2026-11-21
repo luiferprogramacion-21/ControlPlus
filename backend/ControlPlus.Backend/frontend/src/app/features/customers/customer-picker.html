@@ -12,7 +12,7 @@
         @for (candidate of results(); track candidate.id) {
           <button type="button" class="customer-result" role="option" [disabled]="!eligible(candidate)" (click)="choose(candidate)">
             <span><strong>{{ candidate.fullName }}</strong><small>{{ candidate.documentNumber ? (candidate.documentType + ' ' + candidate.documentNumber) : 'Sin documento' }} · {{ candidate.phone || 'Sin teléfono' }}</small></span>
-            <small>{{ eligible(candidate) ? candidate.address : 'Sin documento ni teléfono: no sirve para crédito' }}</small>
+            <small>{{ ineligibleReason(candidate) || candidate.address || candidate.phone || '' }}</small>
           </button>
         } @empty {
           <p class="empty-customer-result">{{ loading() ? 'Buscando…' : 'No hay clientes que coincidan con la búsqueda.' }}</p>
@@ -34,8 +34,10 @@
         }
         <label class="field-label field-label--spaced" for="customer-new-phone">Teléfono {{ required() ? '(obligatorio si no hay documento)' : '(opcional)' }}</label>
         <input id="customer-new-phone" class="text-field" name="newPhone" [(ngModel)]="form.phone" maxlength="30">
-        <label class="field-label field-label--spaced" for="customer-new-address">Dirección</label>
-        <input id="customer-new-address" class="text-field" name="newAddress" [(ngModel)]="form.address" maxlength="300" required>
+        @if (required()) {
+          <label class="field-label field-label--spaced" for="customer-new-address">Dirección <span>(obligatoria para crédito o apartado)</span></label>
+          <input id="customer-new-address" class="text-field" name="newAddress" [(ngModel)]="form.address" maxlength="300" required>
+        }
         @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
         <div class="form-actions customer-picker__actions"><button class="button button--secondary" type="button" (click)="creating.set(false); error.set('')" [disabled]="saving()">Volver a buscar</button><button class="button button--primary" type="submit" [disabled]="saving()">{{ saving() ? 'Guardando…' : 'Guardar y seleccionar' }}</button></div>
       </form>

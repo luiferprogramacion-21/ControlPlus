@@ -88,8 +88,7 @@ public sealed class LayawayPaymentService(ILayawayPaymentRepository layaways,
             methods.Any(x => x.Codigo == "EFECTIVO" ? !x.AfectaEfectivo : x.AfectaEfectivo))
             return Fail(ApplicationError.Validation("Los métodos de pago deben estar activos y conservar su clasificación."));
         var byCode = methods.ToDictionary(x => x.Codigo);
-        if (input.Payments.Any(x => byCode[x.MethodCode].RequiereReferencia && x.Reference is null))
-            return Fail(ApplicationError.Validation("La referencia electrónica es obligatoria."));
+        // Desde el 21 de noviembre de 2026 la referencia de Transferencia y Nequi es opcional (propuesta 7).
 
         var now = clock.UtcNow;
         var correlationId = Guid.CreateVersion7();
@@ -177,8 +176,8 @@ public sealed class LayawayPaymentService(ILayawayPaymentRepository layaways,
                     !CashMoney.IsValid(received, allowNegative: false) || received < payment.AppliedAmount)
                     return NormalizedPayment.Fail("El efectivo requiere recibido suficiente y no admite referencia.");
             }
-            else if (payment.ReceivedAmount is not null || reference is null)
-                return NormalizedPayment.Fail("Transferencia y Nequi requieren referencia y no admiten recibido.");
+            else if (payment.ReceivedAmount is not null)
+                return NormalizedPayment.Fail("Transferencia y Nequi no admiten recibido.");
             payments.Add(new CreateLayawayPaymentRequest(code, payment.AppliedAmount,
                 payment.ReceivedAmount, reference));
         }

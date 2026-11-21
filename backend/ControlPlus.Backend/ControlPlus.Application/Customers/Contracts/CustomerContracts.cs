@@ -5,7 +5,7 @@ using ControlPlus.Application.Security.Contracts;
 namespace ControlPlus.Application.Customers.Contracts;
 
 public sealed record CustomerDto(Guid Id, string? DocumentType, string? DocumentNumber,
-    string FullName, string? Phone, string Address, string? Email, string? Observations,
+    string FullName, string? Phone, string? Address, string? Email, string? Observations,
     bool IsActive, long Version, decimal? CreditLimit = null);
 
 public sealed record CustomerListQuery(string? Search = null, string? Status = null, int Page = 1, int PageSize = 20);

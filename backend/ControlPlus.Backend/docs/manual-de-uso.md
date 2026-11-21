@@ -130,7 +130,7 @@ El Administrador lo emite en Administración → Usuarios → **Carné**. Si se 
 
 Menú **Caja** → bloque **Apertura de caja**.
 
-1. Escribe el **fondo inicial** (el efectivo con el que empiezas). Debe ser **mayor que cero**: la caja no se abre con base $0.
+1. Escribe el **fondo inicial** (el efectivo con el que empiezas). Debe ser **mayor que cero**: la caja no se abre con base $0. El sistema propone el mismo fondo de la última apertura y el botón **Igual que la última vez** lo vuelve a poner si lo cambiaste.
 2. Elige la **modalidad del turno**:
    - **Turno individual** (viene marcado): una sola persona abre, vende y cierra. Todas las ventas quedan a su nombre.
    - **Turno compartido**: varias personas se turnan en el mismo mostrador. Cada una se identifica con su carné antes de cada venta.
@@ -223,7 +223,8 @@ Al retomar una venta, el sistema quita lo que ya no tiene existencias y te lo di
 **Cobrar un abono**: menú **Créditos y abonos** → busca al cliente → **Abonar**.
 
 - Hace falta un **turno abierto** a tu nombre (o tu sesión de operador en turno compartido).
-- Se puede pagar en uno o varios medios. En Transferencia y Nequi la **referencia es obligatoria**.
+- El **valor del abono** viene con **todo el saldo**. Para un abono parcial escribe encima o pulsa **La mitad**; **Todo el saldo** lo vuelve a poner.
+- Se puede pagar en uno o varios medios. En Transferencia y Nequi la referencia es **opcional**.
 - Un abono parcial deja saldo; uno total deja el crédito en **Pagado**.
 - Puedes consultar el **historial de abonos** del crédito.
 - **Anular un abono** o **perdonar una deuda** no te corresponde (ver partes 3 y 4).
@@ -233,13 +234,15 @@ Al retomar una venta, el sistema quita lo que ya no tiene existencias y te lo di
 Un apartado separa productos para un cliente mientras los va pagando. Menú **Apartados**.
 
 - **Nuevo apartado:** el cliente es obligatorio. Se exige un **pago inicial** (normalmente el 20 % del total; siempre al menos $1) y se fija una **fecha límite** (15 días por defecto). Necesitas la autorización de un Supervisor o del Administrador.
-- **Abonar:** cada pago queda registrado.
+- **Abonar:** cada pago queda registrado. En Transferencia y Nequi la referencia es **opcional**.
 - **Entregar productos:** solo cuando el apartado está **pagado por completo**.
 - **Cancelar un apartado** lo hace un Supervisor o el Administrador, que decide cuánto se devuelve.
 
 ## 2.10 Clientes
 
-Menú **Clientes** → **Nuevo cliente**. Lleva nombre, **dirección** (obligatoria), teléfono y, si quieres, documento. El documento no se puede repetir. Puedes consultar su **historial**.
+Menú **Clientes** → **Nuevo cliente**. Lleva nombre y, si quieres, documento (tipo y número), teléfono y dirección. El documento no se puede repetir. Puedes consultar su **historial**.
+
+Desde el punto de venta (**+ Nuevo cliente**) se piden solo nombre, documento y teléfono. La **dirección** solo se pide en una venta a crédito o un apartado, porque ahí es obligatoria: un cliente sin dirección no sirve para crédito ni apartado hasta completarla en Clientes.
 
 ## 2.11 Consultar productos y existencias
 
@@ -306,7 +309,7 @@ En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto*
 
 En **Caja** pulsa **Cerrar caja** (también está en Inicio). El cierre se hace en tres pasos:
 
-1. **Contar el efectivo.** El sistema muestra el efectivo **esperado**; cuenta el **efectivo físico** y escribe lo contado. **Solo se cuenta el efectivo.** Nequi, transferencias y otros medios se muestran como información. Pulsa **Siguiente**.
+1. **Contar el efectivo.** El sistema muestra el efectivo **esperado**. Escribe **cuántos billetes** hay de 100.000, 50.000, 20.000, 10.000, 5.000 y 2.000, y el total en monedas: el sistema suma y lo pone en **Contado**. Si ya sabes el total, puedes escribirlo directo. **Solo se cuenta el efectivo.** Nequi, transferencias y otros medios se muestran como información. Pulsa **Siguiente**.
 2. **Revisar la diferencia.** La diferencia es contado menos esperado (no hay cierre «a ciegas»). Si todo cuadra, lo dice; si no, elige el **motivo** del descuadre. Pulsa **Siguiente**.
 3. **Confirmar.** Revisa el resumen y pulsa **Cerrar caja**. Si hubo diferencia, pide la **autorización de un Administrador**.
 
@@ -370,7 +373,7 @@ En **Créditos y abonos** puedes registrar abonos (como el Cajero) y además:
 
 ## 3.9 Catálogo y etiquetas
 
-- **Crear productos** (con cantidad y costo inicial si ya tienes mercancía) y **consultar** las categorías; crear o cambiar categorías es del Administrador. Cada producto recibe una **referencia automática** (abreviatura de la categoría + número, por ejemplo `PAP-000004`).
+- **Crear productos** (con cantidad y costo inicial si ya tienes mercancía). A la vista quedan nombre, categoría, precio, existencia, costo, proveedor y stock mínimo; unidad, código de barras, descripción, precio mayorista y la calculadora de ganancia están en **Más datos** (la unidad es «Unidad» y el código de barras se genera solo) y **consultar** las categorías; crear o cambiar categorías es del Administrador. Cada producto recibe una **referencia automática** (abreviatura de la categoría + número, por ejemplo `PAP-000004`).
 - **No ves los costos** ni cambias el nombre, código o precio de un producto ya creado: eso es del Administrador.
 - **Etiquetas:** Catálogo → **Etiquetas de productos**. Elige los productos, revisa la **vista previa** y pulsa **Imprimir etiquetas**. Necesita una impresora de etiquetas configurada por el Administrador.
 
@@ -378,9 +381,9 @@ En **Créditos y abonos** puedes registrar abonos (como el Cajero) y además:
 
 Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor**, **Mercancía recibida** y **Compras sin pedido**.
 
-- **Pedir mercancía:** **Nuevo pedido al proveedor** → elige el proveedor, agrega productos con su cantidad → **Crear pedido**.
-- **Cuando llega mercancía:** pulsa **Registrar compra** (también **Recibir mercancía** en Inicio). El sistema pregunta si viene de un pedido:
-  - **Sí, viene de un pedido:** eliges el pedido y anotas lo que llegó. Puedes recibir **parcial** (solo lo que llegó) o **Recibir todo lo pendiente**.
+- **Pedir mercancía:** **Más ▾** → **Nuevo pedido al proveedor** → elige el proveedor, agrega productos con su cantidad → **Crear pedido**.
+- **Cuando llega mercancía:** pulsa **Recibir mercancía** (también en Inicio). Son tres pasos, que se ven arriba de cada ventana: **1. ¿De dónde viene?**, **2. Productos y cantidades** y **3. Confirmar**. El sistema pregunta si viene de un pedido:
+  - **Sí, viene de un pedido:** eliges el pedido; las cantidades pendientes **vienen listas**. Si llegó menos (recepción **parcial**), corrígelas.
   - **No, es una compra sin pedido:** anotas el proveedor, el número de factura, los productos y sus costos.
 
   Lo recibido entra al inventario y actualiza el costo.

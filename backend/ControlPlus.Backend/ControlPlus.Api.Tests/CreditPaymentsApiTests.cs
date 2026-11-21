@@ -168,6 +168,19 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         Assert.Equal(500m, reconciliation.PaymentMethods.Single(x => x.Code == "NEQUI").ExpectedAmount);
     }
 
+    /// <summary>Propuesta 7 (21 de noviembre de 2026): Nequi y Transferencia sin referencia se aceptan (la base ya no la exige).</summary>
+    [Fact, Trait("Category", "Integration")]
+    public async Task ElectronicPaymentWithoutReference_IsAccepted_AndStoredAsNull()
+    {
+        using var client = CreateClient();
+        var setup = await BootstrapAsync(client);
+        var creditId = (await CreateCreditAsync(client, setup, "credit-no-reference")).CreditId!.Value;
+        var payment = await ReadAsync<CreditPaymentOperationDto>(await PayAsync(client, creditId, "credit-no-reference-pay",
+            new ApplyCreditPaymentRequest(1, [new("NEQUI", 200m, null, null), new("TRANSFERENCIA", 100m, null, " ")])),
+            HttpStatusCode.Created);
+        Assert.Equal(new[] { "NEQUI", "TRANSFERENCIA" }, payment.Payments.Select(x => x.MethodCode).Order().ToArray());
+    }
+
     [Fact, Trait("Category", "Integration")]
     public async Task ElectronicReferencesAndAmountGuards_RejectWithoutAnyFinancialWrite()
     {
@@ -177,8 +190,6 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         var before = await SnapshotAsync(creditId, setup.ProductId);
         var invalid = new[]
         {
-            new ApplyCreditPaymentRequest(1, [new CreditPaymentMethodRequest("TRANSFERENCIA", 200m, null, null)]),
-            new ApplyCreditPaymentRequest(1, [new CreditPaymentMethodRequest("NEQUI", 200m, null, " ")]),
             new ApplyCreditPaymentRequest(1, [new CreditPaymentMethodRequest("NEQUI", 200m, 200m, "N-1")]),
             new ApplyCreditPaymentRequest(1, [new CreditPaymentMethodRequest("EFECTIVO", 200m, 199m, null)]),
             new ApplyCreditPaymentRequest(1, [new CreditPaymentMethodRequest("EFECTIVO", 1_001m, 1_001m, null)]),

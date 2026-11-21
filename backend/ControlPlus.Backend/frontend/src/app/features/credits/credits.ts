@@ -99,7 +99,20 @@ export class Credits implements OnInit {
   }
   historyChanged(e: PageEvent): void { this.historyPage = e.pageIndex + 1; this.historyPageSize = e.pageSize; void this.loadHistory(); }
   close(): void { if (this.saving()) return; this.selected.set(null); this.detailOpen.set(false); this.dialog.set(false); this.cancellingPayment.set(false); this.forgiving.set(false); this.history.set(null); this.pendingKey = null; this.pendingCancellation = null; this.pendingForgiveness = null; this.error.set(''); }
-  openPayment(credit: Credit): void { if (credit.state === 'PAGADO' || credit.state === 'ANULADO' || credit.balance <= 0) return; this.selected.set(credit); this.drafts = [this.emptyDraft()]; this.pendingKey = null; this.dialog.set(true); this.error.set(''); }
+  /** Propuesta 1 (21 de noviembre de 2026): el abono llega con todo el saldo; para uno parcial se escribe encima o se usa «La mitad». */
+  openPayment(credit: Credit): void {
+    if (credit.state === 'PAGADO' || credit.state === 'ANULADO' || credit.balance <= 0) return;
+    this.selected.set(credit); this.drafts = [{ ...this.emptyDraft(), appliedAmount: credit.balance, receivedAmount: credit.balance }];
+    this.pendingKey = null; this.dialog.set(true); this.error.set('');
+  }
+  halfBalance(credit: Credit): number { return Math.ceil(credit.balance / 2); }
+  /** Pone el valor del abono en el único medio de pago; con efectivo, lo recibido es ese mismo valor. */
+  quickAmount(kind: 'ALL' | 'HALF'): void {
+    const credit = this.selected(); if (!credit || this.drafts.length !== 1) return;
+    const amount = kind === 'ALL' ? credit.balance : Math.ceil(credit.balance / 2);
+    const draft = this.drafts[0]; draft.appliedAmount = amount;
+    if (draft.methodCode === 'EFECTIVO') draft.receivedAmount = amount;
+  }
   addMethod(): void { if (this.drafts.length < 3) { const next = (['EFECTIVO', 'TRANSFERENCIA', 'NEQUI'] as Method[]).find(m => !this.drafts.some(d => d.methodCode === m)); if (next) this.drafts.push({ methodCode: next, appliedAmount: 0, receivedAmount: null, reference: '' }); } }
   removeMethod(index: number): void { if (this.drafts.length > 1) this.drafts.splice(index, 1); }
   validation(): string {
@@ -110,7 +123,8 @@ export class Credits implements OnInit {
     if (!Number.isSafeInteger(this.appliedTotal) || this.appliedTotal > credit.balance) return 'El abono supera el saldo pendiente.';
     for (const d of this.drafts) {
       if (d.methodCode === 'EFECTIVO' && (!Number.isSafeInteger(Number(d.receivedAmount)) || Number(d.receivedAmount) < Number(d.appliedAmount) || Number(d.receivedAmount) > LIMIT)) return 'El efectivo recibido debe cubrir el importe aplicado.';
-      if (d.methodCode !== 'EFECTIVO' && (!d.reference.trim() || d.reference.trim().length > 200)) return 'Ingresa una referencia de hasta 200 caracteres para el pago electrónico.';
+      // Propuesta 7 (21 de noviembre de 2026): la referencia del abono es opcional.
+      if (d.methodCode !== 'EFECTIVO' && d.reference.trim().length > 200) return 'La referencia admite hasta 200 caracteres.';
     }
     return '';
   }
@@ -118,7 +132,7 @@ export class Credits implements OnInit {
     if (this.saving()) return;
     const issue = this.validation(); if (issue) { this.error.set(issue); return; }
     const credit = this.selected()!;
-    const payments: PaymentMethodInput[] = this.drafts.map(d => ({ methodCode: d.methodCode, appliedAmount: Number(d.appliedAmount), receivedAmount: d.methodCode === 'EFECTIVO' ? Number(d.receivedAmount) : null, reference: d.methodCode === 'EFECTIVO' ? null : d.reference.trim() }));
+    const payments: PaymentMethodInput[] = this.drafts.map(d => ({ methodCode: d.methodCode, appliedAmount: Number(d.appliedAmount), receivedAmount: d.methodCode === 'EFECTIVO' ? Number(d.receivedAmount) : null, reference: d.methodCode === 'EFECTIVO' ? null : d.reference.trim() || null }));
     const fingerprint = JSON.stringify({ id: credit.id, version: credit.version, payments });
     if (fingerprint !== this.pendingFingerprint) { this.pendingKey = crypto.randomUUID(); this.pendingFingerprint = fingerprint; }
     this.saving.set(true); this.error.set('');

@@ -429,6 +429,12 @@ public sealed partial class EfCashRepository(OfficialControlPlusDbContext dbCont
             .Select(session => (Guid?)session.UsuarioId)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<decimal?> GetLastInitialAmountAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.TurnoCaja.AsNoTracking()
+            .OrderByDescending(shift => shift.FechaHoraApertura)
+            .Select(shift => (decimal?)shift.MontoInicial)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyCollection<CredencialUsuario>> ListActiveCredentialsAsync(
         CancellationToken cancellationToken = default) =>
         await dbContext.CredencialUsuario

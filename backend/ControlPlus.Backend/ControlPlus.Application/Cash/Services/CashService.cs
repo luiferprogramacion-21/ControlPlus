@@ -130,6 +130,7 @@ public sealed partial class CashService(
                 OpenShiftResponsibleName = responsibleName,
                 ActiveOperatorName = operatorName,
                 ActiveOperatorRole = operatorRole,
+                LastInitialAmount = canManage && shift is null ? await repository.GetLastInitialAmountAsync(cancellationToken) : null,
             });
 
         return Result.Success(new CashStateDto(null, null, null, null, false, null,

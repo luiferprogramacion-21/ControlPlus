@@ -117,15 +117,23 @@
         </mat-select>
           @if (!product.id && hasCategoriesWithoutAbbreviation()) { <mat-hint>Las categorías sin prefijo se configuran en la pestaña Categorías antes de crear productos.</mat-hint> }
           <mat-error>Selecciona una categoría.</mat-error></mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Unidad</mat-label><mat-select formControlName="measurementUnitId">
-          @for (unit of units(); track unit.id) { @if (unit.isActive) { <mat-option [value]="unit.id">{{ unit.name }}</mat-option> } }
-        </mat-select><mat-error>Selecciona una unidad.</mat-error></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Precio minorista</mat-label><input matInput type="text" cpNumberInput step="1" min="0" formControlName="retailPrice"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
+        @if (!product.id) {
+          <mat-form-field appearance="outline"><mat-label>Existencia inicial</mat-label><cp-help matSuffix text="Cuántas unidades hay hoy en la tienda al crear el producto." /><input matInput type="text" cpNumberInput step="1" min="0" max="2147483647" formControlName="initialQuantity"><mat-error>Usa un entero entre 0 y 2.147.483.647.</mat-error></mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Costo de compra por unidad</mat-label><cp-help matSuffix text="Lo que te cuesta cada unidad. Sirve para calcular la ganancia y evitar vender por debajo del costo." /><input matInput type="text" cpNumberInput [cpNumberString]="true" min="0" step="0.0001" formControlName="initialUnitCost"><mat-hint>Cuánto pagaste al proveedor por cada unidad que estás ingresando. Decimales con coma.</mat-hint><mat-error>Usa un valor de 0 a 14 dígitos enteros y hasta 4 decimales.</mat-error></mat-form-field>
+        }
         @if (session.has('SUPPLIERS.READ')) {
           <mat-form-field appearance="outline"><mat-label>Proveedor preferido (opcional)</mat-label><cp-help matSuffix text="A quién se le suele comprar. Sirve para armar los pedidos por proveedor." /><mat-select formControlName="supplierId">
             <mat-option value="">Ninguno</mat-option>
             @for (supplier of suppliers(); track supplier.id) { <mat-option [value]="supplier.id">{{ supplier.name }}</mat-option> }
           </mat-select></mat-form-field>
         }
+        <mat-form-field appearance="outline"><mat-label>Stock mínimo</mat-label><cp-help matSuffix text="Cuando las existencias lleguen a este número, el producto aparece como «Stock bajo» para reponerlo." /><input matInput type="text" cpNumberInput step="1" min="0" formControlName="minimumStock"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
+        @if (!product.id) { <button class="more-data-toggle" type="button" [attr.aria-expanded]="moreProductData()" (click)="moreProductData.set(!moreProductData())">{{ moreProductData() ? '▾' : '▸' }} Más datos <span>(opcional: unidad, código de barras, descripción y precio mayorista)</span></button> }
+        @if (product.id || moreProductData()) {
+        <mat-form-field appearance="outline"><mat-label>Unidad</mat-label><mat-select formControlName="measurementUnitId">
+          @for (unit of units(); track unit.id) { @if (unit.isActive) { <mat-option [value]="unit.id">{{ unit.name }}</mat-option> } }
+        </mat-select><mat-error>Selecciona una unidad.</mat-error></mat-form-field>
         @if (!product.id) {
           <mat-checkbox [checked]="generateBarcode()" (change)="generateBarcode.set($event.checked)">Generar código</mat-checkbox>
         }
@@ -133,7 +141,6 @@
           <mat-form-field appearance="outline"><mat-label>Código de barras</mat-label><cp-help matSuffix text="El código que lee el lector. Si el producto no trae uno, deja marcado «Generar código» y el sistema crea uno." /><input matInput formControlName="barcode" [readonly]="!!product.id && product.barcodeGenerated"></mat-form-field>
         }
         <mat-form-field appearance="outline"><mat-label>Descripción</mat-label><textarea matInput formControlName="description"></textarea></mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Precio minorista</mat-label><input matInput type="text" cpNumberInput step="1" min="0" formControlName="retailPrice"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
         <mat-form-field appearance="outline"><mat-label>Precio mayorista</mat-label><cp-help matSuffix text="Precio para quien compra al por mayor. Solo se usa desde el mínimo de unidades de un mismo producto que fija el Administrador." /><input matInput type="text" cpNumberInput step="1" min="0" formControlName="wholesalePrice"></mat-form-field>
         @if (referenceCost(product) !== null) {
           <div class="price-calculator" role="group" aria-label="Calculadora de precio">
@@ -148,10 +155,6 @@
             @else if (priceNote(product); as note) { <small [class.price-calculator__low]="note.low">{{ note.text }}</small> }
           </div>
         }
-        <mat-form-field appearance="outline"><mat-label>Stock mínimo</mat-label><cp-help matSuffix text="Cuando las existencias lleguen a este número, el producto aparece como «Stock bajo» para reponerlo." /><input matInput type="text" cpNumberInput step="1" min="0" formControlName="minimumStock"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
-        @if (!product.id) {
-          <mat-form-field appearance="outline"><mat-label>Existencia inicial</mat-label><cp-help matSuffix text="Cuántas unidades hay hoy en la tienda al crear el producto." /><input matInput type="text" cpNumberInput step="1" min="0" max="2147483647" formControlName="initialQuantity"><mat-error>Usa un entero entre 0 y 2.147.483.647.</mat-error></mat-form-field>
-          <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Costo de compra por unidad</mat-label><cp-help matSuffix text="Lo que te cuesta cada unidad. Sirve para calcular la ganancia y evitar vender por debajo del costo." /><input matInput type="text" cpNumberInput [cpNumberString]="true" min="0" step="0.0001" formControlName="initialUnitCost"><mat-hint>Cuánto pagaste al proveedor por cada unidad que estás ingresando. Decimales con coma.</mat-hint><mat-error>Usa un valor de 0 a 14 dígitos enteros y hasta 4 decimales.</mat-error></mat-form-field>
         }
         @if (error()) { <div class="alert alert--error form-error" role="alert" aria-live="assertive">
           @if (createErrorKind() === 'validation') { <strong>Revisa los datos.</strong> }

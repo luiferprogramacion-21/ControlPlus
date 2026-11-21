@@ -172,8 +172,7 @@ public sealed partial class CreditsService(ICreditsRepository credits, ISalesRep
             methods.Any(x => x.Codigo == "EFECTIVO" ? !x.AfectaEfectivo : x.AfectaEfectivo))
             return Result.Failure<CreditPaymentOperationDto>(ApplicationError.Validation("Los métodos de pago deben estar activos y conservar su clasificación."));
         var byCode = methods.ToDictionary(x => x.Codigo);
-        if (payments.Any(x => byCode[x.MethodCode].RequiereReferencia && string.IsNullOrWhiteSpace(x.Reference)))
-            return Result.Failure<CreditPaymentOperationDto>(ApplicationError.Validation("La referencia electrónica es obligatoria."));
+        // Desde el 21 de noviembre de 2026 la referencia de Transferencia y Nequi es opcional en los abonos (propuesta 7).
         var now = clock.UtcNow;
         var today = await TodayAsync(cancellationToken);
         var correlationId = Guid.CreateVersion7();

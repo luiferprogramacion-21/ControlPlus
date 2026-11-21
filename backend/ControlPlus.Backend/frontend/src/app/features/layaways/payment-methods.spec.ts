@@ -20,10 +20,16 @@ describe('Medios de pago: funciones', () => {
     ['supera el máximo', [draft({ appliedAmount: 6000, receivedAmount: 6000 })], { mode: 'payment' as const, max: 5000, overMessage: 'Supera el saldo.' }, 'Supera el saldo'],
     ['suma distinta a la exacta', [draft({ appliedAmount: 3000 })], { mode: 'refund' as const, exact: 4000, exactMessage: 'No suma.' }, 'No suma'],
     ['efectivo recibido menor', [draft({ appliedAmount: 5000, receivedAmount: 4000 })], { mode: 'payment' as const }, 'efectivo recibido'],
-    ['electrónico sin referencia', [draft({ methodCode: 'NEQUI', reference: ' ' })], { mode: 'payment' as const }, 'referencia'],
+    ['devolución electrónica sin referencia', [draft({ methodCode: 'NEQUI', reference: ' ' })], { mode: 'refund' as const }, 'referencia'],
     ['electrónico con referencia larga', [draft({ methodCode: 'TRANSFERENCIA', reference: 'x'.repeat(201) })], { mode: 'refund' as const }, 'referencia'],
   ])('rechaza: %s', (_name, rows, rules, text) => {
     expect(validateDrafts(rows as PaymentDraft[], rules)).toContain(text);
+  });
+
+  it('en un abono la referencia electrónica es opcional y se envía nula (21 de noviembre de 2026)', () => {
+    const rows = [draft({ methodCode: 'NEQUI', reference: ' ' })] as PaymentDraft[];
+    expect(validateDrafts(rows, { mode: 'payment' })).toBe('');
+    expect(toPayments(rows)[0].reference).toBeNull();
   });
 
   it('en reembolso el efectivo no exige recibido y acepta una suma exacta', () => {

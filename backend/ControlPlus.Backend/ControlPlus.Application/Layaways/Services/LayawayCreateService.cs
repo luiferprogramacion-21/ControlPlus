@@ -125,6 +125,8 @@ public sealed class LayawayCreateService(
              string.IsNullOrWhiteSpace(customer.NumeroDocumento)) &&
             string.IsNullOrWhiteSpace(customer.Telefono))
             return Fail(ApplicationError.Validation("El cliente requiere documento completo o teléfono para apartar."));
+        if (string.IsNullOrWhiteSpace(customer.Direccion))
+            return Fail(ApplicationError.Validation("El cliente necesita dirección para apartar. Complétala en Clientes."));
 
         Usuario? authorizer = null;
         if (!selfAuthorized)
@@ -261,9 +263,7 @@ public sealed class LayawayCreateService(
             methods.Any(x => x.Codigo == "EFECTIVO" ? !x.AfectaEfectivo : x.AfectaEfectivo))
             return Fail(ApplicationError.Validation("Los métodos de pago deben estar activos y conservar su clasificación."));
         var methodsByCode = methods.ToDictionary(x => x.Codigo, StringComparer.Ordinal);
-        if (input.Payments.Any(x => methodsByCode[x.MethodCode].RequiereReferencia &&
-            string.IsNullOrWhiteSpace(x.Reference)))
-            return Fail(ApplicationError.Validation("La referencia electrónica es obligatoria."));
+        // Desde el 21 de noviembre de 2026 la referencia de Transferencia y Nequi es opcional (propuesta 7).
 
         var permission = await permissionRepository.GetByCodeAsync(PermissionCodes.LayawayManage, cancellationToken);
         if (permission is null || !permission.Activo)
@@ -474,8 +474,8 @@ public sealed class LayawayCreateService(
                     !CashMoney.IsValid(received, allowNegative: false) || received < payment.AppliedAmount)
                     return NormalizedCreate.Fail("El efectivo requiere recibido suficiente y no admite referencia.");
             }
-            else if (payment.ReceivedAmount is not null || reference is null)
-                return NormalizedCreate.Fail("Transferencia y Nequi requieren referencia y no admiten recibido.");
+            else if (payment.ReceivedAmount is not null)
+                return NormalizedCreate.Fail("Transferencia y Nequi no admiten recibido.");
             payments.Add(new CreateLayawayPaymentRequest(code, payment.AppliedAmount, payment.ReceivedAmount, reference));
         }
         if (payments.Select(x => x.MethodCode).Distinct().Count() != payments.Count)

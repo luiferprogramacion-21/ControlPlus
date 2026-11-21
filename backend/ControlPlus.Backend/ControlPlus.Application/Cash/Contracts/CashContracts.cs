@@ -48,7 +48,10 @@ public sealed record CashStateDto(
     // Nombre de quien pasó su carné en el turno compartido (20 de noviembre de 2026): la venta queda a su nombre.
     string? ActiveOperatorName = null,
     // Rol de quien pasó el carné (CAJERO, SUPERVISOR o ADMINISTRADOR): decide si el descuento o el mayorista piden autorización.
-    string? ActiveOperatorRole = null);
+    string? ActiveOperatorRole = null,
+    // Fondo inicial de la última apertura (21 de noviembre de 2026): solo para quien administra la caja y sin turno
+    // abierto, para ofrecer «Igual que la última vez» al abrir.
+    decimal? LastInitialAmount = null);
 
 public sealed record ConfigureCashRegisterRequest(string Code, string Name);
 

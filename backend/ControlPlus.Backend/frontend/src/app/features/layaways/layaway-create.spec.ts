@@ -106,7 +106,7 @@ describe('LayawayCreate: nuevo apartado', () => {
     ['cantidad mayor que la existencia', () => { fill(); component.lines()[0].quantity = 6; component.update(); }, 'cantidades'],
     ['cantidad decimal', () => { fill(); component.lines()[0].quantity = 1.5; component.update(); }, 'cantidades'],
     ['pago inicial mayor que el total', () => { fill(); component.drafts = [{ methodCode: 'EFECTIVO', appliedAmount: 10001, receivedAmount: 10001, reference: '' }]; }, 'supera el total'],
-    ['electrónico sin referencia', () => { fill(); component.drafts = [{ methodCode: 'NEQUI', appliedAmount: 5000, receivedAmount: null, reference: '' }]; }, 'referencia'],
+    ['electrónico con referencia larga', () => { fill(); component.drafts = [{ methodCode: 'NEQUI', appliedAmount: 5000, receivedAmount: null, reference: 'x'.repeat(201) }]; }, 'referencia'],
   ])('valida: %s', async (_name, setup, text) => {
     setup();
     expect(component.validation()).toContain(text);

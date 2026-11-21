@@ -52,3 +52,6 @@ mat-paginator { display:block; min-width:0; overflow:visible; font-size:14px; }
 /* Ventana de producto o categoría: la barra de botones ocupa el ancho del panel (padding 18px). */
 .editor .form-actions { justify-content: flex-end; margin: 12px -18px -18px; padding: 14px 18px 18px; }
 .editor .panel-heading h3 { margin: 0; font-size: 20px; }
+/* «Más datos» del producto nuevo (21 de noviembre de 2026). */
+.more-data-toggle { display:block; width:100%; margin:4px 0 12px; padding:10px 0; border:0; border-top:1px solid var(--cp-border); background:none; color:var(--cp-primary); font:inherit; font-weight:700; text-align:left; cursor:pointer; }
+.more-data-toggle span { color:var(--cp-text-muted); font-weight:400; }

@@ -60,6 +60,8 @@ public interface ICashRepository
     Task<IReadOnlyCollection<CredencialUsuario>> ListActiveCredentialsAsync(CancellationToken cancellationToken = default);
     /// <summary>User of the active card session of the open shared shift, if any (read only, no lock).</summary>
     Task<Guid?> GetActiveSharedOperatorUserIdAsync(CancellationToken cancellationToken = default);
+    /// <summary>Fondo inicial del último turno abierto, para ofrecerlo al abrir la caja (21 de noviembre de 2026).</summary>
+    Task<decimal?> GetLastInitialAmountAsync(CancellationToken cancellationToken = default);
     Task<CredencialUsuario?> GetActiveCredentialForUserAsync(Guid userId, CancellationToken cancellationToken = default, bool forUpdate = false);
     Task AddCredentialAsync(CredencialUsuario credential, CancellationToken cancellationToken = default);
 

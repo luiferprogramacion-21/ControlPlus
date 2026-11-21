@@ -38,7 +38,14 @@ export class CustomerPicker implements OnInit, OnDestroy {
   ngOnDestroy(): void { clearTimeout(this.timer); }
 
   /** For a credit the customer needs a complete document or a phone. */
-  eligible(customer: Customer): boolean { return !this.required() || !!(customer.documentType && customer.documentNumber) || !!customer.phone; }
+  eligible(customer: Customer): boolean { return !this.ineligibleReason(customer); }
+  /** Por qué el cliente no sirve para crédito o apartado: sin documento ni teléfono, o sin dirección (21 de noviembre de 2026). */
+  ineligibleReason(customer: Customer): string {
+    if (!this.required()) return '';
+    if (!(customer.documentType && customer.documentNumber) && !customer.phone) return 'Sin documento ni teléfono: no sirve para crédito';
+    if (!customer.address?.trim()) return 'Sin dirección: complétela en Clientes para crédito o apartado';
+    return '';
+  }
 
   onSearch(value: string): void {
     this.search = value; clearTimeout(this.timer);
@@ -67,7 +74,9 @@ export class CustomerPicker implements OnInit, OnDestroy {
   validation(): string {
     const f = this.form; const name = f.fullName.trim(); const address = f.address.trim();
     if (!name || name.length > 200) return 'Indica un nombre de hasta 200 caracteres.';
-    if (!address || address.length > 300) return 'Indica una dirección de hasta 300 caracteres.';
+    // Propuesta 6 (21 de noviembre de 2026): la dirección solo se pide para crédito o apartado.
+    if (this.required() && !address) return 'Indica la dirección: es obligatoria para un crédito o apartado.';
+    if (address.length > 300) return 'La dirección supera 300 caracteres.';
     if (this.canWriteDocument && !!f.documentType !== !!f.documentNumber.trim()) return 'Indica tipo y número de documento juntos.';
     if (f.documentNumber.trim().length > 50) return 'El documento supera 50 caracteres.';
     if (f.phone.trim().length > 30) return 'El teléfono supera 30 caracteres.';
@@ -82,7 +91,7 @@ export class CustomerPicker implements OnInit, OnDestroy {
       const created = await this.api.create({
         documentType: this.canWriteDocument && f.documentType ? f.documentType : null,
         documentNumber: this.canWriteDocument && f.documentType ? f.documentNumber.trim().toUpperCase() : null,
-        fullName: f.fullName.trim(), phone: f.phone.trim() || null, address: f.address.trim(), email: null, observations: null,
+        fullName: f.fullName.trim(), phone: f.phone.trim() || null, address: this.required() ? f.address.trim() : null, email: null, observations: null,
       });
       this.chosen.emit(created);
     } catch (e) { this.error.set(errorText(e)); }

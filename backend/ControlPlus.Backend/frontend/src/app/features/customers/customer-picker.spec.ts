@@ -52,17 +52,19 @@ describe('CustomerPicker', () => {
     expect(picker.eligible(customer({ documentType: null, documentNumber: null }))).toBe(true);
   });
 
-  it('exige nombre y dirección para registrar un cliente', async () => {
+  it('en contado basta el nombre; la dirección solo se exige para crédito o apartado (21 de noviembre de 2026)', async () => {
     await open(); picker.startCreate();
     expect(picker.validation()).toContain('nombre');
-    picker.form.fullName = 'Luis'; expect(picker.validation()).toContain('dirección');
+    picker.form.fullName = 'Luis'; expect(picker.validation()).toBe('');
+    await open(true); picker.startCreate(); picker.form.fullName = 'Luis'; picker.form.phone = '300';
+    expect(picker.validation()).toContain('dirección');
     picker.form.address = 'Calle 2'; expect(picker.validation()).toBe('');
   });
 
   it('con el permiso básico o el completo escribe el documento y exige tipo y número juntos', async () => {
     await open(); picker.startCreate(); picker.form.fullName = 'Luis'; picker.form.address = 'Calle 2'; picker.form.documentType = 'CC'; picker.form.documentNumber = '999';
     await picker.create();
-    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ documentType: 'CC', documentNumber: '999', fullName: 'Luis', address: 'Calle 2' }));
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ documentType: 'CC', documentNumber: '999', fullName: 'Luis', address: null }));
     permissions = ['CUSTOMERS.MANAGE']; api.create.mockClear();
     picker.form.documentNumber = ''; expect(picker.validation()).toContain('juntos');
     picker.form.documentNumber = ' ab12 '; await picker.create();

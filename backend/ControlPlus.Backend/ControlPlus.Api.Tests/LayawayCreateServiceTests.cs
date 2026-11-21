@@ -132,7 +132,7 @@ public sealed class LayawayCreateServiceTests
                 nameof(ILayawayCreateRepository.GetEstablishmentAsync) =>
                     Task.FromResult<Establecimiento?>(new Establecimiento { DiasLimiteApartado = 15 }),
                 nameof(ILayawayCreateRepository.GetActiveCustomerForUpdateAsync) =>
-                    Task.FromResult<Cliente?>(new Cliente { Id = _customerId, Telefono = "3000000000" }),
+                    Task.FromResult<Cliente?>(new Cliente { Id = _customerId, Telefono = "3000000000", Direccion = "Calle de prueba" }),
                 _ => throw new NotSupportedException(method.Name)
             });
             Service = new LayawayCreateService(layaways, sales, users,

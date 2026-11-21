@@ -60,6 +60,15 @@ export class Cash implements OnInit {
   concept = '';
   credential = '';
   counted: Record<string, number | null> = {};
+  /** Propuesta 4 (21 de noviembre de 2026): contar el efectivo por billete; el sistema suma y pone el total en «Contado». */
+  readonly BILLS = [100_000, 50_000, 20_000, 10_000, 5_000, 2_000] as const;
+  billCounts: Record<number, number | null> = {};
+  coinsTotal: number | null = null;
+  get billTotal(): number {
+    return this.BILLS.reduce((sum, bill) => sum + bill * (Number(this.billCounts[bill]) || 0), 0) + (Number(this.coinsTotal) || 0);
+  }
+  /** Cada cambio en la tabla de billetes reemplaza el valor contado del efectivo. */
+  onBillCountChange(methodId: string): void { this.counted[methodId] = this.billTotal; this.onCountedChange(); }
   reasonId = '';
   differenceObservation = '';
   ngOnInit(): void { void this.establishment.load().catch(() => undefined); void this.refresh(); }
@@ -89,7 +98,7 @@ export class Cash implements OnInit {
     this.loading.set(true); this.stateLoading.set(true); this.error.set('');
     let stateLoaded = false;
     try {
-      const state = await this.api.state(); stateLoaded = true; this.stateLoading.set(false); this.stateReadError.set(false); this.state.set(state);
+      const state = await this.api.state(); stateLoaded = true; this.stateLoading.set(false); this.stateReadError.set(false); this.state.set(state); if (!state.hasOpenShift && !this.initialAmount && state.lastInitialAmount) this.initialAmount = state.lastInitialAmount;
       if (state.hasOpenShift) {
         this.movements.set((await this.api.movements()).items);
         if (this.session.has('CASH.SHIFT_MANAGE') && state.currentShift) {
@@ -141,7 +150,7 @@ export class Cash implements OnInit {
   }
   async loadReconciliation(): Promise<void> {
     const value = await this.api.reconciliation();
-    if (this.reconciliation()?.shiftId !== value.shiftId) this.resetReasons();
+    if (this.reconciliation()?.shiftId !== value.shiftId) { this.resetReasons(); this.billCounts = {}; this.coinsTotal = null; }
     this.reconciliation.set(value);
     this.counted = Object.fromEntries(value.paymentMethods.filter(method => method.affectsCash).map(method => [method.paymentMethodId, method.countedAmount]));
   }

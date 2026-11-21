@@ -102,7 +102,8 @@ public sealed class CustomerService(ICustomerRepository repository, IPermissionC
     {
         type = Optional(type)?.ToUpperInvariant(); number = Optional(number)?.ToUpperInvariant(); name = Optional(name); phone = Optional(phone); address = Optional(address); email = Optional(email)?.ToLowerInvariant(); observations = Optional(observations);
         if (name is null || name.Length > 200) return (null,null,null,null,null,null,null,ApplicationError.Validation("El nombre completo es obligatorio y no puede superar 200 caracteres."));
-        if (address is null || address.Length > 300) return (null,null,null,null,null,null,null,ApplicationError.Validation("La dirección es obligatoria y no puede superar 300 caracteres."));
+        // Desde el 21 de noviembre de 2026 la dirección es opcional al registrar; el crédito y el apartado la exigen.
+        if (address?.Length > 300) return (null,null,null,null,null,null,null,ApplicationError.Validation("La dirección no puede superar 300 caracteres."));
         if (phone?.Length > 30 || email?.Length > 254) return (null,null,null,null,null,null,null,ApplicationError.Validation("El teléfono o correo supera la longitud permitida."));
         if ((type is null) != (number is null)) return (null,null,null,null,null,null,null,ApplicationError.Validation("El tipo y número de documento deben informarse juntos o ambos ser nulos."));
         if (type is not null && type is not ("CC" or "CE" or "NIT" or "PASAPORTE" or "PPT" or "OTRO")) return (null,null,null,null,null,null,null,ApplicationError.Validation("El tipo de documento no es válido."));
@@ -112,7 +113,7 @@ public sealed class CustomerService(ICustomerRepository repository, IPermissionC
     }
     private static string? Optional(string? x) => string.IsNullOrWhiteSpace(x) ? null : x.Trim();
     private static IReadOnlyCollection<string> Changed(Cliente x, (string? Type,string? Number,string? Name,string? Phone,string? Address,string? Email,string? Observations,ApplicationError? Error) i) => new[] { (x.TipoDocumento != i.Type,"tipoDocumento"), (x.NumeroDocumento != i.Number,"numeroDocumento"), (x.NombreCompleto != i.Name,"nombreCompleto"), (x.Telefono != i.Phone,"telefono"), (x.Direccion != i.Address,"direccion"), (x.Correo != i.Email,"correo"), (x.Observaciones != i.Observations,"observaciones") }.Where(x => x.Item1).Select(x => x.Item2).ToArray();
-    private static CustomerDto Map(Cliente x) => new(x.Id, x.TipoDocumento, x.NumeroDocumento, x.NombreCompleto, x.Telefono, x.Direccion!, x.Correo, x.Observaciones, x.Activo, x.Version, x.CupoCredito);
+    private static CustomerDto Map(Cliente x) => new(x.Id, x.TipoDocumento, x.NumeroDocumento, x.NombreCompleto, x.Telefono, x.Direccion, x.Correo, x.Observaciones, x.Activo, x.Version, x.CupoCredito);
 
     /// <summary>Cupo de crédito (16 de noviembre de 2026): vacío o pesos enteros positivos.</summary>
     private static ApplicationError? CreditLimitError(decimal? limit) =>

@@ -9,10 +9,10 @@ describe('Customers', () => {
   let permissions = ['CUSTOMERS.MANAGE'];
   const session = { has: (permission: string) => permissions.includes(permission) };
   beforeEach(() => { vi.clearAllMocks(); permissions = ['CUSTOMERS.MANAGE']; TestBed.configureTestingModule({ providers: [{ provide: CustomersApi, useValue: api }, { provide: SessionService, useValue: session }] }); component = TestBed.runInInjectionContext(() => new Customers()); });
-  it('valida dirección y pareja documental antes del alta', async () => {
-    component.newCustomer(); component.form.fullName = 'Ana';
+  it('valida la pareja documental antes del alta; la dirección es opcional (21 de noviembre de 2026)', async () => {
+    component.newCustomer(); component.form.fullName = 'Ana'; component.form.documentType = 'CC';
     await component.save(); expect(api.create).not.toHaveBeenCalled();
-    component.form.address = 'Calle 1'; component.form.documentType = 'CC';
+    component.form.address = 'x'.repeat(301); component.form.documentType = null;
     await component.save(); expect(api.create).not.toHaveBeenCalled();
   });
   it('envía alta válida normalizada', async () => {

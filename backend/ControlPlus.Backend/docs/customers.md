@@ -4,7 +4,7 @@ El primer corte expone altas, consulta, búsqueda, edición e inactivación/reac
 
 `CUSTOMERS.BASIC_MANAGE` permite trabajar con clientes activos y modificar nombre completo, **documento (opcional, tipo y número juntos y sin repetirse)**, teléfono, dirección y correo. `CUSTOMERS.MANAGE` agrega observaciones, cupo de crédito, lectura de inactivos y cambio de estado. Decisión del 18 de noviembre de 2026: el documento dejó de ser exclusivo del permiso completo para que el Cajero también pueda registrarlo. Los permisos se revalidan desde persistencia, por lo que una revocación individual prevalece sobre rol o concesión.
 
-Nombre completo y dirección son obligatorios. El documento es opcional, pero tipo y número se informan juntos; se recortan y normalizan a mayúsculas, sin alterar caracteres internos del número. La pareja documental es única. Correo se recorta, pasa a minúsculas y se valida.
+El nombre completo es obligatorio. La dirección es opcional al registrar desde el 21 de noviembre de 2026 (antes era obligatoria), pero se exige para vender a crédito o abrir un apartado. El documento es opcional, pero tipo y número se informan juntos; se recortan y normalizan a mayúsculas, sin alterar caracteres internos del número. La pareja documental es única. Correo se recorta, pasa a minúsculas y se valida.
 
 La búsqueda usa prefijos sobre nombre completo, número de documento y teléfono. Nombre y teléfono son insensibles a mayúsculas mediante `lower(columna)`; documento usa el valor normalizado en mayúsculas. `%`, `_` y `\` aportados por el usuario se escapan y se tratan como texto, no como comodines SQL. El listado mantiene filtro de estado, paginación y orden estable por nombre completo e ID.
 
@@ -14,7 +14,7 @@ Las mutaciones se guardan junto con una auditoría en la misma transacción de E
 
 ## Uso en créditos
 
-Una venta a crédito exige `customerId` de un cliente existente y activo con documento completo (tipo y número) o teléfono; la dirección obligatoria del registro de Cliente no reemplaza ese dato de identificación. Una vez otorgado, la inactivación del cliente impide nuevos créditos, pero conserva la consulta, el historial y la posibilidad de abonar el crédito previo. Las respuestas de Créditos muestran solo nombre, tipo y número de documento, y teléfono para identificación; omiten dirección, correo, observaciones y auditoría detallada. El historial de abonos exige simultáneamente `CREDIT.MANAGE` y `CUSTOMERS.HISTORY_READ` efectivos.
+Una venta a crédito exige `customerId` de un cliente existente y activo con documento completo (tipo y número) o teléfono, y además con dirección (21 de noviembre de 2026); la dirección no reemplaza ese dato de identificación. Una vez otorgado, la inactivación del cliente impide nuevos créditos, pero conserva la consulta, el historial y la posibilidad de abonar el crédito previo. Las respuestas de Créditos muestran solo nombre, tipo y número de documento, y teléfono para identificación; omiten dirección, correo, observaciones y auditoría detallada. El historial de abonos exige simultáneamente `CREDIT.MANAGE` y `CUSTOMERS.HISTORY_READ` efectivos.
 
 ## Historial comercial: primer corte
 

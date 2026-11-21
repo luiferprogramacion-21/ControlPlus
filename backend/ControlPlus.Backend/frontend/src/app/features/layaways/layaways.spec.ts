@@ -82,7 +82,7 @@ describe('Layaways: abonos y entrega', () => {
     ['importe decimal', [{ m: 'EFECTIVO', a: 10.5, r: 11, ref: '' }], 'entero mayor que cero'],
     ['supera el saldo', [{ m: 'EFECTIVO', a: 80001, r: 90000, ref: '' }], 'supera el saldo'],
     ['efectivo recibido menor', [{ m: 'EFECTIVO', a: 5000, r: 4000, ref: '' }], 'efectivo recibido'],
-    ['electrónico sin referencia', [{ m: 'NEQUI', a: 5000, r: null, ref: ' ' }], 'referencia'],
+    ['electrónico con referencia larga', [{ m: 'NEQUI', a: 5000, r: null, ref: 'x'.repeat(201) }], 'referencia'],
   ])('valida: %s', async (_name, rows, text) => {
     await component.openPayment(layaway());
     component.drafts = rows.map(x => ({ methodCode: x.m as 'EFECTIVO', appliedAmount: x.a, receivedAmount: x.r as number | null, reference: x.ref }));

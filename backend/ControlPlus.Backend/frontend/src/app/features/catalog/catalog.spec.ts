@@ -203,6 +203,11 @@ describe('Catalog: existencias iniciales', () => {
       .toEqual(['N.º de producto', 'Código de barras', 'Producto']);
     fixture.componentInstance.newProduct();
     fixture.detectChanges();
+    // Propuesta 2 (21 de noviembre de 2026): unidad, barras, descripción y mayorista quedan en «Más datos».
+    expect(root.querySelector('mat-checkbox input')).toBeNull();
+    expect(root.textContent).toContain('Stock mínimo');
+    (root.querySelector('.more-data-toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
     expect((root.querySelector('mat-checkbox input') as HTMLInputElement).checked).toBe(true);
     expect(root.querySelector('mat-select[formControlName="barcodeFormat"]')).toBeNull();
     expect(root.textContent).toContain('Costo de compra por unidad');

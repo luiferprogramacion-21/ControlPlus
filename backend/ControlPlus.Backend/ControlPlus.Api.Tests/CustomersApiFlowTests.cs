@@ -160,7 +160,7 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         Assert.Equal(254, validMail.Length);
         var boundary = await CreateAsync(client, new("OTRO", new string('x', 50), new string('n', 200), new string('t', 30), new string('d', 300), validMail, null));
         Assert.Equal(200, boundary.FullName.Length);
-        Assert.Equal(300, boundary.Address.Length);
+        Assert.Equal(300, boundary.Address!.Length);
         Assert.Equal(30, boundary.Phone!.Length);
         Assert.Equal(254, boundary.Email!.Length);
         var before = await CustomerStateAsync();

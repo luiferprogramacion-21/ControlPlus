@@ -617,6 +617,11 @@ app-root .cdk-overlay-popover { zoom: calc(1 / var(--cp-zoom)); }
 .quick-link > cp-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; background: var(--cp-primary-soft); color: var(--cp-primary); }
 .quick-link span { display: flex; flex-direction: column; gap: 3px; }
 .quick-link small { color: var(--cp-text-muted); font-size: 12px; }
+/* Botones de valor rápido junto a un importe (abono, fondo de caja), 21 de noviembre de 2026. */
+.quick-amounts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.quick-chip { min-height: 36px; padding: 6px 14px; border: 1px solid var(--cp-control-border); border-radius: 999px; background: var(--cp-surface); color: var(--cp-primary); font: inherit; font-weight: 600; cursor: pointer; }
+.quick-chip:hover { background: var(--cp-primary-soft); }
+.quick-chip--on { border: 2px solid var(--cp-primary); background: var(--cp-primary-soft); }
 .module-status-list { margin: 12px 0 0; }
 .module-panel { min-width: 0; display: flex; flex-direction: column; padding: 18px 20px 20px; }
 .module-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
@@ -803,3 +808,11 @@ kbd { display: inline-block; min-width: 28px; padding: 2px 7px; border: 1px soli
 .user-menu__scale strong { min-width: 56px; text-align: center; font-size: 15px; }
 .user-menu__step { width: 36px; height: 32px; border: 1px solid var(--cp-control-border); border-radius: 8px; background: var(--cp-surface); color: var(--cp-primary); font-size: 18px; font-weight: 700; cursor: pointer; }
 .user-menu__step:hover { background: var(--cp-primary-soft); border-color: var(--cp-primary); }
+
+/* Contar el efectivo por billete (21 de noviembre de 2026). */
+.bill-count { display:grid; gap:6px; margin:0 0 14px; padding:12px 14px; border:1px solid var(--cp-border); border-radius:10px; background:var(--cp-surface-alt); }
+.bill-count__head, .bill-count__row { display:grid; grid-template-columns:minmax(110px,1fr) minmax(90px,140px) minmax(110px,1fr); align-items:center; gap:12px; }
+.bill-count__head { color:var(--cp-text-secondary); font-size:12px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.bill-count__head span:last-child, .bill-count__row strong { text-align:right; }
+.bill-count__row input { min-height:36px; padding:4px 10px; border:1px solid var(--cp-control-border); border-radius:7px; font:inherit; text-align:right; background:var(--cp-surface); }
+.bill-count .form-hint { margin:4px 0 0; }

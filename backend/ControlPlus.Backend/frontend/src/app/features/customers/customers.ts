@@ -44,11 +44,11 @@ export class Customers implements OnInit {
   newCustomer(): void { this.selected.set(null); this.form = this.empty(); this.editing.set(true); this.error.set(''); }
   edit(customer: Customer): void { this.selected.set(customer); this.form = { documentType: customer.documentType, documentNumber: customer.documentNumber, fullName: customer.fullName, phone: customer.phone, address: customer.address, email: customer.email, observations: customer.observations, creditLimit: customer.creditLimit ?? null }; this.editing.set(true); this.error.set(''); }
   cancel(): void { this.editing.set(false); this.selected.set(null); }
-  private normalized(): CustomerInput { const f = this.form; const value = (x: string | null) => x?.trim() || null; return { documentType: value(f.documentType)?.toUpperCase() ?? null, documentNumber: value(f.documentNumber)?.toUpperCase() ?? null, fullName: f.fullName.trim(), phone: value(f.phone), address: f.address.trim(), email: value(f.email)?.toLowerCase() ?? null, observations: this.full ? value(f.observations) : this.selected()?.observations ?? null, creditLimit: this.full ? limit(f.creditLimit) : this.selected()?.creditLimit ?? null }; }
+  private normalized(): CustomerInput { const f = this.form; const value = (x: string | null) => x?.trim() || null; return { documentType: value(f.documentType)?.toUpperCase() ?? null, documentNumber: value(f.documentNumber)?.toUpperCase() ?? null, fullName: f.fullName.trim(), phone: value(f.phone), address: value(f.address), email: value(f.email)?.toLowerCase() ?? null, observations: this.full ? value(f.observations) : this.selected()?.observations ?? null, creditLimit: this.full ? limit(f.creditLimit) : this.selected()?.creditLimit ?? null }; }
   validation(): string {
     const f = this.normalized();
     if (!f.fullName || f.fullName.length > 200) return 'Indica un nombre de hasta 200 caracteres.';
-    if (!f.address || f.address.length > 300) return 'Indica una dirección de hasta 300 caracteres.';
+    if ((f.address?.trim().length ?? 0) > 300) return 'La dirección supera 300 caracteres.';
     if (!!f.documentType !== !!f.documentNumber) return 'Indica tipo y número de documento juntos.';
     if (f.documentNumber && f.documentNumber.length > 50) return 'El documento supera 50 caracteres.';
     if (f.phone && f.phone.length > 30) return 'El teléfono supera 30 caracteres.';

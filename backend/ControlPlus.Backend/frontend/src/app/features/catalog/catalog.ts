@@ -63,6 +63,8 @@ export class Catalog implements OnInit {
   readonly productPageSize = signal(20);
   readonly categoryPageSize = signal(20);
   readonly generateBarcode = signal(false);
+  /** Propuesta 2 (21 de noviembre de 2026): en un producto nuevo, unidad, barras, descripción y mayorista van en «Más datos». */
+  readonly moreProductData = signal(false);
   /** Product IVA switch: «Sin IVA» (default) sends no percentage; «Con IVA» asks for it. Optional information. */
   readonly hasTax = signal(false);
   private requestId = 0;
@@ -227,7 +229,7 @@ export class Catalog implements OnInit {
   newProduct(): void {
     if (this.saving() || this.checkingCreate()) return;
     if (this.restorePendingCreate()) return;
-    this.cancel(); this.generateBarcode.set(true);
+    this.cancel(); this.generateBarcode.set(true); this.moreProductData.set(false);
     this.selectedProduct.set({ id: '', version: 0 } as Product);
     this.productForm.reset({
       name: '', internalCode: '', categoryId: '', measurementUnitId: '', supplierId: '',
@@ -316,7 +318,12 @@ export class Catalog implements OnInit {
       this.error.set('Hay un alta pendiente de confirmar. Recupera el alta original; los cambios no se enviarán con otra clave.');
       return;
     }
-    if (this.productForm.invalid || this.saving() || this.checkingCreate()) { this.productForm.markAllAsTouched(); return; }
+    if (this.productForm.invalid || this.saving() || this.checkingCreate()) {
+      this.productForm.markAllAsTouched();
+      const c = this.productForm.controls;
+      if (c.measurementUnitId.invalid || c.barcode.invalid || c.description.invalid || c.wholesalePrice.invalid) this.moreProductData.set(true);
+      return;
+    }
     const selected = this.selectedProduct();
     if (!selected) return;
     const f = this.productForm.getRawValue();
