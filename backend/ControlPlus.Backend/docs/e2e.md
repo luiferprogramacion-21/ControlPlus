@@ -13,6 +13,12 @@ Decisión del 16 de noviembre de 2026: pruebas de extremo a extremo del flujo pr
 5. **Cerrar caja:** en «Arqueo y cierre» el efectivo esperado es $110.000; se cuenta esa cifra, la diferencia es $0 y el turno se cierra.
 6. Comprobar que el producto quedó con 8 unidades disponibles.
 
+`e2e/tests/sales-credit.spec.ts` (21 de noviembre de 2026) corre después, con la caja que dejó cerrada la prueba anterior:
+
+1. **Abrir caja** con el fondo propuesto de la última apertura ($100.000) y el botón **Igual que la última vez**.
+2. **Vender a crédito** registrando el cliente desde la venta: nombre, documento, teléfono y la dirección, que solo se pide en crédito o apartado.
+3. **Abonar** en Créditos: el valor llega con todo el saldo ($8.000) y se paga por Nequi **sin referencia**. El crédito queda pagado.
+
 ## Cómo corren en el CI
 
 El trabajo «Pruebas de navegador (flujo principal)» de `.github/workflows/ci.yml`:
