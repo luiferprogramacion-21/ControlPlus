@@ -1,5 +1,16 @@
 # ControlPlus — contexto oficial para agentes de desarrollo
 
+## Cierre obligatorio de cada tarea (instrucción del usuario del 21 de noviembre de 2026)
+
+- El agente que hace el trabajo lo termina hasta dejarlo listo para instalar; no lo transfiere a otro agente para cerrar la entrega.
+- Antes de confirmar, leer este archivo y revisar `git status --short` y `git log origin/main..main`. Preparar con rutas explícitas solo los archivos propios; si un archivo es compartido, preparar únicamente las líneas propias. No incluir trabajo ajeno.
+- Todo cambio visual que se aparte del prototipo requiere aprobación del usuario. Registrar cada decisión aquí y los cambios de uso en `docs/manual-de-uso.md`.
+- Cada migración nueva se agrega al final de `ExpectedAppliedMigrations` en `ControlPlus.Api.Tests/SalesApiFlowTests.cs`, con su prueba y activador `scripts/<nombre>/Invoke-Activation.ps1`, `Preflight.sql` y `Postflight.sql`, fijando el historial anterior y posterior. Nunca acceder a `controlplus` ni aplicarla allí desde el agente.
+- Deben pasar localmente `dotnet build ControlPlus.Backend.slnx -m:1 /warnaserror`, `dotnet test ControlPlus.Backend.slnx --no-build --filter "Category!=Integration"` y, desde `frontend`, `npx ng test --watch=false` y `npx ng build`. Ajustar también las pruebas de integración cuando cambie una regla.
+- Confirmar con mensaje claro en español y subir con `git push origin main`. Lanzar `scripts/dev/Watch-CI.ps1 -Sha (git rev-parse HEAD)` en PowerShell oculto y consultar una sola vez el resultado `%TEMP%/controlplus-ci/<sha7>.txt` cuando se necesite; no hacer bucles de consultas. Ante FALLO, leer `gh run view <id> --log-failed`, corregir, subir y esperar de nuevo.
+- Solo con CI verde entregar pasos de instalación en PowerShell como Administrador: detener el servicio, activar la migración pendiente si corresponde hasta `..._ACTIVATION_OK`, ejecutar `scripts/service/Install-ControlPlusService.ps1` hasta `CONTROLPLUS_SERVICE_OK` e indicar qué revisar en pantalla. El instalador compila la carpeta completa: no instalar con trabajo ajeno sin confirmar en `git status --short`.
+- Escribir en español y nunca exponer contraseñas ni secretos.
+
 ## 1. Propósito de este archivo
 
 Este archivo es la fuente breve y operativa de contexto para trabajar en el proyecto **ControlPlus**. Todo agente que abra el repositorio debe leerlo antes de proponer cambios, crear código, modificar la base de datos o ajustar la interfaz.

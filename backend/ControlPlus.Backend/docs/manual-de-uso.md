@@ -215,7 +215,8 @@ Al retomar una venta, el sistema quita lo que ya no tiene existencias y te lo di
 
 - El **cliente es obligatorio**, con documento completo o teléfono.
 - No se cobra nada en el momento: se registra la deuda por el total.
-- Elige la **fecha de vencimiento** (desde mañana hasta 90 días). El sistema propone una fecha según la configuración del negocio.
+- La **fecha de vencimiento** viene propuesta según el plazo que configuró el Administrador, contado desde la fecha operativa del crédito: por ejemplo, 21/11/2026 más 3 meses vence el 21/02/2027. La pantalla muestra los días o meses configurados. Si el día no existe en el mes de destino, usa su último día.
+- Puedes cambiar la fecha desde mañana hasta 3 meses calendario si el plazo está configurado en meses; en los demás casos, hasta 90 días. Al volver al carrito y entrar de nuevo a cobrar se actualiza la sugerencia; una fecha que hayas editado se conserva.
 - Necesitas la **autorización de un Supervisor o del Administrador**.
 - El sistema **avisa** si el cliente tiene créditos vencidos o si esta venta supera su **cupo**. Si el Administrador activó el bloqueo, solo **el Administrador** puede autorizar la excepción.
 - **No hay intereses ni recargos**: la deuda nunca crece.
@@ -454,7 +455,7 @@ Menú **Configuración**, con cuatro pestañas. La numeración de documentos y l
 | --- | --- |
 | **Establecimiento** | Nombre comercial, NIT o documento opcional, teléfono, dirección y los textos de encabezado y pie del ticket. |
 | **Caja y turnos** | Modalidad predeterminada: individual o compartido (solo sin turno abierto). |
-| **Cambios, apartados y créditos** | Plazo de cambios de producto (15 días), pago inicial mínimo de apartados (20 %, se puede apagar; siempre al menos $1), plazo límite de apartados (15 días), plazo sugerido de los créditos (1 a 90 días) y **mínimo mayorista** (12 unidades). También el **bloqueo de créditos a morosos y de cupo excedido**: si lo activas, solo tú puedes autorizar una excepción. |
+| **Cambios, apartados y créditos** | Plazo de cambios de producto (15 días), pago inicial mínimo de apartados (20 %, se puede apagar; siempre al menos $1), plazo límite de apartados (15 días), plazo sugerido de los créditos (elige **Días**, de 1 a 90, o **Meses**, de 1 a 3; también puedes elegir el vencimiento en cada venta) y **mínimo mayorista** (12 unidades). Guarda el plazo para aplicarlo a los créditos nuevos. También el **bloqueo de créditos a morosos y de cupo excedido**: si lo activas, solo tú puedes autorizar una excepción. |
 | **Impresión** | Perfiles de impresora y cola de impresión (ver 4.7). |
 
 ## 4.7 Impresora
