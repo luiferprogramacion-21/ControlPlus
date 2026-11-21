@@ -48,10 +48,11 @@ export class Customers implements OnInit {
   validation(): string {
     const f = this.normalized();
     if (!f.fullName || f.fullName.length > 200) return 'Indica un nombre de hasta 200 caracteres.';
-    if ((f.address?.trim().length ?? 0) > 300) return 'La dirección supera 300 caracteres.';
-    if (!!f.documentType !== !!f.documentNumber) return 'Indica tipo y número de documento juntos.';
-    if (f.documentNumber && f.documentNumber.length > 50) return 'El documento supera 50 caracteres.';
-    if (f.phone && f.phone.length > 30) return 'El teléfono supera 30 caracteres.';
+    // Decisión del 21 de noviembre de 2026: todo cliente lleva nombre, documento, teléfono y dirección.
+    if (!f.documentType || !f.documentNumber) return 'Indica el tipo y el número de documento.';
+    if (f.documentNumber.length > 50) return 'El documento supera 50 caracteres.';
+    if (!f.phone || f.phone.length > 30) return 'Indica el teléfono (hasta 30 caracteres).';
+    if (!f.address || f.address.length > 300) return 'Indica la dirección (hasta 300 caracteres).';
     if (f.email && (f.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email))) return 'Revisa el correo.';
     if (f.creditLimit != null && (!Number.isInteger(f.creditLimit) || f.creditLimit <= 0)) return 'El cupo de crédito debe ser un valor en pesos enteros mayor que cero, o vacío para no tener límite.';
     return '';

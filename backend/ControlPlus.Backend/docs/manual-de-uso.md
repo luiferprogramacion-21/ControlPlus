@@ -240,9 +240,9 @@ Un apartado separa productos para un cliente mientras los va pagando. Menú **Ap
 
 ## 2.10 Clientes
 
-Menú **Clientes** → **Nuevo cliente**. Lleva nombre y, si quieres, documento (tipo y número), teléfono y dirección. El documento no se puede repetir. Puedes consultar su **historial**.
+Menú **Clientes** → **Nuevo cliente**. Todo cliente lleva **nombre, documento (tipo y número), teléfono y dirección**; el correo es opcional. El documento no se puede repetir. Puedes consultar su **historial**.
 
-Desde el punto de venta (**+ Nuevo cliente**) se piden solo nombre, documento y teléfono. La **dirección** solo se pide en una venta a crédito o un apartado, porque ahí es obligatoria: un cliente sin dirección no sirve para crédito ni apartado hasta completarla en Clientes.
+Desde el punto de venta (**+ Nuevo cliente**) se piden esos mismos cuatro datos. Si un cliente antiguo no los tiene, al editarlo en Clientes hay que completarlos; sin dirección no sirve para crédito ni apartado.
 
 ## 2.11 Consultar productos y existencias
 
@@ -309,7 +309,7 @@ En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto*
 
 En **Caja** pulsa **Cerrar caja** (también está en Inicio). El cierre se hace en tres pasos:
 
-1. **Contar el efectivo.** El sistema muestra el efectivo **esperado**. Escribe **cuántos billetes** hay de 100.000, 50.000, 20.000, 10.000, 5.000 y 2.000, y el total en monedas: el sistema suma y lo pone en **Contado**. Si ya sabes el total, puedes escribirlo directo. **Solo se cuenta el efectivo.** Nequi, transferencias y otros medios se muestran como información. Pulsa **Siguiente**.
+1. **Contar el efectivo.** El sistema muestra el efectivo **esperado**. Escribe **cuántos billetes** hay de 100.000, 50.000, 20.000, 10.000, 5.000 y 2.000: el sistema suma y lo pone en **Contado**. Si ya sabes el total, digítalo directo en **Contado**. **Solo se cuenta el efectivo.** Nequi, transferencias y otros medios se muestran como información. Pulsa **Siguiente**.
 2. **Revisar la diferencia.** La diferencia es contado menos esperado (no hay cierre «a ciegas»). Si todo cuadra, lo dice; si no, elige el **motivo** del descuadre. Pulsa **Siguiente**.
 3. **Confirmar.** Revisa el resumen y pulsa **Cerrar caja**. Si hubo diferencia, pide la **autorización de un Administrador**.
 
@@ -381,7 +381,7 @@ En **Créditos y abonos** puedes registrar abonos (como el Cajero) y además:
 
 Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor**, **Mercancía recibida** y **Compras sin pedido**.
 
-- **Pedir mercancía:** **Más ▾** → **Nuevo pedido al proveedor** → elige el proveedor, agrega productos con su cantidad → **Crear pedido**.
+- **Pedir mercancía:** **Nuevo pedido al proveedor** (al lado de Recibir mercancía) → elige el proveedor, agrega productos con su cantidad → **Crear pedido**.
 - **Cuando llega mercancía:** pulsa **Recibir mercancía** (también en Inicio). Son tres pasos, que se ven arriba de cada ventana: **1. ¿De dónde viene?**, **2. Productos y cantidades** y **3. Confirmar**. El sistema pregunta si viene de un pedido:
   - **Sí, viene de un pedido:** eliges el pedido; las cantidades pendientes **vienen listas**. Si llegó menos (recepción **parcial**), corrígelas.
   - **No, es una compra sin pedido:** anotas el proveedor, el número de factura, los productos y sus costos.

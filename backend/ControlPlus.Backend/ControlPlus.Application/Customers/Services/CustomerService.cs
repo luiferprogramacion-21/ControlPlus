@@ -102,10 +102,12 @@ public sealed class CustomerService(ICustomerRepository repository, IPermissionC
     {
         type = Optional(type)?.ToUpperInvariant(); number = Optional(number)?.ToUpperInvariant(); name = Optional(name); phone = Optional(phone); address = Optional(address); email = Optional(email)?.ToLowerInvariant(); observations = Optional(observations);
         if (name is null || name.Length > 200) return (null,null,null,null,null,null,null,ApplicationError.Validation("El nombre completo es obligatorio y no puede superar 200 caracteres."));
-        // Desde el 21 de noviembre de 2026 la dirección es opcional al registrar; el crédito y el apartado la exigen.
-        if (address?.Length > 300) return (null,null,null,null,null,null,null,ApplicationError.Validation("La dirección no puede superar 300 caracteres."));
-        if (phone?.Length > 30 || email?.Length > 254) return (null,null,null,null,null,null,null,ApplicationError.Validation("El teléfono o correo supera la longitud permitida."));
-        if ((type is null) != (number is null)) return (null,null,null,null,null,null,null,ApplicationError.Validation("El tipo y número de documento deben informarse juntos o ambos ser nulos."));
+        // Decisión del 21 de noviembre de 2026: todo cliente que se guarde (alta o edición) lleva nombre, documento
+        // (tipo y número), teléfono y dirección.
+        if (address is null || address.Length > 300) return (null,null,null,null,null,null,null,ApplicationError.Validation("La dirección es obligatoria y no puede superar 300 caracteres."));
+        if (phone is null || phone.Length > 30) return (null,null,null,null,null,null,null,ApplicationError.Validation("El teléfono es obligatorio y no puede superar 30 caracteres."));
+        if (email?.Length > 254) return (null,null,null,null,null,null,null,ApplicationError.Validation("El correo supera la longitud permitida."));
+        if (type is null || number is null) return (null,null,null,null,null,null,null,ApplicationError.Validation("El tipo y número de documento son obligatorios."));
         if (type is not null && type is not ("CC" or "CE" or "NIT" or "PASAPORTE" or "PPT" or "OTRO")) return (null,null,null,null,null,null,null,ApplicationError.Validation("El tipo de documento no es válido."));
         if (number?.Length > 50) return (null,null,null,null,null,null,null,ApplicationError.Validation("El número de documento no puede superar 50 caracteres."));
         if (email is not null && (!MailAddress.TryCreate(email, out var parsed) || parsed.Address != email)) return (null,null,null,null,null,null,null,ApplicationError.Validation("El correo no tiene un formato válido."));

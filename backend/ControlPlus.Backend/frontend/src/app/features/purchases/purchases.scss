@@ -94,11 +94,8 @@
 .purchase-kind__option strong { font-size:18px; }
 .purchase-kind__option small { color:var(--cp-text-secondary); font-size:14px; }
 .purchase-kind__option:hover, .purchase-kind__option:focus-visible { border-color:var(--cp-primary); background:var(--cp-primary-soft); }
-/* Recibir mercancía en 3 pasos y menú «Más ▾» del encabezado (21 de noviembre de 2026). */
+/* Recibir mercancía en 3 pasos (21 de noviembre de 2026). */
 .purchase-steps { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; padding:0; list-style:none; }
 .purchase-steps li { padding:6px 12px; border-radius:999px; background:var(--cp-primary-soft); color:var(--cp-primary); font-size:13px; font-weight:700; }
 .purchase-steps li.is-current { background:var(--cp-primary); color:#fff; }
 .purchase-steps li.is-done { background:var(--cp-success-soft); color:var(--cp-success); }
-.heading-more { position:relative; }
-.heading-more__backdrop { position:fixed; inset:0; z-index:999; }
-.heading-more__menu { position:absolute; top:calc(100% + 4px); right:0; }

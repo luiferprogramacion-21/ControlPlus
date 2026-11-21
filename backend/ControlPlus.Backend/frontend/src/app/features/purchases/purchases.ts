@@ -94,9 +94,7 @@ export class Purchases implements OnInit {
     this.switchTab('orders');
     this.view = view;
   }
-  /** Propuesta 3 (21 de noviembre de 2026): «Recibir mercancía» es el botón principal; «Nuevo pedido» va en «Más ▾». */
-  readonly headingMenu = signal(false);
-  async newOrderFromMenu(): Promise<void> { this.headingMenu.set(false); await this.newOrder(); }
+  /** Propuesta 3 (21 de noviembre de 2026): «Recibir mercancía» es el botón principal y «Nuevo pedido al proveedor» va a su lado. */
   startRegisterPurchase(): void { if (this.canReceive) { this.error.set(''); this.askingPurchaseKind.set(true); } }
   async registerFromOrder(): Promise<void> {
     this.askingPurchaseKind.set(false);

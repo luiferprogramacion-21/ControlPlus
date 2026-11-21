@@ -52,32 +52,25 @@ describe('CustomerPicker', () => {
     expect(picker.eligible(customer({ documentType: null, documentNumber: null }))).toBe(true);
   });
 
-  it('en contado basta el nombre; la dirección solo se exige para crédito o apartado (21 de noviembre de 2026)', async () => {
-    await open(); picker.startCreate();
-    expect(picker.validation()).toContain('nombre');
-    picker.form.fullName = 'Luis'; expect(picker.validation()).toBe('');
-    await open(true); picker.startCreate(); picker.form.fullName = 'Luis'; picker.form.phone = '300';
-    expect(picker.validation()).toContain('dirección');
-    picker.form.address = 'Calle 2'; expect(picker.validation()).toBe('');
+  it('exige nombre, documento, teléfono y dirección para guardar, en contado y en crédito (21 de noviembre de 2026)', async () => {
+    for (const credit of [false, true]) {
+      await open(credit); picker.startCreate();
+      expect(picker.validation()).toContain('nombre');
+      picker.form.fullName = 'Luis'; expect(picker.validation()).toContain('documento');
+      picker.form.documentType = 'CC'; expect(picker.validation()).toContain('documento');
+      picker.form.documentNumber = ' ab12 '; expect(picker.validation()).toContain('teléfono');
+      picker.form.phone = '3001112233'; expect(picker.validation()).toContain('dirección');
+      picker.form.address = 'Calle 2'; expect(picker.validation()).toBe('');
+    }
   });
 
-  it('con el permiso básico o el completo escribe el documento y exige tipo y número juntos', async () => {
-    await open(); picker.startCreate(); picker.form.fullName = 'Luis'; picker.form.address = 'Calle 2'; picker.form.documentType = 'CC'; picker.form.documentNumber = '999';
+  it('envía los cuatro datos normalizados y selecciona al creado', async () => {
+    await open(true); picker.startCreate();
+    Object.assign(picker.form, { fullName: ' Luis ', documentType: 'CC', documentNumber: ' ab12 ', phone: ' 300 ', address: ' Calle 2 ' });
     await picker.create();
-    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ documentType: 'CC', documentNumber: '999', fullName: 'Luis', address: null }));
-    permissions = ['CUSTOMERS.MANAGE']; api.create.mockClear();
-    picker.form.documentNumber = ''; expect(picker.validation()).toContain('juntos');
-    picker.form.documentNumber = ' ab12 '; await picker.create();
-    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ documentType: 'CC', documentNumber: 'AB12' }));
-  });
-
-  it('un crédito exige teléfono o documento al registrar y selecciona al creado', async () => {
-    await open(true); picker.startCreate(); picker.form.fullName = 'Luis'; picker.form.address = 'Calle 2';
-    expect(picker.validation()).toContain('teléfono o el documento');
-    picker.form.phone = '3001112233'; await picker.create();
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ documentType: 'CC', documentNumber: 'AB12', fullName: 'Luis', phone: '300', address: 'Calle 2' }));
     expect(chosen[0]?.id).toBe('new');
   });
-
   it('rellena el formulario con lo escrito: texto como nombre, números como teléfono', async () => {
     await open(); picker.search = 'Laura Martínez'; picker.startCreate(); expect(picker.form).toMatchObject({ fullName: 'Laura Martínez', phone: '' });
     picker.search = '3001234567'; picker.startCreate(); expect(picker.form).toMatchObject({ fullName: '', phone: '3001234567' });

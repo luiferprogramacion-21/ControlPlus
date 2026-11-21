@@ -6,11 +6,7 @@
     </div>
     <div class="heading-actions">
       @if (canReceive) { <button class="button button--primary" type="button" (click)="startRegisterPurchase()">Recibir mercancía</button> }
-      @if (canWriteOrders) {
-        <div class="heading-more" (keydown.escape)="headingMenu.set(false)"><button class="button button--secondary" type="button" aria-haspopup="menu" [attr.aria-expanded]="headingMenu()" (click)="headingMenu.set(!headingMenu())">Más ▾</button>
-          @if (headingMenu()) { <div class="heading-more__backdrop" (click)="headingMenu.set(false)"></div><div class="row-menu heading-more__menu" role="menu"><button class="row-menu__item" type="button" role="menuitem" (click)="newOrderFromMenu()" autofocus>Nuevo pedido al proveedor</button></div> }
-        </div>
-      }
+      @if (canWriteOrders) { <button class="button button--secondary" type="button" (click)="newOrder()">Nuevo pedido al proveedor</button> }
     </div>
   </div>
   <div class="purchase-tabs" role="tablist" aria-label="Compras">

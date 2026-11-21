@@ -63,9 +63,8 @@ export class Cash implements OnInit {
   /** Propuesta 4 (21 de noviembre de 2026): contar el efectivo por billete; el sistema suma y pone el total en «Contado». */
   readonly BILLS = [100_000, 50_000, 20_000, 10_000, 5_000, 2_000] as const;
   billCounts: Record<number, number | null> = {};
-  coinsTotal: number | null = null;
   get billTotal(): number {
-    return this.BILLS.reduce((sum, bill) => sum + bill * (Number(this.billCounts[bill]) || 0), 0) + (Number(this.coinsTotal) || 0);
+    return this.BILLS.reduce((sum, bill) => sum + bill * (Number(this.billCounts[bill]) || 0), 0);
   }
   /** Cada cambio en la tabla de billetes reemplaza el valor contado del efectivo. */
   onBillCountChange(methodId: string): void { this.counted[methodId] = this.billTotal; this.onCountedChange(); }
@@ -150,7 +149,7 @@ export class Cash implements OnInit {
   }
   async loadReconciliation(): Promise<void> {
     const value = await this.api.reconciliation();
-    if (this.reconciliation()?.shiftId !== value.shiftId) { this.resetReasons(); this.billCounts = {}; this.coinsTotal = null; }
+    if (this.reconciliation()?.shiftId !== value.shiftId) { this.resetReasons(); this.billCounts = {}; }
     this.reconciliation.set(value);
     this.counted = Object.fromEntries(value.paymentMethods.filter(method => method.affectsCash).map(method => [method.paymentMethodId, method.countedAmount]));
   }

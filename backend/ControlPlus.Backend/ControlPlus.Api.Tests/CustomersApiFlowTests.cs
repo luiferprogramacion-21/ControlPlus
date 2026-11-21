@@ -71,40 +71,42 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         var users = await BootstrapAsync(client);
         SetBearer(client, users.Admin.Token.AccessToken);
 
-        var withoutDocument = await CreateAsync(client, new(null, null, "  Ana sin documento  ", " 300 123 ", " Calle 1 ", " ANA@EXAMPLE.COM ", null));
+        var withoutDocument = await CreateAsync(client, new(" cc ", " ana-77 ", "  Ana Pérez  ", " 300 123 ", " Calle 1 ", " ANA@EXAMPLE.COM ", null));
         Assert.True(withoutDocument.IsActive);
         Assert.Equal(1, withoutDocument.Version);
         Assert.Equal('7', withoutDocument.Id.ToString("D")[14]);
-        Assert.Equal("Ana sin documento", withoutDocument.FullName);
+        Assert.Equal("Ana Pérez", withoutDocument.FullName);
+        Assert.Equal("ANA-77", withoutDocument.DocumentNumber);
         Assert.Equal("ana@example.com", withoutDocument.Email);
 
         foreach (var type in new[] { "CC", "CE", "NIT", "PASAPORTE", "PPT", "OTRO" })
         {
-            var created = await CreateAsync(client, new($" {type} ", $" ab-{type}.1 ", $"Cliente {type}", null, "Dirección", null, null));
+            var created = await CreateAsync(client, new($" {type} ", $" ab-{type}.1 ", $"Cliente {type}", "300", "Dirección", null, null));
             Assert.Equal(type, created.DocumentType);
             Assert.Equal($"AB-{type}.1", created.DocumentNumber);
         }
 
         var duplicate = await client.PostAsJsonAsync("/api/customers",
-            new CreateCustomerRequest("CC", "ab-cc.1", "Duplicado", null, "Dirección", null, null));
+            new CreateCustomerRequest("CC", "ab-cc.1", "Duplicado", "300", "Dirección", null, null));
         await AssertProblemAsync(duplicate, HttpStatusCode.Conflict, "resource.conflict");
 
         var before = await CustomerStateAsync();
         var invalid = new CreateCustomerRequest("INVALID", "1", "", new string('t', 31), "", "invalid-email", null);
         await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers", invalid), HttpStatusCode.BadRequest, "validation.failed");
         await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
-            new CreateCustomerRequest(null, null, null, null, "Dirección", null, null)), HttpStatusCode.BadRequest, "validation.failed");
-        await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
-            // Desde el 21 de noviembre de 2026 la dirección es opcional; sigue rechazándose una de más de 300 caracteres.
-            new CreateCustomerRequest(null, null, "Nombre", null, new string('d', 301), null, null)), HttpStatusCode.BadRequest, "validation.failed");
-        await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
-            new CreateCustomerRequest("CC", null, "Nombre", null, "Dirección", null, null)), HttpStatusCode.BadRequest, "validation.failed");
-        await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
-            new CreateCustomerRequest(null, "123", "Nombre", null, "Dirección", null, null)), HttpStatusCode.BadRequest, "validation.failed");
-        await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
-            new CreateCustomerRequest(null, null, new string('n', 201), null, "Dirección", null, null)), HttpStatusCode.BadRequest, "validation.failed");
-        await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
-            new CreateCustomerRequest(null, null, "Nombre", null, new string('d', 301), null, null)), HttpStatusCode.BadRequest, "validation.failed");
+            new CreateCustomerRequest("CC", "N-1", null, "300", "Dirección", null, null)), HttpStatusCode.BadRequest, "validation.failed");
+        // Decisión del 21 de noviembre de 2026: nombre, documento, teléfono y dirección son obligatorios.
+        foreach (var missing in new[]
+                 {
+                     new CreateCustomerRequest(null, null, "Nombre", "300", "Dirección", null, null),
+                     new CreateCustomerRequest("CC", null, "Nombre", "300", "Dirección", null, null),
+                     new CreateCustomerRequest(null, "123", "Nombre", "300", "Dirección", null, null),
+                     new CreateCustomerRequest("CC", "M-1", "Nombre", null, "Dirección", null, null),
+                     new CreateCustomerRequest("CC", "M-2", "Nombre", "300", null, null, null),
+                     new CreateCustomerRequest("CC", "M-3", new string('n', 201), "300", "Dirección", null, null),
+                     new CreateCustomerRequest("CC", "M-4", "Nombre", "300", new string('d', 301), null, null)
+                 })
+            await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers", missing), HttpStatusCode.BadRequest, "validation.failed");
         Assert.Equal(before, await CustomerStateAsync());
 
         await using var scope = _factory!.Services.CreateAsyncScope();
@@ -120,7 +122,7 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         var detail = audit.DatosNuevos ?? string.Empty;
         Assert.Contains("customerId", detail, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("activo", detail, StringComparison.OrdinalIgnoreCase);
-        foreach (var sensitive in new[] { "Ana sin documento", "300 123", "ana@example.com", "Calle 1", "AB-CC.1" })
+        foreach (var sensitive in new[] { "Ana Pérez", "300 123", "ana@example.com", "Calle 1", "ANA-77", "AB-CC.1" })
             Assert.DoesNotContain(sensitive, detail, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -167,10 +169,10 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         var before = await CustomerStateAsync();
         foreach (var invalid in new[]
                  {
-                     new CreateCustomerRequest("OTRO", new string('x', 51), "Name", null, "Address", null, null),
-                     new CreateCustomerRequest(null, null, "Name", new string('t', 31), "Address", null, null),
-                     new CreateCustomerRequest(null, null, "Name", null, "Address", new string('a', 255), null),
-                     new CreateCustomerRequest(null, null, "Name", null, "Address", "not-an-email", null)
+                     new CreateCustomerRequest("OTRO", new string('x', 51), "Name", "300", "Address", null, null),
+                     new CreateCustomerRequest("CC", "B-1", "Name", new string('t', 31), "Address", null, null),
+                     new CreateCustomerRequest("CC", "B-2", "Name", "300", "Address", new string('a', 255), null),
+                     new CreateCustomerRequest("CC", "B-3", "Name", "300", "Address", "not-an-email", null)
                  })
         {
             await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers", invalid), HttpStatusCode.BadRequest, "validation.failed");
@@ -205,9 +207,9 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         }
 
         var basicCustomer = await CreateAsync(client,
-            new CreateCustomerRequest(null, null, "Cliente básico", "300", "Dirección", "basic@example.com", null));
-        Assert.Null(basicCustomer.DocumentType);
-        Assert.Null(basicCustomer.DocumentNumber);
+            new CreateCustomerRequest("CC", "BASIC-1", "Cliente básico", "300", "Dirección", "basic@example.com", null));
+        Assert.Equal("CC", basicCustomer.DocumentType);
+        Assert.Equal("BASIC-1", basicCustomer.DocumentNumber);
         Assert.Null(basicCustomer.Observations);
         var afterBasicCreate = await CustomerStateAsync();
         Assert.Equal(beforeRejected.CustomerCount + 1, afterBasicCreate.CustomerCount);
@@ -215,19 +217,19 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
 
         // El permiso básico escribe el documento (opcional, tipo y número juntos y sin repetirse).
         var withDocument = await CreateAsync(client,
-            new CreateCustomerRequest("CC", "BASIC-DOCUMENT", "Documento básico", null, "Dirección", null, null));
+            new CreateCustomerRequest("CC", "BASIC-DOCUMENT", "Documento básico", "300", "Dirección", null, null));
         Assert.Equal("CC", withDocument.DocumentType);
         Assert.Equal("BASIC-DOCUMENT", withDocument.DocumentNumber);
         await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
-            new CreateCustomerRequest("CC", null, "Tipo aislado", null, "Dirección", null, null)),
+            new CreateCustomerRequest("CC", null, "Tipo aislado", "300", "Dirección", null, null)),
             HttpStatusCode.BadRequest, "validation.failed");
         await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
-            new CreateCustomerRequest("CC", "BASIC-DOCUMENT", "Documento repetido", null, "Dirección", null, null)),
+            new CreateCustomerRequest("CC", "BASIC-DOCUMENT", "Documento repetido", "300", "Dirección", null, null)),
             HttpStatusCode.Conflict, "resource.conflict");
 
         SetBearer(client, users.Admin.Token.AccessToken);
         var managedCustomer = await CreateAsync(client,
-            new CreateCustomerRequest("CC", "ADMIN-DOCUMENT", "Cliente completo", null, "Dirección", null, "Observación válida"));
+            new CreateCustomerRequest("CC", "ADMIN-DOCUMENT", "Cliente completo", "300", "Dirección", null, "Observación válida"));
         Assert.Equal("CC", managedCustomer.DocumentType);
         Assert.Equal("ADMIN-DOCUMENT", managedCustomer.DocumentNumber);
         Assert.Equal("Observación válida", managedCustomer.Observations);
@@ -240,7 +242,7 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         Assert.True(await HasEffectivePermissionAsync(users.Cashier.User.Id, PermissionCodes.CustomersManage));
         SetBearer(client, granted.AccessToken);
         var individuallyManaged = await CreateAsync(client,
-            new CreateCustomerRequest("PPT", "GRANTED-DOCUMENT", "Concesión individual", null, "Dirección", null, "Observación concedida"));
+            new CreateCustomerRequest("PPT", "GRANTED-DOCUMENT", "Concesión individual", "300", "Dirección", null, "Observación concedida"));
         Assert.Equal("PPT", individuallyManaged.DocumentType);
         Assert.Equal("GRANTED-DOCUMENT", individuallyManaged.DocumentNumber);
         Assert.Equal("Observación concedida", individuallyManaged.Observations);
@@ -324,9 +326,9 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         var users = await BootstrapAsync(client);
         SetBearer(client, users.Admin.Token.AccessToken);
         var zulu = await CreateAsync(client, new("CC", "DOC-777", "zulu", "300-777", "D", null, null));
-        var alphaOne = await CreateAsync(client, new(null, null, "Alpha", "555-A", "D", null, null));
-        var alphaTwo = await CreateAsync(client, new(null, null, "Alpha", "555-B", "D", null, null));
-        _ = await CreateAsync(client, new(null, null, "Beta", "555-C", "D", null, null));
+        var alphaOne = await CreateAsync(client, new("CC", "AL-1", "Alpha", "555-A", "D", null, null));
+        var alphaTwo = await CreateAsync(client, new("CC", "AL-2", "Alpha", "555-B", "D", null, null));
+        _ = await CreateAsync(client, new("CC", "BE-1", "Beta", "555-C", "D", null, null));
 
         var defaults = await ReadAsync<PagedResult<CustomerDto>>(await client.GetAsync("/api/customers"), HttpStatusCode.OK);
         Assert.Equal(1, defaults.Page);
@@ -377,8 +379,8 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
 
         var percent = await CreateAsync(client, new("OTRO", "DOC%LITERAL", "Percent%Literal", "555_100", "D", null, null));
         _ = await CreateAsync(client, new("OTRO", "DOCXLITERAL", "PercentXLiteral", "555A100", "D", null, null));
-        var slash = await CreateAsync(client, new(null, null, "Slash\\Literal", null, "D", null, null));
-        _ = await CreateAsync(client, new(null, null, "SlashXLiteral", null, "D", null, null));
+        var slash = await CreateAsync(client, new("CC", "SL-1", "Slash\\Literal", "777-1", "D", null, null));
+        _ = await CreateAsync(client, new("CC", "SL-2", "SlashXLiteral", "777-2", "D", null, null));
 
         Assert.Equal(percent.Id, Assert.Single((await SearchAsync(client, "PERCENT%")).Items).Id);
         Assert.Equal(percent.Id, Assert.Single((await SearchAsync(client, "doc%")).Items).Id);
@@ -401,9 +403,9 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
 
         var responses = await Task.WhenAll(
             firstClient.PostAsJsonAsync("/api/customers",
-                new CreateCustomerRequest("CC", documentNumber, "Race One", null, "Address", null, null)),
+                new CreateCustomerRequest("CC", documentNumber, "Race One", "300", "Address", null, null)),
             secondClient.PostAsJsonAsync("/api/customers",
-                new CreateCustomerRequest("CC", documentNumber, "Race Two", null, "Address", null, null)));
+                new CreateCustomerRequest("CC", documentNumber, "Race Two", "300", "Address", null, null)));
 
         Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Created);
         var conflict = Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Conflict);
@@ -510,7 +512,7 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         using var secondClient = CreateClient();
         var users = await BootstrapAsync(setupClient);
         SetBearer(setupClient, users.Admin.Token.AccessToken);
-        var customer = await CreateAsync(setupClient, new(null, null, "Concurrent", null, "Address", null, null));
+        var customer = await CreateAsync(setupClient, new("CC", "CONC-1", "Concurrent", "300", "Address", null, null));
         SetBearer(firstClient, users.Admin.Token.AccessToken);
         SetBearer(secondClient, users.Admin.Token.AccessToken);
 
@@ -537,8 +539,8 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
             lockCommand.Parameters.AddWithValue("id", customer.Id);
             Assert.NotNull(await lockCommand.ExecuteScalarAsync());
         }
-        var one = firstClient.PutAsJsonAsync($"/api/customers/{customer.Id}", new UpdateCustomerRequest(null, null, "First", null, "Address", null, null, customer.Version));
-        var two = secondClient.PutAsJsonAsync($"/api/customers/{customer.Id}", new UpdateCustomerRequest(null, null, "Second", null, "Address", null, null, customer.Version));
+        var one = firstClient.PutAsJsonAsync($"/api/customers/{customer.Id}", new UpdateCustomerRequest("CC", "CONC-1", "First", "300", "Address", null, null, customer.Version));
+        var two = secondClient.PutAsJsonAsync($"/api/customers/{customer.Id}", new UpdateCustomerRequest("CC", "CONC-1", "Second", "300", "Address", null, null, customer.Version));
         await Task.Delay(250);
         await transaction.CommitAsync();
         var results = await Task.WhenAll(one, two);
@@ -555,7 +557,7 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         using var client = CreateClient();
         var users = await BootstrapAsync(client);
         SetBearer(client, users.Admin.Token.AccessToken);
-        var existing = await CreateAsync(client, new(null, null, "No eliminable", null, "Dirección", null, null));
+        var existing = await CreateAsync(client, new("CC", "KEEP-1", "No eliminable", "300", "Dirección", null, null));
         var beforeDelete = await CustomerStateAsync();
         Assert.Equal(HttpStatusCode.MethodNotAllowed, (await client.DeleteAsync("/api/customers")).StatusCode);
         Assert.Equal(HttpStatusCode.MethodNotAllowed, (await client.DeleteAsync($"/api/customers/{existing.Id}")).StatusCode);
@@ -576,11 +578,11 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         using var client = CreateClient();
         var users = await BootstrapAsync(client);
         SetBearer(client, users.Admin.Token.AccessToken);
-        var customer = await CreateAsync(client, new(null, null, "Before", null, "Address", null, null));
+        var customer = await CreateAsync(client, new("CC", "RB-1", "Before", "300", "Address", null, null));
         var before = await CustomerStateAsync();
         await InstallDeferredCustomerUpdateFailureAsync(customer.Id);
         var response = await client.PutAsJsonAsync($"/api/customers/{customer.Id}",
-            new UpdateCustomerRequest(null, null, "Rollback", null, "Address", null, null, customer.Version));
+            new UpdateCustomerRequest("CC", "RB-1", "Rollback", "300", "Address", null, null, customer.Version));
         await AssertProblemAsync(response, HttpStatusCode.Conflict, "resource.conflict");
         Assert.True(await DeferredUpdateFailureObservedAsync());
         Assert.Equal(before, await CustomerStateAsync());
@@ -595,7 +597,7 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         using var client = CreateClient();
         var users = await BootstrapAsync(client);
         SetBearer(client, users.Admin.Token.AccessToken);
-        var customer = await CreateAsync(client, new(null, null, "Historial", null, "Dirección", null, null));
+        var customer = await CreateAsync(client, new("CC", "HIST-1", "Historial", "300", "Dirección", null, null));
         var url = $"/api/customers/{customer.Id}/history";
         var empty = await ReadAsync<PagedResult<CustomerHistoryItem>>(await client.GetAsync(url), HttpStatusCode.OK);
         Assert.Empty(empty.Items);
