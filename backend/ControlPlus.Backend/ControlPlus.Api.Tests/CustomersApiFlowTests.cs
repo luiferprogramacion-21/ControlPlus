@@ -95,7 +95,8 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
         await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
             new CreateCustomerRequest(null, null, null, null, "Dirección", null, null)), HttpStatusCode.BadRequest, "validation.failed");
         await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
-            new CreateCustomerRequest(null, null, "Nombre", null, null, null, null)), HttpStatusCode.BadRequest, "validation.failed");
+            // Desde el 21 de noviembre de 2026 la dirección es opcional; sigue rechazándose una de más de 300 caracteres.
+            new CreateCustomerRequest(null, null, "Nombre", null, new string('d', 301), null, null)), HttpStatusCode.BadRequest, "validation.failed");
         await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
             new CreateCustomerRequest("CC", null, "Nombre", null, "Dirección", null, null)), HttpStatusCode.BadRequest, "validation.failed");
         await AssertProblemAsync(await client.PostAsJsonAsync("/api/customers",
