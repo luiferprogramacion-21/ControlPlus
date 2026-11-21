@@ -521,9 +521,9 @@ El 17 de noviembre de 2026 el usuario pidió guardar esta revisión y repartir l
 | S | Correo del usuario y recuperación de la contraseña con un código por correo | Media | Claude — **hecha y en uso desde el 18 de noviembre de 2026** |
 | N | Fecha de vencimiento en el ticket de venta a crédito | Baja | Codex (junto con F, mismo archivo) |
 | O | Conciliar documentos con estados viejos | Baja | Claude |
-| P | Actualizar herramientas de desarrollo con avisos de seguridad, al final y con regresión completa | Baja | Claude |
+| P | Actualizar herramientas de desarrollo con avisos de seguridad, al final y con regresión completa | Baja | Claude — **21 de noviembre de 2026:** quedan 2 avisos (antes 12), solo de desarrollo (`vite` 8.3.0 y `@angular/build` 22.2.4); producción tiene 0. Subir a `@angular/build` 22.2.6 choca en npm con las dependencias opcionales de Angular 22.3 y deja el lockfile inválido para `npm ci`; se deja para después de la entrega, junto con la subida de Angular completo |
 | Q | Ampliar las pruebas de navegador | Baja | Claude |
-| R | Medir el objetivo de 1 segundo | Baja | Claude |
+| R | Medir el objetivo de 1 segundo | Baja | Claude — **script listo el 21 de noviembre de 2026** (`scripts/performance/Measure-Responses.ps1`, solo consultas, contra el servicio instalado); falta que el operador lo corra en la tienda |
 | — | Manual de uso y guía de instalación y operación | Entrega | Claude — **un manual con una parte para cada rol** (Administrador/dueño, Supervisor y Cajero), aprobado el 18 de noviembre de 2026 — **primera versión escrita en `docs/manual-de-uso.md` el 18 de noviembre de 2026**: parte común, Cajero, Supervisor, Administrador y anexo de permisos; falta revisarla con quienes lo usarán y, si se quiere, añadir capturas de pantalla |
 
 ### Decisión del 18 de noviembre de 2026: contraseñas y correo del usuario
