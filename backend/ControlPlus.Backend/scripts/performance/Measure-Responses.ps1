@@ -64,7 +64,7 @@ $rows = foreach ($check in $checks) {
         try { Invoke-WebRequest -UseBasicParsing -Uri ($BaseUrl + $check.Path) -Headers $headers | Out-Null }
         catch {
             $code = $_.Exception.Response.StatusCode.value__
-            $status = if ($code -in 401, 403) { 'Sin permiso' } elseif ($code -eq 409) { 'No aplica' } else { "Error $code" }
+            $status = if ($code -in 401, 403) { 'Sin permiso' } elseif ($code -in 404, 409) { 'No aplica (sin turno abierto)' } else { "Error $code" }
             break
         }
         $watch.Stop(); $times.Add($watch.Elapsed.TotalMilliseconds)
