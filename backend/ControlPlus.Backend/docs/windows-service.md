@@ -1,5 +1,8 @@
 # ControlPlus como servicio de Windows
 
+> **Estado vigente (21 de noviembre de 2026):** el arranque automático después de reiniciar se comprobó el 16 de noviembre de 2026. La impresión térmica funciona desde el servicio instalado desde el 18 de noviembre (ticket, reimpresión y estado «Impreso»). Siguen sin probarse con hardware el corte de papel, la impresora apagada con su reintento y el cajón.
+
+
 ## Decisión (15 de noviembre de 2026)
 
 Para que la tienda no dependa de abrir terminales, ControlPlus se instala como un único servicio de Windows:

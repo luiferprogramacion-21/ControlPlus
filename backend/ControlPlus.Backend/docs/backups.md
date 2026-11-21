@@ -1,5 +1,8 @@
 # Respaldos automáticos — corte 1
 
+> **Estado vigente (21 de noviembre de 2026):** todo está en marcha. Los respaldos automáticos, la copia externa cifrada en OneDrive, la prueba de restauración y la restauración de emergencia real (16 de noviembre) funcionan. La **copia local en USB** quedó configurada y verificada el 20 de noviembre de 2026. Las notas de «pendiente» de abajo son históricas.
+
+
 ## Decisiones (15 de noviembre de 2026)
 
 Sigue el diseño de Fase 4 (`configuracion.destino_respaldo`, `ejecucion_respaldo`, `copia_respaldo` y las maquetas 22 y 22c):

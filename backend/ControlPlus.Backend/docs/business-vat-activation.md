@@ -1,5 +1,8 @@
 # Activación del IVA del negocio (historial 19→21)
 
+> **Estado vigente (21 de noviembre de 2026):** las tres migraciones de IVA ya están aplicadas en `controlplus` (historial 19→21 el 11 de noviembre y 21→22 el 12 de noviembre de 2026). Los bloques «pendiente de ejecución» de abajo son históricos: **no repetir ninguno**. El IVA se quitó de la operación el 18 de noviembre de 2026.
+
+
 **Activación ejecutada por el operador el 11 de noviembre de 2026.** La evidencia está en `C:\Users\luife\ControlPlus-Backups\BusinessVat-20261111T140623Z-d62b0903500246c79110ba1fa64eb681` y registra `BUSINESS_VAT_ACTIVATION_OK`. El agente no consultó `controlplus` ni ejecutó migraciones. Objetivos aplicados, en este orden:
 
 1. `20261110010000_BusinessVatSettingV1`: columnas y CHECK de `configuracion.establecimiento`, catálogo `TAXES.MANAGE` y una concesión de plantilla a Administrador.

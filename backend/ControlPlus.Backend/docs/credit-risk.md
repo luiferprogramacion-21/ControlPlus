@@ -1,5 +1,8 @@
 # Clientes morosos y cupo de crédito
 
+> **Estado vigente (21 de noviembre de 2026):** morosos y cupo están activados en `controlplus` (17 de noviembre de 2026). Las cuotas también se implementaron y activaron (`CreditInstallmentsV1`), pero desde el 17 de noviembre la pantalla vuelve a pedir una sola fecha; cada crédito conserva internamente una cuota única. Cualquier mención de cuotas como «trabajo futuro» es histórica.
+
+
 Decisión del 16 de noviembre de 2026 (sección «cierre de Créditos, auditoría y pruebas para la V1» de `AGENTS.md`).
 
 ## Reglas

@@ -1,5 +1,8 @@
 # Contrato propuesto: interruptor de IVA del negocio
 
+> **Estado vigente (21 de noviembre de 2026):** histórico. El IVA se quitó de todo el sistema el 18 de noviembre de 2026: no hay pestaña IVA, `PUT /api/settings/vat` rechaza encenderlo y las ventas y apartados nuevos van sin IVA. Las migraciones de IVA siguen aplicadas y no se revierten; las ventas antiguas conservan su desglose. Véase `AGENTS.md`.
+
+
 **Estado: todas las decisiones funcionales fueron respondidas por el usuario el 10 de noviembre de 2026; contrato redactado por Claude (frontend) para que Codex (backend) lo implemente. El backend aún no está implementado; el panel de Configuración del frontend ya existe y solo se muestra con `TAXES.MANAGE`.** Al implementarlo, registrar la decisión en `AGENTS.md`.
 
 ## Decisiones del usuario
