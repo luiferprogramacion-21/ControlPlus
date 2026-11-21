@@ -1,4 +1,5 @@
 import { code128Widths } from '../../core/code128';
+import { cardIconSvg } from './credential-card-icon';
 
 export interface CredentialCard { businessName: string; displayName: string; userName: string; roleName: string; token: string; fragment: string; }
 
@@ -49,28 +50,35 @@ export function printedBarcodeSvg(token: string, barHeightMm = 18): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}" role="img" aria-label="Código de barras del carné" shape-rendering="crispEdges" fill="#000">${bars}</svg>`;
 }
 
-/** Card for the 80 mm receipt printer with the barcode the reader scans. */
+/**
+ * Card for the 80 mm receipt printer with the barcode the reader scans (redesigned on 20 November 2026 at the user's
+ * request so it is not all white). The thermal printer prints black only, so the design is in black: a solid band with
+ * the icon and the business name in white, the person's name large, the role in a framed label, and the barcode on white.
+ */
 export function buildCredentialCardHtml(card: CredentialCard): string {
   const across = fitsAcross(card.token);
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Carné ${escape(card.userName)}</title>
 <style>
   @page { size: 80mm auto; margin: 3mm 4.5mm; }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { margin: 0; width: ${PRINTED_CARD_WIDTH_MM}mm; font-family: Arial, Helvetica, sans-serif; color: #000; }
-  .card { width: ${PRINTED_CARD_WIDTH_MM}mm; ${across ? `height: ${PRINTED_CARD_HEIGHT_MM}mm; justify-content: space-between;` : 'gap: 3mm;'} padding: 3.5mm 0; display: flex; flex-direction: column; border: 0.3mm dashed #000; }
-  header, .person { padding: 0 3mm; }
-  header { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; }
-  header strong { font-size: 14pt; }
-  header span { font-size: 8pt; text-transform: uppercase; white-space: nowrap; }
-  .person { margin: 0; }
-  .person b { display: block; font-size: 14pt; }
-  .person small { font-size: 10pt; }
-  .barcode { display: flex; flex-direction: column; align-items: center; gap: 1mm; }
+  .card { width: ${PRINTED_CARD_WIDTH_MM}mm; ${across ? `height: ${PRINTED_CARD_HEIGHT_MM}mm;` : ''} display: flex; flex-direction: column; border: 0.4mm solid #000; border-radius: 3mm; overflow: hidden; }
+  .band { display: flex; align-items: center; gap: 2.5mm; padding: 2mm 3mm; background: #000; color: #fff; }
+  .band svg { flex: none; }
+  .band strong { display: block; font-size: 13pt; line-height: 1.1; }
+  .band span { display: block; font-size: 6.5pt; letter-spacing: 1.2px; text-transform: uppercase; }
+  .rule { height: 0.8mm; margin: 0.8mm 0 0; background: #000; }
+  .person { margin: 0; padding: 2mm 3mm 0; }
+  .person b { display: block; font-size: 14pt; line-height: 1.15; }
+  .person .role { display: inline-block; margin-top: 0.8mm; padding: 0.3mm 1.6mm; border: 0.35mm solid #000; border-radius: 1.2mm; font-size: 8pt; font-weight: bold; text-transform: uppercase; }
+  .person .user { font-size: 8.5pt; margin-left: 1.5mm; }
+  .barcode { display: flex; flex-direction: column; align-items: center; gap: 0.6mm; margin-top: auto; padding: 1.5mm 0 2mm; }
   .barcode svg { display: block; }
-  .barcode small { display: block; font-size: 8pt; letter-spacing: 1px; }
+  .barcode small { display: block; font-size: 7.5pt; letter-spacing: 1px; }
 </style></head><body><div class="card">
-  <header><strong>${escape(card.businessName)}</strong><span>Carné de operador</span></header>
-  <p class="person"><b>${escape(card.displayName)}</b><small>${escape(card.roleName)} · ${escape(card.userName)}</small></p>
-  <div class="barcode">${printedBarcodeSvg(card.token)}<small>…${escape(card.fragment)}${across ? '' : ' · gire el carné para leerlo'}</small></div>
+  <header class="band">${cardIconSvg(9, '#fff')}<div><strong>${escape(card.businessName)}</strong><span>Carné de operador</span></div></header>
+  <div class="rule"></div>
+  <p class="person"><b>${escape(card.displayName)}</b><span class="role">${escape(card.roleName)}</span><span class="user">${escape(card.userName)}</span></p>
+  <div class="barcode">${printedBarcodeSvg(card.token, across ? 14 : 18)}<small>…${escape(card.fragment)}${across ? '' : ' · gire el carné para leerlo'}</small></div>
 </div></body></html>`;
 }

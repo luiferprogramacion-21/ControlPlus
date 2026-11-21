@@ -199,6 +199,8 @@ describe('Carné de operador', () => {
   it('la tarjeta solo contiene los datos necesarios', () => {
     const html = buildCredentialCardHtml({ businessName: 'Negocio de prueba', displayName: 'Luis', userName: 'luis', roleName: 'Cajero', token: 'ABC123', fragment: 'ABC123' });
     expect(html).toContain('Negocio de prueba');
-    expect(html).toContain('Cajero · luis');
+    expect(html).toContain('<span class="role">Cajero</span>');
+    expect(html).toContain('<span class="user">luis</span>');
+    expect(html).toContain('<svg'); // ícono de ControlPlus en la franja
   });
 });
