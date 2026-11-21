@@ -1717,6 +1717,9 @@ public partial class OfficialControlPlusDbContext : DbContext
                 .HasDefaultValue(30)
                 .HasComment("Opcional. Si es NULL, el vendedor debe escoger el vencimiento de cada credito.")
                 .HasColumnName("dias_credito_predeterminado");
+            entity.Property(e => e.MesesCreditoPredeterminado)
+                .HasComment("Opcional. Plazo en meses calendario, excluyente con dias_credito_predeterminado.")
+                .HasColumnName("meses_credito_predeterminado");
             entity.Property(e => e.MinimoUnidadesMayorista)
                 .HasDefaultValue(12)
                 .HasComment("Unidades minimas de un mismo producto para vender a precio mayorista en ventas, apartados y cambios.")

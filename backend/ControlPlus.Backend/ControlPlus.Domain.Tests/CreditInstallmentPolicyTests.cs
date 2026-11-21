@@ -36,6 +36,29 @@ public sealed class CreditInstallmentPolicyTests
     }
 
     [Fact]
+    public void Build_AcceptsThreeCalendarMonthsOnlyWhenThatCreditRuleIsActive()
+    {
+        var grantedOn = new DateOnly(2026, 11, 21);
+        var dueOn = new DateOnly(2027, 2, 21);
+        Assert.Throws<ArgumentException>(() => CreditInstallmentPolicy.Build(2_200, grantedOn, dueOn, null));
+        var installment = Assert.Single(CreditInstallmentPolicy.Build(2_200, grantedOn, dueOn, null, 3));
+        Assert.Equal(dueOn, installment.DueOn);
+        Assert.Throws<ArgumentException>(() => CreditInstallmentPolicy.Build(2_200, grantedOn,
+            dueOn.AddDays(1), null, 3));
+    }
+
+    [Fact]
+    public void Build_ClampsThreeMonthLimitToLastDayOfDestinationMonth()
+    {
+        var grantedOn = new DateOnly(2026, 1, 31);
+        var dueOn = new DateOnly(2026, 4, 30);
+        Assert.Equal(dueOn, Assert.Single(CreditInstallmentPolicy.Build(2_200, grantedOn,
+            dueOn, null, 3)).DueOn);
+        Assert.Throws<ArgumentException>(() => CreditInstallmentPolicy.Build(2_200, grantedOn,
+            dueOn.AddDays(1), null, 3));
+    }
+
+    [Fact]
     public void Status_IsOverdueWhenAnyInstallmentWithBalanceIsPastDue()
     {
         var today = new DateOnly(2026, 11, 16);

@@ -196,9 +196,11 @@
         <div class="checkout-heading"><div class="panel-heading"><h2>{{ saleType() === 'CREDITO' ? 'Venta a crédito' : 'Cobro de la venta' }}</h2></div><div class="amount-due"><span>{{ saleType() === 'CREDITO' ? 'Total del crédito' : 'Total a cobrar' }}</span><strong>{{ estimate | currency:'COP':'symbol':'1.0-0' }}</strong></div></div>
         @if (saleType() === 'CREDITO') {
           <div class="credit-checkout-fields">
-            <label class="field-label" for="credit-due-date">Fecha de vencimiento</label><input id="credit-due-date" class="text-field" type="date" [min]="minimumDueDate" [max]="maximumDueDate" [(ngModel)]="dueDate" [disabled]="locked || busy()">
-            @if (creditDefaultDays() !== null) { <p class="form-hint">Plazo predeterminado: <strong>{{ creditDefaultDays() | number:'1.0-0' }} {{ creditDefaultDays() === 1 ? 'día' : 'días' }}</strong>@if (defaultDueDateText) { (vence el <strong>{{ defaultDueDateText }}</strong>) }. Puedes cambiar la fecha entre mañana y 90 días.</p> }
-            @else if (creditRulesKnown()) { <p class="form-hint">No hay un plazo predeterminado: elige la fecha de vencimiento, entre mañana y 90 días.</p> }
+            <label class="field-label" for="credit-due-date">Fecha de vencimiento</label><input id="credit-due-date" class="text-field" type="date" [min]="minimumDueDate" [max]="maximumDueDate" [ngModel]="dueDate" (ngModelChange)="setDueDate($event)" [disabled]="locked || busy()">
+            @if (creditRulesLoading()) { <p class="form-hint" role="status">Consultando el plazo configurado…</p> }
+            @else if (defaultCreditTermText) { <p class="form-hint">Plazo predeterminado: <strong>{{ defaultCreditTermText }}</strong>@if (defaultDueDateText) { (vence el <strong>{{ defaultDueDateText }}</strong>) }. Puedes cambiar la fecha entre mañana y {{ creditDueWindowText }}.</p> }
+            @else if (creditRulesKnown()) { <p class="form-hint">No hay un plazo predeterminado: elige la fecha de vencimiento, entre mañana y {{ creditDueWindowText }}.</p> }
+            @else { <p class="form-hint">No se pudo consultar el plazo configurado. Elige la fecha entre mañana y 90 días.</p> }
           </div>
           @if (creditRisk(); as risk) {
             <div class="inline-feedback" [class.inline-feedback--error]="risk.blocked" [class.inline-feedback--warning]="!risk.blocked" role="alert">
@@ -220,10 +222,53 @@
           }
         </div>
         }
-        <div class="checkout-actions"><button class="button button--secondary" type="button" (click)="returnToSale()" [disabled]="busy()">Volver · Esc</button><button class="button button--primary checkout-confirm" type="button" (click)="confirm()" [disabled]="busy()">{{ busy() ? 'Procesando…' : locked ? 'Reintentar confirmación' : saleType() === 'CREDITO' ? 'Confirmar crédito · Enter' : 'Confirmar venta · Enter' }}</button></div>
+        <div class="checkout-actions"><button class="button button--secondary" type="button" (click)="returnToSale()" [disabled]="busy()">Volver · Esc</button><button class="button button--primary checkout-confirm" type="button" (click)="confirm()" [disabled]="busy() || (saleType() === 'CREDITO' && creditRulesLoading())">{{ busy() ? 'Procesando…' : locked ? 'Reintentar confirmación' : saleType() === 'CREDITO' ? 'Confirmar crédito · Enter' : 'Confirmar venta · Enter' }}</button></div>
         @if (locked) { <p class="field-hint">Los datos y la clave de este intento se conservan para reintentar.</p><button class="link-button" type="button" (click)="discardPending()" [disabled]="busy()">Descartar esta venta pendiente</button> }
       </section>
-      <aside class="panel panel--padded review-card"><div class="panel-heading"><h2>Resumen de la venta</h2></div><dl class="review-list"><div><dt>Subtotal</dt><dd>{{ subtotal | currency:'COP':'symbol':'1.0-0' }}</dd></div><div><dt>Descuento</dt><dd>-{{ discounts | currency:'COP':'symbol':'1.0-0' }}</dd></div><div class="review-list__total"><dt>Total</dt><dd>{{ estimate | currency:'COP':'symbol':'1.0-0' }}</dd></div></dl><dl class="review-meta"><div><dt>Cliente</dt><dd>{{ selectedCustomerName }}</dd></div><div><dt>Operador</dt><dd>{{ session.user()?.displayName }}</dd></div><div><dt>Saldo pendiente</dt><dd>{{ (saleType() === 'CREDITO' ? estimate : remaining) | currency:'COP':'symbol':'1.0-0' }}</dd></div></dl>@if (saleType() === 'CREDITO' && hasCustomerAccess) { <div class="credit-customer-action"><p class="field-hint">{{ customerId ? 'El crédito queda a nombre de este cliente.' : 'El crédito necesita un cliente.' }}</p><button class="button button--secondary" type="button" (click)="openCustomerPicker()" [disabled]="locked || busy()">{{ customerId ? 'Cambiar cliente' : 'Elegir o crear cliente' }}</button></div> }</aside>
+      <aside class="panel panel--padded review-card" aria-labelledby="checkout-summary-title">
+        <header class="review-card__heading">
+          <div><span class="review-card__eyebrow">Cuenta actual</span><h2 id="checkout-summary-title">Resumen de la venta</h2></div>
+          <span class="status-pill" [class.status-pill--warning]="saleType() === 'CONTADO' && remaining !== 0">{{ saleType() === 'CREDITO' ? 'A crédito' : remaining === 0 ? 'Lista' : 'Pendiente' }}</span>
+        </header>
+
+        <section class="review-card__total" aria-label="Total de la venta">
+          <span>{{ saleType() === 'CREDITO' ? 'Total del crédito' : 'Total a cobrar' }}</span>
+          <strong>{{ estimate | currency:'COP':'symbol':'1.0-0' }}</strong>
+          <small>{{ cart().length | number:'1.0-0' }} {{ cart().length === 1 ? 'producto' : 'productos' }} · {{ units | number:'1.0-0' }} {{ units === 1 ? 'unidad' : 'unidades' }}</small>
+        </section>
+
+        @if (saleType() === 'CONTADO') {
+          <dl class="review-card__settlement">
+            <div><dt>Recibido</dt><dd>{{ receivedTotal | currency:'COP':'symbol':'1.0-0' }}</dd></div>
+            <div [class.review-card__metric--ready]="remaining === 0"><dt>Saldo</dt><dd>{{ (remaining > 0 ? remaining : 0) | currency:'COP':'symbol':'1.0-0' }}</dd></div>
+            <div [class.review-card__metric--change]="change > 0"><dt>Cambio</dt><dd>{{ change | currency:'COP':'symbol':'1.0-0' }}</dd></div>
+          </dl>
+
+          <section class="review-card__payments" aria-labelledby="checkout-payments-title">
+            <h3 id="checkout-payments-title">Medios de pago</h3>
+            <div class="review-card__payment-list">
+              @for (payment of activePaymentRows; track payment.code) {
+                <div><span>{{ payment.name }}</span><strong>{{ paymentAmount(payment.code) | currency:'COP':'symbol':'1.0-0' }}</strong></div>
+              }
+            </div>
+          </section>
+          <p class="review-card__flow"><strong>Para terminar:</strong> comprueba el pago y pulsa «Confirmar venta». El cierre del cajón no cambia la pantalla automáticamente.</p>
+        }
+
+        <dl class="review-card__breakdown">
+          <div><dt>Subtotal</dt><dd>{{ subtotal | currency:'COP':'symbol':'1.0-0' }}</dd></div>
+          @if (discounts > 0) { <div class="review-card__discount"><dt>Descuento</dt><dd>-{{ discounts | currency:'COP':'symbol':'1.0-0' }}</dd></div> }
+        </dl>
+
+        <dl class="review-card__identity">
+          <div><dt>Cliente</dt><dd>{{ selectedCustomerName }}</dd></div>
+          <div><dt>Operador</dt><dd>{{ cashState()?.activeOperatorName || session.user()?.displayName }}</dd></div>
+        </dl>
+
+        @if (saleType() === 'CREDITO' && hasCustomerAccess) {
+          <div class="credit-customer-action"><p class="field-hint">{{ customerId ? 'El crédito queda a nombre de este cliente.' : 'El crédito necesita un cliente.' }}</p><button class="button button--secondary" type="button" (click)="openCustomerPicker()" [disabled]="locked || busy()">{{ customerId ? 'Cambiar cliente' : 'Elegir o crear cliente' }}</button></div>
+        }
+      </aside>
     </div>
   }
   @if (showCustomer()) { <cp-customer-picker [required]="saleType() === 'CREDITO'" [title]="saleType() === 'CREDITO' ? 'Cliente para la venta a crédito' : 'Seleccionar cliente'" (chosen)="onCustomerChosen($event)" (closed)="closeCustomerPicker()" /> }

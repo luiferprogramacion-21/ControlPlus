@@ -96,6 +96,69 @@ public sealed class CreditSettingsApiTests : IAsyncLifetime
             .GetProperty("DefaultDays").GetInt32());
     }
 
+    [Fact, Trait("Category", "Integration")]
+    public async Task Administrator_ConfiguresCalendarMonths_AndSalesReadTheSameRule()
+    {
+        using var client = CreateClient();
+        var (admin, _, cashier) = await BootstrapAsync(client);
+        SetBearer(client, admin);
+        var initial = await ReadAsync<CreditSettingsDto>(
+            await client.GetAsync("/api/credits/settings"), HttpStatusCode.OK);
+        Assert.Equal(30, initial.DefaultDays);
+        Assert.Null(initial.DefaultMonths);
+
+        var updated = await ReadAsync<CreditSettingsDto>(await client.PutAsJsonAsync(
+            "/api/credits/settings", new UpdateCreditSettingsRequest(null, initial.Version,
+                DefaultMonths: 3)), HttpStatusCode.OK);
+        Assert.Null(updated.DefaultDays);
+        Assert.Equal(3, updated.DefaultMonths);
+        Assert.True(updated.Version > initial.Version);
+
+        SetBearer(client, cashier);
+        var rules = await ReadAsync<CreditRulesDto>(
+            await client.GetAsync("/api/sales/credit-rules"), HttpStatusCode.OK);
+        Assert.Null(rules.DefaultDays);
+        Assert.Equal(3, rules.DefaultMonths);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var audit = await db.EventoAuditoria.AsNoTracking()
+            .SingleAsync(x => x.Accion == "CREDITSETTINGSUPDATED");
+        using var data = JsonDocument.Parse(audit.DatosNuevos!);
+        Assert.Equal(30, data.RootElement.GetProperty("Previous").GetProperty("DefaultDays").GetInt32());
+        Assert.Equal(3, data.RootElement.GetProperty("New").GetProperty("DefaultMonths").GetInt32());
+    }
+
+    [Theory, Trait("Category", "Integration")]
+    [InlineData(0)]
+    [InlineData(4)]
+    public async Task InvalidCalendarMonths_AreRejectedWithoutChangingSettings(int months)
+    {
+        using var client = CreateClient();
+        var (admin, _, _) = await BootstrapAsync(client);
+        SetBearer(client, admin);
+        var initial = await ReadAsync<CreditSettingsDto>(
+            await client.GetAsync("/api/credits/settings"), HttpStatusCode.OK);
+        await AssertProblemAsync(await client.PutAsJsonAsync("/api/credits/settings",
+            new UpdateCreditSettingsRequest(null, initial.Version, DefaultMonths: months)),
+            HttpStatusCode.BadRequest, "validation.failed");
+        Assert.Equal(initial, await ReadAsync<CreditSettingsDto>(
+            await client.GetAsync("/api/credits/settings"), HttpStatusCode.OK));
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task DaysAndMonthsTogether_AreRejected()
+    {
+        using var client = CreateClient();
+        var (admin, _, _) = await BootstrapAsync(client);
+        SetBearer(client, admin);
+        var initial = await ReadAsync<CreditSettingsDto>(
+            await client.GetAsync("/api/credits/settings"), HttpStatusCode.OK);
+        await AssertProblemAsync(await client.PutAsJsonAsync("/api/credits/settings",
+            new UpdateCreditSettingsRequest(30, initial.Version, DefaultMonths: 3)),
+            HttpStatusCode.BadRequest, "validation.failed");
+    }
+
     [Theory, Trait("Category", "Integration")]
     [InlineData(1)]
     [InlineData(90)]
@@ -228,6 +291,8 @@ public sealed class CreditSettingsApiTests : IAsyncLifetime
             new { defaultDays = 30, expectedVersion = initial.Version, unexpected = true })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync(
             "/api/credits/settings", new { expectedVersion = initial.Version })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync(
+            "/api/credits/settings", new { defaultDays = 30, expectedVersion = initial.Version })).StatusCode);
     }
 
     [Fact, Trait("Category", "Integration")]

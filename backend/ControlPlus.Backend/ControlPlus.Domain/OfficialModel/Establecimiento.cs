@@ -38,9 +38,14 @@ public partial class Establecimiento
     public bool RequireMinimumInitial { get; set; } = true;
 
     /// <summary>
-    /// Plazo predeterminado para créditos nuevos. NULL significa que el vendedor elige la fecha cada vez.
+    /// Plazo predeterminado en días para créditos nuevos. Se excluye con MesesCreditoPredeterminado.
     /// </summary>
     public int? DiasCreditoPredeterminado { get; set; }
+
+    /// <summary>
+    /// Plazo predeterminado en meses calendario para créditos nuevos. NULL junto con días obliga a elegir la fecha.
+    /// </summary>
+    public int? MesesCreditoPredeterminado { get; set; }
 
     /// <summary>
     /// Unidades mínimas de un mismo producto para vender a precio mayorista (1 a 999; 12 por defecto).

@@ -58,10 +58,14 @@ import { HelpTip } from '../../shared/help-tip';
           <form class="rule-card__body" (submit)="$event.preventDefault(); saveCredit()">
             <label class="rule-switch"><input type="checkbox" role="switch" name="creditChooseEachTime" [(ngModel)]="creditChooseEachTime"><span class="rule-switch__track" aria-hidden="true"></span><span>Elegir el vencimiento en cada venta</span></label>
             @if (!creditChooseEachTime) {
-              <label class="rule-field rule-field--nested"><span class="rule-field__label">Vencimiento sugerido</span>
-                <span class="rule-input"><input id="credit-days" name="creditDays" type="text" cpNumberInput min="1" max="90" step="1" [(ngModel)]="creditDays"><b>días</b></span></label>
+              <div class="rule-field rule-field--nested"><span class="rule-field__label">Vencimiento sugerido</span>
+                <span class="rule-term-controls">
+                  @if (creditUnit === 'days') { <span class="rule-input"><input id="credit-days" name="creditDays" type="text" cpNumberInput min="1" max="90" step="1" [(ngModel)]="creditDays" aria-label="Cantidad de días"><b>días</b></span> }
+                  @else { <span class="rule-input"><input id="credit-months" name="creditMonths" type="text" cpNumberInput min="1" max="3" step="1" [(ngModel)]="creditMonths" aria-label="Cantidad de meses"><b>meses</b></span> }
+                  <select id="credit-unit" class="rule-unit" name="creditUnit" [(ngModel)]="creditUnit" aria-label="Unidad del plazo de crédito"><option value="days">Días</option><option value="months">Meses</option></select>
+                </span></div>
             }
-            <p class="rule-note">Quien vende puede cambiar la fecha entre mañana y 90 días.</p>
+            <p class="rule-note">Quien vende puede cambiar la fecha entre mañana y {{ creditUnit === 'months' && !creditChooseEachTime ? '3 meses calendario' : '90 días' }}. El plazo se cuenta desde la fecha de la venta.</p>
             <div class="rule-divider"></div>
             <label class="rule-switch"><input type="checkbox" role="switch" name="creditBlock" [(ngModel)]="creditBlock"><span class="rule-switch__track" aria-hidden="true"></span><span>Bloquear créditos a morosos o por encima del cupo</span></label>
             <p class="rule-note rule-note--nested">{{ creditBlock ? 'Solo el Administrador puede autorizar esas ventas.' : 'Se avisa, pero se puede vender.' }}</p>
@@ -100,6 +104,8 @@ export class SettingsPanel implements OnInit {
   readonly savingCredit = signal(false);
   readonly creditError = toastSignal('error'); readonly creditNotice = toastSignal('success');
   creditDays: number | null = 30;
+  creditMonths: number | null = 3;
+  creditUnit: 'days' | 'months' = 'days';
   creditChooseEachTime = false;
   creditBlock = false;
   readonly savingPolicy = signal(false);
@@ -151,14 +157,24 @@ export class SettingsPanel implements OnInit {
     try { this.applyCredit(await this.api.creditSettings()); } catch (e) { this.creditLoadError.set(errorText(e)); }
   }
   private applyCredit(settings: CreditSettings): void {
-    this.credit.set(settings); this.creditChooseEachTime = settings.defaultDays === null; this.creditDays = settings.defaultDays ?? 30;
+    this.credit.set(settings);
+    this.creditChooseEachTime = settings.defaultDays == null && settings.defaultMonths == null;
+    this.creditUnit = settings.defaultMonths != null ? 'months' : 'days';
+    this.creditDays = settings.defaultDays ?? 30;
+    this.creditMonths = settings.defaultMonths ?? 3;
     this.creditBlock = settings.blockRiskyCredit === true;
   }
   creditChanged(current: CreditSettings): boolean {
-    return (this.creditChooseEachTime ? null : Number(this.creditDays)) !== current.defaultDays || this.creditBlock !== (current.blockRiskyCredit === true);
+    const days = this.creditChooseEachTime || this.creditUnit === 'months' ? null : Number(this.creditDays);
+    const months = this.creditChooseEachTime || this.creditUnit === 'days' ? null : Number(this.creditMonths);
+    return days !== current.defaultDays || months !== (current.defaultMonths ?? null) || this.creditBlock !== (current.blockRiskyCredit === true);
   }
   validateCredit(): string {
     if (this.creditChooseEachTime) return '';
+    if (this.creditUnit === 'months') {
+      const months = Number(this.creditMonths);
+      return Number.isInteger(months) && months >= 1 && months <= 3 ? '' : 'El plazo debe ser un entero entre 1 y 3 meses.';
+    }
     const days = Number(this.creditDays);
     return Number.isInteger(days) && days >= 1 && days <= 90 ? '' : 'El plazo debe ser un entero entre 1 y 90 días.';
   }
@@ -167,9 +183,11 @@ export class SettingsPanel implements OnInit {
     const issue = this.validateCredit(); if (issue) { this.creditError.set(issue); return; }
     this.savingCredit.set(true); this.creditError.set(''); this.creditNotice.set('');
     try {
-      this.applyCredit(await this.api.updateCreditSettings(this.creditChooseEachTime ? null : Number(this.creditDays), current.version, this.creditBlock));
+      const days = this.creditChooseEachTime || this.creditUnit === 'months' ? null : Number(this.creditDays);
+      const months = this.creditChooseEachTime || this.creditUnit === 'days' ? null : Number(this.creditMonths);
+      this.applyCredit(await this.api.updateCreditSettings(days, current.version, this.creditBlock, months));
       this.creditNotice.set('Guardado. Aplica a los créditos nuevos.');
-    } catch (e) { this.creditError.set(errorText(e)); try { this.credit.set(await this.api.creditSettings()); } catch { /* el error ya se muestra */ } }
+    } catch (e) { this.creditError.set(errorText(e)); try { this.applyCredit(await this.api.creditSettings()); } catch { /* el error ya se muestra */ } }
     finally { this.savingCredit.set(false); }
   }
 

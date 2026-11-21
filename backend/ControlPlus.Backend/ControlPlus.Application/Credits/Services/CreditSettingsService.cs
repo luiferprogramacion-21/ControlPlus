@@ -26,6 +26,7 @@ public sealed class CreditSettingsService(
     ICustomerCreditExposureReader exposureReader) : ICreditSettingsService
 {
     private const int MaximumDays = 90;
+    private const int MaximumMonths = 3;
 
     public async Task<Result<CreditSettingsDto>> GetAsync(
         ActorContext actor, CancellationToken cancellationToken = default)
@@ -54,7 +55,8 @@ public sealed class CreditSettingsService(
         var establishment = await sales.GetActiveEstablishmentAsync(cancellationToken);
         return establishment is null || establishment.Id != installation.EstablecimientoId
             ? Result.Failure<CreditRulesDto>(ApplicationError.NotFound("el establecimiento activo"))
-            : Result.Success(new CreditRulesDto(establishment.DiasCreditoPredeterminado, establishment.CreditoBloquearRiesgo));
+            : Result.Success(new CreditRulesDto(establishment.DiasCreditoPredeterminado,
+                establishment.CreditoBloquearRiesgo, establishment.MesesCreditoPredeterminado));
     }
 
     public async Task<Result<CreditSettingsDto>> UpdateAsync(
@@ -78,8 +80,14 @@ public sealed class CreditSettingsService(
             return Result.Failure<CreditSettingsDto>(
                 ApplicationError.ConcurrencyConflict("La configuración fue modificada."));
 
-        var previous = new { DefaultDays = establishment.DiasCreditoPredeterminado, BlockRiskyCredit = establishment.CreditoBloquearRiesgo };
+        var previous = new
+        {
+            DefaultDays = establishment.DiasCreditoPredeterminado,
+            DefaultMonths = establishment.MesesCreditoPredeterminado,
+            BlockRiskyCredit = establishment.CreditoBloquearRiesgo
+        };
         establishment.DiasCreditoPredeterminado = request.DefaultDays;
+        establishment.MesesCreditoPredeterminado = request.DefaultMonths;
         if (request.BlockRiskyCredit is { } block) establishment.CreditoBloquearRiesgo = block;
         establishment.FechaModificacion = clock.UtcNow.UtcDateTime;
         await AuditWriter.WriteCashAsync(audits, clock, actor.UserId,
@@ -87,7 +95,7 @@ public sealed class CreditSettingsService(
             new
             {
                 Previous = previous,
-                New = new { request.DefaultDays, BlockRiskyCredit = establishment.CreditoBloquearRiesgo }
+                New = new { request.DefaultDays, request.DefaultMonths, BlockRiskyCredit = establishment.CreditoBloquearRiesgo }
             },
             Guid.CreateVersion7(), null, null, null, null, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -142,12 +150,18 @@ public sealed class CreditSettingsService(
     {
         if (request is null || request.ExpectedVersion <= 0)
             return ApplicationError.Validation("La versión esperada debe ser positiva.");
-        return request.DefaultDays is < 1 or > MaximumDays
-            ? ApplicationError.Validation(
-                $"El plazo predeterminado debe estar entre 1 y {MaximumDays} días, o vacío para elegir la fecha en cada crédito.")
+        if (request.DefaultDays is < 1 or > MaximumDays)
+            return ApplicationError.Validation(
+                $"El plazo predeterminado debe estar entre 1 y {MaximumDays} días, o vacío para elegir la fecha en cada crédito.");
+        if (request.DefaultMonths is < 1 or > MaximumMonths)
+            return ApplicationError.Validation(
+                $"El plazo predeterminado debe estar entre 1 y {MaximumMonths} meses, o vacío para elegir la fecha en cada crédito.");
+        return request.DefaultDays is not null && request.DefaultMonths is not null
+            ? ApplicationError.Validation("Elija un plazo predeterminado en días o en meses, no ambos.")
             : null;
     }
 
     private static CreditSettingsDto Map(Establecimiento establishment) =>
-        new(establishment.DiasCreditoPredeterminado, establishment.Version, establishment.CreditoBloquearRiesgo);
+        new(establishment.DiasCreditoPredeterminado, establishment.Version,
+            establishment.CreditoBloquearRiesgo, establishment.MesesCreditoPredeterminado);
 }

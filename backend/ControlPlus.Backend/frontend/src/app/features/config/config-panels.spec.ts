@@ -19,7 +19,7 @@ describe('Configuración', () => {
     api.numbering.mockResolvedValue(null);
     api.changePolicy.mockResolvedValue({ days: 15, version: 3 });
     api.layawaySettings.mockResolvedValue({ minimumPercentage: 20, defaultDays: 15, requireMinimumInitial: true, version: 2 });
-    api.creditSettings.mockResolvedValue({ defaultDays: 30, version: 1, blockRiskyCredit: false });
+    api.creditSettings.mockResolvedValue({ defaultDays: 30, defaultMonths: null, version: 1, blockRiskyCredit: false });
     api.salesSettings.mockResolvedValue({ wholesaleMinimumQuantity: 12, version: 1 });
     api.reasons.mockResolvedValue([]);
     TestBed.configureTestingModule({ providers: [{ provide: ConfigApi, useValue: api }, { provide: SessionService, useValue: { has: (p: string) => permissions.includes(p) } }] });
@@ -32,15 +32,32 @@ describe('Configuración', () => {
     it('carga el plazo predeterminado del crédito y lo guarda con la versión esperada', async () => {
       const c = await open();
       expect([c.creditDays, c.creditChooseEachTime, c.creditChanged(c.credit()!)]).toEqual([30, false, false]);
-      api.updateCreditSettings.mockResolvedValue({ defaultDays: 45, version: 2, blockRiskyCredit: false });
+      api.updateCreditSettings.mockResolvedValue({ defaultDays: 45, defaultMonths: null, version: 2, blockRiskyCredit: false });
       c.creditDays = 45; expect(c.creditChanged(c.credit()!)).toBe(true); await c.saveCredit();
-      expect(api.updateCreditSettings).toHaveBeenCalledWith(45, 1, false); expect(c.creditNotice()).toContain('créditos nuevos'); expect(c.credit()?.version).toBe(2);
+      expect(api.updateCreditSettings).toHaveBeenCalledWith(45, 1, false, null); expect(c.creditNotice()).toContain('créditos nuevos'); expect(c.credit()?.version).toBe(2);
+    });
+
+    it('permite configurar tres meses calendario y carga de nuevo esa unidad', async () => {
+      const c = await open();
+      c.creditUnit = 'months'; c.creditMonths = 3;
+      expect(c.creditChanged(c.credit()!)).toBe(true);
+      api.updateCreditSettings.mockResolvedValue({ defaultDays: null, defaultMonths: 3, version: 2, blockRiskyCredit: false });
+      await c.saveCredit();
+      expect(api.updateCreditSettings).toHaveBeenCalledWith(null, 1, false, 3);
+      expect(c.creditUnit).toBe('months'); expect(c.creditMonths).toBe(3);
+      expect(c.creditChooseEachTime).toBe(false); expect(c.creditChanged(c.credit()!)).toBe(false);
+    });
+
+    it.each([[0], [4], [1.5], ['']])('rechaza %s meses de crédito', async value => {
+      const c = await open(); c.creditUnit = 'months'; c.creditMonths = value as number;
+      expect(c.validateCredit()).toContain('entre 1 y 3');
+      await c.saveCredit(); expect(api.updateCreditSettings).not.toHaveBeenCalled();
     });
 
     it('«elegir el vencimiento en cada crédito» envía plazo nulo y conserva el valor', async () => {
-      const c = await open(); api.updateCreditSettings.mockResolvedValue({ defaultDays: null, version: 2, blockRiskyCredit: false });
+      const c = await open(); api.updateCreditSettings.mockResolvedValue({ defaultDays: null, defaultMonths: null, version: 2, blockRiskyCredit: false });
       c.creditChooseEachTime = true; await c.saveCredit();
-      expect(api.updateCreditSettings).toHaveBeenCalledWith(null, 1, false); expect(c.creditChooseEachTime).toBe(true); expect(c.creditChanged(c.credit()!)).toBe(false);
+      expect(api.updateCreditSettings).toHaveBeenCalledWith(null, 1, false, null); expect(c.creditChooseEachTime).toBe(true); expect(c.creditChanged(c.credit()!)).toBe(false);
     });
 
     it.each([[0], [91], [2.5], ['']])('rechaza el plazo de crédito %s', async value => {
@@ -50,15 +67,15 @@ describe('Configuración', () => {
 
     it('un conflicto de versión muestra el error y recarga lo vigente', async () => {
       const c = await open(); api.updateCreditSettings.mockRejectedValue(new HttpErrorResponse({ status: 409, error: { code: 'concurrency.conflict' } }));
-      api.creditSettings.mockResolvedValue({ defaultDays: 20, version: 5, blockRiskyCredit: false }); c.creditDays = 45; await c.saveCredit();
-      expect(c.creditError()).not.toBe(''); expect(c.credit()).toEqual({ defaultDays: 20, version: 5, blockRiskyCredit: false });
+      api.creditSettings.mockResolvedValue({ defaultDays: 20, defaultMonths: null, version: 5, blockRiskyCredit: false }); c.creditDays = 45; await c.saveCredit();
+      expect(c.creditError()).not.toBe(''); expect(c.credit()).toEqual({ defaultDays: 20, defaultMonths: null, version: 5, blockRiskyCredit: false });
     });
 
     it('activa el bloqueo de créditos a morosos o sobre el cupo sin cambiar el plazo', async () => {
       const c = await open(); expect(c.creditBlock).toBe(false);
-      api.updateCreditSettings.mockResolvedValue({ defaultDays: 30, version: 2, blockRiskyCredit: true });
+      api.updateCreditSettings.mockResolvedValue({ defaultDays: 30, defaultMonths: null, version: 2, blockRiskyCredit: true });
       c.creditBlock = true; expect(c.creditChanged(c.credit()!)).toBe(true); await c.saveCredit();
-      expect(api.updateCreditSettings).toHaveBeenCalledWith(30, 1, true);
+      expect(api.updateCreditSettings).toHaveBeenCalledWith(30, 1, true, null);
       expect(c.creditBlock).toBe(true); expect(c.creditChanged(c.credit()!)).toBe(false);
     });
 

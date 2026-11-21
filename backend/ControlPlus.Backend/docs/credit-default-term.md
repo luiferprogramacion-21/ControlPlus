@@ -1,5 +1,7 @@
 # Plazo predeterminado del vencimiento del crédito
 
+> La descripción de 30 días que sigue documenta la decisión y activación originales del 12 de noviembre. La ampliación a meses calendario del 21 de noviembre se describe al final y reemplaza el contrato anterior cuando se active su migración.
+
 **Estado: decisión funcional aprobada por el usuario el 12 de noviembre de 2026 e implementada en el árbol local. El backend, el panel de Configuración y la pantalla de venta a crédito comparten este contrato. La migración única del corte fue probada en base temporal y activada una sola vez en `controlplus` por el operador el 12 de noviembre de 2026 (`LAYAWAY_CREDIT_RULES_ACTIVATION_OK`, historial 22→23; véanse `docs/testing.md` y `docs/business-vat-activation.md`). No repetir.** Véase el bloque 22→23 de `docs/business-vat-activation.md`.
 
 ## Decisión del usuario
@@ -45,3 +47,15 @@
 - `GET /api/sales/credit-rules` con `CREDIT.REQUEST` y sin él; devuelve el plazo vigente y `null` cuando se eligió «cada vez».
 - Una venta a crédito con la fecha propuesta (fecha operativa + `defaultDays`) se confirma; las reglas actuales del rango de 1 a 90 días no cambian.
 - Los créditos existentes no cambian y regresión de ventas a crédito.
+
+## Ampliación: días o meses calendario (21 de noviembre de 2026)
+
+El Administrador puede escoger un plazo predeterminado de **1 a 90 días** o **1 a 3 meses calendario**. También puede dejar ambos campos nulos para que quien venda elija cada vencimiento. `defaultDays` y `defaultMonths` nunca llevan valores simultáneos. El valor inicial y los datos existentes siguen en 30 días hasta que el Administrador los cambie; no se actualizan créditos ya registrados.
+
+La fecha propuesta se calcula desde la **fecha operativa del turno en que se hace el crédito**. Un mes calendario conserva el número de día si existe en el mes de destino y, si no, usa el último día: 21/11/2026 + 3 meses = **21/02/2027**; 31/01/2026 + 1 mes = **28/02/2026**. La pantalla muestra «3 meses» o «30 días», según la configuración, junto con el vencimiento calculado. Al volver al carrito y entrar de nuevo a cobrar, consulta la configuración actual y actualiza la sugerencia automática; una fecha que el usuario editó se conserva.
+
+`GET/PUT /api/credits/settings` y `GET /api/sales/credit-rules` agregan `defaultMonths`. `PUT` exige enviar tanto `defaultDays` como `defaultMonths`, aunque uno o ambos sean nulos; acepta `{ "defaultDays": null, "defaultMonths": 3, "expectedVersion": 1 }` más `blockRiskyCredit` cuando corresponda. Los límites son 1–90 días y 1–3 meses, con validación en el servidor y la base. La sugerencia sigue siendo editable: con meses configurados, la fecha máxima es tres meses calendario desde la fecha operativa; con días o sin sugerencia, 90 días. La fecha mínima siempre es mañana.
+
+La migración compensatoria `20261121020000_CreditDefaultMonthsV1` añade `configuracion.establecimiento.meses_credito_predeterminado` nullable, CHECK de 1–3 y CHECK de exclusividad con los días. **Está pendiente de activación** y requiere que `20261121010000_OptionalCreditLayawayPaymentReferenceV1` ya esté aplicada (historial 36). No repetir migraciones anteriores ni ejecutar Down.
+
+El operador puede activarla una vez, con la API detenida y PowerShell como Administrador, mediante `scripts/credit-default-months/Invoke-Activation.ps1 -UsePostgresCredential`. El script exige historial 36, ausencia de otros clientes y esquema pendiente; publica la API, hace respaldo verificado con SHA-256, repite el preflight, aplica únicamente el objetivo y comprueba historial 37, restricciones y huella de los datos anteriores. Guarda `result.json` y la evidencia en `ControlPlus-Backups/CreditDefaultMonths-*`. El agente no ejecuta este script ni accede a la base real `controlplus`.

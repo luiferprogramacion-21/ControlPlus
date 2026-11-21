@@ -18,6 +18,9 @@
 .rule-input:focus-within { outline: 2px solid var(--cp-focus); outline-offset: 1px; }
 .rule-input input { width: 72px; padding: 8px 10px; border: 0; background: transparent; color: var(--cp-text); font: inherit; font-weight: 600; text-align: right; outline: none; }
 .rule-input b { padding: 8px 10px; border-left: 1px solid var(--cp-border); background: var(--cp-table-head); color: var(--cp-text-secondary); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.rule-term-controls { display: inline-flex; align-items: center; gap: 8px; }
+.rule-unit { min-height: 38px; padding: 7px 9px; border: 1px solid var(--cp-control-border); border-radius: 8px; background: var(--cp-surface); color: var(--cp-text); font: inherit; }
+.rule-unit:focus-visible { outline: 2px solid var(--cp-focus); outline-offset: 1px; }
 .rule-note { margin: 0; color: var(--cp-text-muted); font-size: 12.5px; }
 .rule-field--nested, .rule-note--nested { margin-left: 50px; }
 .rule-divider { height: 1px; margin: 4px 0; background: var(--cp-border); }

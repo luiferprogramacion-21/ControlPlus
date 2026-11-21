@@ -30,9 +30,9 @@ export interface ChangePolicy { days: number; version: number; }
 export interface LayawaySettings { minimumPercentage: number; defaultDays: number | null; requireMinimumInitial: boolean; version: number; }
 
 
-/** Default due-date term of a credit sale in days (1 to 90); null means the seller must choose the date each time. */
+/** Credit due-date suggestion: either 1–90 days, 1–3 calendar months, or neither. */
 /** blockRiskyCredit: con true, vender a crédito a un moroso o sobre el cupo exige autorización de un Administrador. */
-export interface CreditSettings { defaultDays: number | null; version: number; blockRiskyCredit: boolean; }
+export interface CreditSettings { defaultDays: number | null; defaultMonths?: number | null; version: number; blockRiskyCredit: boolean; }
 /** Units of the same product required for the wholesale price in sales, layaways and changes (1 to 999). */
 export interface SalesSettings { wholesaleMinimumQuantity: number; version: number; }
 
@@ -78,8 +78,8 @@ export class ConfigApi {
   updateSalesSettings(wholesaleMinimumQuantity: number, expectedVersion: number): Promise<SalesSettings> {
     return firstValueFrom(this.http.put<SalesSettings>('/api/sales/settings', { wholesaleMinimumQuantity, expectedVersion }));
   }
-  updateCreditSettings(defaultDays: number | null, expectedVersion: number, blockRiskyCredit: boolean): Promise<CreditSettings> {
-    return firstValueFrom(this.http.put<CreditSettings>('/api/credits/settings', { defaultDays, expectedVersion, blockRiskyCredit }));
+  updateCreditSettings(defaultDays: number | null, expectedVersion: number, blockRiskyCredit: boolean, defaultMonths: number | null = null): Promise<CreditSettings> {
+    return firstValueFrom(this.http.put<CreditSettings>('/api/credits/settings', { defaultDays, defaultMonths, expectedVersion, blockRiskyCredit }));
   }
 
 

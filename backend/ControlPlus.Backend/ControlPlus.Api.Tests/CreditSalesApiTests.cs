@@ -188,6 +188,40 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
             .Select(x => x.FechaVencimiento).SingleAsync());
     }
 
+    [Fact, Trait("Category", "Integration")]
+    public async Task CreditSale_AcceptsConfiguredThreeCalendarMonths_AndRejectsLaterDate()
+    {
+        using var client = CreateClient();
+        var scenario = await BootstrapAsync(client);
+        SetBearer(client, scenario.Admin.AccessToken);
+        var settings = await ReadAsync<CreditSettingsDto>(
+            await client.GetAsync("/api/credits/settings"), HttpStatusCode.OK);
+        _ = await ReadAsync<CreditSettingsDto>(await client.PutAsJsonAsync(
+            "/api/credits/settings", new UpdateCreditSettingsRequest(null, settings.Version,
+                DefaultMonths: 3)), HttpStatusCode.OK);
+
+        SetBearer(client, scenario.Cashier.AccessToken);
+        var rules = await ReadAsync<CreditRulesDto>(
+            await client.GetAsync("/api/sales/credit-rules"), HttpStatusCode.OK);
+        Assert.Equal(3, rules.DefaultMonths);
+        Assert.Null(rules.DefaultDays);
+        var dueOn = scenario.Shift.OperatingDate.AddMonths(rules.DefaultMonths!.Value);
+
+        _ = await StartSessionAsync(client, scenario, scenario.Cashier);
+        SetBearer(client, scenario.Cashier.AccessToken);
+        await AssertProblemAsync(await PostSaleAsync(client, "credit-months-too-late",
+            CreditRequest(scenario, scenario.CustomerId, dueOn.AddDays(1))),
+            HttpStatusCode.BadRequest);
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client,
+            "credit-months-calendar", CreditRequest(scenario, scenario.CustomerId, dueOn)),
+            HttpStatusCode.Created);
+
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal(dueOn, await db.Credito.AsNoTracking()
+            .Where(x => x.Id == sale.CreditId).Select(x => x.FechaVencimiento).SingleAsync());
+    }
+
     [Fact]
     [Trait("Category", "Integration")]
     public async Task CashWithoutSaleType_RemainsDefault_AndExplicitCashReplaysSameIdempotencyKey()

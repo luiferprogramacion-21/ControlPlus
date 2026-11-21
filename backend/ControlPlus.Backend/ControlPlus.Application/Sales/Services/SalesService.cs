@@ -241,7 +241,8 @@ public sealed partial class SalesService(
             try
             {
                 plannedInstallments = CreditInstallmentPolicy.Build(prepared.Total, shift.FechaOperativa,
-                    request.DueDate, request.InstallmentDueDates);
+                    request.DueDate, request.InstallmentDueDates,
+                    establishment.MesesCreditoPredeterminado is null ? null : CreditInstallmentPolicy.MaximumCalendarMonths);
             }
             catch (ArgumentException exception)
             {

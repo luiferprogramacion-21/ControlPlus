@@ -116,7 +116,7 @@ describe('Sales: punto de venta de contado', () => {
     it('prellena el efectivo exacto y no hay cambio', () => {
       component.startCheckout();
       expect(component.checkoutMode()).toBe(true);
-      expect([component.cashApplied, component.cashReceived, component.remaining, component.change]).toEqual([50000, 50000, 0, 0]);
+      expect([component.cashApplied, component.cashReceived, component.receivedTotal, component.remaining, component.change]).toEqual([50000, 50000, 50000, 0, 0]);
       expect(component.canConfirm).toBe(true);
     });
     it('los billetes suman: el primero reemplaza y los siguientes se agregan', () => {
@@ -128,26 +128,28 @@ describe('Sales: punto de venta de contado', () => {
       component.clearCashReceived();
       expect(component.cashReceived).toBe(0);
     });
-    it('abre el cajón al pulsar Cobrar una sola vez por venta y solo avisa si falla', async () => {
+    it('abre el cajón una vez por entrada al cobro y vuelve a abrir después de regresar al carrito', async () => {
+      component.startCheckout(); component.startCheckout(); await vi.advanceTimersByTimeAsync(0);
+      expect(openDrawerForCheckout).toHaveBeenCalledOnce();
+      component.returnToSale(); component.add(product({ id: 'otro', retailPrice: 10000 }));
       component.startCheckout(); await vi.advanceTimersByTimeAsync(0);
-      component.checkoutMode.set(false); component.startCheckout(); await vi.advanceTimersByTimeAsync(0);
       expect(openDrawerForCheckout).toHaveBeenCalledTimes(2);
-      expect(openDrawerForCheckout.mock.calls[0][0]).toBe(openDrawerForCheckout.mock.calls[1][0]);
+      expect(openDrawerForCheckout.mock.calls[0][0]).not.toBe(openDrawerForCheckout.mock.calls[1][0]);
       expect(component.error()).toBe('');
       openDrawerForCheckout.mockResolvedValueOnce({ status: 'FALLIDO' });
-      component.checkoutMode.set(false); component.startCheckout(); await vi.advanceTimersByTimeAsync(0);
+      component.returnToSale(); component.startCheckout(); await vi.advanceTimersByTimeAsync(0);
       expect(component.error()).toContain('Cajón');
     });
     it('si el cliente entrega más, el cambio es la diferencia', () => {
       component.startCheckout(); component.onCashReceived(100000);
-      expect([component.cashApplied, component.change, component.remaining]).toEqual([50000, 50000, 0]);
+      expect([component.cashApplied, component.receivedTotal, component.change, component.remaining]).toEqual([50000, 100000, 50000, 0]);
     });
     it('pago mixto: el medio nuevo recibe automáticamente lo que falta', () => {
       component.startCheckout(); component.onCashReceived(20000);
       expect(component.remaining).toBe(30000);
       component.addPayment();
       expect(component.activePayments()).toEqual(['EFECTIVO', 'TRANSFERENCIA']);
-      expect([component.cashApplied, component.transferApplied, component.remaining]).toEqual([20000, 30000, 0]);
+      expect([component.cashApplied, component.transferApplied, component.receivedTotal, component.remaining]).toEqual([20000, 30000, 50000, 0]);
     });
     it('al editar un medio, el otro se reajusta', () => {
       component.startCheckout(); component.onCashReceived(20000); component.addPayment();
