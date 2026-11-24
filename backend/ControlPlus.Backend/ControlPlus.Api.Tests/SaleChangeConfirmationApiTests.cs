@@ -349,8 +349,7 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(HttpStatusCode.BadRequest, tooMuch.StatusCode);
         Assert.Contains("más de lo que pagó", await tooMuch.Content.ReadAsStringAsync());
 
-        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
-        SetBearer(client, setup.Cashier.AccessToken);
+        // El intento rechazado no consume la sesión del operador: el siguiente usa la misma.
         var change = await ReadAsync<SaleChangeDto>(await PostChangeAsync(client, sale.Id, "change-received-less",
             Request(600m, 499m)), HttpStatusCode.Created);
         Assert.Equal(600m, change.TotalReturned);
