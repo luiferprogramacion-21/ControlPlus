@@ -11,11 +11,14 @@ export interface HomeTask { id: string; title: string; description: string; icon
  * Tareas de Inicio según permisos y estado de Caja. Lo que la persona no puede hacer no aparece.
  * Con la caja cerrada, «Abrir caja» va primero y «Vender» explica que antes hay que abrirla.
  */
-export function homeTasks(can: (permission: string) => boolean, cash: CashState | null): HomeTask[] {
+export function homeTasks(can: (permission: string) => boolean, cash: CashState | null, userId: string | null = null): HomeTask[] {
   const tasks: HomeTask[] = [];
   const cashOpen = !!cash?.hasOpenShift && !cash.requiresPreviousShiftClosure;
   const manageCash = can('CASH.SHIFT_MANAGE');
-  if (manageCash && cash && cash.isConfigured && !cash.hasOpenShift) tasks.push({ id: 'abrir-caja', title: 'Abrir caja', description: 'Empieza el turno con el dinero inicial.', icon: 'cash', link: '/operacion/caja', primary: true });
+  // Auditoría del 23/11/2026 (C.1): quien vende (el Cajero) abre la caja con autorización y cierra su propio turno.
+  const opensCash = manageCash || (can('CASH.OWN_READ') && can('SALES.CREATE'));
+  const ownsShift = !!userId && cash?.currentShift?.mode === 'INDIVIDUAL' && cash.currentShift.responsibleUserId === userId;
+  if (opensCash && cash && cash.isConfigured && !cash.hasOpenShift) tasks.push({ id: 'abrir-caja', title: 'Abrir caja', description: 'Empieza el turno con el dinero inicial.', icon: 'cash', link: '/operacion/caja', primary: true });
   if (manageCash && cash?.requiresPreviousShiftClosure) tasks.push({ id: 'cerrar-anterior', title: 'Cerrar el turno anterior', description: 'Quedó abierto un turno de otro día.', icon: 'cash', link: '/operacion/caja', primary: true });
   if (can('SALES.CREATE')) tasks.push({ id: 'vender', title: 'Vender', description: cash && !cashOpen ? 'Primero abre la caja.' : 'Registrar una venta y cobrar.', icon: 'sales', link: '/operacion/ventas', primary: cashOpen || !cash });
   if (can('SALES.OWN_READ') || can('SALES.ALL_READ')) tasks.push({ id: 'cambio', title: 'Cambiar o devolver', description: 'Cambio de productos de una venta.', icon: 'history', link: '/operacion/ventas/historial', queryParams: { accion: 'cambio' } });
@@ -25,7 +28,7 @@ export function homeTasks(can: (permission: string) => boolean, cash: CashState 
   if (can('CUSTOMERS.BASIC_MANAGE') || can('CUSTOMERS.MANAGE')) tasks.push({ id: 'clientes', title: 'Clientes', description: 'Buscar o registrar un cliente.', icon: 'customers', link: '/operacion/clientes' });
   if (can('PURCHASES.RECEIVE')) tasks.push({ id: 'mercancia', title: 'Recibir mercancía', description: 'Registrar lo que llegó del proveedor.', icon: 'reception', link: '/operacion/compras', queryParams: { accion: 'registrar' } });
   if (can('INVENTORY.READ')) tasks.push({ id: 'inventario', title: 'Inventario', description: 'Existencias y productos por agotarse.', icon: 'inventory', link: '/operacion/inventario' });
-  if (manageCash && cashOpen) tasks.push({ id: 'cerrar-caja', title: 'Cerrar caja', description: 'Contar el efectivo y terminar el turno.', icon: 'cash', link: '/operacion/caja' });
+  if ((manageCash || ownsShift) && cashOpen) tasks.push({ id: 'cerrar-caja', title: 'Cerrar caja', description: 'Contar el efectivo y terminar el turno.', icon: 'cash', link: '/operacion/caja' });
   if (can('REPORTS.FINANCIAL_READ')) tasks.push({ id: 'resumen', title: 'Resumen del día', description: 'Ventas, caja y alertas de hoy.', icon: 'dashboard', link: '/operacion/dashboard' });
   return tasks;
 }
@@ -90,7 +93,7 @@ export class Home implements OnInit {
   readonly loadingCash = signal(false);
   readonly cashOpen = computed(() => !!this.cash()?.hasOpenShift && !this.cash()?.requiresPreviousShiftClosure);
   readonly firstName = computed(() => (this.session.user()?.displayName ?? '').trim().split(/\s+/)[0] || 'de nuevo');
-  readonly tasks = computed(() => homeTasks(permission => this.session.has(permission), this.session.has('CASH.OWN_READ') ? this.cash() : null));
+  readonly tasks = computed(() => homeTasks(permission => this.session.has(permission), this.session.has('CASH.OWN_READ') ? this.cash() : null, this.session.user()?.id ?? null));
 
   async ngOnInit(): Promise<void> {
     if (!this.session.has('CASH.OWN_READ')) return;

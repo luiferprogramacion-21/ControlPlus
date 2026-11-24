@@ -12,6 +12,15 @@ describe('Inicio: tareas frecuentes', () => {
     expect(tasks.some(t => t.id === 'cerrar-caja')).toBe(false);
   });
 
+  it('el Cajero ve «Abrir caja» y, con su propio turno abierto, «Cerrar caja» (auditoría del 23/11/2026)', () => {
+    const cashier = ['SALES.CREATE', 'CASH.OWN_READ'];
+    expect(homeTasks(p => cashier.includes(p), cash()).map(task => task.id)).toContain('abrir-caja');
+    const shift = { id: 's1', mode: 'INDIVIDUAL', state: 'ABIERTA', operatingDate: '2026-11-23', openedAtUtc: '', initialAmount: 0, version: 1, responsibleUserId: 'u-cajero' };
+    const open = cash({ hasOpenShift: true, currentShift: shift });
+    expect(homeTasks(p => cashier.includes(p), open, 'u-cajero').map(task => task.id)).toContain('cerrar-caja');
+    expect(homeTasks(p => cashier.includes(p), open, 'otro').map(task => task.id)).not.toContain('cerrar-caja');
+  });
+
   it('con la caja abierta, «Vender» es la tarea principal y aparece «Cerrar caja»', () => {
     const tasks = homeTasks(p => ['SALES.CREATE', 'CASH.SHIFT_MANAGE'].includes(p), cash({ hasOpenShift: true }));
     expect(tasks.find(t => t.id === 'vender')?.primary).toBe(true);

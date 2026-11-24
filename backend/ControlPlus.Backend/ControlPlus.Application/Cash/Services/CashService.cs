@@ -341,10 +341,14 @@ public sealed partial class CashService(
     public async Task<Result<CashReconciliationDto>> GetReconciliationAsync(
         ActorContext actor, CancellationToken cancellationToken = default)
     {
-        var error = await RequireAsync(actor, PermissionCodes.CashShiftManage, cancellationToken);
+        // Auditoría del 23/11/2026 (C.1): el Cajero ve el arqueo solo de su propio turno individual, para poder cerrarlo.
+        var canManage = await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.CashShiftManage, cancellationToken);
+        var error = await RequireAsync(actor, canManage ? PermissionCodes.CashShiftManage : PermissionCodes.CashOwnRead, cancellationToken);
         if (error is not null) return Result.Failure<CashReconciliationDto>(error);
         var shift = await repository.GetOpenShiftAsync(false, cancellationToken);
         if (shift is null) return Result.Failure<CashReconciliationDto>(ApplicationError.NotFound("un turno abierto"));
+        if (!canManage && (shift.ModoOperacion != CashConstants.IndividualMode || shift.UsuarioResponsableId != actor.UserId))
+            return Result.Failure<CashReconciliationDto>(ApplicationError.Forbidden("Solo quien abrió la caja puede contarla y cerrarla."));
         var expected = await repository.GetExpectedAmountsAsync(shift.Id, cancellationToken);
         var validation = ValidateExpectedMethods(expected);
         return validation is null
@@ -358,8 +362,14 @@ public sealed partial class CashService(
         CloseCashShiftRequest request,
         CancellationToken cancellationToken = default)
     {
-        var error = await RequireAsync(actor, PermissionCodes.CashShiftManage, cancellationToken);
+        // Auditoría del 23/11/2026 (C.1): un Cajero cierra su propio turno individual con la autorización de un Supervisor o
+        // del Administrador, igual que para abrirlo; quien administra la caja lo cierra solo, como antes.
+        var canManage = await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.CashShiftManage, cancellationToken);
+        var error = await RequireAsync(actor, canManage ? PermissionCodes.CashShiftManage : PermissionCodes.CashOwnRead, cancellationToken);
         if (error is not null) return Result.Failure<CashReconciliationDto>(error);
+        if (!canManage && request?.Authorization is null)
+            return Result.Failure<CashReconciliationDto>(ApplicationError.Forbidden(
+                "Para cerrar la caja, un Cajero necesita la autorización de un Supervisor o del Administrador (carné o usuario y contraseña)."));
         if (request?.PaymentMethods is null || request.PaymentMethods.Count == 0)
             return Result.Failure<CashReconciliationDto>(Validation("Debe registrar el valor contado o verificado para cada medio de pago."));
         if (request.PaymentMethods.Any(x => x is null || x.PaymentMethodId == Guid.Empty || !CashMoney.IsValid(x.CountedAmount)))
@@ -399,13 +409,17 @@ public sealed partial class CashService(
     private async Task<Result<CashReconciliationDto>> CloseWithinTransactionAsync(
         ActorContext actor, Guid shiftId, CloseCashShiftRequest request, CancellationToken cancellationToken)
     {
-        var permissionError = await RequireAsync(actor, PermissionCodes.CashShiftManage, cancellationToken);
+        var canManage = await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.CashShiftManage, cancellationToken);
+        var permissionError = await RequireAsync(actor, canManage ? PermissionCodes.CashShiftManage : PermissionCodes.CashOwnRead, cancellationToken);
         if (permissionError is not null) return Result.Failure<CashReconciliationDto>(permissionError);
         var actorSnapshot = await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
         var administratorSelfAuthorized = actorSnapshot?.HighestRoleLevel == RoleLevel.Administrador &&
             request.Authorization is null;
         var shift = await repository.GetShiftForUpdateAsync(shiftId, cancellationToken);
         if (shift is null) return Result.Failure<CashReconciliationDto>(ApplicationError.NotFound("el turno de caja"));
+        if (!canManage && (shift.ModoOperacion != CashConstants.IndividualMode || shift.UsuarioResponsableId != actor.UserId))
+            return Result.Failure<CashReconciliationDto>(ApplicationError.Forbidden(
+                "Un Cajero solo puede cerrar el turno individual que él mismo abrió."));
         var correlationId = Guid.CreateVersion7();
         Usuario? authorizer = null;
         if (request.Authorization is not null)
@@ -452,7 +466,7 @@ public sealed partial class CashService(
 
         if (totalDifference == 0)
         {
-            if (request.DifferenceReasonId is not null || request.Authorization is not null)
+            if (request.DifferenceReasonId is not null || (canManage && request.Authorization is not null))
                 return Result.Failure<CashReconciliationDto>(Validation("Un cierre sin diferencia no requiere motivo ni autorización."));
         }
         else
@@ -462,8 +476,11 @@ public sealed partial class CashService(
                 reason = await repository.GetActiveDifferenceReasonAsync(reasonId, cancellationToken);
                 if (reason is null) return Result.Failure<CashReconciliationDto>(ApplicationError.NotFound("el motivo activo de diferencia de caja"));
             }
-            else if (administratorSelfAuthorized)
+            else if (administratorSelfAuthorized || !canManage)
             {
+                // El Cajero no consulta el catálogo de motivos: escribe qué pasó y se registra el motivo genérico (23/11/2026).
+                if (!canManage && string.IsNullOrWhiteSpace(request.DifferenceObservation))
+                    return Result.Failure<CashReconciliationDto>(Validation("Escribe qué pasó con la diferencia de la caja."));
                 // The Administrator may close without choosing a reason: the generic "OTRO" is recorded.
                 var establishment = await repository.GetEstablishmentAsync(false, cancellationToken);
                 if (establishment is null) return Result.Failure<CashReconciliationDto>(ApplicationError.NotFound("el establecimiento"));
@@ -542,14 +559,14 @@ public sealed partial class CashService(
             nameof(DetalleArqueoMedioPago), shift.Id,
             new { TotalExpected = totalExpected, TotalCounted = totalCounted, CashDifference = shift.Diferencia, TotalDifference = totalDifference,
                 AuthorizationMode = administratorSelfAuthorized && totalDifference != 0 ? "ADMINISTRATOR_SELF" :
-                    authorization is not null ? "OTHER_USER" : "NONE",
+                    authorization is not null ? "OTHER_USER" : authorizer is not null ? "CASHIER_CLOSE_AUTHORIZED" : "NONE",
                 PaymentMethods = details.Select(x => new { x.MetodoPagoId, x.ValorEsperado, x.ValorContado, x.Diferencia }) },
             correlationId, authorizer?.Id, null, shift.TerminalId, reason?.Codigo, cancellationToken);
         await AuditWriter.WriteCashAsync(auditRepository, clock, actor.UserId, AuditAction.CashShiftClosed,
             nameof(TurnoCaja), shift.Id, new { shift.FechaOperativa, CashDifference = shift.Diferencia,
                 TotalDifference = totalDifference,
                 AuthorizationMode = administratorSelfAuthorized && totalDifference != 0 ? "ADMINISTRATOR_SELF" :
-                    authorization is not null ? "OTHER_USER" : "NONE" },
+                    authorization is not null ? "OTHER_USER" : authorizer is not null ? "CASHIER_CLOSE_AUTHORIZED" : "NONE" },
             correlationId, authorizer?.Id, null, shift.TerminalId, reason?.Codigo, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success(MapReconciliation(shift, expected, counted));

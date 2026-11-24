@@ -100,8 +100,8 @@ export class Cash implements OnInit {
       const state = await this.api.state(); stateLoaded = true; this.stateLoading.set(false); this.stateReadError.set(false); this.state.set(state); if (!state.hasOpenShift && !this.initialAmount && state.lastInitialAmount) this.initialAmount = state.lastInitialAmount;
       if (state.hasOpenShift) {
         this.movements.set((await this.api.movements()).items);
-        if (this.session.has('CASH.SHIFT_MANAGE') && state.currentShift) {
-          await this.loadDrawerStatus();
+        if (this.canClose && state.currentShift) {
+          if (this.canManageCash) await this.loadDrawerStatus();
           if (this.reconciliation()?.shiftId !== state.currentShift.id) { this.reconciliation.set(null); this.resetReasons(); }
           await this.loadReconciliation();
         }
@@ -182,6 +182,19 @@ export class Cash implements OnInit {
     this.closeStep.set(step);
   }
   get selectedReasonName(): string { return this.reasons()?.find(reason => reason.id === this.reasonId)?.name ?? ''; }
+  /** Auditoría del 23/11/2026 (C.1): el Cajero cierra su propio turno individual con la autorización de un superior. */
+  get canManageCash(): boolean { return this.session.has('CASH.SHIFT_MANAGE'); }
+  get ownsShift(): boolean {
+    const shift = this.state()?.currentShift;
+    return !!shift && shift.mode === 'INDIVIDUAL' && !!shift.responsibleUserId && shift.responsibleUserId === this.session.user()?.id;
+  }
+  get canClose(): boolean { return this.canManageCash || this.ownsShift; }
+  /** Falta el motivo (quien administra la caja) o la explicación (el Cajero) de una diferencia. */
+  get blockedByReason(): boolean {
+    if (this.difference === 0) return false;
+    if (!this.canManageCash) return !this.differenceObservation.trim();
+    return !this.isAdministrator && (this.reasonsLoading() || !this.reasons()?.length || !this.reasonId);
+  }
   get isAdministrator(): boolean { return typeof this.session.hasRole === 'function' && this.session.hasRole('ADMINISTRADOR'); }
   private resetReasons(): void { this.reasons.set(null); this.reasonsError.set(''); this.reasonId = ''; }
   async open(): Promise<void> {
@@ -226,8 +239,18 @@ export class Cash implements OnInit {
   }
   async close(): Promise<void> {
     const rec = this.reconciliation();
-    if (!rec || !this.session.has('CASH.SHIFT_MANAGE') || this.busy() || !this.hasValidCounts) return;
+    if (!rec || !this.canClose || this.busy() || !this.hasValidCounts) return;
     const hasDifference = this.difference !== 0;
+    if (!this.canManageCash) {
+      if (hasDifference && !this.differenceObservation.trim()) { this.error.set('Escribe qué pasó con la diferencia de la caja.'); return; }
+      await this.authorization.open({ title: 'Autorizar cierre de caja',
+        description: 'Un Cajero cierra la caja con la autorización de un Supervisor o del Administrador. El turno termina y ya no se puede vender hasta abrir otro.',
+        detail: `Diferencia ${groupedNumber(this.difference)} COP`,
+        operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
+        onError: message => this.error.set(message),
+        run: credentials => this.submitClosure(rec, credentials) });
+      return;
+    }
     if (hasDifference && !this.isAdministrator) {
       if (this.reasons() === null || this.reasonsLoading() || this.reasonsError()) { this.error.set('No se pudieron cargar los motivos. Reintenta la consulta.'); return; }
       if (!this.reasons()!.some(reason => reason.id === this.reasonId)) { this.error.set('Selecciona un motivo de cierre.'); return; }
@@ -247,9 +270,9 @@ export class Cash implements OnInit {
       await this.api.close(rec.shiftId, {
         version: rec.shiftVersion,
         paymentMethods: this.cashMethods().map(m => ({ paymentMethodId: m.paymentMethodId, countedAmount: Number(this.counted[m.paymentMethodId]) })),
-        differenceReasonId: hasDifference ? this.reasonId || null : null,
+        differenceReasonId: hasDifference && this.canManageCash ? this.reasonId || null : null,
         differenceObservation: hasDifference ? this.differenceObservation.trim() || null : null,
-        authorization: hasDifference && credentials ? authorizationBody(credentials) : null,
+        authorization: credentials && (hasDifference || !this.canManageCash) ? authorizationBody(credentials) : null,
       });
       this.closingMode.set(false); this.notice.set('Turno cerrado.'); await this.refresh();
     }, !!credentials);

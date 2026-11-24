@@ -165,6 +165,30 @@ public sealed partial class CashApiFlowTests
         Assert.Equal(scenario.Administrator.User.Id, full.CurrentShift.ResponsibleUserId);
     }
 
+    /// <summary>Auditoría del 23/11/2026 (C.1): el Cajero cierra su propio turno con la autorización de un Supervisor.</summary>
+    [Fact, Trait("Category", "Integration")]
+    public async Task Cashier_ClosesOwnShiftOnlyWithSupervisorAuthorization()
+    {
+        var scenario = await PrepareCorrectionScenarioAsync(0m);
+        using var administrator = AuthenticatedClient(scenario.Administrator.AccessToken);
+        await ReadSuccessAsync<CashReconciliationDto>(await administrator.PostAsJsonAsync(
+            $"/api/cash/shifts/{scenario.Shift.Id}/close", BalancedClose(await ReconcileAsync(administrator))), HttpStatusCode.OK);
+        using var cashier = CreateClient();
+        SetBearer(cashier, (await LoginAsync(cashier, CashierUserName, CashierPassword)).AccessToken);
+        var owned = await ReadSuccessAsync<CashShiftDto>(await cashier.PostAsJsonAsync("/api/cash/shifts",
+            new OpenCashShiftRequest(1000m, null, new CashOpenAuthorizationRequest(SupervisorUserName, SupervisorPassword))),
+            HttpStatusCode.Created);
+
+        var reconciliation = await ReconcileAsync(cashier);
+        Assert.Equal(owned.Id, reconciliation.ShiftId);
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.PostAsJsonAsync(
+            $"/api/cash/shifts/{owned.Id}/close", BalancedClose(reconciliation))).StatusCode);
+        var closed = await ReadSuccessAsync<CashReconciliationDto>(await cashier.PostAsJsonAsync(
+            $"/api/cash/shifts/{owned.Id}/close", BalancedClose(reconciliation) with
+            { Authorization = new CashCloseAuthorizationRequest(SupervisorUserName, SupervisorPassword) }), HttpStatusCode.OK);
+        Assert.Equal(owned.Id, closed.ShiftId);
+    }
+
     [Fact, Trait("Category", "Integration")]
     public async Task OwnRead_IndividualOwnerKeepsOwnDetailsAfterManagementPermissionRevoked()
     {
@@ -187,7 +211,8 @@ public sealed partial class CashApiFlowTests
         var state = await ReadSuccessAsync<CashStateDto>(await cashier.GetAsync("/api/cash/state"), HttpStatusCode.OK);
         Assert.Equal(owned.Id, state.CurrentShift!.Id);
         Assert.Equal(456m, state.CurrentShift.InitialAmount);
-        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.GetAsync("/api/cash/reconciliation")).StatusCode);
+        // Auditoría del 23/11/2026 (C.1): el Cajero ve el arqueo de su propio turno individual para poder cerrarlo con autorización.
+        Assert.Equal(HttpStatusCode.OK, (await cashier.GetAsync("/api/cash/reconciliation")).StatusCode);
     }
 
     [Fact, Trait("Category", "Integration")]
