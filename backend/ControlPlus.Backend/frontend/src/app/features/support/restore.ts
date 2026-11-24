@@ -46,7 +46,7 @@ export class Restore implements OnInit {
     finally { this.testing.set(false); }
   }
 
-  destination(type: string): string { return type === 'EXTERNO_CIFRADO' ? 'Externo cifrado' : 'Local separado'; }
+  destination(type: string): string { return type === 'EXTERNO_CIFRADO' ? 'Externo cifrado (nube)' : 'Disco o USB de la tienda'; }
 
   dateTime(iso: string | null | undefined): string {
     if (!iso) return '—';

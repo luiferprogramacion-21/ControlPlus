@@ -57,4 +57,12 @@
 .restore-choice.is-active { border-color: var(--cp-primary); color: var(--cp-primary); background: var(--cp-primary-soft); }
 .restore-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .restore-note { flex: 1; margin: 0; padding: 14px 18px; border-radius: 8px; background: var(--cp-error-soft); color: var(--cp-error); font-weight: 600; font-size: 14px; }
-@container cp (max-width: 900px) { .restore-metrics, .restore-layout { grid-template-columns: 1fr; } .restore-footer { flex-direction: column; align-items: stretch; } }
+/* Pasos para probar un respaldo (auditoría A.20). */
+.restore-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 16px; padding: 0; list-style: none; }
+.restore-steps li { display: grid; gap: 4px; padding: 14px 16px; border-radius: 12px; background: var(--cp-primary-soft); }
+.restore-steps strong { color: var(--cp-primary); font-size: 15px; }
+.restore-steps span { color: var(--cp-text-secondary); font-size: 13px; line-height: 1.45; }
+.restore-test { width: 100%; margin: 6px 0 10px; }
+.restore-real { margin-top: 16px; }
+.restore-real .restore-note { margin-top: 10px; }
+@container cp (max-width: 900px) { .restore-metrics, .restore-layout, .restore-steps { grid-template-columns: 1fr; } .restore-footer { flex-direction: column; align-items: stretch; } }

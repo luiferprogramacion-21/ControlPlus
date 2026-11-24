@@ -1,21 +1,28 @@
 <section class="support-page" aria-labelledby="restore-title">
   <div class="support-heading">
     <div>
-      <h2 id="restore-title">Restauración y continuidad</h2>
-      <p>Solo administrador · Las pruebas no reemplazan la base operativa. <a routerLink="/operacion/soporte">Volver a Soporte</a></p>
+      <h2 id="restore-title">Comprobar que los respaldos sirven</h2>
+      <p>Solo administrador · La prueba no toca tus datos reales. <a routerLink="/operacion/soporte">Volver a Soporte</a></p>
     </div>
   </div>
+
+  <!-- Auditoría A.20: pasos claros para probar una restauración sin conocer términos técnicos. -->
+  <ol class="restore-steps" aria-label="Cómo probar un respaldo">
+    <li><strong>1. Elige una copia</strong><span>La más reciente ya viene elegida. Puedes elegir otra en la lista.</span></li>
+    <li><strong>2. Pulsa «Probar restauración»</strong><span>ControlPlus la recupera en una base de prueba aparte, revisa que esté completa y luego la borra.</span></li>
+    <li><strong>3. Mira el resultado</strong><span>«Prueba correcta» quiere decir que con esa copia se puede recuperar la información.</span></li>
+  </ol>
 
   @if (loading() && !overview()) { <p class="support-message" role="status">Cargando copias…</p> }
 
   @if (overview(); as data) {
     <div class="support-metrics restore-metrics">
       <article class="support-metric">
-        <div><span>RPO vigente</span><strong>{{ number(data.rpoMinutes) }} min</strong><small class="support-info">Pérdida máxima objetivo</small></div>
+        <div><span>Se respalda cada</span><strong>{{ number(data.rpoMinutes) }} min</strong><small class="support-info">Es lo máximo que se perdería si falla el equipo</small></div>
         <span class="support-metric__badge support-metric__badge--info" aria-hidden="true">R</span>
       </article>
       <article class="support-metric">
-        <div><span>RTO objetivo</span><strong>{{ rto(data.rtoMinutes) }}</strong><small class="restore-warning">Tiempo máximo de recuperación</small></div>
+        <div><span>Tiempo para recuperar</span><strong>{{ rto(data.rtoMinutes) }}</strong><small class="restore-warning">Lo máximo que tardaría volver a trabajar</small></div>
         <span class="support-metric__badge restore-badge--warning" aria-hidden="true">T</span>
       </article>
       <article class="support-metric">
@@ -31,44 +38,41 @@
 
     <div class="restore-layout">
       <section class="support-panel" aria-labelledby="restore-copies-title">
-        <h3 id="restore-copies-title">Copias disponibles</h3>
-        <p>Destino local separado y copia externa cifrada.</p>
-        <div class="support-table restore-copies"><table><thead><tr><th>Fecha y hora</th><th>Destino</th><th class="align-right">Tamaño</th><th>Estado</th><th>Acción</th></tr></thead><tbody>
+        <h3 id="restore-copies-title">1. Copias disponibles</h3>
+        <p>Las copias en el disco o USB de la tienda y las de la nube (cifradas).</p>
+        <div class="support-table restore-copies"><table><thead><tr><th>Fecha y hora</th><th>Dónde está</th><th class="align-right">Tamaño</th><th>Estado</th><th>Acción</th></tr></thead><tbody>
           @for (copy of data.copies; track copy.copyId) {
             <tr [class.is-selected]="copy.copyId === selectedId()">
               <td>{{ dateTime(copy.backupAt) }}</td><td>{{ destination(copy.destinationType) }}</td>
               <td class="align-right">{{ size(copy.sizeBytes) }}</td>
               <td>@if (!copy.available) { <span class="badge badge--warning">No disponible</span> } @else if (copy.verified) { <span class="badge badge--success">Verificado</span> } @else { <span class="badge badge--warning">Sin verificar</span> }</td>
-              <td><button class="link-button" type="button" [disabled]="!copy.available" (click)="select(copy)">{{ copy.copyId === selectedId() ? 'Seleccionada' : 'Seleccionar' }}</button></td>
+              <td><button class="link-button" type="button" [disabled]="!copy.available" (click)="select(copy)">{{ copy.copyId === selectedId() ? 'Elegida' : 'Elegir' }}</button></td>
             </tr>
-          } @empty { <tr><td colspan="5" class="support-pending">Todavía no hay copias completadas.</td></tr> }
+          } @empty { <tr><td colspan="5" class="support-pending">Todavía no hay copias. Vuelve a Soporte y pulsa «Crear respaldo».</td></tr> }
         </tbody></table></div>
       </section>
 
       <section class="support-panel" aria-labelledby="restore-selected-title">
-        <h3 id="restore-selected-title">Copia seleccionada</h3>
+        <h3 id="restore-selected-title">2. Probar la copia elegida</h3>
         @if (selected(); as copy) {
-          <p>{{ dateTime(copy.backupAt) }} · {{ destination(copy.destinationType) }}</p>
+          <p><strong>{{ dateTime(copy.backupAt) }}</strong> · {{ destination(copy.destinationType) }}</p>
           <dl class="support-facts"><div><dt>Integridad</dt><dd>@if (copy.verified) { <span class="badge badge--success">Verificada</span> } @else { — }</dd></div></dl>
-          <p class="restore-kind">Tipo de acción</p>
-          <div class="restore-actions">
-            <button class="button button--secondary restore-choice is-active" type="button" disabled>Probar restauración</button>
-            <button class="button button--secondary restore-choice" type="button" disabled title="Para reemplazar los datos reales hay que detener ControlPlus y seguir un procedimiento aparte.">Restaurar operación</button>
-          </div>
-          <p class="field-hint">«Restaurar operación» reemplaza los datos reales y no se hace desde esta pantalla: hay que detener ControlPlus y seguir un procedimiento aparte, con ayuda de soporte.</p>
+          <button class="button button--primary restore-test" type="button" (click)="test()" [disabled]="testing()">{{ testing() ? 'Probando… (puede tardar un minuto)' : 'Probar restauración' }}</button>
           @if (result(); as r) {
             <div class="inline-feedback" [class.inline-feedback--success]="r.result === 'EXITOSA'" [class.inline-feedback--error]="r.result !== 'EXITOSA'" role="status">
               @if (r.result === 'EXITOSA') { Prueba correcta: la copia se restauró en una base temporal, se verificó y se borró. Tardó {{ number(r.rtoObservedMinutes) }} min. }
               @else { La prueba falló: {{ r.error }} }
             </div>
           }
-        } @else { <p class="support-pending">Seleccione una copia disponible.</p> }
+        } @else { <p class="support-pending">Elige una copia disponible en la lista.</p> }
       </section>
     </div>
 
-    <div class="restore-footer">
+    <section class="support-panel restore-real" aria-labelledby="restore-real-title">
+      <h3 id="restore-real-title">¿Y si de verdad se perdió la información?</h3>
+      <p>Recuperar los datos reales reemplaza lo que hay en el equipo, por eso no se hace con un botón: hay que detener ControlPlus y seguir el procedimiento de emergencia con ayuda de soporte. Antes de empezar, el sistema guarda una copia de lo que había.</p>
+      <button class="button button--secondary restore-choice" type="button" disabled title="Se hace con el procedimiento de emergencia, con ayuda de soporte.">Restaurar operación</button>
       <p class="restore-note" role="note">Restaurar la operación exige confirmación, verificación y registro de auditoría.</p>
-      <button class="button button--primary" type="button" (click)="test()" [disabled]="!selected() || testing()">{{ testing() ? 'Probando… (puede tardar un minuto)' : 'Probar restauración' }}</button>
-    </div>
+    </section>
   }
 </section>

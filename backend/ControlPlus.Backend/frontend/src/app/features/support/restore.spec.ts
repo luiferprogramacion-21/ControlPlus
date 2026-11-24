@@ -39,6 +39,9 @@ describe('Restauración', () => {
     expect(text).toContain('Verificado');
     expect(text).toContain('No disponible');
     expect(text).toContain('Restaurar la operación exige confirmación, verificación y registro de auditoría.');
+    // Auditoría A.20: pasos sencillos y palabras de tienda, sin RPO ni RTO.
+    expect(text).toContain('Pulsa «Probar restauración»'); expect(text).toContain('Se respalda cada');
+    expect(text).not.toContain('RPO'); expect(text).not.toContain('RTO');
   });
 
   it('selecciona la copia disponible más reciente y no deja elegir una que ya no existe', async () => {

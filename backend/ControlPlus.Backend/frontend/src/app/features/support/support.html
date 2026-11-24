@@ -39,8 +39,8 @@
         <h3 id="support-components-title">Estado de componentes</h3>
         <p>Diagnóstico local de ControlPlus.</p>
         <ul class="support-components">
-          <li><span>API ASP.NET Core</span><span class="badge" [class.badge--success]="apiUp()" [class.badge--error]="!apiUp()">{{ apiUp() ? 'Disponible' : 'No disponible' }}</span></li>
-          <li><span>PostgreSQL</span><span class="badge" [class.badge--success]="databaseUp()" [class.badge--error]="!databaseUp()">{{ databaseUp() ? 'Disponible' : 'No disponible' }}</span></li>
+          <li><span>Programa ControlPlus</span><span class="badge" [class.badge--success]="apiUp()" [class.badge--error]="!apiUp()">{{ apiUp() ? 'Disponible' : 'No disponible' }}</span></li>
+          <li><span>Base de datos</span><span class="badge" [class.badge--success]="databaseUp()" [class.badge--error]="!databaseUp()">{{ databaseUp() ? 'Disponible' : 'No disponible' }}</span></li>
           <li><span>Servicio de respaldos</span><span class="badge" [class.badge--success]="data.serviceEnabled" [class.badge--warning]="!data.serviceEnabled">{{ data.serviceEnabled ? 'Disponible' : 'Apagado' }}</span></li>
           @for (item of [{ name: 'Impresora térmica', diagnosis: printer() }, { name: 'Cola de impresión', diagnosis: queue() }]; track item.name) {
             <li><span class="support-component">{{ item.name }}@if (item.diagnosis) { <small>{{ item.diagnosis.detail }}</small> }</span>
@@ -61,7 +61,8 @@
             <div><dt>Integridad</dt><dd>@if (data.lastSuccessfulBackup?.verified) { <span class="badge badge--success">Verificada</span> } @else { — }</dd></div>
           </dl>
           @if (!data.serviceEnabled) { <p class="field-hint">El servicio está apagado en este equipo. Ejecute la preparación de respaldos (scripts\backups\Initialize-Backups.ps1) y reinicie la API.</p> }
-          <div class="support-actions"><button class="button button--secondary" type="button" (click)="runNow()" [disabled]="running() || !data.serviceEnabled">{{ running() ? 'Solicitando…' : 'Crear respaldo' }}</button><a class="button button--secondary" routerLink="/operacion/soporte/restauracion">Restauración</a></div>
+          <div class="support-actions"><button class="button button--secondary" type="button" (click)="runNow()" [disabled]="running() || !data.serviceEnabled">{{ running() ? 'Solicitando…' : 'Crear respaldo' }}</button><a class="button button--secondary" routerLink="/operacion/soporte/restauracion">Probar restauración</a></div>
+          <p class="field-hint">«Probar restauración» comprueba que un respaldo sirve, sin tocar tus datos reales.</p>
         </section>
 
         <section class="support-panel" aria-labelledby="support-events-title">
