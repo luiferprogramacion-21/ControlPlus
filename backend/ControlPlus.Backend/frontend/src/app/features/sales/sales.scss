@@ -7,7 +7,7 @@
 .pos-heading h2,.panel-heading h2 { margin:0 0 4px; font-size:18px; font-weight:500; }
 .pos-heading p { margin:0; color:var(--cp-text-muted); font-size:13px; }
 .search-area { position:relative; flex:0 0 auto; }
-.cart-table { min-width:0; min-height:0; flex:1 1 0; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.cart-table { min-width:0; min-height:260px; flex:1 1 0; overscroll-behavior:contain; scrollbar-gutter:stable; }
 .cart-table table { min-width:760px; }
 .cart-table th,.cart-table td { padding:11px 12px; border-bottom:1px solid var(--cp-border); text-align:left; }
 .cart-table th { position:sticky; top:0; z-index:1; background:var(--cp-table-head); color:var(--cp-text-secondary); font-size:12px; box-shadow:0 1px var(--cp-border); }

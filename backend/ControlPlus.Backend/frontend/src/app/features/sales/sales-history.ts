@@ -5,7 +5,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Page, errorText } from '../../core/api';
+import { Page, errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
@@ -237,7 +237,7 @@ export class SalesHistory implements OnInit {
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 403) {
         this.pending = null;
-        throw new Error(credentials ? 'No se autorizó la anulación. El autorizador debe tener un rol superior al tuyo y el permiso de anular ventas.' : 'No tienes permiso para anular ventas.');
+        throw new Error(reasonOr(error, credentials ? 'No se autorizó la anulación. El autorizador debe tener un rol superior al tuyo y el permiso de anular ventas.' : 'No tienes permiso para anular ventas.'));
       }
       throw error;
     } finally { this.saving.set(false); }

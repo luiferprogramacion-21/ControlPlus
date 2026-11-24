@@ -25,6 +25,19 @@ public sealed partial class SalesService
         return Result.Success<IReadOnlyCollection<SaleChangeDto>>(changes.Select(MapChange).ToArray());
     }
 
+    /// <summary>
+    /// Auditoría del 23 de noviembre de 2026: el mensaje dice quién tiene la caja y qué hacer, en vez de «pertenece a otro
+    /// usuario». Una operación que mueve dinero solo la hace quien abrió el turno individual.
+    /// </summary>
+    private async Task<ApplicationError> OtherShiftOwnerErrorAsync(Guid? responsibleId, string operation, CancellationToken ct)
+    {
+        var name = responsibleId is Guid id ? (await userRepository.GetByIdAsync(id, ct))?.DisplayName : null;
+        var who = string.IsNullOrWhiteSpace(name) ? "otro usuario" : name.Trim();
+        return ApplicationError.Forbidden(
+            $"La caja está abierta en turno individual por {who}. {operation} mueve dinero de esa caja, así que debe hacerlo {who} " +
+            "con su usuario. Si varias personas atienden la caja, ciérrenla y ábranla en turno compartido.");
+    }
+
     public async Task<Result<SaleChangeDto>> ConfirmChangeAsync(ActorContext actor, Guid saleId,
         string idempotencyKey, ConfirmSaleChangeRequest request,
         CancellationToken cancellationToken = default)
@@ -82,7 +95,7 @@ public sealed partial class SalesService
         if (shift.ModoOperacion == CashConstants.IndividualMode)
         {
             if (shift.UsuarioResponsableId != actor.UserId)
-                return Result.Failure<SaleChangeDto>(ApplicationError.Forbidden("El turno individual pertenece a otro usuario."));
+                return Result.Failure<SaleChangeDto>(await OtherShiftOwnerErrorAsync(shift.UsuarioResponsableId, "Este cambio", ct));
         }
         else if (shift.ModoOperacion == CashConstants.SharedMode)
         {

@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { errorText } from '../../core/api';
+import { errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { WindowSheet } from '../../shared/window-sheet';
@@ -132,7 +132,7 @@ export class SalePaymentCorrection implements OnInit {
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 403) {
         this.pending = null;
-        throw new Error(credentials ? 'No se autorizó. Debe autorizar un Administrador.' : 'No tienes permiso para corregir ventas.');
+        throw new Error(reasonOr(error, credentials ? 'No se autorizó. Debe autorizar un Administrador.' : 'No tienes permiso para corregir ventas.'));
       }
       throw error;
     } finally { this.saving.set(false); }

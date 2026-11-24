@@ -836,3 +836,14 @@ kbd { display: inline-block; min-width: 28px; padding: 2px 7px; border: 1px soli
 .bill-count__head span:last-child, .bill-count__row strong { text-align:right; }
 .bill-count__row input { min-height:36px; padding:4px 10px; border:1px solid var(--cp-control-border); border-radius:7px; font:inherit; text-align:right; background:var(--cp-surface); }
 .bill-count .form-hint { margin:4px 0 0; }
+
+/* Venta con un cobro sin confirmar (auditoría del 23 de noviembre de 2026). */
+.pending-sale-alert { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 10px 0; padding: 12px 14px; border: 1px solid var(--cp-warning); border-radius: 10px; background: var(--cp-warning-soft); color: var(--cp-warning); line-height: 1.45; }
+.pending-sale-alert__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Motivos como botones de opción siempre visibles (auditoría del 23 de noviembre de 2026). */
+.reason-choices { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+.reason-choice { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--cp-control-border); border-radius: 8px; background: var(--cp-surface); cursor: pointer; }
+.reason-choice:hover { background: var(--cp-primary-soft); }
+.reason-choice--on { border: 2px solid var(--cp-primary); background: var(--cp-primary-soft); font-weight: 600; }
+.reason-choice input { width: 18px; height: 18px; margin: 0; accent-color: var(--cp-primary); }

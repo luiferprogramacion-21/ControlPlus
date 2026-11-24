@@ -856,3 +856,31 @@ El usuario pidió que todas las acciones sean lo más cortas e intuitivas posibl
    - `OptionalPaymentReferenceActivationTests` prueba preflight, postflight y la función.
 
 Estos cambios se apartan del prototipo y quedan aprobados.
+
+### Auditoría del usuario del 23 de noviembre de 2026
+
+El usuario hizo la auditoría por rol (`Auditoria-ControlPlus.docx`, 87 pruebas): 71 funcionan; fallaron C.13, C.14, C.19, S.10, S.11, S.13, S.14, S.16, S.19, S.20, A.4 y A.14, y dejó pedidos en las observaciones. Las correcciones se repartieron: Codex hace Compras, Pedidos, Apartados y Reportes; Claude, punto de venta, Caja, autorizaciones, Clientes, Usuarios, Auditoría y Soporte.
+
+Aprobado también: el nuevo «Resumen de la venta» al cobrar (Codex, `5cf4e17`).
+
+**Decisiones del usuario (sustituyen las reglas anteriores donde choquen):**
+
+- **D1.** El plazo de un crédito puede llegar a 6 meses calendario o 180 días (antes 3 meses o 90 días). Necesita migración. Codex.
+- **D2.** El Cajero siempre pide autorización para vender a crédito. Decide el rol de quien vende (en turno compartido, el dueño del carné), no el de quien inició sesión. Claude.
+- **D3.** El medio de pago se puede corregir aunque la caja de esa venta ya esté cerrada, con autorización del Administrador. El cierre no cambia: la corrección queda enlazada a ese día y sus reportes la muestran; el dinero se mueve en la caja abierta. Claude.
+- **D4.** Se mantiene: no se anula un abono en efectivo si la caja abierta no tiene ese efectivo; el mensaje explica qué hacer. Claude.
+- **D5.** El Supervisor cambia precios y el modo del turno con autorización del Administrador (carné o usuario y contraseña). Claude.
+- **D6.** Eliminar un usuario con historial: desaparece de la lista, no entra y su nombre de usuario queda libre; se conserva solo su nombre para que su historial diga quién lo hizo, y la eliminación queda en la auditoría. Claude.
+- **D7.** El Administrador configura el descuento máximo del Cajero y del Supervisor. El Administrador no tiene porcentaje máximo: su límite es el costo. Nadie vende bajo el costo. Necesita migración. Claude.
+- **D8.** La referencia de Nequi y transferencia también es opcional en las devoluciones (apartados y cambios). Codex.
+- **Mensajes claros en TODO el sistema** (pedido expreso del usuario): todo rechazo muestra el motivo real que manda el servidor y qué hacer; ninguna pantalla queda trabada sin explicar. La pantalla no reemplaza un 403/409 por un texto fijo: usa `reasonOr(error, textoPropio)` de `core/api.ts`, que muestra el motivo del servidor y deja el texto propio solo para un rechazo sin explicación.
+
+**Primera entrega de Claude (23 de noviembre de 2026), sin migración:**
+
+- S.10/S.11: el cambio de productos lo rechazaba el servidor porque la caja estaba abierta en turno individual por otra persona, pero la pantalla decía que el autorizador no tenía rol. Ahora dice quién tiene la caja y qué hacer (`OtherShiftOwnerErrorAsync`).
+- C.5: un rechazo claro del servidor (400, 404, 409, 422) ya no deja el punto de venta trabado. Solo una respuesta perdida conserva el intento, con un aviso en el carrito para volver al cobro o descartarlo.
+- Billetes: al entrar al cobro el primer billete reemplaza el exacto y los siguientes se suman.
+- Carrito con alto mínimo (venta a crédito abierta desde Créditos).
+- Comprobante de corrección en formato de ticket de 80 mm, compacto y sin «localhost».
+- Anular venta: los motivos se eligen con botones de opción siempre visibles.
+- Se quitó «Para terminar…» del cobro.

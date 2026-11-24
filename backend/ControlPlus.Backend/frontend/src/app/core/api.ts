@@ -32,6 +32,22 @@ export function errorText(error: unknown): string {
   return 'Ocurrió un error al procesar la solicitud.';
 }
 
+/** Texto genérico de «prohibido» del servidor: no explica nada, así que la pantalla usa el suyo. */
+const GENERIC_FORBIDDEN = 'No tiene permiso para realizar esta acción.';
+
+/**
+ * Auditoría del 23 de noviembre de 2026: cuando el servidor explica por qué rechazó algo (por ejemplo, «La caja está abierta
+ * en turno individual por Maximiliano…»), se muestra ese motivo. El texto propio de la pantalla queda solo para un rechazo
+ * sin explicación.
+ */
+export function reasonOr(error: unknown, fallback: string): string {
+  if (error instanceof HttpErrorResponse && error.error && typeof error.error === 'object') {
+    const title = typeof error.error.title === 'string' ? error.error.title.trim() : '';
+    if (title && title !== GENERIC_FORBIDDEN && !TECHNICAL_MESSAGE.test(title)) return title;
+  }
+  return fallback;
+}
+
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const session = inject(SessionService);
   const router = inject(Router);

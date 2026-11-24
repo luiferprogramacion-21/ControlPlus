@@ -6,7 +6,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { errorText } from '../../core/api';
+import { errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { CatalogApi, Product } from '../catalog/catalog-api';
 import { CashApi, CashState } from '../cash/cash-api';
@@ -551,6 +551,8 @@ export class Sales implements OnInit, OnDestroy {
       // Por defecto se cobra exacto en efectivo: el cajero solo escribe si el cliente entrega más.
       this.activePayments.set(['EFECTIVO']); this.transferApplied = this.nequiApplied = 0; this.transferReference = this.nequiReference = '';
       this.cashApplied = this.cashReceived = this.estimate;
+      // El exacto viene escrito: el primer billete lo reemplaza y los siguientes se suman entre ellos (auditoría del 23/11).
+      this.billsAdding = false;
     }
     this.creditRisk.set(null);
     if (this.saleType() === 'CREDITO') void this.checkCreditRisk();
@@ -599,7 +601,8 @@ export class Sales implements OnInit, OnDestroy {
     if (!this.busy()) {
       this.endCreditRulesRequest();
       this.drawerCheckoutKey = null;
-      this.checkoutMode.set(false); this.error.set(''); this.focusSearch();
+      // El motivo de un rechazo sigue visible al volver al carrito, para saber qué corregir.
+      this.checkoutMode.set(false); this.focusSearch();
     }
   }
   // --- retail / wholesale price ---------------------------------------------------------------
@@ -651,7 +654,7 @@ export class Sales implements OnInit, OnDestroy {
             : await this.api.verifyConcession(kind, credentials.userName, credentials.password);
           this.concessionAuthorization = credentials; this.concessionAuthorizedBy.set(result.authorizedBy);
         } catch (error) {
-          if (error instanceof HttpErrorResponse && error.status === 403) throw new Error('No se autorizó. Revisa el usuario y la contraseña o el carné, y que sea un Supervisor o Administrador con permiso para autorizar.');
+          if (error instanceof HttpErrorResponse && error.status === 403) throw new Error(reasonOr(error, 'No se autorizó. Revisa el usuario y la contraseña o el carné, y que sea un Supervisor o Administrador con permiso para autorizar.'));
           throw error;
         }
       },
@@ -953,7 +956,9 @@ export class Sales implements OnInit, OnDestroy {
           'Se registrará la venta a crédito, se descontará inventario y se abrirá la deuda del cliente.' + (this.needsConcessionAuthorization ? ' También autoriza el descuento o el precio mayorista.' : ''),
         detail: `${this.selectedCustomerName} · ${groupedNumber(this.estimate)} COP · vence ${this.dueDate}`,
         operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
-        selfAuthorizedRoles: blocked ? ['ADMINISTRADOR'] : ['ADMINISTRADOR', 'SUPERVISOR'],
+        // Auditoría del 23 de noviembre de 2026: decide quien vende (en turno compartido, el dueño del carné), no quien
+        // inició sesión. Un Cajero siempre pasa por la ventana de autorización.
+        selfAuthorizedRoles: (blocked ? ['ADMINISTRADOR'] : ['ADMINISTRADOR', 'SUPERVISOR']).filter(role => this.sellerHasRole(role)),
         onError: message => this.error.set(message),
         run: credentials => this.submitSale(credentials) });
     } else if (this.needsConcessionAuthorization) {
@@ -1002,7 +1007,12 @@ export class Sales implements OnInit, OnDestroy {
       // La venta ya está confirmada: un fallo de impresión no la afecta y se puede reintentar con el botón.
       setTimeout(() => void this.printSaleTicket(true));
       await this.refreshCash();
-    } catch (error) { if (error instanceof HttpErrorResponse && error.status === 403 && this.pending?.input.saleType === 'CREDITO') { this.pending = null; throw new Error(this.creditRisk()?.blocked ? `${this.creditRiskText} Con el bloqueo activo, solo un Administrador puede autorizar esta venta.` : 'No se autorizó el crédito. Verifica el rol, permiso y credenciales del autorizador.'); } if (error instanceof HttpErrorResponse && error.status === 403 && credentials) { this.pending = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); throw new Error('No se autorizó el descuento o el precio mayorista. Aplica la autorización de nuevo con un Supervisor o Administrador.'); } if (credentials) throw error; this.error.set(`${errorText(error)} Si la respuesta se perdió, reintenta la misma venta con la misma clave.`); }
+    } catch (error) { if (error instanceof HttpErrorResponse && error.status === 403 && this.pending?.input.saleType === 'CREDITO') { this.pending = null; throw new Error(this.creditRisk()?.blocked ? `${this.creditRiskText} Con el bloqueo activo, solo un Administrador puede autorizar esta venta.` : reasonOr(error, 'No se autorizó el crédito. Verifica el rol, permiso y credenciales del autorizador.')); } if (error instanceof HttpErrorResponse && error.status === 403 && credentials) { this.pending = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); throw new Error(reasonOr(error, 'No se autorizó el descuento o el precio mayorista. Aplica la autorización de nuevo con un Supervisor o Administrador.')); } if (credentials) throw error;
+      // Auditoría del 23 de noviembre de 2026: un rechazo claro del servidor (400, 404, 409, 422) significa que la venta NO se
+      // guardó; la pantalla queda libre para corregir y se explica el motivo. Solo una respuesta perdida (sin conexión o un
+      // fallo del servidor) conserva el intento para reintentarlo con la misma clave sin duplicar la venta.
+      if (error instanceof HttpErrorResponse && [400, 404, 409, 422].includes(error.status)) { this.pending = null; this.error.set(`No se guardó la venta: ${errorText(error)}`); }
+      else this.error.set('No se supo si la venta quedó guardada (se perdió la respuesta). Pulsa «Reintentar confirmación»: si ya se guardó, no se repite.'); }
     finally { this.busy.set(false); }
   }
 
@@ -1105,4 +1115,6 @@ export class Sales implements OnInit, OnDestroy {
     return new Intl.DateTimeFormat('es-CO', { dateStyle: 'long', timeStyle: 'short' }).format(date);
   }
   discardPending(): void { this.pending = null; this.error.set(''); }
+  /** Vuelve a la pantalla de cobro de un intento sin confirmar, sin crear otro. */
+  startCheckoutAgain(): void { if (this.locked && this.cart().length) { this.checkoutMode.set(true); this.focusField('cash-received', 'credit-due-date'); } }
 }

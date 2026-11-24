@@ -89,8 +89,9 @@
       <form class="panel panel--padded module-form" (submit)="$event.preventDefault(); confirm()">
         <div class="panel-heading"><h2 id="sale-cancel-title">Anular venta</h2><p>{{ d.visibleNumber }} · {{ d.total | currency:'COP':'symbol':'1.0-0' }}</p></div>
         <p class="muted">Se repone el inventario y se revierten los pagos. Una venta a crédito solo se anula si no tiene abonos. Un Supervisor necesita la autorización de un Administrador; el Administrador anula sin segundo autorizador.</p>
-        <label class="field-label field-label--spaced" for="sale-cancel-reason">Motivo</label>
-        <select id="sale-cancel-reason" class="text-field" name="reason" [(ngModel)]="reasonId"><option value="">Selecciona un motivo</option>@for (reason of reasons(); track reason.id) { <option [value]="reason.id">{{ reason.name }}</option> }</select>
+        <fieldset class="reason-choices"><legend class="field-label field-label--spaced">Motivo</legend>
+          @for (reason of reasons(); track reason.id) { <label class="reason-choice" [class.reason-choice--on]="reasonId === reason.id"><input type="radio" name="reason" [value]="reason.id" [(ngModel)]="reasonId">{{ reason.name }}</label> }
+        </fieldset>
         <label class="field-label field-label--spaced" for="sale-cancel-observation">Observación <span>{{ selectedReason?.code === 'OTRO' ? '(obligatoria)' : '(opcional)' }}</span></label>
         <textarea id="sale-cancel-observation" class="text-field" name="observation" maxlength="500" [(ngModel)]="observation"></textarea>
         @if (formError()) { <p class="field-error" role="alert">{{ formError() }}</p> }

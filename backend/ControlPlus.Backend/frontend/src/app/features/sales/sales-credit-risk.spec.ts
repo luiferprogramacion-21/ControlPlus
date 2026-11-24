@@ -62,7 +62,8 @@ describe('Sales: clientes morosos y cupo de crédito', () => {
   it('en modo aviso el Supervisor sigue autorizándose a sí mismo', async () => {
     await create(); component.startCheckout(); await loaded();
     await component.confirm();
-    expect(open).toHaveBeenCalledWith(expect.objectContaining({ title: 'Autorizar venta a crédito', selfAuthorizedRoles: ['ADMINISTRADOR', 'SUPERVISOR'] }));
+    // Solo cuenta el rol de quien vende (aquí un Supervisor): un Cajero siempre pasa por la ventana de autorización.
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ title: 'Autorizar venta a crédito', selfAuthorizedRoles: ['SUPERVISOR'] }));
   });
 
   it('con el bloqueo activo solo un Administrador autoriza o vende la excepción', async () => {
@@ -71,7 +72,8 @@ describe('Sales: clientes morosos y cupo de crédito', () => {
     await component.confirm();
     const prompt = open.mock.calls[0][0];
     expect(prompt.title).toBe('Autorizar crédito bloqueado');
-    expect(prompt.selfAuthorizedRoles).toEqual(['ADMINISTRADOR']);
+    // Un Supervisor no es Administrador: con el bloqueo activo necesita la autorización de uno.
+    expect(prompt.selfAuthorizedRoles).toEqual([]);
     expect(prompt.description).toContain('solo un Administrador');
   });
 

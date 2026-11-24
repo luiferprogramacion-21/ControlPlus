@@ -3,7 +3,7 @@ import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { errorText } from '../../core/api';
+import { errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { CatalogApi, Product } from '../catalog/catalog-api';
@@ -194,7 +194,7 @@ export class SaleChange implements OnInit {
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 403) {
         this.pending = null;
-        throw new Error(credentials ? 'No se autorizó el cambio. El autorizador debe tener un rol superior al tuyo y el permiso de autorizar cambios.' : 'No tienes permiso para autorizar cambios de productos.');
+        throw new Error(reasonOr(error, credentials ? 'No se autorizó el cambio. El autorizador debe tener un rol superior al tuyo y el permiso de autorizar cambios.' : 'No tienes permiso para autorizar cambios de productos.'));
       }
       if (error instanceof HttpErrorResponse && error.status === 409) {
         this.pending = null;
