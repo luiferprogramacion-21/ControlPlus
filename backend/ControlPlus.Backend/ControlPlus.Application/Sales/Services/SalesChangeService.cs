@@ -161,6 +161,17 @@ public sealed partial class SalesService
             var previousQuantity = returnedBefore.GetValueOrDefault(original.Id);
             var net = SaleChangeAvailability.HistoricalReturnValue(original.PrecioUnitario,
                 original.ValorDescuento, original.Cantidad, previousQuantity, returned.Quantity);
+            if (returned.ReceivedUnitValue is decimal agreed)
+            {
+                // Se recibe por menos de lo pagado: la diferencia queda como descuento de la línea devuelta.
+                if (agreed < 0 || decimal.Truncate(agreed) != agreed || agreed > CashMoney.Maximum / returned.Quantity)
+                    return Result.Failure<SaleChangeDto>(Validation("El valor en que se recibe cada unidad debe ser en pesos enteros, cero o más."));
+                var agreedNet = agreed * returned.Quantity;
+                if (agreedNet > net)
+                    return Result.Failure<SaleChangeDto>(Validation(
+                        $"{original.NombreProducto}: no se puede recibir por más de lo que pagó el cliente (${net.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("es-CO"))} por {returned.Quantity} {(returned.Quantity == 1 ? "unidad" : "unidades")}). Marca «Mismo precio» o escribe un valor menor."));
+                net = agreedNet;
+            }
             var gross = checked(original.PrecioUnitario * returned.Quantity);
             detailRows.Add(NewChangeDetail(original.ProductoId, original.Id, "DEVUELTO",
                 original.CodigoProducto, original.NombreProducto, original.UnidadMedida,

@@ -14,7 +14,8 @@ import { WHOLESALE_MIN_QUANTITY } from './sale-discount';
 import { toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
 
-interface Returning { saleLineId: string; productId: string; code: string; name: string; sold: number; remaining: number; net: number; quantity: number; resellable: boolean; }
+/** `receivedUnit`: valor por unidad en que se recibe lo devuelto; nulo es «mismo precio» (auditoría del 23/11/2026). */
+interface Returning { saleLineId: string; productId: string; code: string; name: string; sold: number; remaining: number; net: number; quantity: number; resellable: boolean; receivedUnit: number | null; }
 interface Delivering { product: Product; quantity: number; priceType: 'MINORISTA' | 'MAYORISTA'; }
 interface Pending { key: string; fingerprint: string; authorizerUserName: string | null; }
 
@@ -74,7 +75,8 @@ export class SaleChange implements OnInit {
         const before = previous?.get(line.saleLineId);
         return { saleLineId: line.saleLineId, productId: line.productId, code: line.productCode, name: line.productName, sold: line.soldQuantity,
           remaining: line.remainingQuantity, net: original?.netAmount ?? 0,
-          quantity: before ? Math.min(Number(before.quantity) || 0, line.remainingQuantity) : 0, resellable: before?.resellable ?? true };
+          quantity: before ? Math.min(Number(before.quantity) || 0, line.remainingQuantity) : 0, resellable: before?.resellable ?? true,
+          receivedUnit: before?.receivedUnit ?? null };
       }));
       if (keep) this.error.set('La venta cambió mientras preparabas el cambio. Se actualizaron los datos; revisa los valores y confirma de nuevo.');
     } catch (e) { this.error.set(errorText(e)); }
@@ -83,7 +85,7 @@ export class SaleChange implements OnInit {
 
   // --- productos que devuelve el cliente: solo se devuelve lo que se compró -------------------
   /** Marca o desmarca una línea; al marcarla se toma todo lo disponible de esa línea. */
-  toggleReturn(line: Returning, selected: boolean): void { line.quantity = selected ? line.remaining : 0; }
+  toggleReturn(line: Returning, selected: boolean): void { line.quantity = selected ? line.remaining : 0; if (!selected) line.receivedUnit = null; }
   /** Cantidad de una línea con varias unidades: entero entre 1 y lo disponible, nunca más de lo comprado. */
   setReturnQuantity(line: Returning, value: unknown): void {
     const parsed = Math.trunc(Number(value));
@@ -95,9 +97,18 @@ export class SaleChange implements OnInit {
   }
 
   // --- amounts -------------------------------------------------------------------------------
-  returnedValue(line: Returning): number {
+  /** Lo que pagó el cliente por las unidades que devuelve (lo más que se le puede reconocer). */
+  paidValue(line: Returning): number {
     const prep = this.prep(); const row = prep?.lines.find(l => l.saleLineId === line.saleLineId);
     return line.quantity > 0 && row ? returnValue(line.net, line.sold, row.returnedQuantity, line.quantity) : 0;
+  }
+  returnedValue(line: Returning): number {
+    if (line.quantity <= 0) return 0;
+    return this.mode() === 'exchange' && line.receivedUnit !== null ? (Number(line.receivedUnit) || 0) * line.quantity : this.paidValue(line);
+  }
+  /** «Mismo precio» marcado reconoce lo pagado; desmarcado propone el valor pagado por unidad para que se ajuste. */
+  setSamePrice(line: Returning, same: boolean): void {
+    line.receivedUnit = same || line.quantity <= 0 ? null : Math.floor(this.paidValue(line) / line.quantity);
   }
   get totalReturned(): number { return this.returning().reduce((sum, line) => sum + this.returnedValue(line), 0); }
   unitPrice(line: Delivering): number { return line.priceType === 'MAYORISTA' ? (line.product.wholesalePrice ?? line.product.retailPrice) : line.product.retailPrice; }
@@ -134,6 +145,12 @@ export class SaleChange implements OnInit {
     const returned = this.returning().filter(line => Number(line.quantity) > 0);
     if (!returned.length) return 'Indica al menos un producto devuelto.';
     for (const line of returned) if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) > line.remaining) return `La cantidad devuelta de ${line.name} debe ser un entero hasta ${groupedNumber(line.remaining)}.`;
+    if (this.mode() === 'exchange') for (const line of returned) {
+      if (line.receivedUnit === null) continue;
+      const value = Number(line.receivedUnit);
+      if (!Number.isInteger(value) || value < 0) return `Escribe en cuánto se recibe cada unidad de ${line.name}, en pesos enteros, o marca «Mismo precio».`;
+      if (value * Number(line.quantity) > this.paidValue(line)) return `${line.name}: no se puede recibir por más de lo que pagó el cliente ($${groupedNumber(this.paidValue(line))}).`;
+    }
     if (returned.some(line => !line.resellable)) return 'Solo se puede reponer mercancía en buen estado. Pide al Administrador revisar un producto dañado.';
     if (this.mode() === 'remove' && !this.reason.trim()) return 'Selecciona el motivo de la corrección.';
     if (this.mode() === 'exchange' && !this.delivering().length) return 'Agrega al menos un producto entregado o elige Quitar producto.';
@@ -156,7 +173,8 @@ export class SaleChange implements OnInit {
     }));
     return {
       expectedSaleVersion: prep.saleVersion, expectedCreditVersion: prep.creditVersion,
-      returned: this.returning().filter(l => Number(l.quantity) > 0).map(l => ({ saleLineId: l.saleLineId, quantity: Number(l.quantity), resellable: l.resellable })),
+      returned: this.returning().filter(l => Number(l.quantity) > 0).map(l => ({ saleLineId: l.saleLineId, quantity: Number(l.quantity), resellable: l.resellable,
+        ...(this.mode() === 'exchange' && l.receivedUnit !== null ? { receivedUnitValue: Number(l.receivedUnit) } : {}) })),
       delivered: this.delivering().map(l => ({ productId: l.product.id, quantity: Number(l.quantity), priceType: l.priceType })),
       treatment: s.treatment, payments,
       ...(this.mode() === 'remove' ? { reason: this.reason.trim() } : {}),

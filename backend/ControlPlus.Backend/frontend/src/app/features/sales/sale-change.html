@@ -20,7 +20,12 @@
               <td><div class="change-return"><label class="change-return__check"><input type="checkbox" [name]="'sel-' + line.saleLineId" [ngModel]="line.quantity > 0" (ngModelChange)="toggleReturn(line, $event)" [attr.aria-label]="'Devolver ' + line.name"> Devolver</label>
                 @if (line.quantity > 0 && line.remaining > 1) { <label class="change-return__qty"><input class="text-field" type="text" cpNumberInput min="1" [max]="line.remaining" step="1" [name]="'ret-' + line.saleLineId" [ngModel]="line.quantity" (ngModelChange)="setReturnQuantity(line, $event)" [attr.aria-label]="'Cantidad devuelta de ' + line.name"><span>de {{ line.remaining | number:'1.0-0' }}</span></label> }</div></td>
               <td><label><input type="checkbox" [name]="'res-' + line.saleLineId" [(ngModel)]="line.resellable" [disabled]="line.quantity <= 0"> Sí, en buen estado</label></td>
-              <td class="align-right numeric">{{ returnedValue(line) | currency:'COP':'symbol':'1.0-0' }}</td></tr>
+              <td class="align-right numeric"><div class="change-received">
+                @if (mode() === 'exchange' && line.quantity > 0) {
+                  <label class="change-return__check"><input type="checkbox" [name]="'same-' + line.saleLineId" [ngModel]="line.receivedUnit === null" (ngModelChange)="setSamePrice(line, $event)"> Mismo precio</label>
+                  @if (line.receivedUnit !== null) { <label class="change-return__qty"><span>Se recibe en</span><input class="text-field" type="text" cpNumberInput min="0" step="1" [name]="'val-' + line.saleLineId" [(ngModel)]="line.receivedUnit" [attr.aria-label]="'Valor por unidad en que se recibe ' + line.name"><span>c/u</span></label> }
+                }
+                <strong>{{ returnedValue(line) | currency:'COP':'symbol':'1.0-0' }}</strong></div></td></tr>
           } @empty { <tr class="empty-row"><td colspan="6">Esta venta no tiene productos disponibles para devolver.</td></tr> }
         </tbody></table></div>
 

@@ -138,7 +138,11 @@ public sealed record UpdateSaleChangePolicyRequest([property: JsonRequired] int 
     [property: JsonRequired] long ExpectedVersion);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
-public sealed record SaleChangeReturnRequest(Guid SaleLineId, int Quantity, bool Resellable);
+/// <param name="ReceivedUnitValue">
+/// Auditoría del 23/11/2026: valor por unidad en que la tienda recibe lo devuelto. Nulo es «mismo precio» (lo que pagó el
+/// cliente); si se indica, en pesos enteros y sin superar lo que pagó por esas unidades.
+/// </param>
+public sealed record SaleChangeReturnRequest(Guid SaleLineId, int Quantity, bool Resellable, decimal? ReceivedUnitValue = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record SaleChangeDeliveryRequest(Guid ProductId, int Quantity, string PriceType);

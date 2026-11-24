@@ -18,3 +18,7 @@ td small { display: block; color: var(--cp-text-muted); }
 .change-return__check { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .change-return__qty { display: inline-flex; align-items: center; gap: 8px; color: var(--cp-text-muted); font-size: 13px; white-space: nowrap; }
 .change-return__qty .text-field { width: 52px; min-height: 30px; padding: 3px 6px; font-size: 14px; text-align: center; }
+
+/* Valor en que se recibe lo devuelto, o «Mismo precio» (auditoría del 23 de noviembre de 2026). */
+.change-received { display: grid; justify-items: end; gap: 6px; }
+.change-received .change-return__qty input { width: 110px; text-align: right; }

@@ -324,6 +324,43 @@ public sealed partial class SalesApiFlowTests
     }
 
     [Fact, Trait("Category", "Integration")]
+    public async Task SaleChange_ReturnedProductCanBeReceivedForLessThanPaidButNeverMore()
+    {
+        // Auditoría del 23/11/2026: al devolver se puede indicar en cuánto se recibe cada unidad; vacío es «mismo precio».
+        using var client = CreateClient();
+        var setup = await BootstrapAsync(client);
+        await ConfigureChangeNumberingAsync(client, setup.Admin.AccessToken);
+        await OpenSharedShiftAsync(client, setup.Admin.AccessToken);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
+        var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "change-received-origin",
+            new ConfirmSaleRequest(null, [new(setup.Products.Standard, 1, "MINORISTA", null)], null, null,
+                [new("EFECTIVO", 1000m, 1000m, null)])), HttpStatusCode.Created);
+        var line = Assert.Single(sale.Lines);
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
+        var preparation = await ReadAsync<SaleChangePreparationDto>(await client.GetAsync(
+            $"/api/sales/{sale.Id}/change-preparation"), HttpStatusCode.OK);
+        ConfirmSaleChangeRequest Request(decimal received, decimal refund) => new(preparation.SaleVersion, null,
+            [new(line.Id, 1, true, received)], [new(setup.Products.ResidueA, 1, "MINORISTA")], "AUTO",
+            [new("EFECTIVO", refund, null, null)], new(SupervisorUser, SupervisorPassword));
+
+        var tooMuch = await PostChangeAsync(client, sale.Id, "change-received-too-much", Request(1200m, 1099m));
+        Assert.Equal(HttpStatusCode.BadRequest, tooMuch.StatusCode);
+        Assert.Contains("más de lo que pagó", await tooMuch.Content.ReadAsStringAsync());
+
+        _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);
+        SetBearer(client, setup.Cashier.AccessToken);
+        var change = await ReadAsync<SaleChangeDto>(await PostChangeAsync(client, sale.Id, "change-received-less",
+            Request(600m, 499m)), HttpStatusCode.Created);
+        Assert.Equal(600m, change.TotalReturned);
+        var returned = change.Details.Single(x => x.Type == "DEVUELTO");
+        Assert.Equal(600m, returned.NetAmount);
+        Assert.Equal(1, Assert.Single((await ReadAsync<SaleChangePreparationDto>(await client.GetAsync(
+            $"/api/sales/{sale.Id}/change-preparation"), HttpStatusCode.OK)).Lines).ReturnedQuantity);
+    }
+
+    [Fact, Trait("Category", "Integration")]
     public async Task SaleChange_RejectedAuthorizationAndInvalidSettlementLeaveSaleAndFinancesIntact()
     {
         using var client = CreateClient();

@@ -94,6 +94,23 @@ describe('SaleChange: cambio de productos', () => {
     expect(closed.validation()).toContain('ya está pagado');
   });
 
+  it('recibe lo devuelto por menos de lo pagado si se desmarca «Mismo precio», nunca por más (auditoría del 23/11)', async () => {
+    const c = await open(); const line = c.returning()[0]; line.quantity = 1; c.addDelivered(pants);
+    expect(line.receivedUnit).toBeNull(); expect(c.totalReturned).toBe(10000);
+    c.setSamePrice(line, false);
+    expect(line.receivedUnit).toBe(10000);
+    line.receivedUnit = 7000;
+    expect(c.totalReturned).toBe(7000); expect(c.difference).toBe(18000);
+    line.receivedUnit = 12000;
+    expect(c.validation()).toContain('más de lo que pagó');
+    line.receivedUnit = 7000; c.drafts[0].appliedAmount = 18000; c.drafts[0].receivedAmount = 20000;
+    expect(c.validation()).toBe('');
+    await c.confirm();
+    expect(api.confirmChange.mock.calls[0][1].returned).toEqual([{ saleLineId: 'l1', quantity: 1, resellable: true, receivedUnitValue: 7000 }]);
+    c.setSamePrice(line, true);
+    expect(line.receivedUnit).toBeNull(); expect(c.totalReturned).toBe(10000);
+  });
+
   it('calcula el valor devuelto, el entregado y la diferencia', async () => {
     const c = await open(); c.returning()[0].quantity = 1; c.addDelivered(pants);
     expect(c.totalReturned).toBe(10000); expect(c.totalDelivered).toBe(25000); expect(c.difference).toBe(15000);
