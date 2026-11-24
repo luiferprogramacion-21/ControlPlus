@@ -116,7 +116,7 @@ Implementar en este orden, salvo instrucción expresa:
 - Bloquear usuario después de 5 intentos fallidos; reactivación por un rol superior.
 - Las autorizaciones sensibles de Cajero y Supervisor requieren las credenciales vigentes que correspondan a la operación, salvo la creación de apartados y créditos por un Supervisor vigente con permiso efectivo. El Administrador puede ejecutar sin segundo autorizador las operaciones aprobadas individualmente; se conserva el permiso efectivo, los límites de negocio y la auditoría.
 - Ejecutor y autorizador deben ser usuarios distintos en autorizaciones sensibles de Cajero y Supervisor, salvo las dos creaciones aprobadas para Supervisor. Administrador puede omitir las credenciales en crédito, ajuste de inventario, cambio posterior de venta, anulación de venta, cierre de caja con diferencia, creación/cancelación de apartado, anulación de compra, cierre/anulación de pedido y recepción excepcional. Si se envían credenciales en operaciones que las admiten, se validan; la creación de apartado por Administrador las rechaza con 400.
-- El descuento máximo absoluto es 80 %; por rol es Administrador 80 %, Supervisor 20 % y Cajero 5 %. Nunca se vende bajo costo ni se acumula precio mayorista con descuento manual.
+- ~~El descuento máximo absoluto es 80 %; por rol es Administrador 80 %, Supervisor 20 % y Cajero 5 %.~~ **Sustituido por D7 (23 de noviembre de 2026):** el Administrador configura el máximo del Cajero (inicial 5 %) y del Supervisor (inicial 20 %); el Administrador no tiene porcentaje máximo. Sigue vigente: nunca se vende bajo costo ni se acumula precio mayorista con descuento manual.
 - Separar logs técnicos de la auditoría de negocio.
 - Objetivo de respuesta normal: hasta 1 segundo.
 - Implementar pruebas por niveles: dominio/aplicación, integración y flujo principal.
@@ -153,7 +153,7 @@ Implementar en este orden, salvo instrucción expresa:
 - La continuación de permisos compiló la solución en serie con 0 errores/0 advertencias y aprobó la prueba SQL 1/1. El primer intento de integración en base temporal falló antes de conectar por falta de `CONTROLPLUS_TEST_ADMIN_CONNECTION`; después pasó 1/1 en Windows. El bloque de operador en `docs/product-code-access.md` usa credenciales de migrador solo en memoria, respaldo nuevo y comprobaciones SQL de solo lectura; fue ejecutado una vez por el operador.
 - El operador ejecutó después en Windows `ProductCodeAccessDatabaseTests` con el rol dedicado: 1/1 aprobada, 0 errores y 0 omitidas. La aplicación real quedó acreditada posteriormente con `PRODUCT_CODE_GRANT_OK`; la verificación HTTP comunicada desde la API con `controlplus_app` registró listado 200/2, búsqueda `QA-20261028-01` 200/1 y `P-000001` 200/1. No se ejecutó alta/edición real.
 - Tras autorizar el operador la aplicación controlada, su primer preflight se detuvo antes de respaldo y migrador: PowerShell 5.1 pasó a `psql -c` el identificador del historial sin comillas y PostgreSQL buscó `public.__efmigrationshistory`. El bloque se corrigió a SQL temporal UTF-8 sin BOM con `psql -f`. La ejecución posterior informó respaldo SHA-256 `78670E1FE27CA66BDB727144499CF1903BB9BB89E4B742EFDD930F8FD8DF60B9`, migrador exitoso y postflight `PRODUCT_CODE_GRANT_OK`. Sigue pendiente la comprobación HTTP con el rol de aplicación.
-- Cambios sensibles de nombre, código o precio: solo Administrador y con auditoría.
+- Cambios sensibles de nombre, código o precio: Administrador, o Supervisor con la autorización del Administrador (D5, 23 de noviembre de 2026); siempre con auditoría.
 - Mantener historial de precio de compra; el último es referencia.
 - Precio minorista predeterminado y precio mayorista seleccionable.
 - Stock mínimo por producto.
@@ -918,6 +918,7 @@ Aprobado también: el nuevo «Resumen de la venta» al cobrar (Codex, `5cf4e17`)
 - **A.20:** «Probar restauración» explica tres pasos, trae elegida la copia más reciente y usa palabras sencillas en lugar de RPO y RTO.
 - **A.16:** «Corregir un error de caja» se elige con tarjetas. El movimiento elegido propone su mismo tipo, monto y concepto, y la pantalla muestra «Así quedó → Así quedará» y cuánto sube o baja el efectivo de hoy.
 - Clientes e Inventario muestran el motivo real del servidor (`reasonOr`).
+- **D4, mensajes de efectivo insuficiente:** `Application/Common/CashShortage.Error` dice cuánto efectivo hay que entregar, cuánto tiene la caja abierta y qué hacer (registrar un ingreso de efectivo o, si la devolución lo permite, usar Nequi o transferencia). Lo usan anular abono, anular venta, devolver apartado, diferencia de un cambio y corregir el medio de pago. Retiros y correcciones de caja dicen el monto y piden revisarlo.
 
 **D3 (migración aprobada por el usuario el 24 de noviembre de 2026):**
 

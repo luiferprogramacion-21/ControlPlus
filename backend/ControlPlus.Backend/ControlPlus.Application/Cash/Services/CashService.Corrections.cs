@@ -79,7 +79,12 @@ public sealed partial class CashService
             ? request.ReplacementAmount!.Value : -request.ReplacementAmount!.Value;
         decimal cashAfter;
         try { cashAfter = CashMoney.Require(CashMoney.Add(CashMoney.Add(cashBefore, reverseDelta), replacementDelta), false); }
-        catch (CashMoneyException) { return Result.Failure<CashMovementCorrectionDto>(ApplicationError.Conflict("El efectivo esperado no alcanza para esta corrección.")); }
+        catch (CashMoneyException)
+        {
+            var leaving = -(reverseDelta + replacementDelta);
+            return Result.Failure<CashMovementCorrectionDto>(ApplicationError.Conflict(
+                $"Con esta corrección saldrían ${leaving.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("es-CO"))} de la caja, pero solo tiene ${Math.Max(0, cashBefore).ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("es-CO"))} en efectivo. Revisa el monto correcto."));
+        }
         Usuario? authorizer = null;
         if (!self)
         {

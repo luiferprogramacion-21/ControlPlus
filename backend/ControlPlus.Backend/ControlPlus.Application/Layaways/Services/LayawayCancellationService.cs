@@ -126,7 +126,7 @@ public sealed class LayawayCancellationService(
                 var cashAvailable = CashMoney.Sum(expected.Where(x => x.AffectsCash)
                     .Select(x => x.ExpectedAmount));
                 if (cashRefund > cashAvailable)
-                    return Fail(ApplicationError.Conflict("El efectivo esperado no cubre la devolución."));
+                    return Fail(CashShortage.Error("devolver el dinero del apartado", cashRefund, cashAvailable, true));
                 CashMoney.Require(CashMoney.Subtract(cashAvailable, cashRefund), allowNegative: false);
                 foreach (var refund in input.Refunds)
                 {

@@ -173,8 +173,7 @@ public sealed partial class CreditsService
         var expected = await cashRepository.GetExpectedAmountsAsync(shift.Id, cancellationToken);
         var cashAvailable = CashMoney.Sum(expected.Where(x => x.AffectsCash).Select(x => x.ExpectedAmount));
         if (cashRefund > cashAvailable)
-            return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
-                "El efectivo esperado del turno actual no cubre la reversión."));
+            return Result.Failure<CancelCreditPaymentDto>(CashShortage.Error("anular este abono", cashRefund, cashAvailable, false));
 
         var authorizer = await ResolveCancellationAuthorizerAsync(actor, actorSnapshot, request.Authorization,
             administratorSelf, terminal.Id, creditId, cancellationToken);

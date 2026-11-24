@@ -144,7 +144,7 @@ public sealed partial class SalesService
             var expected = await cashRepository.GetExpectedAmountsAsync(shift.Id, ct);
             var cashAvailable = CashMoney.Sum(expected.Where(x => x.AffectsCash).Select(x => x.ExpectedAmount));
             if (CashMoney.Subtract(cashBefore, cashAfter) > cashAvailable)
-                return Fail(ApplicationError.Conflict("El efectivo esperado de la caja no alcanza para esta corrección."));
+                return Fail(CashShortage.Error("pasar ese pago de efectivo a otro medio", CashMoney.Subtract(cashBefore, cashAfter), cashAvailable, false));
         }
 
         var saleReasons = await repository.GetCancellationReasonsAsync(installation.EstablecimientoId, "ANULACION_VENTA", ct);

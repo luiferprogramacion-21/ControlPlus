@@ -140,7 +140,7 @@ public sealed partial class SalesService
             var cashAvailable = expected.Where(x => x.AffectsCash).Sum(x => x.ExpectedAmount);
             if (cashRefund > cashAvailable)
                 return new(new Dictionary<Guid, MetodoPago>(),
-                    ApplicationError.Conflict("El efectivo esperado no cubre la devolución."));
+                    CashShortage.Error("devolver la diferencia del cambio", cashRefund, cashAvailable, true));
         }
         return new(methods.ToDictionary(x => x.Id), null);
     }

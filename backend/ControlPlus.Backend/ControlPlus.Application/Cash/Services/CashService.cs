@@ -807,7 +807,7 @@ public sealed partial class CashService(
         {
             if (request.Amount > availableCash)
                 return Result.Failure<CashMovementDto>(ApplicationError.Conflict(
-                    "El egreso o la sangría no puede superar el efectivo esperado disponible."));
+                    $"No puedes sacar ${request.Amount.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("es-CO"))} de la caja: solo tiene ${Math.Max(0, availableCash).ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("es-CO"))} en efectivo. Revisa el monto."));
         }
         var signedAmount = type == CashConstants.ExpenseMovement ? -request.Amount : request.Amount;
         CashMoney.Require(CashMoney.Add(availableCash, signedAmount), allowNegative: false);

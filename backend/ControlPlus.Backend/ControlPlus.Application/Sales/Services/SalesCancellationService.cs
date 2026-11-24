@@ -242,7 +242,7 @@ public sealed partial class SalesService
             var cashAvailable = CashMoney.Sum(expected.Where(x => x.AffectsCash)
                 .Select(x => x.ExpectedAmount));
             if (cashRefund > cashAvailable)
-                return Result.Failure<CancelSaleDto>(ApplicationError.Conflict("El efectivo esperado no cubre la devolución."));
+                return Result.Failure<CancelSaleDto>(CashShortage.Error("anular esta venta", cashRefund, cashAvailable, false));
         }
 
         Usuario? authorizer;
