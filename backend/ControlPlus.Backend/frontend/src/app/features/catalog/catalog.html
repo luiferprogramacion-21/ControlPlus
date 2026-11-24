@@ -17,6 +17,10 @@
           <mat-option value="">Todas</mat-option>
           @for (category of categoryOptions(); track category.id) { <mat-option [value]="category.id">{{ category.name }}</mat-option> }
         </mat-select></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Existencias</mat-label><mat-select formControlName="stockStatus" (selectionChange)="search()">
+          <mat-option value="">Todas</mat-option><mat-option value="DISPONIBLE">Disponibles</mat-option>
+          <mat-option value="STOCK_BAJO">Stock bajo</mat-option><mat-option value="AGOTADO">Agotados</mat-option>
+        </mat-select></mat-form-field>
         <button mat-flat-button type="submit">Buscar</button>
         @if (session.has('PRODUCTS.CREATE')) { <button mat-stroked-button type="button" [disabled]="saving() || checkingCreate()" (click)="newProduct()">{{ createOutcomeUncertain() ? 'Retomar producto sin confirmar' : 'Nuevo producto' }}</button> }
         @if (session.has('PRODUCTS.SENSITIVE_UPDATE')) { <mat-checkbox formControlName="includeInactiveProducts" (change)="search()">Inactivos</mat-checkbox> }
@@ -30,7 +34,7 @@
                 <tr>
                   <td>{{ product.internalCode }}</td><td>{{ product.barcode || '—' }}</td><td><strong>{{ product.name }}</strong></td>
                   <td>{{ product.categoryName }}</td><td>{{ product.retailPrice | number:'1.0-0' }}</td><td>{{ product.availableStock | number:'1.0-0' }}</td>
-                  <td>{{ !product.isActive ? 'Inactivo' : product.isOutOfStock ? 'Agotado' : 'Activo' }}</td>
+                  <td>@let state = stockState(product);<span class="status-pill stock-state stock-state--{{ state.tone }}">{{ state.label }}</span></td>
                   <td>@if (canEditProduct()) { <button mat-button type="button" (click)="editProduct(product)">Editar</button> }
                   @if (session.has('PRODUCTS.SENSITIVE_UPDATE')) {
                     <button mat-button type="button" [disabled]="saving()" (click)="toggleProduct(product)">{{ product.isActive ? 'Inactivar' : 'Activar' }}</button>

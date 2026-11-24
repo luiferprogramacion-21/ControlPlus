@@ -217,6 +217,20 @@ describe('Catalog: existencias iniciales', () => {
     expect(component.canEditProduct()).toBe(false);
   });
 
+  it('muestra Disponible, Stock bajo o Agotado y filtra por existencias (auditoría C.19)', async () => {
+    const base = { isActive: true, minimumStock: 5 };
+    expect(component.stockState({ ...base, availableStock: 0 }).label).toBe('Agotado');
+    expect(component.stockState({ ...base, availableStock: 5 }).label).toBe('Stock bajo');
+    expect(component.stockState({ ...base, availableStock: 6 }).label).toBe('Disponible');
+    expect(component.stockState({ ...base, isActive: false, availableStock: 9 }).label).toBe('Inactivo');
+    component.filters.patchValue({ stockStatus: 'AGOTADO' });
+    await component.reload();
+    expect(api.products).toHaveBeenLastCalledWith(expect.objectContaining({ stockStatus: 'AGOTADO' }));
+    component.filters.patchValue({ stockStatus: '' });
+    await component.reload();
+    expect(api.products).toHaveBeenLastCalledWith(expect.objectContaining({ stockStatus: undefined }));
+  });
+
   it('renderiza las columnas aprobadas, el alta predeterminada y la sección activa aunque cambie el foco', async () => {
     user.permissions.push('CATEGORIES.READ');
     const fixture = TestBed.createComponent(Catalog);

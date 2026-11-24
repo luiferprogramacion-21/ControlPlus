@@ -1,6 +1,7 @@
 using ControlPlus.Application.Catalog.Contracts;
 using ControlPlus.Application.Catalog.Ports;
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Inventory.Contracts;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Infrastructure.Persistence.Official;
 using Microsoft.EntityFrameworkCore;
@@ -97,7 +98,15 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
         if (!query.IncludeInactive) products = products.Where(x => x.Activo);
         if (query.CategoryId is Guid categoryId) products = products.Where(x => x.CategoriaId == categoryId);
         var hasSearch = !string.IsNullOrWhiteSpace(query.Search);
-        if (!query.IncludeOutOfStock && !hasSearch) products = products.Where(x => x.StockActual - x.StockReservado > 0);
+        products = query.StockStatus switch
+        {
+            // Mismo criterio que Inventario y el Dashboard: «stock bajo» es disponible igual o menor al mínimo (incluye agotados).
+            InventoryStockStatus.LowStock => products.Where(LowStockSelection.Predicate),
+            InventoryStockStatus.OutOfStock => products.Where(x => x.StockActual - x.StockReservado <= 0),
+            InventoryStockStatus.Available => products.Where(x => x.StockActual - x.StockReservado > x.StockMinimo),
+            _ when !query.IncludeOutOfStock && !hasSearch => products.Where(x => x.StockActual - x.StockReservado > 0),
+            _ => products
+        };
         if (hasSearch)
         {
             var term = query.Search!.Trim();

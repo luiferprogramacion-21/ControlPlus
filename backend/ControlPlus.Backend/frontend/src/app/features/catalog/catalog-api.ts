@@ -14,6 +14,14 @@ export interface Product {
   averageCost: number | null; canViewCost: boolean; taxPercentage: number | null; currentStock: number;
   reservedStock: number; availableStock: number; minimumStock: number; isOutOfStock: boolean; isActive: boolean; version: number;
 }
+export type StockStatus = 'DISPONIBLE' | 'STOCK_BAJO' | 'AGOTADO';
+/** Estado de existencias de un producto, en el mismo orden que el filtro: inactivo, agotado, stock bajo y disponible. */
+export function productStockState(product: Pick<Product, 'isActive' | 'availableStock' | 'minimumStock'>): { label: string; tone: 'success' | 'warning' | 'error' | 'neutral' } {
+  if (!product.isActive) return { label: 'Inactivo', tone: 'neutral' };
+  if (product.availableStock <= 0) return { label: 'Agotado', tone: 'error' };
+  if (product.availableStock <= product.minimumStock) return { label: 'Stock bajo', tone: 'warning' };
+  return { label: 'Disponible', tone: 'success' };
+}
 export interface ProductInput {
   categoryId: string; measurementUnitId: string; supplierId: string | null;
   barcode: string | null; barcodeFormat: string | null; name: string; description: string | null;
@@ -31,7 +39,8 @@ export class CatalogApi {
   categories(query: { search?: string; includeInactive?: boolean; page: number; pageSize: number }): Promise<Page<Category>> {
     return firstValueFrom(this.http.get<Page<Category>>('/api/categories', { params: this.params(query) }));
   }
-  products(query: { search?: string; categoryId?: string; includeInactive?: boolean; includeOutOfStock?: boolean; page: number; pageSize: number }): Promise<Page<Product>> {
+  /** `stockStatus`: DISPONIBLE, STOCK_BAJO (incluye agotados) o AGOTADO, con el mismo criterio de Inventario (auditoría C.19). */
+  products(query: { search?: string; categoryId?: string; includeInactive?: boolean; includeOutOfStock?: boolean; stockStatus?: StockStatus; page: number; pageSize: number }): Promise<Page<Product>> {
     return firstValueFrom(this.http.get<Page<Product>>('/api/products', { params: this.params(query) }));
   }
   units(): Promise<Unit[]> { return firstValueFrom(this.http.get<Unit[]>('/api/measurement-units')); }

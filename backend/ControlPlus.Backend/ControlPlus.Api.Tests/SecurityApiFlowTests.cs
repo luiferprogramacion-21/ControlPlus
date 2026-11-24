@@ -1075,6 +1075,19 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cashierSession.AccessToken);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/products?includeOutOfStock=true")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/products?includeInactive=true")).StatusCode);
+        // Auditoría C.19: el Cajero consulta las existencias por estado (Disponible, Stock bajo, Agotado).
+        foreach (var status in new[] { "DISPONIBLE", "STOCK_BAJO", "AGOTADO", "agotado" })
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/products?stockStatus={status}")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/products?stockStatus=INACTIVO")).StatusCode);
+        async Task<Guid[]> IdsAsync(string status)
+        {
+            using var json = JsonDocument.Parse(await client.GetStringAsync($"/api/products?stockStatus={status}&pageSize=100"));
+            return json.RootElement.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).ToArray();
+        }
+        Assert.Contains(product.Id, await IdsAsync("AGOTADO"));
+        Assert.Contains(product.Id, await IdsAsync("STOCK_BAJO"));
+        Assert.DoesNotContain(product.Id, await IdsAsync("DISPONIBLE"));
+        Assert.DoesNotContain(inactiveProduct.Id, await IdsAsync("AGOTADO"));
         var directSearch = await client.GetAsync("/api/products?search=FILTER-001");
         Assert.Equal(HttpStatusCode.OK, directSearch.StatusCode);
         using (var searchJson = JsonDocument.Parse(await directSearch.Content.ReadAsStringAsync()))

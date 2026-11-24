@@ -55,3 +55,9 @@ mat-paginator { display:block; min-width:0; overflow:visible; font-size:14px; }
 /* «Más datos» del producto nuevo (21 de noviembre de 2026). */
 .more-data-toggle { display:block; width:100%; margin:4px 0 12px; padding:10px 0; border:0; border-top:1px solid var(--cp-border); background:none; color:var(--cp-primary); font:inherit; font-weight:700; text-align:left; cursor:pointer; }
 .more-data-toggle span { color:var(--cp-text-muted); font-weight:400; }
+
+/* Estado de existencias como en Inventario (auditoría C.19). */
+.status-pill.stock-state--success { background: var(--cp-success-soft); color: var(--cp-success); }
+.status-pill.stock-state--warning { background: var(--cp-warning-soft); color: var(--cp-warning); }
+.status-pill.stock-state--error { background: var(--cp-error-soft); color: var(--cp-error); }
+.status-pill.stock-state--neutral { background: var(--cp-surface-muted); color: var(--cp-text-muted); }

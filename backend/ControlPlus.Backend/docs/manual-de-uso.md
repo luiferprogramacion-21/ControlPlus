@@ -216,7 +216,7 @@ Al retomar una venta, el sistema quita lo que ya no tiene existencias y te lo di
 - El **cliente es obligatorio**, con documento completo o teléfono.
 - No se cobra nada en el momento: se registra la deuda por el total.
 - La **fecha de vencimiento** viene propuesta según el plazo que configuró el Administrador, contado desde la fecha operativa del crédito: por ejemplo, 21/11/2026 más 3 meses vence el 21/02/2027. La pantalla muestra los días o meses configurados. Si el día no existe en el mes de destino, usa su último día.
-- Puedes cambiar la fecha desde mañana hasta 3 meses calendario si el plazo está configurado en meses; en los demás casos, hasta 90 días. Al volver al carrito y entrar de nuevo a cobrar se actualiza la sugerencia; una fecha que hayas editado se conserva.
+- Puedes cambiar la fecha desde mañana hasta 6 meses calendario si el plazo está configurado en meses; en los demás casos, hasta 180 días. Al volver al carrito y entrar de nuevo a cobrar se actualiza la sugerencia; una fecha que hayas editado se conserva.
 - Necesitas la **autorización de un Supervisor o del Administrador**.
 - El sistema **avisa** si el cliente tiene créditos vencidos o si esta venta supera su **cupo**. Si el Administrador activó el bloqueo, solo **el Administrador** puede autorizar la excepción.
 - **No hay intereses ni recargos**: la deuda nunca crece.
@@ -247,19 +247,19 @@ Desde el punto de venta (**+ Nuevo cliente**) se piden esos mismos cuatro datos.
 
 ## 2.11 Consultar productos y existencias
 
-- **Catálogo** muestra los productos, sus precios y códigos.
+- **Catálogo** muestra los productos, sus precios, sus códigos y su **estado**: **Disponible**, **Stock bajo** (quedan igual o menos que el mínimo) o **Agotado**. Con **Existencias** filtras: disponibles, stock bajo o agotados.
 - **Inventario** muestra las existencias y las **alertas de reposición** (productos con poco stock o agotados). Solo consulta: los ajustes los hace el Administrador.
 
 ## 2.12 Lo que no puedes hacer, y a quién pedirlo
 
 | Necesitas | Quién |
 | --- | --- |
-| Cerrar la caja | Supervisor o Administrador |
+| Cerrar la caja que tú abriste | Tú mismo, con la autorización de un Supervisor o del Administrador (ver 2.13) |
 | Anular una venta | Supervisor o Administrador |
 | Cambio de producto de una venta ya hecha | Supervisor o Administrador |
 | Anular un abono, perdonar una deuda | Supervisor / Administrador (anular) · solo Administrador (perdonar) |
-| Un descuento mayor a 5 % | Supervisor (hasta 20 %) o Administrador (hasta 80 %) |
-| Corregir un precio, nombre o código de un producto | Administrador |
+| Un descuento mayor al tuyo (5 % salvo que el Administrador lo cambie) | Supervisor (hasta 20 %) o Administrador (hasta el costo) |
+| Corregir un precio, nombre o código de un producto | Administrador, o un Supervisor con su autorización |
 | Ajustar el inventario | Administrador |
 | Abrir el cajón sin una venta | Supervisor o Administrador |
 | Reactivar tu usuario bloqueado | Administrador |
@@ -267,7 +267,7 @@ Desde el punto de venta (**+ Nuevo cliente**) se piden esos mismos cuatro datos.
 ## 2.13 Al terminar tu turno
 
 1. Confirma que no quedan ventas a medias (recupera o descarta).
-2. Avisa al Supervisor o al Administrador para el **cierre de caja**.
+2. **Cierra la caja** si tú la abriste en turno individual: pulsa **Cerrar caja** (en Caja o en Inicio), cuenta el efectivo y confirma. Un Supervisor o el Administrador autoriza el cierre con su carné o su usuario y contraseña. Si el efectivo no cuadra, escribe qué pasó. En turno compartido, el cierre lo hace quien abrió la caja.
 3. Sal del sistema con el botón de salir de la barra superior.
 
 ---
@@ -375,7 +375,8 @@ En **Créditos y abonos** puedes registrar abonos (como el Cajero) y además:
 ## 3.9 Catálogo y etiquetas
 
 - **Crear productos** (con cantidad y costo inicial si ya tienes mercancía). A la vista quedan nombre, categoría, precio, existencia, costo, proveedor y stock mínimo; unidad, código de barras, descripción, precio mayorista y la calculadora de ganancia están en **Más datos** (la unidad es «Unidad» y el código de barras se genera solo) y **consultar** las categorías; crear o cambiar categorías es del Administrador. Cada producto recibe una **referencia automática** (abreviatura de la categoría + número, por ejemplo `PAP-000004`).
-- **No ves los costos** ni cambias el nombre, código o precio de un producto ya creado: eso es del Administrador.
+- **No ves los costos.** Para **cambiar el precio, el nombre u otros datos** de un producto ya creado, pulsa **Editar**, haz el cambio y **Guardar**: el sistema pide la **autorización del Administrador** (su carné, o su usuario y contraseña). Queda en la auditoría quién autorizó y el precio anterior.
+- **Modo del turno:** en Configuración → **Caja y turnos** puedes cambiar entre turno individual y compartido, también con la autorización del Administrador (solo sin turno abierto).
 - **Etiquetas:** Catálogo → **Etiquetas de productos**. Elige los productos, revisa la **vista previa** y pulsa **Imprimir etiquetas**. Necesita una impresora de etiquetas configurada por el Administrador.
 
 ## 3.10 Compras: pedidos y mercancía recibida
@@ -420,7 +421,7 @@ Administración → **Usuarios**.
   - **Carné:** ver 4.3.
 - **Permisos:** concede o quita permisos sueltos a una persona. **Quitar siempre prevalece** sobre lo que da el rol. Cada cambio cierra las sesiones de esa persona y queda auditado.
 - **Inactivar / Reactivar acceso:** quien está inactivo no puede ingresar; reactivar acceso también desbloquea a quien falló 5 veces.
-- **Eliminar:** borra por completo a un usuario, **solo si nunca trabajó en el sistema**. Si ya tiene historial, solo se inactiva. No puedes eliminarte a ti mismo.
+- **Eliminar:** la persona **desaparece de la lista y no puede volver a entrar**, y su nombre de usuario queda libre para otra persona. Si ya trabajó en el sistema, su **nombre** se conserva en ventas, caja y auditoría para saber quién hizo cada cosa; si nunca trabajó, se borra por completo. La eliminación queda en la auditoría. No puedes eliminarte a ti mismo ni eliminar a quien tiene la caja abierta.
 
 Administración → **Roles:** muestra la plantilla de permisos de cada rol; puedes ajustarla o restaurarla. Siempre debe haber **al menos un Administrador activo**.
 
@@ -439,7 +440,8 @@ Menú **Catálogo**.
 - **Editar:** cambios de nombre, código o precio quedan **auditados**.
 - **Inactivar** un producto lo saca de la venta sin perder su historial.
 - **Borrar:** solo si **no tiene ningún historial** (ventas, compras, apartados…). Pide confirmación. Si tiene historial, solo se inactiva.
-- **Agotados:** se ocultan de los listados normales; en **Inventario** puedes filtrarlos.
+- **Agotados:** se ocultan de los listados normales. Con **Existencias** (Disponibles, Stock bajo, Agotados) los filtras aquí o en **Inventario**; cada producto muestra su estado.
+- Un **Supervisor** también puede editar un producto, pero al guardar necesita **tu autorización** (carné o usuario y contraseña).
 
 ## 4.5 Inventario
 
@@ -454,8 +456,8 @@ Menú **Configuración**, con cuatro pestañas. La numeración de documentos y l
 | Pestaña | Para qué sirve |
 | --- | --- |
 | **Establecimiento** | Nombre comercial, NIT o documento opcional, teléfono, dirección y los textos de encabezado y pie del ticket. |
-| **Caja y turnos** | Modalidad predeterminada: individual o compartido (solo sin turno abierto). |
-| **Cambios, apartados y créditos** | Plazo de cambios de producto (15 días), pago inicial mínimo de apartados (20 %, se puede apagar; siempre al menos $1), plazo límite de apartados (15 días), plazo sugerido de los créditos (elige **Días**, de 1 a 90, o **Meses**, de 1 a 3; también puedes elegir el vencimiento en cada venta) y **mínimo mayorista** (12 unidades). Guarda el plazo para aplicarlo a los créditos nuevos. También el **bloqueo de créditos a morosos y de cupo excedido**: si lo activas, solo tú puedes autorizar una excepción. |
+| **Caja y turnos** | Modalidad predeterminada: individual o compartido (solo sin turno abierto). Un Supervisor también la cambia, con tu autorización. |
+| **Cambios, apartados y créditos** | Plazo de cambios de producto (15 días), pago inicial mínimo de apartados (20 %, se puede apagar; siempre al menos $1), plazo límite de apartados (15 días), plazo sugerido de los créditos (elige **Días**, de 1 a 180, o **Meses**, de 1 a 6; también puedes elegir el vencimiento en cada venta), **mínimo mayorista** (12 unidades) y el **descuento máximo del Cajero** (5 %) **y del Supervisor** (20 %), en la tarjeta «Precio mayorista y descuentos». Tú no tienes porcentaje máximo: tu límite es el costo. Guarda el plazo para aplicarlo a los créditos nuevos. También el **bloqueo de créditos a morosos y de cupo excedido**: si lo activas, solo tú puedes autorizar una excepción. |
 | **Impresión** | Perfiles de impresora y cola de impresión (ver 4.7). |
 
 ## 4.7 Impresora
@@ -496,7 +498,7 @@ Para dejar de usarlo, desmarca **Permitir apertura** y guarda. Un perfil de etiq
 - **Perdonar la deuda de un crédito:** Créditos y abonos → **Perdonar la deuda**, con motivo. El crédito queda **Anulado**, la mercancía no vuelve y los abonos ya hechos se conservan.
 - **Anular un abono** sin segundo autorizador.
 - **Cancelar un apartado** y decidir cuánto se devuelve.
-- **Descuentos hasta 80 %.** Ningún rol puede pasar de 80 %, ni vender bajo el costo.
+- **Descuentos sin porcentaje máximo:** tu límite es el costo. Nadie vende bajo el costo.
 
 ## 4.10 Dashboard y Reportes
 
@@ -532,7 +534,7 @@ Administración → **Auditoría**: lista de solo lectura de las acciones críti
 
 Estas reglas no se pueden cambiar con permisos:
 
-- Descuento máximo: **Cajero 5 %, Supervisor 20 %, Administrador 80 %.** Nunca más de 80 %.
+- Descuento máximo: **Cajero 5 % y Supervisor 20 %** (los cambias en Configuración); **el Administrador hasta el costo**.
 - **Nunca se vende bajo costo.** Mayorista y descuento manual no se acumulan.
 - Todas las cantidades son **enteras**; no se vende por peso.
 - **Cliente obligatorio** en créditos y apartados.
@@ -549,7 +551,7 @@ Estas reglas no se pueden cambiar con permisos:
 | Operación | Cajero | Supervisor | Administrador |
 | --- | :---: | :---: | :---: |
 | Vender de contado | ✔ | ✔ | ✔ |
-| Descuento | 5 % con autorización | 20 % | 80 % |
+| Descuento (configurable) | 5 % con autorización | 20 % | hasta el costo |
 | Precio mayorista | con autorización | ✔ | ✔ |
 | Vender a crédito | con autorización | ✔ | ✔ |
 | Abonar a un crédito | ✔ | ✔ | ✔ |
@@ -561,21 +563,21 @@ Estas reglas no se pueden cambiar con permisos:
 | Movimientos de caja | — | ✔ | ✔ |
 | Abrir el cajón sin una venta | — | ✔ | ✔ |
 | Habilitar el cajón de dinero | — | — | ✔ |
-| Cerrar la caja | — | ✔ (con Administrador si hay diferencia) | ✔ |
+| Cerrar la caja | la suya, con autorización | ✔ (con Administrador si hay diferencia) | ✔ |
 | Anular una venta | — | con Administrador | ✔ |
 | Cambio de productos | — | con Administrador | ✔ |
 | Reimprimir tickets | ✔ | ✔ | ✔ |
 | Ver existencias | ✔ | ✔ | ✔ |
 | Ajustar el inventario | — | — | ✔ |
 | Crear productos | — | ✔ | ✔ |
-| Cambiar precio, nombre o código | — | — | ✔ |
+| Cambiar precio, nombre o código | — | con Administrador | ✔ |
 | Ver costos | — | — | ✔ |
 | Etiquetas de productos | — | ✔ | ✔ |
 | Pedidos y mercancía recibida | — | ✔ | ✔ |
 | Crear proveedores, anular compras | — | — | ✔ |
 | Reportes y Dashboard | — | — | ✔ |
 | Usuarios, roles, auditoría | — | — | ✔ |
-| Configuración e impresión | — | solo turno | ✔ |
+| Configuración e impresión | — | modo del turno, con Administrador | ✔ |
 | Respaldos | — | — | ✔ |
 
 «Con autorización» significa que otra persona de rol superior debe aprobarlo en la ventana de autorización. El Administrador puede dar o quitar permisos sueltos, así que la tabla es la plantilla por defecto.

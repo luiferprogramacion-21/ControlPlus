@@ -142,8 +142,14 @@ public sealed class CatalogService(
         if (error is not null) return Result.Failure<PagedResult<ProductDto>>(error);
         var paging = ValidatePaging(query.Page, query.PageSize);
         if (paging is not null) return Result.Failure<PagedResult<ProductDto>>(paging);
+        var stockStatus = string.IsNullOrWhiteSpace(query.StockStatus) ? null : query.StockStatus.Trim().ToUpperInvariant();
+        if (stockStatus is not null && stockStatus is not (Inventory.Contracts.InventoryStockStatus.Available
+                or Inventory.Contracts.InventoryStockStatus.LowStock or Inventory.Contracts.InventoryStockStatus.OutOfStock))
+            return Result.Failure<PagedResult<ProductDto>>(ApplicationError.Validation(
+                "El estado de existencias debe ser DISPONIBLE, STOCK_BAJO o AGOTADO."));
+        query = query with { StockStatus = stockStatus };
 
-        if (query.IncludeOutOfStock &&
+        if (query.IncludeOutOfStock && stockStatus is null &&
             !await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.InventoryRead, cancellationToken))
         {
             return Result.Failure<PagedResult<ProductDto>>(ApplicationError.Forbidden(

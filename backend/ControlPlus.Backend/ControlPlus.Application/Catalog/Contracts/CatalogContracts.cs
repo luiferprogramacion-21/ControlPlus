@@ -51,7 +51,10 @@ public sealed record ProductListQuery(
     bool IncludeInactive = false,
     bool IncludeOutOfStock = false,
     int Page = 1,
-    int PageSize = 20);
+    int PageSize = 20,
+    // Auditoría del 23/11/2026 (C.19): DISPONIBLE, STOCK_BAJO o AGOTADO con el mismo criterio de Inventario y del Dashboard
+    // (InventoryStockStatus). Lo usa también el Cajero; con estado no se aplica IncludeOutOfStock.
+    string? StockStatus = null);
 
 public sealed record ProductPurchaseCostHistoryQuery(int Page = 1, int PageSize = 20);
 

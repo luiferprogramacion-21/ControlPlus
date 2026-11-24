@@ -16,7 +16,7 @@ import { RouterLink } from '@angular/router';
 import { SessionService } from '../../core/session.service';
 import { errorText, Page } from '../../core/api';
 import { profitPercentOf, suggestedPrice } from '../../shared/price-calculator';
-import { CatalogApi, Category, CostHistory, CreateProductInput, Product, ProductInput, Supplier, Unit } from './catalog-api';
+import { CatalogApi, Category, CostHistory, CreateProductInput, Product, ProductInput, productStockState, StockStatus, Supplier, Unit } from './catalog-api';
 import { toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
 import { HelpTip } from '../../shared/help-tip';
@@ -74,7 +74,7 @@ export class Catalog implements OnInit {
   private readonly createAttemptStorageKey = 'controlplus.catalog.create-attempt';
 
   readonly filters = this.fb.nonNullable.group({
-    productSearch: [''], categorySearch: [''], categoryId: [''],
+    productSearch: [''], categorySearch: [''], categoryId: [''], stockStatus: ['' as '' | StockStatus],
     includeInactiveProducts: [false], includeInactiveCategories: [false],
   });
   readonly categoryForm = this.fb.nonNullable.group({
@@ -166,6 +166,7 @@ export class Catalog implements OnInit {
         const result = await this.api.products({
           search: f.productSearch.trim(), categoryId: f.categoryId || undefined,
           includeInactive: this.session.has('PRODUCTS.SENSITIVE_UPDATE') && f.includeInactiveProducts,
+          stockStatus: f.stockStatus || undefined,
           page: this.productPage(), pageSize: this.productPageSize(),
         });
         if (id === this.requestId) this.products.set(result);
@@ -399,7 +400,7 @@ export class Catalog implements OnInit {
       this.cancel();
       if (!selected.id) {
         this.tab.set('products'); this.productPage.set(1);
-        this.filters.patchValue({ productSearch: saved.internalCode, categoryId: '' });
+        this.filters.patchValue({ productSearch: saved.internalCode, categoryId: '', stockStatus: '' });
       }
       this.notice.set(`Producto guardado. N.º de producto: ${saved.internalCode}.`); await this.reload();
     } catch (e) {
@@ -476,6 +477,8 @@ export class Catalog implements OnInit {
     catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); }
   }
   /** Only an Administrator with the effective permission sees the button; the server enforces it too. */
+  /** Auditoría C.19: Disponible, Stock bajo o Agotado, igual que en Inventario. */
+  readonly stockState = productStockState;
   /** Decisión D5: también el Supervisor (crea productos) edita, con la autorización del Administrador. */
   canEditProduct(): boolean { return this.session.has('PRODUCTS.SENSITIVE_UPDATE') || this.session.has('PRODUCTS.CREATE'); }
   productEditNeedsAuthorization(): boolean { return !this.session.has('PRODUCTS.SENSITIVE_UPDATE'); }

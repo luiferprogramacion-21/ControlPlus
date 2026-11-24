@@ -183,7 +183,8 @@ public sealed class CashController(
         await RegisterMovementAsync(request, cashService.RegisterCashDropAsync, cancellationToken);
 
     [HttpGet("reconciliation")]
-    [PermissionAuthorize(PermissionCodes.CashShiftManage)]
+    // Auditoría C.1: el Cajero cuenta su propio turno individual; el servicio exige CASH.SHIFT_MANAGE o ser su responsable.
+    [PermissionAuthorize(PermissionCodes.CashOwnRead)]
     [ProducesResponseType<CashReconciliationDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
@@ -198,7 +199,8 @@ public sealed class CashController(
     }
 
     [HttpPost("shifts/{shiftId:guid}/close")]
-    [PermissionAuthorize(PermissionCodes.CashShiftManage)]
+    // Auditoría C.1: el Cajero cierra su propio turno con autorización; el servicio valida permiso, responsable y autorizador.
+    [PermissionAuthorize(PermissionCodes.CashOwnRead)]
     [Consumes("application/json")]
     [ProducesResponseType<CashReconciliationDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
