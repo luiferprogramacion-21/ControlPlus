@@ -176,20 +176,71 @@ public sealed partial class CashService(
         var mode = NormalizeMode(request?.Mode);
         if (mode is null) return Result.Failure<CashStateDto>(Validation("El modo debe ser INDIVIDUAL o COMPARTIDO."));
 
-        await using var transaction = await transactionManager.BeginAsync(IsolationLevel.Serializable, cancellationToken);
+        // Decisión D5 del 23/11/2026: el Administrador cambia el modo solo; el Supervisor, con la autorización del Administrador.
+        var isAdministrator = (await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken))
+            ?.HighestRoleLevel == RoleLevel.Administrador;
+        if (isAdministrator)
+        {
+            if (request!.Authorization is not null)
+                return Result.Failure<CashStateDto>(Validation("El Administrador cambia el modo del turno sin autorización."));
+            await using var transaction = await transactionManager.BeginAsync(IsolationLevel.Serializable, cancellationToken);
+            var result = await UpdateShiftModeWithinTransactionAsync(actor, request, mode, false, cancellationToken);
+            if (result.IsSuccess) await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+
+        if (request!.Authorization is null)
+            return Result.Failure<CashStateDto>(ApplicationError.Forbidden(
+                "Para cambiar el modo del turno, un Supervisor necesita la autorización del Administrador (carné o usuario y contraseña)."));
+        if (request.Authorization.UsesCredential())
+        {
+            if (request.Authorization.MixesCredentialWithPassword())
+                return Result.Failure<CashStateDto>(Validation("Envíe la credencial escaneada o usuario y contraseña, no ambos."));
+            var (scannedUserName, scannedCredentialId) = await credentialResolver.ResolveOrUnknownAsync(request.Authorization.CredentialToken!, cancellationToken);
+            request = request with { Authorization = request.Authorization with { UserName = scannedUserName, ResolvedCredentialId = scannedCredentialId } };
+        }
+        if (!request.Authorization!.IsComplete())
+            return Result.Failure<CashStateDto>(Validation("Indique usuario y contraseña del Administrador o escanee su carné."));
+        var account = request.Authorization.UserName!.Trim().ToUpperInvariant();
+        return await loginAttemptCoordinator.ExecuteAsync(account,
+            token => UpdateShiftModeWithinTransactionAsync(actor, request, mode, true, token), cancellationToken);
+    }
+
+    private async Task<Result<CashStateDto>> UpdateShiftModeWithinTransactionAsync(
+        ActorContext actor, UpdateCashShiftModeRequest request, string mode, bool needsAuthorization, CancellationToken cancellationToken)
+    {
         var establishment = await repository.GetEstablishmentAsync(true, cancellationToken);
         if (establishment is null) return Result.Failure<CashStateDto>(ApplicationError.NotFound("el establecimiento activo"));
-        if (establishment.Version != request!.Version)
-            return Result.Failure<CashStateDto>(ApplicationError.ConcurrencyConflict("La configuración fue modificada por otra operación."));
+        if (establishment.Version != request.Version)
+            return Result.Failure<CashStateDto>(ApplicationError.ConcurrencyConflict("La configuración fue modificada por otra operación. Recargue la pantalla."));
         if (await repository.GetOpenShiftAsync(false, cancellationToken) is not null)
-            return Result.Failure<CashStateDto>(ApplicationError.Conflict("No se puede cambiar el modo mientras exista un turno abierto."));
+            return Result.Failure<CashStateDto>(ApplicationError.Conflict(
+                "Hay un turno abierto. Ciérrelo primero en Caja; el nuevo modo aplica desde el próximo turno."));
+
+        Usuario? authorizer = null;
+        if (needsAuthorization)
+        {
+            var validated = await ValidateAuthorizerAsync(actor, request.Authorization, cancellationToken);
+            if (validated.IsFailure || validated.Value!.HighestRoleLevel != RoleLevel.Administrador)
+            {
+                await AuditWriter.WriteCashFailureAsync(auditRepository, clock, actor.UserId,
+                    AuditAction.CashShiftModeUpdated, nameof(Establecimiento), establishment.Id,
+                    new { Failure = "INVALID_AUTHORIZER_CREDENTIALS_OR_PERMISSION", Mode = mode }, Guid.CreateVersion7(),
+                    null, null, cancellationToken);
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                return Result.Failure<CashStateDto>(ApplicationError.Forbidden(
+                    "Solo un Administrador activo autoriza el cambio del modo del turno. Revise el usuario y la contraseña o escanee su carné."));
+            }
+            authorizer = validated.Value;
+        }
 
         establishment.ChangeCashShiftMode(mode, clock.UtcNow);
         var correlationId = Guid.CreateVersion7();
         await AuditWriter.WriteCashAsync(auditRepository, clock, actor.UserId, AuditAction.CashShiftModeUpdated,
-            nameof(Establecimiento), establishment.Id, new { Mode = mode }, correlationId, null, null, null, null, cancellationToken);
+            nameof(Establecimiento), establishment.Id,
+            new { Mode = mode, AuthorizedBy = authorizer?.UserName, AuthorizedWith = authorizer is null ? null : request.Authorization!.UsesCredential() ? "CARNE" : "CONTRASENA" },
+            correlationId, authorizer?.Id, null, null, null, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
         var cash = await repository.GetCashRegisterAsync(false, cancellationToken);
         return Result.Success(MapState(cash, null, establishment));
     }

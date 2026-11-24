@@ -19,7 +19,10 @@ public sealed class CatalogService(
     IUserRepository userRepository,
     IAuditRepository auditRepository,
     IUnitOfWork unitOfWork,
-    IClock clock) : ICatalogService
+    IClock clock,
+    IPasswordHasher passwordHasher,
+    IAuthorizerCredentialResolver credentialResolver,
+    ILoginAttemptCoordinator loginAttemptCoordinator) : ICatalogService
 {
     private static readonly IReadOnlySet<string> BarcodeFormats = new HashSet<string>(
         ["CODE128", "EAN13", "EAN8", "UPC_A", "OTRO"], StringComparer.OrdinalIgnoreCase);
@@ -327,8 +330,37 @@ public sealed class CatalogService(
     public async Task<Result<ProductDto>> UpdateProductAsync(
         ActorContext actor, Guid productId, UpdateProductRequest request, CancellationToken cancellationToken = default)
     {
-        var error = await RequireAsync(actor, PermissionCodes.ProductsSensitiveUpdate, cancellationToken);
+        ArgumentNullException.ThrowIfNull(request);
+        if (await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.ProductsSensitiveUpdate, cancellationToken))
+        {
+            if (request.Authorization is not null)
+                return Result.Failure<ProductDto>(ApplicationError.Validation("Quien edita productos con su propio permiso no envía autorización."));
+            return await UpdateProductCoreAsync(actor, productId, request, false, cancellationToken);
+        }
+
+        // Decisión D5 del 23/11/2026: el Supervisor (crea productos) cambia precio y datos con la autorización del Administrador.
+        var error = await RequireAsync(actor, PermissionCodes.ProductsCreate, cancellationToken);
         if (error is not null) return Result.Failure<ProductDto>(error);
+        if (request.Authorization is null)
+            return Result.Failure<ProductDto>(ApplicationError.Forbidden(
+                "Para cambiar el precio o los datos de un producto, un Supervisor necesita la autorización del Administrador (carné o usuario y contraseña)."));
+        if (request.Authorization.UsesCredential())
+        {
+            if (request.Authorization.MixesCredentialWithPassword())
+                return Result.Failure<ProductDto>(ApplicationError.Validation("Envíe el carné escaneado o usuario y contraseña, no ambos."));
+            var (scannedUserName, scannedCredentialId) = await credentialResolver.ResolveOrUnknownAsync(request.Authorization.CredentialToken!, cancellationToken);
+            request = request with { Authorization = request.Authorization with { UserName = scannedUserName, ResolvedCredentialId = scannedCredentialId } };
+        }
+        if (!request.Authorization!.IsComplete())
+            return Result.Failure<ProductDto>(ApplicationError.Validation("Indique usuario y contraseña del Administrador o escanee su carné."));
+        var account = request.Authorization.UserName!.Trim().ToUpperInvariant();
+        return await loginAttemptCoordinator.ExecuteAsync(account,
+            token => UpdateProductCoreAsync(actor, productId, request, true, token), cancellationToken);
+    }
+
+    private async Task<Result<ProductDto>> UpdateProductCoreAsync(
+        ActorContext actor, Guid productId, UpdateProductRequest request, bool needsAuthorization, CancellationToken cancellationToken)
+    {
         var validation = ValidateProduct(request.InternalCode, request.Name, request.Description, request.Barcode,
             request.BarcodeFormat, request.BarcodeGenerated, request.RetailPrice, request.WholesalePrice,
             request.TaxPercentage, request.MinimumStock, allowGeneratedBarcodeWithoutValue: false);
@@ -350,6 +382,26 @@ public sealed class CatalogService(
         if (barcode is not null && await repository.ProductBarcodeExistsAsync(barcode, product.Id, cancellationToken))
             return Result.Failure<ProductDto>(ApplicationError.Conflict("Ya existe un producto con ese código de barras."));
 
+        Usuario? authorizer = null;
+        if (needsAuthorization)
+        {
+            var validated = await AuthorizerValidator.ValidateAsync(userRepository, passwordHasher, permissionChecker,
+                auditRepository, clock, actor, request.Authorization, PermissionCodes.ProductsSensitiveUpdate,
+                RoleLevel.Administrador, ApplicationError.Forbidden(
+                    "Solo un Administrador activo autoriza el cambio de un producto. Revise el usuario y la contraseña o escanee su carné."),
+                cancellationToken);
+            if (validated.IsFailure)
+            {
+                await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId, AuditAction.ProductUpdated, nameof(Producto),
+                    product.Id, new { Failure = "INVALID_AUTHORIZER_CREDENTIALS_OR_PERMISSION", product.CodigoInterno }, cancellationToken);
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                return Result.Failure<ProductDto>(validated.Error!);
+            }
+            authorizer = validated.Value;
+        }
+
+        var previousRetailPrice = product.PrecioMinorista;
+        var previousWholesalePrice = product.PrecioMayorista;
         product.Update(request.CategoryId, request.MeasurementUnitId, request.SupplierId, internalCode,
             barcode, NormalizeOptional(request.BarcodeFormat)?.ToUpperInvariant(), request.BarcodeGenerated,
             request.Name.Trim(), request.Description, request.RetailPrice, request.WholesalePrice,
@@ -357,7 +409,14 @@ public sealed class CatalogService(
         product.Categoria = related.Category!;
         product.UnidadMedida = related.Unit!;
         await AuditWriter.WriteAsync(auditRepository, clock, actor.UserId, AuditAction.ProductUpdated,
-            nameof(Producto), product.Id, new { product.CodigoInterno, product.Nombre, product.PrecioMinorista, product.Version }, cancellationToken);
+            nameof(Producto), product.Id, new
+            {
+                product.CodigoInterno, product.Nombre, product.PrecioMinorista, product.Version,
+                PreviousRetailPrice = previousRetailPrice == product.PrecioMinorista ? (decimal?)null : previousRetailPrice,
+                PreviousWholesalePrice = previousWholesalePrice == product.PrecioMayorista ? null : previousWholesalePrice,
+                AuthorizedBy = authorizer?.UserName,
+                AuthorizedWith = authorizer is null ? null : request.Authorization!.UsesCredential() ? "CARNE" : "CONTRASENA"
+            }, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         var canViewCost = await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.ProductCostsRead, cancellationToken);
         return Result.Success(Map(product, canViewCost));

@@ -31,8 +31,8 @@
                   <td>{{ product.internalCode }}</td><td>{{ product.barcode || '—' }}</td><td><strong>{{ product.name }}</strong></td>
                   <td>{{ product.categoryName }}</td><td>{{ product.retailPrice | number:'1.0-0' }}</td><td>{{ product.availableStock | number:'1.0-0' }}</td>
                   <td>{{ !product.isActive ? 'Inactivo' : product.isOutOfStock ? 'Agotado' : 'Activo' }}</td>
-                  <td>@if (session.has('PRODUCTS.SENSITIVE_UPDATE')) {
-                    <button mat-button type="button" (click)="editProduct(product)">Editar</button>
+                  <td>@if (canEditProduct()) { <button mat-button type="button" (click)="editProduct(product)">Editar</button> }
+                  @if (session.has('PRODUCTS.SENSITIVE_UPDATE')) {
                     <button mat-button type="button" [disabled]="saving()" (click)="toggleProduct(product)">{{ product.isActive ? 'Inactivar' : 'Activar' }}</button>
                     @if (canDeleteProduct()) { <button mat-button type="button" class="danger-action" [disabled]="saving()" (click)="askDelete(product)">Borrar</button> }
                   } @if (session.has('PRODUCTS.COSTS_READ')) {
@@ -170,6 +170,7 @@
             @else if (!reconcilingCreate() && !reconciliationQueryFailed()) { <p>Sin coincidencias en la consulta; esto no demuestra que el alta no se haya guardado.</p> }
           }
         </div> }
+        @if (product.id && productEditNeedsAuthorization()) { <p class="field-hint" role="note">Al guardar se pide la autorización del Administrador (carné o usuario y contraseña).</p> }
         <div class="actions form-actions"><button mat-flat-button type="submit" [disabled]="saving() || checkingCreate() || (createOutcomeUncertain() && !product.id)">Guardar</button><button mat-button type="button" (click)="cancel()" [disabled]="saving() || checkingCreate()">{{ createOutcomeUncertain() && !product.id ? 'Cerrar formulario' : 'Cancelar' }}</button></div>
       </form>
     </section>

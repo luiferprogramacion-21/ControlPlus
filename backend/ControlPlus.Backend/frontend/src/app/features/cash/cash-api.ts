@@ -56,7 +56,10 @@ export class CashApi {
     return firstValueFrom(this.http.post<Reconciliation>(`/api/cash/shifts/${shiftId}/close`, input, { context: input.authorization ? authorizationContext() : undefined }));
   }
   /** INDIVIDUAL o COMPARTIDO; solo sin turno abierto. version = configurationVersion del estado. */
-  updateShiftMode(mode: 'INDIVIDUAL' | 'COMPARTIDO', version: number): Promise<CashState> { return firstValueFrom(this.http.put<CashState>('/api/cash/shift-mode', { mode, version })); }
+  /** Decisión D5: el Supervisor envía la autorización del Administrador; el Administrador, ninguna. */
+  updateShiftMode(mode: 'INDIVIDUAL' | 'COMPARTIDO', version: number, authorization: AuthorizationBody | null = null): Promise<CashState> {
+    return firstValueFrom(this.http.put<CashState>('/api/cash/shift-mode', authorization ? { mode, version, authorization } : { mode, version }));
+  }
   /** Un carné inválido responde 401: se marca como intento de credencial para no cerrar la sesión del operador. */
   startSession(credentialToken: string): Promise<OperatorSession> { return firstValueFrom(this.http.post<OperatorSession>('/api/cash/operator-sessions', { credentialToken }, { context: authorizationContext() })); }
   endSession(id: string): Promise<OperatorSession> { return firstValueFrom(this.http.post<OperatorSession>(`/api/cash/operator-sessions/${id}/close`, {})); }

@@ -109,7 +109,19 @@ public sealed record UpdateProductRequest(
     decimal? WholesalePrice,
     decimal? TaxPercentage,
     int MinimumStock,
-    long Version);
+    long Version,
+    ProductAuthorizationRequest? Authorization = null);
+
+/// <summary>
+/// Decisión D5 del 23/11/2026: el Supervisor cambia el precio y los datos de un producto con la autorización del
+/// Administrador (usuario y contraseña, o su carné escaneado). Quien tiene PRODUCTS.SENSITIVE_UPDATE no la envía.
+/// </summary>
+[System.Text.Json.Serialization.JsonUnmappedMemberHandling(System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow)]
+public sealed record ProductAuthorizationRequest(string? UserName, string? Password, string? CredentialToken = null)
+    : IAuthorizerCredentials
+{
+    [System.Text.Json.Serialization.JsonIgnore] public Guid? ResolvedCredentialId { get; init; }
+}
 
 public interface ICatalogService
 {

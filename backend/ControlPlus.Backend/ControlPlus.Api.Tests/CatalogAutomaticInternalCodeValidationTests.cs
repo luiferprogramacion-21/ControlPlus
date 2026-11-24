@@ -118,14 +118,37 @@ public sealed partial class CatalogAutomaticInternalCodeApiTests
         Assert.Equal(product.InternalCode, updated.InternalCode);
         Assert.Equal(product.Version + 1, updated.Version);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync($"/api/products/{product.Id}", update)).StatusCode);
-        // A Supervisor can create, but still cannot edit codes or prices by default.
+        // Decisión D5: el Supervisor crea productos y cambia precio o datos solo con la autorización del Administrador.
         var roles = (await client.GetFromJsonAsync<PagedResult<RoleDto>>("/api/roles?page=1&pageSize=20"))!;
         var role = roles.Items.Single(x => x.Code == RoleCodes.Supervisor);
+        var cashierRole = roles.Items.Single(x => x.Code == RoleCodes.Cashier);
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/users",
             new CreateUserRequest("catalog.update.supervisor", "Supervisor de prueba", "Catalog-Update-Test-2026!", [role.Id]))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("catalog.update.supervisor2", "Otro Supervisor", "Catalog-Update-Test-2026!", [role.Id]))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/users",
+            new CreateUserRequest("catalog.update.cashier", "Cajero de prueba", "Catalog-Update-Test-2026!", [cashierRole.Id]))).StatusCode);
         using var supervisor = _factory!.CreateClient();
         await LoginValidationActorAsync(supervisor, "catalog.update.supervisor", "Catalog-Update-Test-2026!");
-        Assert.Equal(HttpStatusCode.Forbidden, (await supervisor.PutAsJsonAsync($"/api/products/{product.Id}", update with { Version = updated.Version })).StatusCode);
+        var priced = update with { Version = updated.Version, RetailPrice = 1500m };
+        var withoutAuthorization = await supervisor.PutAsJsonAsync($"/api/products/{product.Id}", priced);
+        Assert.Equal(HttpStatusCode.Forbidden, withoutAuthorization.StatusCode);
+        Assert.Contains("autorización del Administrador", await withoutAuthorization.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Forbidden, (await supervisor.PutAsJsonAsync($"/api/products/{product.Id}", priced with
+            { Authorization = new ProductAuthorizationRequest(AdminName, "Wrong-Password-2026!") })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await supervisor.PutAsJsonAsync($"/api/products/{product.Id}", priced with
+            { Authorization = new ProductAuthorizationRequest("catalog.update.supervisor2", "Catalog-Update-Test-2026!") })).StatusCode);
+        var authorized = await supervisor.PutAsJsonAsync($"/api/products/{product.Id}", priced with
+            { Authorization = new ProductAuthorizationRequest(AdminName, AdminPassword) });
+        Assert.Equal(HttpStatusCode.OK, authorized.StatusCode);
+        Assert.Equal(1500m, (await authorized.Content.ReadFromJsonAsync<ProductDto>())!.RetailPrice);
+        // El Administrador no envía autorización; el Cajero no edita productos ni con ella.
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync($"/api/products/{product.Id}", priced with
+            { Version = updated.Version + 1, Authorization = new ProductAuthorizationRequest(AdminName, AdminPassword) })).StatusCode);
+        using var cashier = _factory!.CreateClient();
+        await LoginValidationActorAsync(cashier, "catalog.update.cashier", "Catalog-Update-Test-2026!");
+        Assert.Equal(HttpStatusCode.Forbidden, (await cashier.PutAsJsonAsync($"/api/products/{product.Id}", priced with
+            { Version = updated.Version + 1, Authorization = new ProductAuthorizationRequest(AdminName, AdminPassword) })).StatusCode);
     }
 
     private async Task<ValidationScenario> CreateValidationScenarioAsync()

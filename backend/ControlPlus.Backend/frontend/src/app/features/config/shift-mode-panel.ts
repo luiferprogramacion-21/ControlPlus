@@ -2,20 +2,23 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { errorText } from '../../core/api';
 import { CashApi, CashState } from '../cash/cash-api';
 import { toastSignal } from '../../core/toast';
+import { SessionService } from '../../core/session.service';
+import { AuthorizationCredentials, AuthorizationDialog, authorizationBody } from '../../shared/authorization-dialog';
 
 type Mode = 'INDIVIDUAL' | 'COMPARTIDO';
 
 /**
  * Modo de trabajo del turno (maqueta 21b, decisión del 18 de noviembre de 2026). Individual: una persona abre, vende y
  * cierra. Compartido: varios operadores se turnan en la caja y cada venta se desbloquea con su carné. Solo se cambia sin
- * turno abierto; aplica desde el próximo turno.
+ * turno abierto; aplica desde el próximo turno. Decisión D5 del 23/11/2026: el Supervisor lo cambia con la autorización del
+ * Administrador (carné o usuario y contraseña).
  */
 @Component({
   selector: 'cp-shift-mode-panel',
   template: `
     @if (loadError()) { <div class="inline-feedback inline-feedback--error" role="alert">{{ loadError() }} <button class="link-button" type="button" (click)="load()">Reintentar</button></div> }
     <section class="panel module-panel">
-      <div class="module-toolbar"><div><h3>Modo de trabajo del turno</h3><p class="muted">La opción inicial es Turno individual; el Administrador puede cambiarla.</p></div></div>
+      <div class="module-toolbar"><div><h3>Modo de trabajo del turno</h3><p class="muted">La opción inicial es Turno individual. El Administrador la cambia; el Supervisor, con la autorización del Administrador.</p></div></div>
       @if (state(); as cash) {
         <div class="shift-modes" role="radiogroup" aria-label="Modo de trabajo del turno">
           @for (option of options; track option.mode) {
@@ -54,6 +57,8 @@ type Mode = 'INDIVIDUAL' | 'COMPARTIDO';
 })
 export class ShiftModePanel implements OnInit {
   private readonly cash = inject(CashApi);
+  private readonly session = inject(SessionService);
+  private readonly authorization = inject(AuthorizationDialog);
   readonly state = signal<CashState | null>(null);
   readonly loadError = toastSignal('error');
   readonly saving = signal(false);
@@ -82,14 +87,24 @@ export class ShiftModePanel implements OnInit {
   async save(): Promise<void> {
     const cash = this.state();
     if (!cash || this.saving() || cash.hasOpenShift || this.selected === this.currentMode(cash) || cash.configurationVersion == null) return;
+    const mode = this.selected, version = cash.configurationVersion;
     this.saving.set(true); this.error.set(''); this.notice.set('');
     try {
-      const updated = await this.cash.updateShiftMode(this.selected, cash.configurationVersion);
-      this.state.set(updated); this.selected = this.currentMode(updated);
-      this.notice.set(this.selected === 'COMPARTIDO'
-        ? 'Turno compartido activado. Desde el próximo turno, cada venta se desbloquea con el carné del operador.'
-        : 'Turno individual activado desde el próximo turno.');
-    } catch (e) { this.error.set(errorText(e)); }
-    finally { this.saving.set(false); }
+      await this.authorization.open({ title: 'Autorizar cambio del modo de turno',
+        description: 'El Supervisor cambia el modo del turno con la autorización del Administrador. Aplica desde el próximo turno.',
+        detail: `Nuevo modo: ${mode === 'COMPARTIDO' ? 'Turno compartido' : 'Turno individual'}`,
+        operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
+        selfAuthorizedRoles: ['ADMINISTRADOR'], onError: message => this.error.set(message),
+        run: credentials => this.apply(mode, version, credentials) });
+    } finally { this.saving.set(false); }
+  }
+
+  /** Lanza el error para que el diálogo de autorización lo muestre sin cerrarse. */
+  private async apply(mode: Mode, version: number, credentials: AuthorizationCredentials | null): Promise<void> {
+    const updated = await this.cash.updateShiftMode(mode, version, credentials ? authorizationBody(credentials) : null);
+    this.state.set(updated); this.selected = this.currentMode(updated);
+    this.notice.set(this.selected === 'COMPARTIDO'
+      ? 'Turno compartido activado. Desde el próximo turno, cada venta se desbloquea con el carné del operador.'
+      : 'Turno individual activado desde el próximo turno.');
   }
 }

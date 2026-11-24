@@ -55,7 +55,8 @@ public sealed record CashStateDto(
 
 public sealed record ConfigureCashRegisterRequest(string Code, string Name);
 
-public sealed record UpdateCashShiftModeRequest(string Mode, long Version);
+/// <param name="Authorization">Decisión D5 del 23/11/2026: el Supervisor cambia el modo con la autorización del Administrador (carné o usuario y contraseña); el Administrador no la envía.</param>
+public sealed record UpdateCashShiftModeRequest(string Mode, long Version, CashOpenAuthorizationRequest? Authorization = null);
 
 /// <summary>Second user (Supervisor or Administrador) who authorizes a Cajero to open the cash shift.</summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]

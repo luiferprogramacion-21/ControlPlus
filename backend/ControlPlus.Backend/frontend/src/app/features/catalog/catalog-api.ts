@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { Page } from '../../core/api';
+import { AuthorizationBody, Page } from '../../core/api';
 import { SuppliersApi } from '../suppliers/suppliers-api';
 
 export interface Category { id: string; name: string; description: string | null; isActive: boolean; version: number; abbreviation: string | null; }
@@ -60,8 +60,10 @@ export class CatalogApi {
       headers: { 'Idempotency-Key': idempotencyKey },
     }));
   }
-  updateProduct(product: Product, input: UpdateProductInput): Promise<Product> {
-    return firstValueFrom(this.http.put<Product>(`/api/products/${product.id}`, { ...input, barcodeGenerated: product.barcodeGenerated, version: product.version }));
+  /** Decisión D5: el Supervisor envía la autorización del Administrador; quien tiene PRODUCTS.SENSITIVE_UPDATE, ninguna. */
+  updateProduct(product: Product, input: UpdateProductInput, authorization: AuthorizationBody | null = null): Promise<Product> {
+    return firstValueFrom(this.http.put<Product>(`/api/products/${product.id}`,
+      { ...input, barcodeGenerated: product.barcodeGenerated, version: product.version, ...(authorization ? { authorization } : {}) }));
   }
   setProductActive(product: Product): Promise<Product> {
     return firstValueFrom(this.http.put<Product>(`/api/products/${product.id}/${product.isActive ? 'deactivate' : 'activate'}`, {}));

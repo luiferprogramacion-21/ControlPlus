@@ -108,7 +108,7 @@ export class AuthorizationDialogComponent implements OnDestroy {
     } catch (error) {
       this.error.set(error instanceof HttpErrorResponse && error.status === 401 &&
         ['authentication.invalid_credentials', 'authentication.unauthorized'].includes(error.error?.code)
-        ? 'Credenciales de autorización inválidas. Revisa el usuario y la contraseña, o vuelve a pasar el carnél.' :
+        ? 'Credenciales de autorización inválidas. Revisa el usuario y la contraseña, o vuelve a pasar el carné.' :
         error instanceof Error && !(error instanceof HttpErrorResponse) ? error.message : errorText(error));
       this.password = ''; this.scanToken = '';
     } finally { this.busy.set(false); this.ref.disableClose = false; }

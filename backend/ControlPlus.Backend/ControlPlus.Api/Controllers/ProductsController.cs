@@ -63,7 +63,9 @@ public sealed class ProductsController(
     }
 
     [HttpPut("{productId:guid}")]
-    [PermissionAuthorize(PermissionCodes.ProductsSensitiveUpdate)]
+    // Decisión D5: PRODUCTS.SENSITIVE_UPDATE edita solo; el Supervisor (PRODUCTS.CREATE), con la autorización del Administrador.
+    // El servicio exige uno u otro.
+    [PermissionAuthorize(PermissionCodes.ProductsRead)]
     [ProducesResponseType<ProductDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

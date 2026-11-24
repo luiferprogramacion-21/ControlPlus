@@ -171,10 +171,17 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         SetBearer(client, supervisor.AccessToken);
         var supervisorState = await ReadSuccessAsync<CashStateDto>(
             await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
+        // Decisión D5: el Supervisor cambia el modo solo con la autorización del Administrador; otro Supervisor no basta.
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync("/api/cash/shift-mode",
+            new UpdateCashShiftModeRequest(CashConstants.IndividualMode, supervisorState.ConfigurationVersion!.Value))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync("/api/cash/shift-mode",
+            new UpdateCashShiftModeRequest(CashConstants.IndividualMode, supervisorState.ConfigurationVersion!.Value,
+                new CashOpenAuthorizationRequest(AdministratorUserName, "Wrong-Password-2026!")))).StatusCode);
         var configuredState = await ReadSuccessAsync<CashStateDto>(
             await client.PutAsJsonAsync(
                 "/api/cash/shift-mode",
-                new UpdateCashShiftModeRequest(CashConstants.IndividualMode, supervisorState.ConfigurationVersion!.Value)),
+                new UpdateCashShiftModeRequest(CashConstants.IndividualMode, supervisorState.ConfigurationVersion!.Value,
+                    new CashOpenAuthorizationRequest(AdministratorUserName, AdministratorPassword))),
             HttpStatusCode.OK);
         Assert.Equal(CashConstants.IndividualMode, configuredState.DefaultShiftMode);
 
@@ -374,7 +381,8 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         SetBearer(client, supervisor.AccessToken);
         var state = await ReadSuccessAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
         state = await ReadSuccessAsync<CashStateDto>(await client.PutAsJsonAsync(
-            "/api/cash/shift-mode", new UpdateCashShiftModeRequest(CashConstants.SharedMode, state.ConfigurationVersion!.Value)), HttpStatusCode.OK);
+            "/api/cash/shift-mode", new UpdateCashShiftModeRequest(CashConstants.SharedMode, state.ConfigurationVersion!.Value,
+                new CashOpenAuthorizationRequest(AdministratorUserName, AdministratorPassword))), HttpStatusCode.OK);
         Assert.Equal(CashConstants.SharedMode, state.DefaultShiftMode);
         var shift = await ReadSuccessAsync<CashShiftDto>(await client.PostAsJsonAsync(
             "/api/cash/shifts", new OpenCashShiftRequest(50_000m, "Turno compartido")), HttpStatusCode.Created);
@@ -472,7 +480,8 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         var postCloseState = await ReadSuccessAsync<CashStateDto>(await client.GetAsync("/api/cash/state"), HttpStatusCode.OK);
         await ReadSuccessAsync<CashStateDto>(await client.PutAsJsonAsync(
             "/api/cash/shift-mode",
-            new UpdateCashShiftModeRequest(CashConstants.IndividualMode, postCloseState.ConfigurationVersion!.Value)), HttpStatusCode.OK);
+            new UpdateCashShiftModeRequest(CashConstants.IndividualMode, postCloseState.ConfigurationVersion!.Value,
+                new CashOpenAuthorizationRequest(AdministratorUserName, AdministratorPassword))), HttpStatusCode.OK);
         var administratorAuthorizedShift = await ReadSuccessAsync<CashShiftDto>(await client.PostAsJsonAsync(
             "/api/cash/shifts", new OpenCashShiftRequest(20_000m, "Cierre autorizado por Administrador")),
             HttpStatusCode.Created);

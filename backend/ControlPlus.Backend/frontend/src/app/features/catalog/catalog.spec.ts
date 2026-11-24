@@ -3,12 +3,15 @@ import { Catalog } from './catalog';
 import { CatalogApi, Product } from './catalog-api';
 import { SessionService } from '../../core/session.service';
 import { HttpErrorResponse } from '@angular/common/http';
+import { AuthorizationDialog, AuthorizationPrompt } from '../../shared/authorization-dialog';
 
 describe('Catalog: existencias iniciales', () => {
   let component: Catalog;
   const api = { createProduct: vi.fn(), products: vi.fn(), updateProduct: vi.fn(), units: vi.fn(), categories: vi.fn(), createCategory: vi.fn(), updateCategory: vi.fn() };
   const user = { id: 'actor-1', roles: ['SUPERVISOR'], permissions: ['PRODUCTS.CREATE', 'PRODUCTS.READ'] };
-  const session = { has: (permission: string) => user.permissions.includes(permission), hasRole: (...codes: string[]) => codes.some(code => user.roles.includes(code)), user: () => user, refreshUser: vi.fn(async () => {}) };
+  const session = { has: (permission: string) => user.permissions.includes(permission), hasRole: (...codes: string[]) => codes.some(code => user.roles.includes(code)), user: () => ({ ...user, userName: 'super' }), refreshUser: vi.fn(async () => {}) };
+  // Decisión D5: el Supervisor edita con la autorización del Administrador (el diálogo se simula).
+  const authorization = { open: vi.fn(async (prompt: AuthorizationPrompt) => { await prompt.run({ userName: 'admin', password: 'clave' }); return true; }) };
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.removeItem('controlplus.catalog.create-attempt');
@@ -20,6 +23,7 @@ describe('Catalog: existencias iniciales', () => {
     api.categories.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
     TestBed.configureTestingModule({ providers: [
       { provide: CatalogApi, useValue: api }, { provide: SessionService, useValue: session },
+      { provide: AuthorizationDialog, useValue: authorization },
     ] });
     component = TestBed.runInInjectionContext(() => new Catalog());
     component.newProduct();
@@ -182,6 +186,7 @@ describe('Catalog: existencias iniciales', () => {
         categoryId: 'category', measurementUnitId: 'unit', supplierId: null, barcode, barcodeFormat: format,
         barcodeGenerated: generated, retailPrice: 1000, wholesalePrice: null, taxPercentage: null,
         minimumStock: 0, description: null } as Product;
+      user.permissions.push('PRODUCTS.SENSITIVE_UPDATE');
       component.editProduct(product);
       expect(component.generateBarcode()).toBe(false);
       component.productForm.controls.name.setValue('Nombre editado');
@@ -191,6 +196,26 @@ describe('Catalog: existencias iniciales', () => {
       }));
       expect(api.createProduct).not.toHaveBeenCalled();
     });
+
+  it('el Supervisor cambia el precio con la autorización del Administrador (D5)', async () => {
+    const product = { id: 'product', internalCode: 'P-000001', version: 1, name: 'Original',
+      categoryId: 'category', measurementUnitId: 'unit', supplierId: null, barcode: null, barcodeFormat: null,
+      barcodeGenerated: false, retailPrice: 1000, wholesalePrice: null, taxPercentage: null,
+      minimumStock: 0, description: null } as unknown as Product;
+    expect(component.canEditProduct()).toBe(true);
+    expect(component.productEditNeedsAuthorization()).toBe(true);
+    component.editProduct(product);
+    component.productForm.controls.retailPrice.setValue(1500 as never);
+    await component.saveProduct();
+    expect(authorization.open).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Autorizar cambio de producto', operatorUserName: 'super', requireDifferentUser: true, allowCredential: true,
+      detail: expect.stringContaining('1.000 → 1.500'),
+    }));
+    expect(api.updateProduct).toHaveBeenCalledWith(product, expect.objectContaining({ retailPrice: 1500 }),
+      { userName: 'admin', password: 'clave' });
+    user.roles = ['CAJERO']; user.permissions = ['PRODUCTS.READ'];
+    expect(component.canEditProduct()).toBe(false);
+  });
 
   it('renderiza las columnas aprobadas, el alta predeterminada y la sección activa aunque cambie el foco', async () => {
     user.permissions.push('CATEGORIES.READ');

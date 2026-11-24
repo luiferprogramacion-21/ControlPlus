@@ -20,6 +20,7 @@ import { CatalogApi, Category, CostHistory, CreateProductInput, Product, Product
 import { toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
 import { HelpTip } from '../../shared/help-tip';
+import { AuthorizationDialog, authorizationBody } from '../../shared/authorization-dialog';
 
 interface ProductCreateAttempt {
   actorId: string;
@@ -38,6 +39,7 @@ export class Catalog implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(CatalogApi);
   readonly session = inject(SessionService);
+  private readonly authorization = inject(AuthorizationDialog);
   readonly tab = signal<'products' | 'categories'>('products');
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -360,8 +362,21 @@ export class Catalog implements OnInit {
         minimumStock: Number(f.minimumStock),
       };
       let saved: Product;
-      if (selected.id) saved = await this.api.updateProduct(selected, { ...input, internalCode: f.internalCode.trim() });
-      else {
+      if (selected.id) {
+        const update = { ...input, internalCode: f.internalCode.trim() };
+        if (this.productEditNeedsAuthorization()) {
+          // Decisión D5: el Supervisor guarda el cambio con la autorización del Administrador (carné o usuario y contraseña).
+          const result: { saved?: Product } = {};
+          await this.authorization.open({ title: 'Autorizar cambio de producto',
+            description: 'El Supervisor cambia el precio o los datos de un producto con la autorización del Administrador.',
+            detail: update.retailPrice === selected.retailPrice ? selected.name
+              : `${selected.name}: precio ${groupedNumber(selected.retailPrice)} → ${groupedNumber(update.retailPrice)} COP`,
+            operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
+            run: async credentials => { result.saved = await this.api.updateProduct(selected, update, credentials ? authorizationBody(credentials) : null); } });
+          if (!result.saved) return;
+          saved = result.saved;
+        } else saved = await this.api.updateProduct(selected, update);
+      } else {
         let createInput: CreateProductInput = { ...input, initialQuantity: Number(f.initialQuantity),
           initialUnitCost: f.initialUnitCost == null || f.initialUnitCost === '' ? null : Number(f.initialUnitCost) };
         let generateBarcode = this.generateBarcode();
@@ -461,6 +476,9 @@ export class Catalog implements OnInit {
     catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); }
   }
   /** Only an Administrator with the effective permission sees the button; the server enforces it too. */
+  /** Decisión D5: también el Supervisor (crea productos) edita, con la autorización del Administrador. */
+  canEditProduct(): boolean { return this.session.has('PRODUCTS.SENSITIVE_UPDATE') || this.session.has('PRODUCTS.CREATE'); }
+  productEditNeedsAuthorization(): boolean { return !this.session.has('PRODUCTS.SENSITIVE_UPDATE'); }
   canDeleteProduct(): boolean { return this.session.hasRole('ADMINISTRADOR') && this.session.has('PRODUCTS.SENSITIVE_UPDATE'); }
   readonly deleting = signal<Product | null>(null);
   askDelete(product: Product): void { this.error.set(''); this.notice.set(''); this.deleting.set(product); }
