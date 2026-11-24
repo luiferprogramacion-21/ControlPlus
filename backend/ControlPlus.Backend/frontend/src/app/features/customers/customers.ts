@@ -5,7 +5,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { Page, errorText } from '../../core/api';
+import { Page, errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Customer, CustomerInput, CustomersApi } from './customers-api';
 import { CustomerHistory } from './customer-history';
@@ -80,7 +80,7 @@ export class Customers implements OnInit {
     if (this.saving()) return; const issue = this.validation(); if (issue) { this.error.set(issue); return; }
     this.saving.set(true); this.error.set(''); this.notice.set('');
     try { const selected = this.selected(); if (selected) await this.api.update(selected, this.normalized()); else await this.api.create(this.normalized()); this.cancel(); this.notice.set('Cliente guardado.'); await this.reload(); }
-    catch (e) { this.error.set(e instanceof HttpErrorResponse && e.status === 409 ? 'El documento ya existe o el cliente cambió. Consulta la ficha actual antes de guardar.' : errorText(e)); }
+    catch (e) { this.error.set(e instanceof HttpErrorResponse && e.status === 409 ? reasonOr(e, 'El documento ya existe o el cliente cambió. Consulta la ficha actual antes de guardar.') : errorText(e)); }
     finally { this.saving.set(false); }
   }
   async refreshSelected(): Promise<void> { const selected = this.selected(); if (!selected) return; try { this.edit(await this.api.get(selected.id)); await this.reload(); } catch (e) { this.error.set(errorText(e)); } }
@@ -95,7 +95,7 @@ export class Customers implements OnInit {
     if (!customer || !this.full || this.saving()) return;
     this.saving.set(true); this.error.set(''); this.notice.set('');
     try { await this.api.status(customer); this.statusTarget.set(null); this.notice.set(customer.isActive ? 'Cliente inactivado.' : 'Cliente activado.'); await this.reload(); }
-    catch (e) { this.error.set(e instanceof HttpErrorResponse && e.status === 409 ? 'El cliente cambió. Actualiza la lista antes de intentar otra vez.' : errorText(e)); }
+    catch (e) { this.error.set(e instanceof HttpErrorResponse && e.status === 409 ? reasonOr(e, 'El cliente cambió. Actualiza la lista antes de intentar otra vez.') : errorText(e)); }
     finally { this.saving.set(false); }
   }
 }

@@ -7,7 +7,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { Page, errorText } from '../../core/api';
+import { Page, errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Adjustment, InventoryApi, Movement, Reason, Stock, StockStatusFilter } from './inventory-api';
 import { Icon } from '../../layout/icon';
@@ -125,7 +125,7 @@ export class Inventory implements OnInit {
     if (!this.pending) this.pending = { key: crypto.randomUUID(), authorizerUserName: authorizationIdentity(credentials), input: { productId: stock.productId, quantityDelta: Number(this.quantityDelta), reasonId: this.reasonId, expectedVersion: stock.version, observation: this.observation.trim() || null, ...(this.correctingMovementId ? { correctedMovementId: this.correctingMovementId } : {}) } };
     this.saving.set(true); this.error.set(''); this.notice.set('');
     try { await this.api.adjust(credentials ? { ...this.pending.input, authorization: authorizationBody(credentials) } : { ...this.pending.input }, this.pending.key); this.pending = null; this.resetForm(); this.notice.set('Ajuste registrado.'); this.adjustmentOpen.set(false); await this.refreshSelected(); }
-    catch (e) { if (e instanceof HttpErrorResponse && e.status === 409) { this.conflict.set(true); this.pending = null; this.error.set('Conflicto de versión o clave. Actualiza existencias y revisa el ajuste antes de crear otro intento.'); } else if (e instanceof HttpErrorResponse && e.status >= 400 && e.status < 500) { this.pending = null; this.error.set(errorText(e)); } throw e; }
+    catch (e) { if (e instanceof HttpErrorResponse && e.status === 409) { this.conflict.set(true); this.pending = null; this.error.set(reasonOr(e, 'Las existencias de este producto cambiaron mientras hacías el ajuste. Actualiza la lista y vuelve a hacerlo.')); } else if (e instanceof HttpErrorResponse && e.status >= 400 && e.status < 500) { this.pending = null; this.error.set(errorText(e)); } throw e; }
     finally { this.saving.set(false); }
   }
   discardPending(): void { if (this.saving()) return; this.pending = null; this.error.set(''); }
