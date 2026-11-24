@@ -1,6 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Component, inject, Injectable, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, Injectable, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { firstValueFrom } from 'rxjs';
@@ -121,6 +121,15 @@ export class AuditLog implements OnInit {
   }));
   readonly records = signal<Page<AuditRecord> | null>(null);
   readonly users = signal<AdminUser[]>([]);
+  /** Auditoría A.19: texto escrito o elegido en los filtros; se traduce al usuario o a la acción al buscar. */
+  userText = ''; actionText = '';
+  readonly userOptions = computed(() => this.users().map(user => ({ id: user.id, text: `${user.userName} · ${user.displayName}` })));
+  /** Una acción con el mismo nombre en dos módulos lleva el módulo entre paréntesis para distinguirlas. */
+  readonly actionOptions = (() => {
+    const all = this.groups.flatMap(group => group.actions.map(action => ({ ...action, module: group.module })));
+    const repeated = new Set(all.map(a => a.label).filter((label, index, labels) => labels.indexOf(label) !== index));
+    return all.map(a => ({ code: a.code, module: a.module, text: repeated.has(a.label) ? `${a.label} (${a.module})` : a.label }));
+  })();
   readonly expanded = signal<string | null>(null);
   readonly loading = signal(false);
   readonly error = toastSignal('error');
@@ -152,7 +161,21 @@ export class AuditLog implements OnInit {
     finally { if (id === this.requestId) this.loading.set(false); }
   }
 
-  find(): void { this.filter.page = 1; void this.reload(); }
+  find(): void {
+    const normalize = (text: string) => text.trim().toLocaleLowerCase('es');
+    const userText = normalize(this.userText), actionText = normalize(this.actionText);
+    const user = userText ? this.userOptions().find(option => normalize(option.text) === userText ||
+      normalize(option.text.split(' · ')[0]) === userText) : undefined;
+    const action = actionText ? this.actionOptions.find(option => normalize(option.text) === actionText) ??
+      this.onlyMatch(this.actionOptions.filter(option => normalize(option.text).includes(actionText))) : undefined;
+    if (userText && !user) { this.error.set(`No hay un usuario «${this.userText.trim()}». Escríbelo como aparece en la lista o déjalo vacío para ver todos.`); return; }
+    if (actionText && !action) { this.error.set(`Hay varias acciones o ninguna con «${this.actionText.trim()}». Elige una de la lista o déjalo vacío para ver todas.`); return; }
+    this.filter.userId = user?.id ?? ''; this.filter.action = action?.code ?? '';
+    if (action) this.actionText = action.text;
+    this.filter.page = 1; void this.reload();
+  }
+  /** Si lo escrito coincide con una sola acción, se usa esa. */
+  private onlyMatch<T>(options: T[]): T | undefined { return options.length === 1 ? options[0] : undefined; }
   pageChanged(event: PageEvent): void { this.filter.page = event.pageIndex + 1; this.filter.pageSize = event.pageSize; void this.reload(); }
   toggle(record: AuditRecord): void { this.expanded.set(this.expanded() === record.id ? null : record.id); }
 

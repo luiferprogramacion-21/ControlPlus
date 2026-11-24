@@ -5,20 +5,15 @@
       <input id="audit-from" class="text-field audit-date" type="date" name="from" [(ngModel)]="filter.from">
       <label class="field-label" for="audit-to">Hasta</label>
       <input id="audit-to" class="text-field audit-date" type="date" name="to" [(ngModel)]="filter.to">
+      <!-- Auditoría A.19: se puede escribir o elegir de la lista; vacío es «todos». -->
       @if (canFilterUsers) {
-        <select class="text-field" name="userId" [(ngModel)]="filter.userId" aria-label="Usuario">
-          <option value="">Todos los usuarios</option>
-          @for (user of users(); track user.id) { <option [value]="user.id">{{ user.userName }} · {{ user.displayName }}</option> }
-        </select>
+        <input class="text-field audit-choice" name="userText" [(ngModel)]="userText" list="audit-user-options" (change)="find()"
+          placeholder="Todos los usuarios (escribe o elige)" aria-label="Usuario" autocomplete="off">
+        <datalist id="audit-user-options">@for (option of userOptions(); track option.id) { <option [value]="option.text"></option> }</datalist>
       }
-      <select class="text-field" name="action" [(ngModel)]="filter.action" aria-label="Acción">
-        <option value="">Todas las acciones</option>
-        @for (group of groups; track group.module) {
-          <optgroup [label]="group.module">
-            @for (action of group.actions; track action.code) { <option [value]="action.code">{{ action.label }}</option> }
-          </optgroup>
-        }
-      </select>
+      <input class="text-field audit-choice" name="actionText" [(ngModel)]="actionText" list="audit-action-options" (change)="find()"
+        placeholder="Todas las acciones (escribe o elige)" aria-label="Acción" autocomplete="off">
+      <datalist id="audit-action-options">@for (option of actionOptions; track option.code) { <option [value]="option.text" [label]="option.module"></option> }</datalist>
       <button class="button button--primary" type="submit" [disabled]="loading()">Buscar</button>
     </form>
   </div>

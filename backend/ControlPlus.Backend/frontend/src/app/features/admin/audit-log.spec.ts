@@ -51,13 +51,33 @@ describe('Auditoría', () => {
     expect(pills.map((pill) => pill.classList.contains('status-pill--warning'))).toEqual([false, true]);
   });
 
-  it('filtra por usuario y acción, y vuelve a la primera página', async () => {
+  it('filtra por usuario y acción escritos o elegidos, y vuelve a la primera página (A.19)', async () => {
     const fixture = await create();
     const component = fixture.componentInstance;
-    component.filter.page = 3; component.filter.userId = 'u1'; component.filter.action = 'SaleCancelled';
+    const saleCancelled = component.actionOptions.find(option => option.code === 'SaleCancelled')!;
+    component.filter.page = 3; component.userText = 'admin · Administrador'; component.actionText = saleCancelled.text;
     component.find();
     await fixture.whenStable();
     expect(api.records).toHaveBeenLastCalledWith(expect.objectContaining({ userId: 'u1', action: 'SaleCancelled', page: 1 }));
+    // Basta con escribir el usuario o un pedazo que coincida con una sola acción, en minúsculas.
+    component.userText = 'ADMIN'; component.actionText = saleCancelled.text.toLowerCase().slice(0, -1);
+    component.find();
+    expect(api.records).toHaveBeenLastCalledWith(expect.objectContaining({ userId: 'u1', action: 'SaleCancelled' }));
+    expect(component.actionText).toBe(saleCancelled.text);
+    // Vacío es «todos».
+    component.userText = ''; component.actionText = ''; component.find();
+    expect(api.records).toHaveBeenLastCalledWith(expect.objectContaining({ userId: '', action: '' }));
+  });
+
+  it('explica cuando lo escrito no corresponde a un usuario o a una sola acción, sin consultar', async () => {
+    const fixture = await create();
+    const component = fixture.componentInstance;
+    api.records.mockClear();
+    component.userText = 'nadie'; component.find();
+    expect(component.error()).toContain('No hay un usuario');
+    component.userText = ''; component.actionText = 'a'; component.find();
+    expect(component.error()).toContain('Elige una de la lista');
+    expect(api.records).not.toHaveBeenCalled();
   });
 
   it('rechaza un rango de fechas invertido sin consultar', async () => {
@@ -105,7 +125,7 @@ describe('Auditoría', () => {
     permissions = ['AUDIT.READ'];
     const fixture = await create();
     expect(admin.users).not.toHaveBeenCalled();
-    expect(fixture.nativeElement.querySelector('select[name="userId"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('input[name="userText"]')).toBeNull();
   });
 
   it('nombra cada acción y su módulo; una acción sin traducir se lee separada en palabras', () => {

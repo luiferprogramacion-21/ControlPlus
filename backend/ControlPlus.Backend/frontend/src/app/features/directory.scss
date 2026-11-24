@@ -17,3 +17,6 @@
 .inventory-history .directory-filters .text-field { width: auto; min-width: 150px; }
 @container cp (max-width: 900px) { .directory-page .module-toolbar { align-items: stretch; flex-direction: column; } .directory-filters { justify-content: flex-start; } }
 @container cp (max-width: 560px) { .directory-page .module-heading { align-items: flex-start; } .directory-page .module-heading .button { min-width: 0; } .directory-filters .text-field { width: 100%; } .directory-filters > .button { flex: 1; } }
+
+/* Filtros que se escriben o se eligen de la lista (auditoría A.19). */
+.audit-choice { min-width: 240px; }
