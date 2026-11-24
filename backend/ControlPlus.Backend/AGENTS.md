@@ -919,7 +919,13 @@ Aprobado también: el nuevo «Resumen de la venta» al cobrar (Codex, `5cf4e17`)
 - **A.16:** «Corregir un error de caja» se elige con tarjetas. El movimiento elegido propone su mismo tipo, monto y concepto, y la pantalla muestra «Así quedó → Así quedará» y cuánto sube o baja el efectivo de hoy.
 - Clientes e Inventario muestran el motivo real del servidor (`reasonOr`).
 
-**Pendiente de aprobación del usuario (necesita migración):**
+**D3 (migración aprobada por el usuario el 24 de noviembre de 2026):**
 
-- **D3:** corregir el medio de pago de una venta cuya caja ya se cerró. La base solo acepta pagos nuevos de una venta mientras su turno está abierto (`ventas.validar_actor_pago_venta()` usa `caja.actor_valido_turno`, que exige `estado = 'ABIERTA'`). Hace falta una migración compensatoria que permita el pago de corrección validado contra el turno abierto actual y que guarde el enlace con el día original.
+- El medio de pago se corrige también en ventas de una caja ya cerrada, con la autorización del Administrador. Ese cierre no cambia. El reverso `REVERSO_PAGO` y el movimiento y los pagos correctos se registran en la caja abierta de hoy, con la correlación de la corrección y el concepto «(venta del dd/mm/aaaa, caja ya cerrada)». La auditoría guarda `FromClosedShift`, `OriginalShiftId` y `OriginalOperatingDate`.
+- **Migración `20261124020000_ClosedShiftPaymentCorrectionV1` (historial 38 → 39), activador `scripts/closed-shift-payment-correction/Invoke-Activation.ps1 -UsePostgresCredential`**, que se corre **después** del de `audit-decisions`. Solo cambia `ventas.validar_actor_pago_venta()`: un pago de venta se valida contra el turno de su movimiento de caja cuando lo acompaña, en ese turno y con la misma correlación, el reverso `REVERSO_PAGO` del movimiento original de esa misma venta; si no, sigue la regla oficial (turno de la venta). No cambia filas. `ClosedShiftPaymentCorrectionActivationTests` prueba preflight, postflight, huellas (pagos de venta, movimientos de caja y turnos) y el Down.
+- El arqueo (`CashRepository.GetExpectedAmountsAsync`) y el flujo de caja diario cuentan cada pago de venta en el turno de **su movimiento de caja**, no en el de la venta. En los datos anteriores siempre coinciden.
+- La caja de hoy queda con la diferencia: si se pasa de efectivo a Nequi, hoy se espera menos efectivo. Junto con el faltante que quedó en el cierre de ese día, el total de los dos días cuadra.
+
+**Pendiente de decisión del usuario:**
+
 - **Punto 17:** pedir al proveedor un producto que aún no está en el sistema.

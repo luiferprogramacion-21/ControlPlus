@@ -12,8 +12,8 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
 
 /**
  * «Corregir medio de pago» (20 de noviembre de 2026): la venta se cobró con un medio y se registró con otro, por ejemplo
- * pagaron por Nequi y quedó como efectivo. La venta, sus productos y su total no cambian; solo los medios. Solo para ventas
- * de contado del turno abierto: un turno cerrado no se reescribe.
+ * pagaron por Nequi y quedó como efectivo. La venta, sus productos y su total no cambian; solo los medios. Decisión D3
+ * del 23/11/2026: también en ventas de una caja ya cerrada; ese cierre no cambia y la diferencia se mueve en la caja de hoy.
  */
 @Component({
   selector: 'cp-sale-payment-correction',
@@ -35,6 +35,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
       </div>
       <cp-payment-methods [drafts]="drafts" mode="payment" idPrefix="payment-correction" />
       <p class="form-hint">Suma: {{ money(total()) }} de {{ money(sale().total) }}. La referencia de Nequi o transferencia es opcional.</p>
+      <p class="form-hint">Si la caja de esta venta ya se cerró, ese cierre no cambia: la corrección se registra en la caja abierta de hoy y queda unida a la venta.</p>
       <label class="field-label field-label--spaced" for="payment-correction-reason">Motivo</label>
       <select id="payment-correction-reason" class="text-field" name="reason" [(ngModel)]="reasonId">
         <option value="">Elige el motivo</option>

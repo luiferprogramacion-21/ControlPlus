@@ -127,7 +127,7 @@ export class SalesHistory implements OnInit {
     } catch (error) { this.error.set(errorText(error)); }
     finally { this.printingCorrection.set(null); }
   }
-  /** Solo ventas de contado confirmadas; el servidor confirma además que sean del turno abierto. */
+  /** Ventas de contado confirmadas, también de una caja ya cerrada (D3); el servidor exige la caja de hoy abierta. */
   canCorrectPayments(sale: SaleDetail): boolean { return this.canCancel(sale) && !sale.creditId && sale.payments.length > 0; }
   beginPaymentCorrection(): void { this.correcting.set(false); this.correctingPayments.set(true); }
   async paymentsCorrected(result: CorrectedPayments): Promise<void> {

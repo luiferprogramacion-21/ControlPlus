@@ -86,7 +86,7 @@
       }
       @if (canCorrectPayments(d)) {
         <button class="correction-card" type="button" (click)="beginPaymentCorrection()"><span class="correction-card__icon" aria-hidden="true">$</span>
-          <span><strong>Corregir medio de pago</strong><small>Por ejemplo, pagaron por Nequi y quedó en efectivo. El total no cambia. Solo en ventas de la caja abierta.</small></span>
+          <span><strong>Corregir medio de pago</strong><small>Por ejemplo, pagaron por Nequi y quedó en efectivo. El total no cambia. Si la caja de ese día ya se cerró, la corrección se registra en la caja de hoy.</small></span>
           <em>Autoriza: Administrador</em></button>
       }
       @if (canCancel(d)) {

@@ -15,8 +15,9 @@ namespace ControlPlus.Application.Sales.Services;
 /// una operación trazable que conserve la venta y el total cobrado»). Example: it was paid with Nequi but recorded as cash.
 /// The sale, its products and its total never change. The original payments are annulled with reason and authorization,
 /// their cash movement is reversed and a new movement carries the correct payments, the same reversal model the shift
-/// already understands, so the expected amount per method stays consistent. Only sales of the open shift: a closed shift
-/// is never rewritten (its difference is reviewed with «Revisar cierre»).
+/// already understands, so the expected amount per method stays consistent. Decision D3 (23 November 2026): a sale of an
+/// already closed shift is corrected too; that closure is never rewritten, the reversal and the new payments live in
+/// today's open shift (migration 20261124020000_ClosedShiftPaymentCorrectionV1) and keep the sale's correlation.
 /// </summary>
 public sealed partial class SalesService
 {
@@ -113,9 +114,9 @@ public sealed partial class SalesService
         var shift = await repository.GetOpenShiftForUpdateAsync(ct);
         if (shift is null || shift.TerminalId != terminal.Id)
             return Fail(ApplicationError.Conflict("Abre la caja para corregir el medio de pago."));
-        if (sale.TurnoCajaId != shift.Id)
-            return Fail(ApplicationError.Conflict(
-                "La venta es de un turno ya cerrado. Ese cierre no se cambia: registra la diferencia con «Revisar cierre» en Caja."));
+        // Decisión D3 del 23/11/2026: una venta de un turno ya cerrado también se corrige. Ese cierre no cambia: el reverso y
+        // el pago correcto se registran en la caja abierta y quedan unidos a la venta (y a su día) por la correlación.
+        var fromClosedShift = sale.TurnoCajaId != shift.Id;
         SesionOperador? operatorSession = null;
         if (shift.ModoOperacion == CashConstants.IndividualMode)
         {
@@ -217,9 +218,14 @@ public sealed partial class SalesService
         {
             Id = Guid.CreateVersion7(), TurnoCajaId = shift.Id, UsuarioId = actor.UserId, SesionOperadorId = operatorSession?.Id,
             MovimientoRevertidoId = originalMovement.Id, Tipo = "REVERSO", CategoriaMovimiento = "REVERSO_PAGO",
-            Valor = sale.Total, Concepto = $"Corrección de medio de pago de {VisibleNumber(sale)}",
+            Valor = sale.Total, Concepto = fromClosedShift
+                ? $"Corrección de medio de pago de {VisibleNumber(sale)} (venta del {sale.FechaOperativa:dd/MM/yyyy}, caja ya cerrada)"
+                : $"Corrección de medio de pago de {VisibleNumber(sale)}",
             FechaHora = now.UtcDateTime, CorrelacionId = correlation
         }, ct);
+        // The database accepts the new payment of a closed shift's sale only next to this reversal (D3): it is saved first,
+        // inside the same transaction, so the order of the inserts never matters.
+        if (fromClosedShift) await unitOfWork.SaveChangesAsync(ct);
         var corrected = MovimientoCaja.Create(shift.Id, actor.UserId, operatorSession?.Id, CashConstants.IncomeMovement,
             "VENTA", sale.Total, $"Venta {VisibleNumber(sale)} (medio corregido)", correlation, now);
         await repository.AddCashMovementAsync(corrected, ct);
@@ -255,6 +261,7 @@ public sealed partial class SalesService
                 Before = current.Select(x => new { Method = x.MetodoPago.Nombre, Amount = x.ValorAplicado }).ToArray(),
                 After = response.Payments.Select(x => new { Method = x.MethodName, Amount = x.AppliedAmount }).ToArray(),
                 CashDifference = response.CashDifference, AuthorizationId = authorization.Id,
+                FromClosedShift = fromClosedShift, OriginalShiftId = sale.TurnoCajaId, OriginalOperatingDate = sale.FechaOperativa,
                 AuthorizationMode = administratorSelfAuthorized ? "ADMINISTRATOR_SELF" : "OTHER_USER"
             }, correlation, authorizer.Id, operatorSession?.Id, terminal.Id, chosen.Codigo, ct);
         await unitOfWork.SaveChangesAsync(ct);

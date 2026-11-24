@@ -34,11 +34,13 @@ public sealed class EfDailyCashFlowRepository(OfficialControlPlusDbContext dbCon
         var movementIds = allMovements.Keys.ToArray();
         var payments = new List<PaymentRow>();
 
+        // Each sale payment belongs to the shift of its cash movement (D3: a closed shift's correction lives in today's shift).
         payments.AddRange(await dbContext.PagoVenta.AsNoTracking()
             .Where(x => x.Venta.InstalacionId == installationId &&
-                (shiftIds.Contains(x.Venta.TurnoCajaId) ||
+                (shiftIds.Contains(x.MovimientoCaja != null ? x.MovimientoCaja.TurnoCajaId : x.Venta.TurnoCajaId) ||
                  (x.MovimientoCajaId.HasValue && movementIds.Contains(x.MovimientoCajaId.Value))))
-            .Select(x => new PaymentRow(x.Venta.TurnoCajaId, x.MovimientoCajaId, "VENTA_CONTADO",
+            .Select(x => new PaymentRow(x.MovimientoCaja != null ? x.MovimientoCaja.TurnoCajaId : x.Venta.TurnoCajaId,
+                x.MovimientoCajaId, "VENTA_CONTADO",
                 x.MetodoPago.Codigo, x.ValorAplicado, x.Estado,
                 x.MovimientoCaja != null && x.MovimientoCaja.InverseMovimientoRevertido != null))
             .ToArrayAsync(cancellationToken));

@@ -249,11 +249,14 @@ public sealed partial class EfCashRepository(OfficialControlPlusDbContext dbCont
         // Payments are the only source for amounts attributed to payment methods.
         // Read original payments of reversals too, even when they belong to an earlier shift.
         var payments = new List<PaymentAmountRow>();
+        // A sale payment counts in the shift of its cash movement: a correction of a closed shift's sale (D3, 23 Nov 2026)
+        // lives in today's open shift. Historical payments always share the shift of their sale.
         payments.AddRange(await dbContext.PagoVenta.AsNoTracking()
-            .Where(payment => payment.Venta.TurnoCajaId == shiftId ||
+            .Where(payment => (payment.MovimientoCaja != null ? payment.MovimientoCaja.TurnoCajaId : payment.Venta.TurnoCajaId) == shiftId ||
                 (payment.MovimientoCajaId.HasValue && reversedIds.Contains(payment.MovimientoCajaId.Value)))
             .Select(payment => new PaymentAmountRow(payment.MetodoPagoId, payment.ValorAplicado,
-                payment.Venta.TurnoCajaId, payment.MovimientoCajaId, payment.Estado,
+                payment.MovimientoCaja != null ? payment.MovimientoCaja.TurnoCajaId : payment.Venta.TurnoCajaId,
+                payment.MovimientoCajaId, payment.Estado,
                 payment.MovimientoCaja != null && payment.MovimientoCaja.InverseMovimientoRevertido != null))
             .ToArrayAsync(cancellationToken));
         payments.AddRange(await dbContext.PagoCredito.AsNoTracking()

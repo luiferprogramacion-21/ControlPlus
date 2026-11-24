@@ -362,7 +362,7 @@ Menú **Historial de ventas**: lista las ventas con sus pagos y productos. **Ver
 3. Elige el **motivo** y pide la autorización de un **Administrador**.
 4. La venta, sus productos y su total **no cambian**; solo el medio de pago. Al terminar, el aviso dice cuánto efectivo de más o de menos espera ahora la caja. Queda auditado.
 
-   Solo se puede en ventas del **turno abierto** y con tu caja abierta (o tu sesión de operador en turno compartido). Si el turno de la venta ya se cerró, ese cierre no se cambia: registra la diferencia con **Revisar cierre** en Caja.
+   Necesitas **la caja de hoy abierta** (o tu sesión de operador en turno compartido). También sirve para ventas de un día cuya caja **ya se cerró**: ese cierre no cambia y la corrección se registra en la caja de hoy, unida a la venta. Por ejemplo, si una venta de ayer se pagó por Nequi pero quedó en efectivo, ayer la caja quedó con faltante y hoy la caja esperará ese efectivo de menos; entre los dos días cuadra.
 
 **Cambio de productos** (una venta ya hecha; no es una anulación)
 
