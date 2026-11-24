@@ -17,17 +17,17 @@ describe('Customers', () => {
   });
   it('envía alta válida normalizada', async () => {
     api.create.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
-    component.newCustomer(); component.form.fullName = ' Ana '; component.form.address = ' Calle 1 '; component.form.phone = '300'; component.form.documentType = 'CC'; component.form.documentNumber = ' 123 ';
+    component.newCustomer(); component.form.fullName = ' Ana '; component.form.address = ' Calle 1 '; component.form.phone = '3001234567'; component.form.documentType = 'CC'; component.form.documentNumber = ' 123 ';
     await component.save(); expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ fullName: 'Ana', address: 'Calle 1', documentNumber: '123' }));
   });
   it('guarda el cupo de crédito; vacío es sin límite y un valor no entero se rechaza', async () => {
     api.create.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
-    component.newCustomer(); component.form.fullName = 'Ana'; component.form.address = 'Calle 1'; component.form.phone = '300'; component.form.documentType = 'CC'; component.form.documentNumber = '123';
+    component.newCustomer(); component.form.fullName = 'Ana'; component.form.address = 'Calle 1'; component.form.phone = '3001234567'; component.form.documentType = 'CC'; component.form.documentNumber = '123';
     component.form.creditLimit = 1500.5; await component.save();
     expect(api.create).not.toHaveBeenCalled(); expect(component.error()).toContain('cupo');
     component.form.creditLimit = '' as never; await component.save();
     expect(api.create).toHaveBeenLastCalledWith(expect.objectContaining({ creditLimit: null }));
-    component.newCustomer(); component.form.fullName = 'Ana'; component.form.address = 'Calle 1'; component.form.phone = '300'; component.form.documentType = 'CC'; component.form.documentNumber = '123';
+    component.newCustomer(); component.form.fullName = 'Ana'; component.form.address = 'Calle 1'; component.form.phone = '3001234567'; component.form.documentType = 'CC'; component.form.documentNumber = '123';
     component.form.creditLimit = 200000; await component.save();
     expect(api.create).toHaveBeenLastCalledWith(expect.objectContaining({ creditLimit: 200000 }));
   });
@@ -35,14 +35,14 @@ describe('Customers', () => {
     permissions = ['CUSTOMERS.BASIC_MANAGE'];
     api.update.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
     const customer = { id: 'c1', documentType: 'CC', documentNumber: '9', fullName: 'Ana', phone: null, address: 'Calle 1', email: null, observations: null, isActive: true, version: 3, creditLimit: 50000 };
-    component.edit(customer); component.form.creditLimit = 1; component.form.phone = '300';
+    component.edit(customer); component.form.creditLimit = 1; component.form.phone = '3001234567';
     await component.save();
-    expect(api.update).toHaveBeenCalledWith(customer, expect.objectContaining({ creditLimit: 50000, phone: '300' }));
+    expect(api.update).toHaveBeenCalledWith(customer, expect.objectContaining({ creditLimit: 50000, phone: '3001234567' }));
   });
   it('con el permiso básico también envía el documento; observaciones y cupo siguen reservados', async () => {
     permissions = ['CUSTOMERS.BASIC_MANAGE'];
     api.create.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
-    component.newCustomer(); component.form.fullName = 'Ana'; component.form.address = 'Calle 1'; component.form.phone = '300'; component.form.documentType = 'CC'; component.form.documentNumber = '123';
+    component.newCustomer(); component.form.fullName = 'Ana'; component.form.address = 'Calle 1'; component.form.phone = '3001234567'; component.form.documentType = 'CC'; component.form.documentNumber = '123';
     component.form.documentType = 'cc'; component.form.documentNumber = ' 123 '; component.form.observations = 'privado'; component.form.creditLimit = 9000;
     await component.save();
     expect(api.create).toHaveBeenLastCalledWith(expect.objectContaining({ documentType: 'CC', documentNumber: '123', observations: null, creditLimit: null }));

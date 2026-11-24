@@ -1,3 +1,4 @@
+import { applyFormat, documentRule, InputFormat } from '../../shared/input-format';
 import { A11yModule } from '@angular/cdk/a11y';
 import { Component, inject, input, OnDestroy, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -10,7 +11,7 @@ const SEARCH_DELAY_MS = 250;
 const DOCUMENT_TYPES = ['CC', 'CE', 'NIT', 'PASAPORTE', 'PPT', 'OTRO'];
 
 /** Window to find a customer (or register one without leaving the sale), as in the prototype. */
-@Component({ selector: 'cp-customer-picker', imports: [FormsModule, A11yModule], templateUrl: './customer-picker.html', styles: ['.customer-doc-row { display: grid; grid-template-columns: 150px 1fr; gap: 8px; }'] })
+@Component({ selector: 'cp-customer-picker', imports: [FormsModule, A11yModule, InputFormat], templateUrl: './customer-picker.html', styles: ['.customer-doc-row { display: grid; grid-template-columns: 150px 1fr; gap: 8px; }'] })
 export class CustomerPicker implements OnInit, OnDestroy {
   private readonly api = inject(CustomersApi);
   readonly session = inject(SessionService);
@@ -76,8 +77,8 @@ export class CustomerPicker implements OnInit, OnDestroy {
     if (!name || name.length > 200) return 'Indica un nombre de hasta 200 caracteres.';
     // Decisión del 21 de noviembre de 2026: todo cliente lleva nombre, documento, teléfono y dirección.
     if (!f.documentType || !f.documentNumber.trim()) return 'Indica el tipo y el número de documento.';
-    if (f.documentNumber.trim().length > 50) return 'El documento supera 50 caracteres.';
-    if (!f.phone.trim() || f.phone.trim().length > 30) return 'Indica el teléfono (hasta 30 caracteres).';
+    if (applyFormat(f.documentNumber.trim(), documentRule(f.documentType)) !== f.documentNumber.trim()) return 'Revisa el número de documento: tiene caracteres que no van o es muy largo.';
+    if (!/^\d{7,10}$/.test(f.phone.trim())) return 'El teléfono debe tener entre 7 y 10 números.';
     if (!address || address.length > 300) return 'Indica la dirección (hasta 300 caracteres).';
     return '';
   }

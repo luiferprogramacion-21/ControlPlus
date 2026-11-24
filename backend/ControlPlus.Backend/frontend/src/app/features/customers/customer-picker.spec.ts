@@ -4,7 +4,7 @@ import { SessionService } from '../../core/session.service';
 import { CustomerPicker } from './customer-picker';
 import { Customer, CustomersApi } from './customers-api';
 
-const customer = (over: Partial<Customer> = {}): Customer => ({ id: 'c1', documentType: 'CC', documentNumber: '123', fullName: 'Ana Pérez', phone: '300', address: 'Calle 1', email: null, observations: null, isActive: true, version: 1, ...over });
+const customer = (over: Partial<Customer> = {}): Customer => ({ id: 'c1', documentType: 'CC', documentNumber: '123', fullName: 'Ana Pérez', phone: '3001234567', address: 'Calle 1', email: null, observations: null, isActive: true, version: 1, ...over });
 
 describe('CustomerPicker', () => {
   const api = { list: vi.fn(), create: vi.fn() };
@@ -58,7 +58,7 @@ describe('CustomerPicker', () => {
       expect(picker.validation()).toContain('nombre');
       picker.form.fullName = 'Luis'; expect(picker.validation()).toContain('documento');
       picker.form.documentType = 'CC'; expect(picker.validation()).toContain('documento');
-      picker.form.documentNumber = ' ab12 '; expect(picker.validation()).toContain('teléfono');
+      picker.form.documentNumber = ' 1234567 '; expect(picker.validation()).toContain('teléfono');
       picker.form.phone = '3001112233'; expect(picker.validation()).toContain('dirección');
       picker.form.address = 'Calle 2'; expect(picker.validation()).toBe('');
     }
@@ -66,9 +66,9 @@ describe('CustomerPicker', () => {
 
   it('envía los cuatro datos normalizados y selecciona al creado', async () => {
     await open(true); picker.startCreate();
-    Object.assign(picker.form, { fullName: ' Luis ', documentType: 'CC', documentNumber: ' ab12 ', phone: ' 300 ', address: ' Calle 2 ' });
+    Object.assign(picker.form, { fullName: ' Luis ', documentType: 'CC', documentNumber: ' 1234567 ', phone: ' 3001234567 ', address: ' Calle 2 ' });
     await picker.create();
-    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ documentType: 'CC', documentNumber: 'AB12', fullName: 'Luis', phone: '300', address: 'Calle 2' }));
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ documentType: 'CC', documentNumber: '1234567', fullName: 'Luis', phone: '3001234567', address: 'Calle 2' }));
     expect(chosen[0]?.id).toBe('new');
   });
   it('rellena el formulario con lo escrito: texto como nombre, números como teléfono', async () => {

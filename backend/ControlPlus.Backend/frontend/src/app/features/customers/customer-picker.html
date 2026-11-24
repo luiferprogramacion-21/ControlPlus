@@ -29,9 +29,9 @@
         <input id="customer-new-name" class="text-field" name="newName" [(ngModel)]="form.fullName" maxlength="200" required cdkFocusInitial>
         <label class="field-label field-label--spaced" for="customer-new-doc-type">Documento (tipo y número)</label>
         <div class="customer-doc-row"><select id="customer-new-doc-type" class="text-field" name="newDocType" [(ngModel)]="form.documentType" required><option value="">Tipo</option>@for (type of documentTypes; track type) { <option [value]="type">{{ type }}</option> }</select>
-          <input class="text-field" name="newDocNumber" [(ngModel)]="form.documentNumber" maxlength="50" required aria-label="Número de documento"></div>
+          <input class="text-field" name="newDocNumber" [(ngModel)]="form.documentNumber" cpFormat="document" [cpDocumentType]="form.documentType" required aria-label="Número de documento"></div>
         <label class="field-label field-label--spaced" for="customer-new-phone">Teléfono</label>
-        <input id="customer-new-phone" class="text-field" name="newPhone" [(ngModel)]="form.phone" maxlength="30" required>
+        <input id="customer-new-phone" class="text-field" name="newPhone" [(ngModel)]="form.phone" cpFormat="phone" required>
         <label class="field-label field-label--spaced" for="customer-new-address">Dirección</label>
         <input id="customer-new-address" class="text-field" name="newAddress" [(ngModel)]="form.address" maxlength="300" required>
         @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }

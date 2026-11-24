@@ -1,3 +1,4 @@
+import { InputFormat } from '../../shared/input-format';
 import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -8,7 +9,7 @@ import { Supplier, SupplierInput, SuppliersApi } from './suppliers-api';
 import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 import { WindowSheet } from '../../shared/window-sheet';
-@Component({ selector: 'cp-suppliers', imports: [WindowSheet, FormsModule, MatPaginatorModule, Icon], templateUrl: './suppliers.html', styleUrl: '../directory.scss' })
+@Component({ selector: 'cp-suppliers', imports: [WindowSheet, FormsModule, InputFormat, MatPaginatorModule, Icon], templateUrl: './suppliers.html', styleUrl: '../directory.scss' })
 export class Suppliers implements OnInit {
   private readonly api = inject(SuppliersApi);
   private readonly confirmation = inject(ConfirmationDialog);

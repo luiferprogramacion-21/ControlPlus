@@ -1,3 +1,4 @@
+import { InputFormat } from '../../shared/input-format';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText } from '../../core/api';
@@ -7,7 +8,7 @@ import { toastSignal } from '../../core/toast';
 /** General business data from mock-up 21. Email is intentionally absent because V1 has no persisted column. */
 @Component({
   selector: 'cp-establishment-panel',
-  imports: [FormsModule],
+  imports: [FormsModule, InputFormat],
   template: `
     <section class="panel module-panel establishment-panel">
       <div class="module-toolbar"><div><h3>Datos del establecimiento</h3><p class="muted">Información que identifica el negocio en ControlPlus y en los comprobantes.</p></div></div>
@@ -16,8 +17,8 @@ import { toastSignal } from '../../core/toast';
         <form class="establishment-form" (submit)="$event.preventDefault(); save()">
           <div class="form-grid form-grid--two">
             <label class="field-label" for="business-name">Nombre comercial<input id="business-name" class="text-field" name="businessName" maxlength="200" [(ngModel)]="commercialName" autocomplete="organization"></label>
-            <label class="field-label" for="business-nit">NIT o documento <span>(opcional)</span><input id="business-nit" class="text-field" name="businessNit" maxlength="30" [(ngModel)]="identification"></label>
-            <label class="field-label" for="business-phone">Teléfono <span>(opcional)</span><input id="business-phone" class="text-field" name="businessPhone" maxlength="30" [(ngModel)]="phone" autocomplete="tel"></label>
+            <label class="field-label" for="business-nit">NIT o documento <span>(opcional)</span><input id="business-nit" class="text-field" name="businessNit" cpFormat="document" cpDocumentType="NIT" [(ngModel)]="identification"></label>
+            <label class="field-label" for="business-phone">Teléfono <span>(opcional)</span><input id="business-phone" class="text-field" name="businessPhone" cpFormat="phone" [(ngModel)]="phone"></label>
             <label class="field-label" for="business-address">Dirección <span>(opcional)</span><input id="business-address" class="text-field" name="businessAddress" maxlength="300" [(ngModel)]="address" autocomplete="street-address"></label>
           </div>
           <div class="receipt-copy-grid">
