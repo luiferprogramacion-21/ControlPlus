@@ -1026,8 +1026,8 @@ public sealed partial class PurchasesApiFlowTests : IAsyncLifetime
         client.DefaultRequestHeaders.Authorization = null;
         await ProblemAsync(await client.GetAsync("/api/purchases/cancellation-reasons"), HttpStatusCode.Unauthorized);
         Bearer(client, users.Supervisor.Token.AccessToken);
-        await ProblemCodeAsync(await client.GetAsync("/api/purchases/cancellation-reasons"),
-            HttpStatusCode.Forbidden, "authorization.forbidden");
+        // Auditoría S.20: el Supervisor lee los motivos para corregir una recepción con autorización, pero no los inicializa.
+        await ReadJsonAsync(await client.GetAsync("/api/purchases/cancellation-reasons"), HttpStatusCode.OK);
         await ProblemCodeAsync(await client.PostAsync("/api/purchases/cancellation-reasons/initialize", null),
             HttpStatusCode.Forbidden, "authorization.forbidden");
         Bearer(client, users.Admin.Token.AccessToken);

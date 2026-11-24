@@ -26,9 +26,13 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
     public async Task<Result<PurchaseCorrectionPreparationDto>> PrepareCorrectionAsync(ActorContext actor,
         Guid id, CancellationToken ct = default)
     {
-        if (!await CanCancelAsync(actor, ct)) return Denied<PurchaseCorrectionPreparationDto>();
+        var canCancel = await CanCancelAsync(actor, ct);
+        if (!canCancel && !await IsReceivingSupervisorAsync(actor, ct)) return Denied<PurchaseCorrectionPreparationDto>();
         var purchase = await repository.GetAsync(id, ct);
         if (purchase is null) return Result.Failure<PurchaseCorrectionPreparationDto>(ApplicationError.NotFound("la compra"));
+        if (!canCancel && purchase.PedidoCompraId is null)
+            return Result.Failure<PurchaseCorrectionPreparationDto>(ApplicationError.Forbidden(
+                "Solo el Administrador anula una compra sin pedido. El Supervisor corrige recepciones de pedidos."));
         var order = purchase.PedidoCompraId is Guid orderId
             ? await repository.GetOrderForUpdateAsync(orderId, ct) : null;
         string? block = purchase.Estado != "CONFIRMADA" ? "Solo se puede corregir una compra o recepción confirmada." : null;
@@ -48,13 +52,15 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         }
         return Result.Success(new PurchaseCorrectionPreparationDto(purchase.Id, purchase.Version,
             purchase.PedidoCompraId, order?.Version, block is null, block,
-            purchase.DetalleCompra.Sum(x => x.Cantidad), purchase.Total));
+            purchase.DetalleCompra.Sum(x => x.Cantidad), purchase.Total, RequiresAdministratorAuthorization: !canCancel));
     }
 
     public async Task<Result<IReadOnlyCollection<PurchaseCancellationReasonDto>>> ListCancellationReasonsAsync(
         ActorContext actor, CancellationToken ct = default)
     {
-        if (!await CanCancelAsync(actor, ct)) return Denied<IReadOnlyCollection<PurchaseCancellationReasonDto>>();
+        // El Supervisor que corrige una recepción (S.20) también elige el motivo.
+        if (!await CanCancelAsync(actor, ct) && !await IsReceivingSupervisorAsync(actor, ct))
+            return Denied<IReadOnlyCollection<PurchaseCancellationReasonDto>>();
         var installation = await repository.GetActiveInstallationForUpdateAsync(ct);
         if (installation is null) return Result.Failure<IReadOnlyCollection<PurchaseCancellationReasonDto>>(ApplicationError.NotFound("la instalación activa"));
         var reasons = await repository.ListCancellationReasonsAsync(installation.EstablecimientoId, ct);
@@ -112,7 +118,17 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
     public async Task<Result<PurchaseDto>> CancelAsync(ActorContext actor, Guid id, string key,
         CancelPurchaseRequest request, CancellationToken ct = default)
     {
-        if (!await CanCancelAsync(actor, ct)) return Denied<PurchaseDto>();
+        if (!await CanCancelAsync(actor, ct))
+        {
+            // Auditoría S.20: el Supervisor solo corrige la recepción de un pedido, y con la autorización del Administrador.
+            if (!await IsReceivingSupervisorAsync(actor, ct)) return Denied<PurchaseDto>();
+            if (request?.ExpectedOrderVersion is null)
+                return Result.Failure<PurchaseDto>(ApplicationError.Forbidden(
+                    "Solo el Administrador anula una compra sin pedido. El Supervisor corrige recepciones de pedidos."));
+            if (request.Authorization is null)
+                return Result.Failure<PurchaseDto>(ApplicationError.Forbidden(
+                    "Para corregir una recepción, un Supervisor necesita la autorización del Administrador (carné o usuario y contraseña)."));
+        }
         key = key?.Trim() ?? "";
         if (id == Guid.Empty || request is null || request.ReasonId == Guid.Empty || request.ExpectedVersion <= 0 ||
             key.Length is < 1 or > 100 || key.Any(x => !char.IsAsciiLetterOrDigit(x) && x is not ('-' or '_' or '.' or ':')) ||
@@ -144,7 +160,9 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
     {
         var installation = await repository.GetActiveInstallationForUpdateAsync(ct);
         if (installation is null) return Result.Failure<PurchaseDto>(ApplicationError.NotFound("la instalación activa"));
-        if (!await CanCancelAsync(actor, ct)) return Denied<PurchaseDto>();
+        if (!await CanCancelAsync(actor, ct) && !(request.ExpectedOrderVersion is not null && request.Authorization is not null &&
+                await IsReceivingSupervisorAsync(actor, ct)))
+            return Denied<PurchaseDto>();
         var previous = await repository.GetIdempotencyAsync(installation.Id, key, ct);
         if (previous is not null)
         {
@@ -351,6 +369,14 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
 
     private async Task<bool> CanCancelAsync(ActorContext actor, CancellationToken ct) =>
         await CanCancelUserAsync(actor.UserId, ct);
+
+    /// <summary>Supervisor vigente que recibe mercancía: corrige recepciones de pedidos con autorización (S.20).</summary>
+    private async Task<bool> IsReceivingSupervisorAsync(ActorContext actor, CancellationToken ct)
+    {
+        var snapshot = await users.GetAuthorizationSnapshotAsync(actor.UserId, ct);
+        return snapshot is not null && snapshot.HighestRoleLevel == RoleLevel.Supervisor &&
+            snapshot.PermissionCodes.Contains(PermissionCodes.PurchasesReceive, StringComparer.OrdinalIgnoreCase);
+    }
 
     private async Task<bool> CanCancelUserAsync(Guid userId, CancellationToken ct)
     {

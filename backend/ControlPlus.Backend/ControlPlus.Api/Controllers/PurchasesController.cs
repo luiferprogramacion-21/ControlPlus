@@ -12,8 +12,10 @@ namespace ControlPlus.Api.Controllers;
 public sealed class PurchasesController(CurrentActorContextResolver actors, IPurchaseService purchases)
     : ApiControllerBase(actors)
 {
+    // Auditoría S.20: el Administrador (PURCHASES.CANCEL) corrige solo; el Supervisor que recibe mercancía, con su autorización.
+    // El servicio exige uno u otro.
     [HttpGet("{purchaseId:guid}/correction-preparation")]
-    [PermissionAuthorize(PermissionCodes.PurchasesCancel)]
+    [PermissionAuthorize(PermissionCodes.PurchasesReceive)]
     [ProducesResponseType<PurchaseCorrectionPreparationDto>(StatusCodes.Status200OK, "application/json")]
     public async Task<IActionResult> PrepareCorrection(Guid purchaseId, CancellationToken ct)
     {
@@ -22,7 +24,7 @@ public sealed class PurchasesController(CurrentActorContextResolver actors, IPur
     }
 
     [HttpPost("{purchaseId:guid}/correct-receipt")]
-    [PermissionAuthorize(PermissionCodes.PurchasesCancel)]
+    [PermissionAuthorize(PermissionCodes.PurchasesReceive)]
     [Consumes("application/json")]
     [ProducesResponseType<PurchaseDto>(StatusCodes.Status200OK, "application/json")]
     public async Task<IActionResult> CorrectReceipt(Guid purchaseId,
@@ -36,7 +38,7 @@ public sealed class PurchasesController(CurrentActorContextResolver actors, IPur
     }
 
     [HttpGet("cancellation-reasons")]
-    [PermissionAuthorize(PermissionCodes.PurchasesCancel)]
+    [PermissionAuthorize(PermissionCodes.PurchasesReceive)]
     [ProducesResponseType<IReadOnlyCollection<PurchaseCancellationReasonDto>>(StatusCodes.Status200OK, "application/json")]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]

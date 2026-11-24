@@ -74,7 +74,9 @@ public sealed record CancelPurchaseRequest(
 
 public sealed record PurchaseCorrectionPreparationDto(Guid PurchaseId, long PurchaseVersion,
     Guid? OrderId, long? OrderVersion, bool CanReverse, string? BlockReason,
-    int UnitsToRemove, decimal OriginalTotal);
+    int UnitsToRemove, decimal OriginalTotal,
+    // Auditoría S.20: el Supervisor corrige la recepción de un pedido con la autorización del Administrador.
+    bool RequiresAdministratorAuthorization = false);
 
 public sealed record PurchaseCancellationReasonDto(Guid Id, string Code, string Name, string? Description, int DisplayOrder);
 

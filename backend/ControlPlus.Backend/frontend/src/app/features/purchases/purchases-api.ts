@@ -8,7 +8,7 @@ export interface PurchaseSummary { id: string; supplierId: string; supplierDocum
 export interface PurchaseLine extends PurchaseLineInput { id: string; grossSubtotal: number; taxBase: number | null; vatAmount: number | null; total: number; previousAverageCost: number | null; resultingAverageCost: number; previousRetailPrice: number; }
 export interface Purchase extends PurchaseSummary { vatMode: string; grossSubtotal: number; vatTotal: number | null; lines: PurchaseLine[]; orderId: string | null; }
 export interface CancellationReason { id: string; code: string; name: string; description: string | null; displayOrder: number; }
-export interface PurchaseCorrectionPreparation { purchaseId: string; purchaseVersion: number; orderId: string | null; orderVersion: number | null; canReverse: boolean; blockReason: string | null; unitsToRemove: number; originalTotal: number; }
+export interface PurchaseCorrectionPreparation { purchaseId: string; purchaseVersion: number; orderId: string | null; orderVersion: number | null; canReverse: boolean; blockReason: string | null; unitsToRemove: number; originalTotal: number; requiresAdministratorAuthorization?: boolean; }
 @Injectable({ providedIn: 'root' })
 export class PurchasesApi {
   private readonly http = inject(HttpClient);

@@ -49,6 +49,44 @@ public sealed partial class PurchasesApiFlowTests
     }
 
     [Fact, Trait("Category", "Integration")]
+    public async Task Supervisor_CorrectsReceiptOnlyWithAdministratorAuthorization()
+    {
+        // Auditoría S.20: el Supervisor ve «Corregir recepción» y la hace con el carné o la contraseña del Administrador.
+        using var client = Client();
+        var setup = await CreateReceivedPurchaseAsync(client, "CORRECTION-SUPERVISOR", 3);
+        var reason = await CorrectionReasonAsync(client);
+        Bearer(client, (await LoginAsync(client, SupervisorName, _supervisorPassword)).AccessToken);
+        var preparation = await ReadAsync<PurchaseCorrectionPreparationDto>(await client.GetAsync(
+            $"/api/purchases/{setup.PurchaseId}/correction-preparation"), HttpStatusCode.OK);
+        Assert.True(preparation.CanReverse);
+        Assert.True(preparation.RequiresAdministratorAuthorization);
+        Assert.NotEmpty(await ReadAsync<PurchaseCancellationReasonDto[]>(
+            await client.GetAsync("/api/purchases/cancellation-reasons"), HttpStatusCode.OK));
+        var request = new CancelPurchaseRequest(preparation.PurchaseVersion, reason.Id, "Llegó otra mercancía",
+            null, preparation.OrderVersion);
+        var withoutAuthorization = await PostPurchaseCorrectionAsync(client, setup.PurchaseId, "supervisor-correction-none", request);
+        Assert.Equal(HttpStatusCode.Forbidden, withoutAuthorization.StatusCode);
+        Assert.Contains("autorización del Administrador", await withoutAuthorization.Content.ReadAsStringAsync());
+        await ProblemAsync(await PostPurchaseCorrectionAsync(client, setup.PurchaseId, "supervisor-correction-self", request with
+            { Authorization = new CancelPurchaseAuthorizationRequest(SupervisorName, _supervisorPassword) }), HttpStatusCode.Unauthorized);
+        // Anular una compra (no una recepción de pedido) sigue siendo solo del Administrador.
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync($"/api/purchases/{setup.PurchaseId}/cancel",
+            request with { Authorization = new CancelPurchaseAuthorizationRequest(AdminName, _adminPassword) })).StatusCode);
+
+        var corrected = await ReadAsync<PurchaseDto>(await PostPurchaseCorrectionAsync(client, setup.PurchaseId,
+            "supervisor-correction-authorized", request with
+            { Authorization = new CancelPurchaseAuthorizationRequest(AdminName, _adminPassword) }), HttpStatusCode.OK);
+        Assert.Equal("ANULADA", corrected.Status);
+        Assert.Equal(0, (await StateAsync(setup.Product.Id)).Stock);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var evidence = await db.Set<CorreccionRecepcion>().AsNoTracking().SingleAsync(x => x.CompraId == setup.PurchaseId);
+        var authorization = await db.AutorizacionOperacion.AsNoTracking().SingleAsync(x => x.Id == evidence.AutorizacionOperacionId);
+        Assert.NotEqual(authorization.UsuarioSolicitanteId, authorization.UsuarioAutorizadorId);
+        Assert.Equal(evidence.UsuarioId, authorization.UsuarioSolicitanteId);
+    }
+
+    [Fact, Trait("Category", "Integration")]
     public async Task CorrectReceipt_WithLaterInventoryMovement_ExplainsBlockAndPreservesReceipt()
     {
         using var client = Client();
