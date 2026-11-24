@@ -245,9 +245,19 @@ Menú **Clientes** → **Nuevo cliente**. Todo cliente lleva **nombre, documento
 
 Desde el punto de venta (**+ Nuevo cliente**) se piden esos mismos cuatro datos. Si un cliente antiguo no los tiene, al editarlo en Clientes hay que completarlos; sin dirección no sirve para crédito ni apartado.
 
+**¿Está al día o moroso?** Al elegir un cliente en el punto de venta, y en la columna **Crédito** de Clientes, se ve su situación con un color:
+
+| Color | Quiere decir |
+| --- | --- |
+| Verde · **Crédito al día** | Debe, pero nada está vencido. |
+| Naranja · **Por vencer** | Una cuota vence en 3 días o menos. |
+| Rojo · **Moroso** | Tiene saldo vencido; dice cuánto y desde cuándo. |
+
+Sin deuda no aparece nada. Al vender a crédito a un moroso sigue saliendo el aviso o el bloqueo que configuró el Administrador.
+
 ## 2.11 Consultar productos y existencias
 
-- **Catálogo** muestra los productos, sus precios, sus códigos y su **estado**: **Disponible**, **Stock bajo** (quedan igual o menos que el mínimo) o **Agotado**. Con **Existencias** filtras: disponibles, stock bajo o agotados.
+- **Catálogo** muestra los productos, sus precios, sus códigos y su **estado**: **Disponible**, **Stock bajo** (quedan igual o menos que el mínimo) o **Agotado**. Con **Existencias** filtras: disponibles, stock bajo o agotados. Al buscar en el punto de venta también ves ese estado.
 - **Inventario** muestra las existencias y las **alertas de reposición** (productos con poco stock o agotados). Solo consulta: los ajustes los hace el Administrador.
 
 ## 2.12 Lo que no puedes hacer, y a quién pedirlo
@@ -306,6 +316,8 @@ En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto*
 - Si el aviso dice que **no se pudo confirmar** el envío, mira primero si el cajón se abrió. Solo si sigue cerrado, pulsa **Preparar nueva solicitud** y vuelve a intentarlo con un motivo.
 - Si el bloque dice **Desactivado**, el Administrador debe habilitar el cajón (ver 4.7).
 
+**Si un ingreso, gasto o retiro quedó mal:** en **Caja** pulsa **Corregir un error de caja** y elige la tarjeta **Un ingreso, gasto o retiro quedó mal**. Elige el movimiento: viene con su mismo tipo, monto y concepto, así que normalmente solo cambias el monto. Si no debía registrarse, elige **Nada**. La pantalla muestra **Así quedó → Así quedará** y cuánto sube o baja el efectivo de hoy. Escribe por qué y confirma con la autorización del Administrador. El movimiento original queda en el historial.
+
 ## 3.4 Cerrar la caja
 
 En **Caja** pulsa **Cerrar caja** (también está en Inicio). El cierre se hace en tres pasos:
@@ -357,7 +369,10 @@ Menú **Historial de ventas**: lista las ventas con sus pagos y productos. **Ver
 1. Abre **Cambios y devoluciones** en el menú (o **Cambiar o devolver** en Inicio, o en la venta recién terminada) y escribe el **número de la venta** que aparece en el ticket. También puedes abrir la venta en el historial → **Cambio de productos**.
 2. Se permite hasta **15 días** después de la venta (el Administrador puede cambiar ese plazo).
 3. Elige lo que devuelve el cliente y lo que se lleva. La **diferencia** se paga o se suma al crédito, según corresponda.
+   Lo devuelto se recibe por lo que el cliente pagó (**Mismo precio**, marcado). Si la tienda lo recibe por menos (por ejemplo, viene usado), desmarca **Mismo precio** y escribe en cuánto se recibe cada unidad. Nunca puede ser más de lo que pagó.
 4. Autoriza un **Administrador**.
+
+En **Corregir venta** cada opción dice qué pasa y quién la autoriza; elige la que corresponda a lo que ocurrió.
 
 ## 3.7 Créditos
 
@@ -389,6 +404,8 @@ Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor*
   - **No, es una compra sin pedido:** anotas el proveedor, el número de factura, los productos y sus costos.
 
   Lo recibido entra al inventario y actualiza el costo.
+- **Al enviar un pedido** se descarga solo su **PDF** para mandarlo al proveedor. En el pedido puedes volver a pulsar **Descargar PDF** o **Imprimir documento**.
+- **Si algo se recibió mal:** en **Mercancía recibida** abre esa recepción y pulsa **Corregir recepción**. Te muestra cómo queda el pedido, eliges el motivo y pides la **autorización del Administrador**. Las unidades salen del inventario y vuelven a quedar pendientes en el pedido. Si esos productos ya se vendieron o se ajustaron después, la pantalla explica por qué no se puede deshacer.
 - No creas ni editas proveedores, ni anulas compras: eso es del Administrador.
 
 ---
@@ -514,14 +531,14 @@ Menú **Soporte y continuidad**.
 - El sistema hace una **copia de la base de datos** cada 30 minutos, después de cada cierre de caja y cuando la pides con el botón **Crear respaldo**.
 - Cada copia va a **dos destinos**: una copia **local** en un disco distinto al de la base y una copia **externa cifrada** en la carpeta de OneDrive o Google Drive.
 - Se conservan 7 copias diarias, 4 semanales y 12 mensuales.
-- **Probar restauración** restaura una copia en una base temporal para comprobar que sirve y la borra al terminar. **No toca** tus datos reales.
+- **Probar restauración** (botón en Soporte) comprueba que una copia sirve, en tres pasos: **1.** elige la copia (la más reciente ya viene elegida); **2.** pulsa **Probar restauración**; **3.** si dice **Prueba correcta**, esa copia sirve. El sistema la recupera en una base de prueba aparte y la borra al terminar: **no toca** tus datos reales. Hazlo cada 90 días; la pantalla avisa cuándo toca.
 - **Restaurar la operación real** no está en pantalla, a propósito: se hace con un script de emergencia (`scripts/backups/emergency/Restore-ControlPlusDatabase.ps1`), que conserva la base anterior. Detalle en `docs/backups.md`.
 
 > Un respaldo en el mismo disco que la base no protege contra la falla de ese disco. Conecta un **USB o segundo disco** y configúralo como destino local.
 
 ## 4.12 Auditoría
 
-Administración → **Auditoría**: lista de solo lectura de las acciones críticas (usuarios y permisos, productos, caja, ventas, inventario, créditos, apartados, impresión). Filtra por fecha, usuario y acción. Nadie puede modificarla.
+Administración → **Auditoría**: lista de solo lectura de las acciones críticas (usuarios y permisos, productos, caja, ventas, inventario, créditos, apartados, impresión). Filtra por fecha, usuario y acción: el usuario y la acción se **escriben o se eligen** de la lista (basta escribir una parte, por ejemplo «abono»). Nadie puede modificarla.
 
 ## 4.13 Mantenimiento del equipo
 
