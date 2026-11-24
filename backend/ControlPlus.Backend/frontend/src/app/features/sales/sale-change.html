@@ -60,7 +60,7 @@
         @if (settlement.mode !== 'none') {
           <h3>{{ settlement.mode === 'payment' ? 'Cobro de la diferencia' : 'Devolución al cliente' }}</h3>
           <p class="form-hint">{{ settlement.mode === 'refund' && p.saleType === 'CONTADO' ? 'La devolución solo puede salir por los medios con los que se pagó la venta (' + originalPayments + ') y la caja debe tener efectivo suficiente si se devuelve en efectivo.' : '' }} Suma de medios: {{ money(appliedTotal) }} de {{ money(settlement.cashAmount) }}.</p>
-          <cp-payment-methods [drafts]="drafts" [mode]="settlement.mode === 'payment' ? 'payment' : 'refund'" idPrefix="change" />
+          <cp-payment-methods [drafts]="drafts" [mode]="settlement.mode === 'payment' ? 'payment' : 'refund'" idPrefix="change" amountLabel="Valor que paga el cliente" [showChange]="true" />
         }
       }
     }

@@ -176,9 +176,11 @@ describe('Cajón de dinero en Caja', () => {
   const confirm = vi.fn();
   let api: Record<'openDrawer' | 'movement' | 'state' | 'movements' | 'drawerStatus' | 'reconciliation', ReturnType<typeof vi.fn>>;
   let screen: Cash;
+  let roles: string[];
+  const authorize = vi.fn(async (prompt: AuthorizationPrompt) => { await prompt.run({ userName: 'admin', password: 'clave' }); return true; });
 
   beforeEach(() => {
-    confirm.mockReset().mockResolvedValue(true);
+    confirm.mockReset().mockResolvedValue(true); authorize.mockClear(); roles = ['ADMINISTRADOR'];
     api = {
       openDrawer: vi.fn().mockResolvedValue({ status: 'ENVIADO' }),
       movement: vi.fn().mockResolvedValue({ id: 'm1', type: 'INGRESO', category: 'MANUAL', amount: 5000, concept: 'Base', occurredAtUtc: '', drawerStatus: 'ENVIADO' }),
@@ -189,8 +191,9 @@ describe('Cajón de dinero en Caja', () => {
     };
     TestBed.configureTestingModule({ providers: [
       { provide: CashApi, useValue: api },
-      { provide: SessionService, useValue: { has: (permission: string) => ['CASH.SHIFT_MANAGE', 'CASH.MOVEMENTS_MANAGE'].includes(permission), user: () => ({ userName: 'supervisor' }) } },
-      { provide: AuthorizationDialog, useValue: { open: vi.fn() } },
+      { provide: SessionService, useValue: { has: (permission: string) => ['CASH.SHIFT_MANAGE', 'CASH.MOVEMENTS_MANAGE'].includes(permission),
+        hasRole: (...codes: string[]) => codes.some(code => roles.includes(code)), user: () => ({ userName: 'supervisor' }) } },
+      { provide: AuthorizationDialog, useValue: { open: authorize } },
       { provide: ConfirmationDialog, useValue: { confirm } },
       { provide: EstablishmentService, useValue: { name: () => 'Tienda', load: () => Promise.resolve() } },
     ] });
@@ -234,8 +237,58 @@ describe('Cajón de dinero en Caja', () => {
     api.movement.mockResolvedValue({ id: 'm1', type: 'INGRESO', category: 'MANUAL', amount: 5000, concept: 'Base', occurredAtUtc: '', drawerStatus: 'FALLIDO' });
     screen.kind = 'incomes'; screen.amount = 5000; screen.concept = 'Base';
     await screen.move();
-    expect(api.movement).toHaveBeenCalledWith('incomes', 5000, 'Base', null);
+    expect(api.movement).toHaveBeenCalledWith('incomes', 5000, 'Base', null, null);
+    expect(authorize).not.toHaveBeenCalled();
     expect(screen.notice()).toBe('Movimiento registrado.');
     expect(screen.drawerNotice()).toContain('no se pudo abrir');
+  });
+
+  it('el Supervisor registra un movimiento con la autorización del Administrador (punto 13)', async () => {
+    roles = ['SUPERVISOR'];
+    screen.kind = 'cash-drops'; screen.amount = 20000; screen.concept = 'Retiro para el banco';
+    await screen.move();
+    expect(authorize).toHaveBeenCalledWith(expect.objectContaining({ title: 'Autorizar movimiento de caja',
+      description: expect.stringContaining('autorización del Administrador'), detail: 'Retiro de efectivo de 20.000 COP · Retiro para el banco',
+      requireDifferentUser: true, allowCredential: true }));
+    expect(api.movement).toHaveBeenCalledWith('cash-drops', 20000, 'Retiro para el banco', null, { userName: 'admin', password: 'clave' });
+    expect(screen.notice()).toBe('Movimiento registrado.');
+  });
+
+  it('en turno compartido decide el rol de quien pasó su carné, aunque la sesión sea del Administrador', async () => {
+    screen.state.set({ ...openState, requiresOperatorSession: true, activeOperatorRole: 'CAJERO', ownOperatorSession: { id: 'session-1', state: 'ACTIVA' } });
+    screen.kind = 'incomes'; screen.amount = 1000; screen.concept = 'Base';
+    await screen.move();
+    expect(authorize).toHaveBeenCalledWith(expect.objectContaining({ requireDifferentUser: false, description: expect.stringContaining('Supervisor o del Administrador') }));
+    expect(api.movement).toHaveBeenCalledWith('incomes', 1000, 'Base', 'session-1', { userName: 'admin', password: 'clave' });
+  });
+});
+
+describe('Cierre de caja del Cajero (pruebas del usuario del 24/11/2026, punto 4)', () => {
+  it('el Cajero dueño de su turno individual ve los pasos para contar y cerrar la caja', async () => {
+    const shift = { id: 'shift-9', mode: 'INDIVIDUAL', state: 'ABIERTA', operatingDate: '2026-11-24', openedAtUtc: '2026-11-24T13:00:00Z',
+      initialAmount: 50000, version: 2, responsibleUserId: 'cajero-1' };
+    const state = { isConfigured: true, hasOpenShift: true, defaultShiftMode: 'INDIVIDUAL', requiresPreviousShiftClosure: false,
+      requiresOperatorSession: false, guidance: null, currentShift: shift, ownOperatorSession: null };
+    const api = {
+      state: vi.fn().mockResolvedValue(state),
+      movements: vi.fn().mockResolvedValue({ items: [] }),
+      reconciliation: vi.fn().mockResolvedValue({ shiftId: 'shift-9', shiftVersion: 2, totalExpected: 50000, totalCounted: null, totalDifference: null, cashDifference: null,
+        paymentMethods: [{ paymentMethodId: 'cash-1', code: 'EFECTIVO', name: 'Efectivo', affectsCash: true, expectedAmount: 50000, countedAmount: null, difference: null }] }),
+    };
+    TestBed.configureTestingModule({ providers: [
+      { provide: CashApi, useValue: api },
+      { provide: SessionService, useValue: { has: (permission: string) => permission === 'CASH.OWN_READ', hasRole: () => false, user: () => ({ id: 'cajero-1', userName: 'cajero', displayName: 'Cajero' }) } },
+      { provide: AuthorizationDialog, useValue: { open: vi.fn() } },
+      { provide: ConfirmationDialog, useValue: { confirm: vi.fn() } },
+      { provide: EstablishmentService, useValue: { name: () => 'Tienda', load: () => Promise.resolve() } },
+    ] });
+    const fixture = TestBed.createComponent(Cash);
+    await fixture.componentInstance.refresh();
+    fixture.componentInstance.closingMode.set(true);
+    fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(api.reconciliation).toHaveBeenCalled();
+    expect(text).toContain('Paso 1 de 3');
+    expect(text).toContain('EFECTIVO ESPERADO');
   });
 });

@@ -29,6 +29,9 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
     private const string SupervisorPassword = "Cash-Supervisor-Test-2026!";
     private const string CashierUserName = "cash.cashier.test";
     private const string CashierPassword = "Cash-Cashier-Test-2026!";
+    // Pruebas del usuario del 24/11/2026 (punto 13): los movimientos de caja de quien no es Administrador piden autorizador.
+    private static CashOpenAuthorizationRequest SupervisorMovementAuthorization => new(SupervisorUserName, SupervisorPassword);
+    private static CashOpenAuthorizationRequest AdministratorMovementAuthorization => new(AdministratorUserName, AdministratorPassword);
 
     private readonly string _masterKey = RandomSecret(48);
     private readonly string _jwtSigningKey = RandomSecret(64);
@@ -213,14 +216,20 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(
             "/api/cash/movements/expenses", new CreateCashMovementRequest(1.5m, "Monto fraccionario", null))).StatusCode);
 
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync(
+            "/api/cash/movements/incomes", new CreateCashMovementRequest(25_000m, "Ingreso sin autorizador", null))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync(
+            "/api/cash/movements/incomes", new CreateCashMovementRequest(25_000m, "Ingreso con clave errada", null,
+                new CashOpenAuthorizationRequest(SupervisorUserName, "Wrong-Password-2026!")))).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
-            "/api/cash/movements/incomes", new CreateCashMovementRequest(25_000m, "Ingreso de prueba", null))).StatusCode);
+            "/api/cash/movements/incomes", new CreateCashMovementRequest(25_000m, "Ingreso de prueba", null, SupervisorMovementAuthorization))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(
-            "/api/cash/movements/expenses", new CreateCashMovementRequest(200_000m, "Egreso sin fondos", null))).StatusCode);
+            "/api/cash/movements/expenses", new CreateCashMovementRequest(200_000m, "Egreso sin fondos", null, SupervisorMovementAuthorization))).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
-            "/api/cash/movements/expenses", new CreateCashMovementRequest(5_000m, "Gasto de prueba", null))).StatusCode);
+            "/api/cash/movements/expenses", new CreateCashMovementRequest(5_000m, "Gasto de prueba", null, SupervisorMovementAuthorization))).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
-            "/api/cash/movements/cash-drops", new CreateCashMovementRequest(10_000m, "Sangría de prueba", null))).StatusCode);
+            "/api/cash/movements/cash-drops", new CreateCashMovementRequest(10_000m, "Sangría de prueba", null, AdministratorMovementAuthorization))).StatusCode);
+        await AssertMovementAuthorizationsAsync(users.Cashier.Id, users.Supervisor.Id);
 
         var movements = await ReadSuccessAsync<PagedResult<CashMovementDto>>(
             await client.GetAsync("/api/cash/movements?page=1&pageSize=20"), HttpStatusCode.OK);
@@ -320,7 +329,7 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(
             $"/api/cash/shifts/{opened.Id}/close", authorizedClose with { Version = closed.ShiftVersion })).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync(
-            "/api/cash/movements/incomes", new CreateCashMovementRequest(1_000m, "Turno cerrado", null))).StatusCode);
+            "/api/cash/movements/incomes", new CreateCashMovementRequest(1_000m, "Turno cerrado", null, SupervisorMovementAuthorization))).StatusCode);
 
         await AssertClosedShiftPersistenceAsync(
             opened.Id,
@@ -405,9 +414,16 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         var supervisorSession = await ReadSuccessAsync<OperatorSessionDto>(await client.PostAsJsonAsync(
             "/api/cash/operator-sessions", new StartOperatorSessionRequest(supervisorCredential.CredentialToken)), HttpStatusCode.Created);
         Assert.Equal(users.Supervisor.Id, supervisorSession.UserId);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync(
+            "/api/cash/movements/expenses",
+            new CreateCashMovementRequest(1_000m, "Gasto supervisor sin Administrador", supervisorSession.Id))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync(
+            "/api/cash/movements/expenses",
+            new CreateCashMovementRequest(1_000m, "Gasto supervisor autorizado por Cajero", supervisorSession.Id,
+                new CashOpenAuthorizationRequest(CashierUserName, CashierPassword)))).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
             "/api/cash/movements/expenses",
-            new CreateCashMovementRequest(1_000m, "Gasto supervisor", supervisorSession.Id))).StatusCode);
+            new CreateCashMovementRequest(1_000m, "Gasto supervisor", supervisorSession.Id, AdministratorMovementAuthorization))).StatusCode);
 
         SetBearer(client, cashier.AccessToken);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(
@@ -440,7 +456,7 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         SetBearer(client, cashier.AccessToken);
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
             "/api/cash/movements/incomes",
-            new CreateCashMovementRequest(5_000m, "Ingreso con concesión", cashierSession.Id))).StatusCode);
+            new CreateCashMovementRequest(5_000m, "Ingreso con concesión", cashierSession.Id, SupervisorMovementAuthorization))).StatusCode);
 
         SetBearer(client, administrator.AccessToken);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
@@ -459,7 +475,7 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         SetBearer(client, cashier.AccessToken);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(
             "/api/cash/movements/incomes",
-            new CreateCashMovementRequest(1_000m, "Sesión cerrada", cashierSession.Id))).StatusCode);
+            new CreateCashMovementRequest(1_000m, "Sesión cerrada", cashierSession.Id, SupervisorMovementAuthorization))).StatusCode);
 
         SetBearer(client, supervisor.AccessToken);
         var reconciliation = await ReadSuccessAsync<CashReconciliationDto>(
@@ -573,6 +589,23 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
             new CreateUserRequest(CashierUserName, "Cajero ficticio de Caja", CashierPassword, [cashierRoleId])),
             HttpStatusCode.Created);
         return new OperationalUsers(supervisor, cashier);
+    }
+
+    /// <summary>Cada movimiento autorizado deja su autorización y en la auditoría quién autorizó; el rechazado, un intento fallido.</summary>
+    private async Task AssertMovementAuthorizationsAsync(Guid cashierId, Guid supervisorId)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var authorizations = await context.AutorizacionOperacion.AsNoTracking()
+            .Where(x => x.TipoOperacion == "MOVIMIENTO_CAJA").ToArrayAsync();
+        Assert.Equal(3, authorizations.Length);
+        Assert.All(authorizations, x => { Assert.Equal(cashierId, x.UsuarioSolicitanteId); Assert.Equal("UTILIZADA", x.Estado); });
+        Assert.Equal(2, authorizations.Count(x => x.UsuarioAutorizadorId == supervisorId));
+        Assert.Equal(1, authorizations.Count(x => x.UsuarioAutorizadorId != supervisorId && x.UsuarioAutorizadorId != cashierId));
+        var registered = await context.EventoAuditoria.AsNoTracking().Where(x => x.Accion == "CASHMOVEMENTREGISTERED").ToArrayAsync();
+        Assert.Equal(3, registered.Length);
+        Assert.All(registered, x => Assert.NotNull(x.UsuarioAutorizadorId));
+        Assert.Equal(1, await context.EventoAuditoria.CountAsync(x => x.Accion == "CASHMOVEMENTAUTHORIZATIONREJECTED" && x.Resultado == "FALLIDO"));
     }
 
     private async Task AssertFailedCloseWasAtomicAsync(Guid shiftId)

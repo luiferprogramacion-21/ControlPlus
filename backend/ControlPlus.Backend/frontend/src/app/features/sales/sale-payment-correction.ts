@@ -28,12 +28,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
         @for (payment of sale().payments; track payment.id) { <li>{{ payment.methodName }}: {{ money(payment.appliedAmount) }}</li> }
       </ul>
       <p class="field-label">Así se pagó en realidad</p>
-      <div class="payment-correction-quick" role="group" aria-label="Todo con un solo medio">
-        <button class="button button--secondary" type="button" (click)="allWith('EFECTIVO')">Todo en efectivo</button>
-        <button class="button button--secondary" type="button" (click)="allWith('NEQUI')">Todo por Nequi</button>
-        <button class="button button--secondary" type="button" (click)="allWith('TRANSFERENCIA')">Todo por transferencia</button>
-      </div>
-      <cp-payment-methods [drafts]="drafts" mode="payment" idPrefix="payment-correction" />
+      <cp-payment-methods [drafts]="drafts" mode="payment" idPrefix="payment-correction" amountLabel="Valor por este medio" />
       <p class="form-hint">Suma: {{ money(total()) }} de {{ money(sale().total) }}. La referencia de Nequi o transferencia es opcional.</p>
       <p class="form-hint">Si la caja de esta venta ya se cerró, ese cierre no cambia: la corrección se registra en la caja abierta de hoy y queda unida a la venta.</p>
       <label class="field-label field-label--spaced" for="payment-correction-reason">Motivo</label>
@@ -51,7 +46,6 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
     </form></div>`,
   styles: [`
     .payment-correction-current { margin: 0 0 12px; padding-left: 18px; }
-    .payment-correction-quick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
   `],
 })
 export class SalePaymentCorrection implements OnInit {
@@ -83,7 +77,7 @@ export class SalePaymentCorrection implements OnInit {
   get selectedReason(): SaleCancellationReason | undefined { return this.reasons().find(r => r.id === this.reasonId); }
   total(): number { return appliedTotal(this.drafts); }
 
-  /** Pone todo el total con un solo medio; en efectivo, lo recibido es el total exacto. */
+  /** Propone todo el total con un solo medio; en efectivo, lo recibido es el total exacto. */
   allWith(method: PaymentMethod): void {
     const total = this.sale().total;
     this.drafts.splice(0, this.drafts.length, { methodCode: method, appliedAmount: total, receivedAmount: method === 'EFECTIVO' ? total : null, reference: '' });

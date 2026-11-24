@@ -13,7 +13,7 @@ describe('Corrección de recepción de compra', () => {
   let roles = ['ADMINISTRADOR']; let permissions = ['PURCHASES.CANCEL', 'PURCHASES.RECEIVE'];
   const purchase = { id: 'purchase', orderId: 'order', version: 8, status: 'CONFIRMADA', visibleNumber: 'CMP-8' } as Purchase;
   const preparation: PurchaseCorrectionPreparation = { purchaseId: 'purchase', purchaseVersion: 8, orderId: 'order', orderVersion: 5, canReverse: true, blockReason: null, unitsToRemove: 3, originalTotal: 4200 };
-  const api = { correctionPreparation: vi.fn(), reasons: vi.fn(), correctReceipt: vi.fn(), list: vi.fn() };
+  const api = { correctionPreparation: vi.fn(), reasons: vi.fn(), correctReceipt: vi.fn(), list: vi.fn(), get: vi.fn() };
   const dialog = { open: vi.fn(async (value: AuthorizationPrompt) => { prompt = value; return false; }) };
 
   beforeEach(() => {
@@ -29,6 +29,21 @@ describe('Corrección de recepción de compra', () => {
     ] });
     component = TestBed.runInInjectionContext(() => new Purchases());
     component.selectedPurchase.set(purchase);
+  });
+
+  it('«Mercancía recibida» lista las recepciones del pedido y abre el detalle donde se corrige (punto 7)', async () => {
+    const receipt = { id: 'purchase', supplierId: 's', supplierDocumentNumber: null, invoiceDate: '2026-11-24', status: 'CONFIRMADA', visibleNumber: 'CMP-8', total: 4200, version: 8 };
+    api.list.mockResolvedValueOnce({ items: [receipt], page: 1, pageSize: 100, totalCount: 1, totalPages: 1 });
+    api.get.mockResolvedValueOnce(purchase);
+    component.selectedPurchase.set(null);
+    const order = { id: 'order', visibleNumber: 'PED-6', supplierId: 's', status: 'COMPLETADO', lines: [] } as unknown as Parameters<Purchases['showReceipts']>[0];
+    await component.showReceipts(order);
+    expect(api.list).toHaveBeenCalledWith({ orderId: 'order', pageSize: 100 });
+    expect(component.orderReceipts()?.items).toEqual([receipt]);
+    await component.openReceipt(receipt);
+    expect(component.orderReceipts()).toBeNull();
+    expect(component.selectedPurchase()).toEqual(purchase);
+    expect(component.canCorrectReceipt).toBe(true);
   });
 
   it('muestra la explicación cuando hay movimientos posteriores y no solicita autorización', async () => {

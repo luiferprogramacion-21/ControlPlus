@@ -939,3 +939,16 @@ Aprobado también: el nuevo «Resumen de la venta» al cobrar (Codex, `5cf4e17`)
 
 - En «Nuevo pedido al proveedor», «+ Producto nuevo» (requiere `PRODUCTS.CREATE`) crea el producto en Catálogo con nombre, categoría, unidad «Unidad», el proveedor del pedido, código de barras generado y sin existencias, y lo agrega marcado al pedido con la cantidad indicada.
 - **El precio de venta es opcional** (pedido del usuario). Vacío se guarda como 0, que la base ya admite (`ck_producto_precio_minorista >= 0`). Un producto sin precio aparece como «Sin precio» en Catálogo, en la búsqueda del punto de venta y al recibir. No se puede vender ni apartar: el servidor responde «… todavía no tiene precio de venta» y el punto de venta no lo agrega. El precio se pone al recibir la mercancía (Administrador) o en Catálogo (Administrador, o Supervisor con su autorización).
+
+### Pruebas del usuario del 24 de noviembre de 2026 (sin migración)
+
+El usuario probó las 16 acciones de la auditoría. Estas correcciones y cambios de pantalla los pidió él y quedan aprobados:
+
+- **Punto 13, regla nueva aprobada:** todo movimiento manual de caja (ingreso, gasto y retiro de efectivo) pide autorizador con la jerarquía de siempre: el Administrador lo registra solo (400 si envía autorización); el Supervisor, con el Administrador; el Cajero con concesión de `CASH.MOVEMENTS_MANAGE`, con un Supervisor o el Administrador (carné o usuario y contraseña). En turno compartido decide el rol de quien pasó su carné. `CreateCashMovementRequest.Authorization`; corre en el coordinador de intentos de inicio de sesión. Se registra `AutorizacionOperacion` `MOVIMIENTO_CAJA` y la auditoría lleva el autorizador; un rechazo queda como `CashMovementAuthorizationRejected` (141).
+- **Punto 4:** el Cajero dueño de su turno individual no veía los pasos de «Cerrar caja» (la pantalla exigía `CASH.SHIFT_MANAGE`); ahora los ve quien puede cerrar.
+- **Punto 5:** al editar un producto con precio mayorista, el campo quedaba inválido (llegaba como texto) y «Guardar» no hacía nada. Llega como número, el campo de números acepta números escritos como texto y un formulario con error avisa «Revisa los campos marcados en rojo». Se quitó el texto «Al guardar se pide la autorización…» del formulario.
+- **Punto 2:** la lista «Seleccionar cliente» muestra el color del crédito (al día, por vencer, moroso) a quien tiene `CREDIT.REQUEST`; sin deuda no muestra nada.
+- **Punto 7:** «Mercancía recibida» tiene **Ver recepciones** en cada pedido con entregas; lista sus recepciones (`GET /api/purchases?orderId=`) y «Ver detalle» abre la recepción con «Corregir recepción».
+- **Punto 9:** se quitaron los botones «Todo en efectivo / Nequi / transferencia» de «Corregir medio de pago».
+- **Punto 12:** el cobro de la diferencia de un cambio muestra en grande el **Cambio** a devolver (`cp-payment-methods` con `showChange`).
+- **Punto 15:** los filtros de Auditoría usan `shared/suggest-field.ts` (sugerencias mientras se escribe, sin importar tildes, flechas, Enter y clic) en lugar de la lista del navegador; lo escrito sin elegir se explica junto a los filtros, nunca con avisos emergentes repetidos. Las acciones y la columna «Sobre» se muestran en español (cajón, correcciones).

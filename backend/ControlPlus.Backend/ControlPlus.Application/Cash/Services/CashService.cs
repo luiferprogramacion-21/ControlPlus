@@ -775,10 +775,66 @@ public sealed partial class CashService(
         if (string.IsNullOrWhiteSpace(request.Concept) || request.Concept.Trim().Length > 500)
             return Result.Failure<CashMovementDto>(Validation("El concepto es obligatorio y admite hasta 500 caracteres."));
 
-        await using var transaction = await transactionManager.BeginAsync(IsolationLevel.Serializable, cancellationToken);
+        // Pruebas del usuario del 24/11/2026 (punto 13): todo movimiento manual (ingreso, gasto o retiro) pide autorizador.
+        // El Administrador lo registra solo; el Supervisor, con el Administrador; el Cajero con permiso, con un Supervisor o el
+        // Administrador. Es la misma jerarquía de las demás autorizaciones.
+        var actorLevel = (await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken))?.HighestRoleLevel;
+        if (actorLevel == RoleLevel.Administrador)
+        {
+            if (request.Authorization is not null)
+                return Result.Failure<CashMovementDto>(Validation("El Administrador registra movimientos de caja sin autorización."));
+            await using var transaction = await transactionManager.BeginAsync(IsolationLevel.Serializable, cancellationToken);
+            var result = await RegisterMovementWithinTransactionAsync(actor, request, type, category, action, false, cancellationToken);
+            if (result.IsSuccess) await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+
+        if (request.Authorization is null)
+            return Result.Failure<CashMovementDto>(ApplicationError.Forbidden(actorLevel == RoleLevel.Supervisor
+                ? "Para registrar un movimiento de caja, un Supervisor necesita la autorización del Administrador (carné o usuario y contraseña)."
+                : "Para registrar un movimiento de caja se necesita la autorización de un Supervisor o del Administrador (carné o usuario y contraseña)."));
+        if (request.Authorization.UsesCredential())
+        {
+            if (request.Authorization.MixesCredentialWithPassword())
+                return Result.Failure<CashMovementDto>(Validation("Envíe la credencial escaneada o usuario y contraseña, no ambos."));
+            var (scannedUserName, scannedCredentialId) = await credentialResolver.ResolveOrUnknownAsync(request.Authorization.CredentialToken!, cancellationToken);
+            request = request with { Authorization = request.Authorization with { UserName = scannedUserName, ResolvedCredentialId = scannedCredentialId } };
+        }
+        if (!request.Authorization!.IsComplete())
+            return Result.Failure<CashMovementDto>(Validation("Indique usuario y contraseña de quien autoriza o escanee su carné."));
+        // El mismo bloqueo por cuenta que el inicio de sesión: una contraseña errada guarda solo su intento fallido y la auditoría.
+        var account = request.Authorization.UserName!.Trim().ToUpperInvariant();
+        return await loginAttemptCoordinator.ExecuteAsync(account,
+            token => RegisterMovementWithinTransactionAsync(actor, request, type, category, action, true, token), cancellationToken);
+    }
+
+    private async Task<Result<CashMovementDto>> RegisterMovementWithinTransactionAsync(
+        ActorContext actor,
+        CreateCashMovementRequest request,
+        string type,
+        string category,
+        AuditAction action,
+        bool needsAuthorization,
+        CancellationToken cancellationToken)
+    {
         var shift = await repository.GetOpenShiftAsync(true, cancellationToken);
         if (shift is null) return Result.Failure<CashMovementDto>(ApplicationError.NotFound("un turno abierto"));
         if (!shift.IsOpen) return Result.Failure<CashMovementDto>(ApplicationError.Conflict("No se pueden registrar movimientos en un turno cerrado."));
+        Usuario? authorizer = null;
+        if (needsAuthorization)
+        {
+            var validated = await ValidateAuthorizerAsync(actor, request.Authorization, cancellationToken);
+            if (validated.IsFailure)
+            {
+                await AuditWriter.WriteCashFailureAsync(auditRepository, clock, actor.UserId,
+                    AuditAction.CashMovementAuthorizationRejected, nameof(MovimientoCaja), null,
+                    new { Failure = "INVALID_AUTHORIZER_CREDENTIALS_OR_PERMISSION", Category = category, request.Amount },
+                    Guid.CreateVersion7(), shift.TerminalId, null, cancellationToken);
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                return Result.Failure<CashMovementDto>(validated.Error!);
+            }
+            authorizer = validated.Value!;
+        }
         SesionOperador? session = null;
         if (shift.ModoOperacion == CashConstants.IndividualMode)
         {
@@ -818,11 +874,29 @@ public sealed partial class CashService(
             request.Amount, request.Concept, correlationId, clock.UtcNow);
         await repository.AddMovementAsync(movement, cancellationToken);
         repository.MarkShiftChanged(shift);
+        if (authorizer is not null)
+        {
+            var now = clock.UtcNow;
+            var permission = await permissionRepository.GetByCodeAsync(PermissionCodes.CashShiftManage, cancellationToken);
+            if (permission is null) return Result.Failure<CashMovementDto>(ApplicationError.Conflict("No existe el permiso estable CASH.SHIFT_MANAGE."));
+            await repository.AddAuthorizationAsync(new AutorizacionOperacion
+            {
+                Id = Guid.CreateVersion7(), UsuarioSolicitanteId = actor.UserId, UsuarioAutorizadorId = authorizer.Id,
+                PermisoId = permission.Id, TipoOperacion = "MOVIMIENTO_CAJA", CorrelacionId = correlationId,
+                DescripcionOperacion = "Autorización de un movimiento manual de caja.",
+                MetodoAutenticacion = request.Authorization.AuthenticationMethod(),
+                CredencialAutorizadorId = request.Authorization?.ResolvedCredentialId,
+                Resultado = "EXITOSA", Estado = "UTILIZADA", FechaSolicitud = now.UtcDateTime,
+                FechaExpiracion = now.AddMinutes(5).UtcDateTime, FechaUtilizacion = now.UtcDateTime
+            }, cancellationToken);
+            authorizer.RegisterSuccessfulLogin(now);
+            await userRepository.UpdateAsync(authorizer, cancellationToken);
+        }
         await AuditWriter.WriteCashAsync(auditRepository, clock, actor.UserId, action, nameof(MovimientoCaja), movement.Id,
-            new { movement.Tipo, movement.CategoriaMovimiento, movement.Valor, movement.Concepto }, correlationId,
-            null, session?.Id, shift.TerminalId, null, cancellationToken);
+            new { movement.Tipo, movement.CategoriaMovimiento, movement.Valor, movement.Concepto,
+                AuthorizedBy = authorizer?.UserName, AuthorizedWith = authorizer is null ? null : request.Authorization!.UsesCredential() ? "CARNE" : "CONTRASENA" },
+            correlationId, authorizer?.Id, session?.Id, shift.TerminalId, null, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
         return Result.Success(Map(movement));
     }
 

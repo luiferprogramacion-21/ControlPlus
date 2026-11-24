@@ -7,7 +7,7 @@ import { Customer, CustomersApi } from './customers-api';
 const customer = (over: Partial<Customer> = {}): Customer => ({ id: 'c1', documentType: 'CC', documentNumber: '123', fullName: 'Ana Pérez', phone: '3001234567', address: 'Calle 1', email: null, observations: null, isActive: true, version: 1, ...over });
 
 describe('CustomerPicker', () => {
-  const api = { list: vi.fn(), create: vi.fn() };
+  const api = { list: vi.fn(), create: vi.fn(), creditStages: vi.fn() };
   let permissions: string[];
   const session = { has: (p: string) => permissions.includes(p) };
   let picker: CustomerPicker; let chosen: (Customer | null)[];
@@ -27,6 +27,29 @@ describe('CustomerPicker', () => {
     TestBed.configureTestingModule({ providers: [{ provide: CustomersApi, useValue: api }, { provide: SessionService, useValue: session }] });
   });
   afterEach(() => vi.useRealTimers());
+
+  it('muestra el color del crédito en la lista al elegir el cliente, solo a quien vende a crédito (punto 2)', async () => {
+    permissions = ['CUSTOMERS.BASIC_MANAGE', 'CREDIT.REQUEST'];
+    api.list.mockResolvedValue({ items: [customer(), customer({ id: 'c2', fullName: 'Luis' }), customer({ id: 'c3', fullName: 'Sin deuda' })], page: 1, pageSize: 20, totalCount: 3, totalPages: 1 });
+    api.creditStages.mockResolvedValue([
+      { customerId: 'c1', stage: 'VENCIDO', outstandingBalance: 50000, overdueBalance: 20000, oldestOverdueOn: '2026-11-20' },
+      { customerId: 'c2', stage: 'POR_VENCER', outstandingBalance: 10000, overdueBalance: 0, nextDueOn: '2026-11-26' },
+      { customerId: 'c3', stage: 'SIN_DEUDA', outstandingBalance: 0, overdueBalance: 0 },
+    ]);
+    const fixture = TestBed.createComponent(CustomerPicker);
+    fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    expect(api.creditStages).toHaveBeenCalledWith(['c1', 'c2', 'c3']);
+    await vi.waitFor(() => expect(fixture.componentInstance.stages()['c1']).toBeDefined());
+    fixture.detectChanges();
+    const pills = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.customer-result .status-pill')).map(x => x.textContent?.trim());
+    expect(pills).toEqual(['Moroso', 'Por vencer']);
+  });
+
+  it('sin permiso de crédito no consulta la etapa', async () => {
+    await open();
+    expect(api.creditStages).not.toHaveBeenCalled();
+    expect(picker.stageOf(customer())).toBeNull();
+  });
 
   it('al abrir lista los clientes activos sin esperar a que se escriba', async () => {
     await open();

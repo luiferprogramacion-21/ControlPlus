@@ -66,13 +66,14 @@ export const toRefunds = (drafts: PaymentDraft[]) => drafts.map(d => ({
           <option value="EFECTIVO">Efectivo</option><option value="TRANSFERENCIA">Transferencia</option><option value="NEQUI">Nequi</option>
         </select>
         @if (!(amountFromTotal && drafts.length === 1)) {
-          <label class="field-label field-label--spaced" [for]="idPrefix + '-amount-' + i">{{ amountFromTotal ? 'Parte por este medio' : mode === 'refund' ? 'Valor a devolver' : 'Valor del abono' }}</label>
+          <label class="field-label field-label--spaced" [for]="idPrefix + '-amount-' + i">{{ amountFromTotal ? 'Parte por este medio' : mode === 'refund' ? 'Valor a devolver' : amountLabel }}</label>
           <input class="text-field" [id]="idPrefix + '-amount-' + i" [name]="idPrefix + '-amount-' + i" type="text" cpNumberInput min="1" step="1" [(ngModel)]="draft.appliedAmount">
         }
         @if (draft.methodCode === 'EFECTIVO') {
           @if (mode === 'payment') {
             <label class="field-label field-label--spaced" [for]="idPrefix + '-received-' + i">Efectivo recibido</label>
             <input class="text-field" [id]="idPrefix + '-received-' + i" [name]="idPrefix + '-received-' + i" type="text" cpNumberInput min="1" step="1" [(ngModel)]="draft.receivedAmount">
+            @if (showChange) { <div class="payment-change" role="status"><span>Cambio</span><strong>{{ money(changeOf(draft)) }}</strong></div> }
           }
         } @else {
           <label class="field-label field-label--spaced" [for]="idPrefix + '-reference-' + i">Referencia <span>(opcional)</span></label>
@@ -82,7 +83,9 @@ export const toRefunds = (drafts: PaymentDraft[]) => drafts.map(d => ({
       </div>
     }
     @if (drafts.length < 3) { <button class="table-action" type="button" (click)="add()">Agregar medio</button> }`,
-  styles: [`.payment-row { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--cp-border); } .payment-row .table-action { margin-top: 10px; }`],
+  styles: [`.payment-row { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--cp-border); } .payment-row .table-action { margin-top: 10px; }
+    .payment-change { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 10px 14px; border-radius: 10px; background: var(--cp-success-soft, #e8f6ee); }
+    .payment-change span { font-weight: 700; } .payment-change strong { font-size: 1.9rem; line-height: 1.1; color: var(--cp-success, #1b7a43); }`],
 })
 export class PaymentMethods {
   @Input({ required: true }) drafts: PaymentDraft[] = [];
@@ -90,6 +93,13 @@ export class PaymentMethods {
   @Input() idPrefix = 'payment';
   /** Auditoría del 23/11/2026: el valor total se escribe arriba; con un solo medio no se pide otra vez y con varios se reparte. */
   @Input() amountFromTotal = false;
+  /** Texto del valor por medio cuando se cobra (por defecto, el de un abono). */
+  @Input() amountLabel = 'Valor del abono';
+  /** Muestra en grande el cambio que se devuelve en efectivo (pruebas del usuario del 24/11/2026, punto 12). */
+  @Input() showChange = false;
+  readonly money = money;
+
+  changeOf(draft: PaymentDraft): number { return Math.max(0, Number(draft.receivedAmount || 0) - Number(draft.appliedAmount || 0)); }
 
   add(): void {
     if (this.drafts.length >= 3) return;

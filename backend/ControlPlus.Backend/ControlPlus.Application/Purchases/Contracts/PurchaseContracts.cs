@@ -4,9 +4,10 @@ using ControlPlus.Application.Security.Contracts;
 
 namespace ControlPlus.Application.Purchases.Contracts;
 
+/// <param name="OrderId">Solo las recepciones de ese pedido (pruebas del usuario del 24/11/2026, punto 7).</param>
 public sealed record PurchaseListQuery(Guid? SupplierId = null, string? Status = null,
     DateOnly? InvoiceDate = null, string? SupplierDocumentNumber = null,
-    int Page = 1, int PageSize = 20);
+    int Page = 1, int PageSize = 20, Guid? OrderId = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record PurchaseLineRequest(

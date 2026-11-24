@@ -11,6 +11,18 @@ import { AUDIT_ACTION_GROUPS, auditActionLabel, auditActionModule } from './audi
 import { toastSignal } from '../../core/toast';
 import { groupedNumber } from '../../shared/number-input';
 import { readableCode } from '../../core/readable-code';
+import { foldText, SuggestField, SuggestOption, suggestMatches } from '../../shared/suggest-field';
+
+/** Sobre qué se hizo la acción, en palabras de la tienda (pruebas del usuario del 24/11/2026, punto 15). */
+const ENTITIES: Record<string, string> = {
+  User: 'Usuario', Usuario: 'Usuario', Role: 'Rol', Permission: 'Permiso', CredencialUsuario: 'Carné',
+  Categoria: 'Categoría', Producto: 'Producto', Caja: 'Caja', TurnoCaja: 'Turno de caja', DetalleArqueoMedioPago: 'Conteo de la caja',
+  MovimientoCaja: 'Movimiento de caja', AperturaCajon: 'Cajón de dinero', SesionOperador: 'Sesión de operador',
+  Venta: 'Venta', CambioVenta: 'Cambio de venta', Cliente: 'Cliente', Credito: 'Crédito', PagoCredito: 'Abono a crédito',
+  Apartado: 'Apartado', PagoApartado: 'Abono a apartado', MovimientoInventario: 'Inventario', Proveedor: 'Proveedor',
+  Compra: 'Compra', PedidoCompra: 'Pedido al proveedor', TrabajoImpresion: 'Impresión', PerfilImpresora: 'Impresora',
+  ConsecutivoDocumento: 'Numeración', MotivoOperacion: 'Motivos', Establecimiento: 'Establecimiento', DestinoRespaldo: 'Respaldo',
+};
 
 /** Internal identifiers mean nothing to the reader of the log (20 November 2026): they are left out of the detail. */
 const HIDDEN_FIELD = /(^id$|Id$|Ids$|^ids$|_id$|correlation|version|Version|stamp|Stamp|hash|Hash|key$|Key$)/;
@@ -98,11 +110,13 @@ function today(): string {
 /** Read-only audit log (approved 16 November 2026): who did what, when, who authorized it and why. */
 @Component({
   selector: 'cp-audit-log',
-  imports: [DatePipe, FormsModule, MatPaginatorModule],
+  imports: [DatePipe, FormsModule, MatPaginatorModule, SuggestField],
   templateUrl: './audit-log.html',
   styleUrls: ['../directory.scss'],
   styles: [`
     .directory-filters .audit-date { width: auto; min-width: 150px; }
+    .directory-filters .audit-choice { width: min(100%, 290px); }
+    .audit-filter-hint { margin: 0 0 10px; text-align: right; }
     .audit-detail td { background: var(--cp-surface-muted); }
     .audit-detail dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 18px; margin: 0; }
     .audit-detail dl div { display: flex; flex-direction: column; min-width: 0; }
@@ -130,6 +144,10 @@ export class AuditLog implements OnInit {
     const repeated = new Set(all.map(a => a.label).filter((label, index, labels) => labels.indexOf(label) !== index));
     return all.map(a => ({ code: a.code, module: a.module, text: repeated.has(a.label) ? `${a.label} (${a.module})` : a.label }));
   })();
+  readonly userSuggestions = computed<SuggestOption[]>(() => this.userOptions().map(option => ({ value: option.id, text: option.text })));
+  readonly actionSuggestions: SuggestOption[] = this.actionOptions.map(option => ({ value: option.code, text: option.text, hint: option.module }));
+  /** Aviso junto a los filtros (no emergente) cuando lo escrito no basta para filtrar. */
+  readonly filterHint = signal('');
   readonly expanded = signal<string | null>(null);
   readonly loading = signal(false);
   readonly error = toastSignal('error');
@@ -161,21 +179,36 @@ export class AuditLog implements OnInit {
     finally { if (id === this.requestId) this.loading.set(false); }
   }
 
+  /** Elegido de la lista: filtra de una vez. Vacío es «todos». */
+  pickUser(id: string): void { this.filterHint.set(''); this.filter.userId = id; this.filter.page = 1; void this.reload(); }
+  pickAction(code: string): void { this.filterHint.set(''); this.filter.action = code; this.filter.page = 1; void this.reload(); }
+
+  /** «Buscar» con texto escrito sin elegir: se usa si coincide con una sola opción; si no, se explica junto a los filtros. */
   find(): void {
-    const normalize = (text: string) => text.trim().toLocaleLowerCase('es');
-    const userText = normalize(this.userText), actionText = normalize(this.actionText);
-    const user = userText ? this.userOptions().find(option => normalize(option.text) === userText ||
-      normalize(option.text.split(' · ')[0]) === userText) : undefined;
-    const action = actionText ? this.actionOptions.find(option => normalize(option.text) === actionText) ??
-      this.onlyMatch(this.actionOptions.filter(option => normalize(option.text).includes(actionText))) : undefined;
-    if (userText && !user) { this.error.set(`No hay un usuario «${this.userText.trim()}». Escríbelo como aparece en la lista o déjalo vacío para ver todos.`); return; }
-    if (actionText && !action) { this.error.set(`Hay varias acciones o ninguna con «${this.actionText.trim()}». Elige una de la lista o déjalo vacío para ver todas.`); return; }
-    this.filter.userId = user?.id ?? ''; this.filter.action = action?.code ?? '';
+    const userText = foldText(this.userText), actionText = foldText(this.actionText);
+    const user = userText ? this.resolve(this.userSuggestions(), userText, text => foldText(text.split(' · ')[0])) : undefined;
+    const action = actionText ? this.resolve(this.actionSuggestions, actionText) : undefined;
+    if (userText && !user) { this.filterHint.set(`No hay un solo usuario con «${this.userText.trim()}». Elige uno de la lista o borra el texto para ver todos.`); return; }
+    if (actionText && !action) {
+      const count = suggestMatches(this.actionSuggestions, this.actionText, 1000).length;
+      this.filterHint.set(count
+        ? `Hay ${count} acciones con «${this.actionText.trim()}». Elige una de la lista o borra el texto para ver todas.`
+        : `Ninguna acción tiene «${this.actionText.trim()}». Revisa lo escrito o borra el texto para ver todas.`);
+      return;
+    }
+    this.filterHint.set('');
+    this.filter.userId = user?.value ?? ''; this.filter.action = action?.value ?? '';
+    if (user) this.userText = user.text;
     if (action) this.actionText = action.text;
     this.filter.page = 1; void this.reload();
   }
-  /** Si lo escrito coincide con una sola acción, se usa esa. */
-  private onlyMatch<T>(options: T[]): T | undefined { return options.length === 1 ? options[0] : undefined; }
+  /** Igual al texto (sin tildes), o la única opción que lo contiene. */
+  private resolve(options: SuggestOption[], folded: string, alias?: (text: string) => string): SuggestOption | undefined {
+    const exact = options.find(option => foldText(option.text) === folded || (alias && alias(option.text) === folded));
+    if (exact) return exact;
+    const found = suggestMatches(options, folded, 2);
+    return found.length === 1 ? found[0] : undefined;
+  }
   pageChanged(event: PageEvent): void { this.filter.page = event.pageIndex + 1; this.filter.pageSize = event.pageSize; void this.reload(); }
   toggle(record: AuditRecord): void { this.expanded.set(this.expanded() === record.id ? null : record.id); }
 
@@ -188,7 +221,9 @@ export class AuditLog implements OnInit {
     return value ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase().replace(/_/g, ' ') : '';
   }
   entityLabel(record: AuditRecord): string {
-    const value = record.entityType.replace(/_/g, ' ').toLowerCase();
+    const known = ENTITIES[record.entityType];
+    if (known) return known;
+    const value = record.entityType.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase();
     return value.charAt(0).toUpperCase() + value.slice(1);
   }
 

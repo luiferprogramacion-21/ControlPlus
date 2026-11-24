@@ -74,10 +74,42 @@ describe('Auditoría', () => {
     const component = fixture.componentInstance;
     api.records.mockClear();
     component.userText = 'nadie'; component.find();
-    expect(component.error()).toContain('No hay un usuario');
-    component.userText = ''; component.actionText = 'a'; component.find();
-    expect(component.error()).toContain('Elige una de la lista');
+    expect(component.filterHint()).toContain('No hay un solo usuario');
+    component.userText = ''; component.actionText = 'credito'; component.find();
+    expect(component.filterHint()).toMatch(/^Hay \d+ acciones con «credito»\. Elige una de la lista/);
+    component.actionText = 'zzz'; component.find();
+    expect(component.filterHint()).toContain('Ninguna acción tiene «zzz»');
+    // Es un aviso junto a los filtros, no un mensaje emergente.
+    expect(component.error()).toBe('');
     expect(api.records).not.toHaveBeenCalled();
+  });
+
+  it('sugiere acciones mientras se escribe, sin importar tildes, y al elegir una filtra de una vez (punto 15)', async () => {
+    const fixture = await create();
+    const component = fixture.componentInstance;
+    api.records.mockClear();
+    const input = (fixture.nativeElement as HTMLElement).querySelector('input[name="actionText"]') as HTMLInputElement;
+    input.dispatchEvent(new Event('focus'));
+    input.value = 'abono credito'; input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    const options = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[role="option"] span')).map(x => x.textContent?.trim());
+    expect(options).toContain('Abono a crédito');
+    expect(options).toContain('Abono a crédito anulado');
+    const first = (fixture.nativeElement as HTMLElement).querySelector('[role="option"]') as HTMLElement;
+    first.dispatchEvent(new MouseEvent('mousedown'));
+    await fixture.whenStable();
+    expect(api.records).toHaveBeenCalledOnce();
+    expect(api.records).toHaveBeenLastCalledWith(expect.objectContaining({ action: expect.stringMatching(/^CreditPayment/), page: 1 }));
+    expect(component.filterHint()).toBe('');
+  });
+
+  it('dice sobre qué fue cada acción en palabras de la tienda', async () => {
+    const fixture = await create();
+    const label = (entityType: string) => fixture.componentInstance.entityLabel({ entityType } as never);
+    expect(label('User')).toBe('Usuario');
+    expect(label('TurnoCaja')).toBe('Turno de caja');
+    expect(label('AperturaCajon')).toBe('Cajón de dinero');
+    expect(label('AlgoNuevo')).toBe('Algo nuevo');
   });
 
   it('rechaza un rango de fechas invertido sin consultar', async () => {

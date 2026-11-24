@@ -112,7 +112,7 @@ export class Catalog implements OnInit {
     const price = suggestedPrice(this.referenceCost(product), this.profitPercent());
     if (price === null) { this.priceHint.set('Indica el costo del producto y el % de ganancia para calcular el precio.'); return; }
     this.priceHint.set('');
-    if (target === 'retailPrice') this.productForm.controls.retailPrice.setValue(price); else this.productForm.controls.wholesalePrice.setValue(String(price));
+    if (target === 'retailPrice') this.productForm.controls.retailPrice.setValue(price); else this.productForm.controls.wholesalePrice.setValue(price);
     this.productForm.controls[target].markAsDirty();
   }
   /** Cuánto se gana sobre el costo con el precio minorista que está escrito. */
@@ -223,7 +223,8 @@ export class Catalog implements OnInit {
       measurementUnitId: product.measurementUnitId, barcode: product.barcode ?? '',
       supplierId: product.supplierId ?? '',
       barcodeFormat: product.barcodeFormat ?? '', description: product.description ?? '',
-      retailPrice: product.retailPrice, wholesalePrice: product.wholesalePrice?.toString() ?? '',
+      // Número, no texto: el campo con puntos de miles solo valida números (pruebas del usuario del 24/11/2026, punto 5).
+      retailPrice: product.retailPrice, wholesalePrice: product.wholesalePrice ?? null,
       taxPercentage: product.taxPercentage?.toString() ?? '', minimumStock: product.minimumStock,
       initialQuantity: 0, initialUnitCost: '',
     });
@@ -284,7 +285,7 @@ export class Catalog implements OnInit {
     this.productForm.controls.internalCode.updateValueAndValidity();
     this.productForm.reset({ ...original, internalCode: '', supplierId: original.supplierId ?? '',
       barcode: original.barcode ?? '', barcodeFormat: original.barcodeFormat ?? '',
-      description: original.description ?? '', wholesalePrice: original.wholesalePrice?.toString() ?? '',
+      description: original.description ?? '', wholesalePrice: original.wholesalePrice ?? null,
       taxPercentage: original.taxPercentage?.toString() ?? '', initialUnitCost: original.initialUnitCost?.toString() ?? '',
     });
     this.generateBarcode.set(original.generateBarcode);
@@ -325,6 +326,8 @@ export class Catalog implements OnInit {
       this.productForm.markAllAsTouched();
       const c = this.productForm.controls;
       if (c.measurementUnitId.invalid || c.barcode.invalid || c.description.invalid || c.wholesalePrice.invalid) this.moreProductData.set(true);
+      // Nunca se queda callado: dice qué revisar.
+      if (this.productForm.invalid) this.error.set('Revisa los campos marcados en rojo y vuelve a guardar.');
       return;
     }
     const selected = this.selectedProduct();

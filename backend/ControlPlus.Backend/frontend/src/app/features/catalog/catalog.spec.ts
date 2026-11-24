@@ -99,7 +99,7 @@ describe('Catalog: existencias iniciales', () => {
       component.applyProfitTo('retailPrice', p);
       expect(component.productForm.controls.retailPrice.value).toBe(1550);
       component.applyProfitTo('wholesalePrice', p);
-      expect(component.productForm.controls.wholesalePrice.value).toBe('1550');
+      expect(component.productForm.controls.wholesalePrice.value).toBe(1550);
       expect(component.priceNote(p)?.text).toContain('ganas 25,6 %');
     });
     it('sin costo o sin porcentaje no cambia el precio y lo explica', () => {
@@ -215,6 +215,33 @@ describe('Catalog: existencias iniciales', () => {
       { userName: 'admin', password: 'clave' });
     user.roles = ['CAJERO']; user.permissions = ['PRODUCTS.READ'];
     expect(component.canEditProduct()).toBe(false);
+  });
+
+  it('un producto con precio mayorista se edita: el precio llega como número y Guardar pide la autorización (punto 5)', async () => {
+    const product = { id: 'product', internalCode: 'BIS-000016', version: 3, name: 'Aretes pequeños (unidad)',
+      categoryId: 'category', measurementUnitId: 'unit', supplierId: null, barcode: 'CP000016', barcodeFormat: 'CODE128',
+      barcodeGenerated: true, retailPrice: 12000, wholesalePrice: 7000, taxPercentage: null,
+      minimumStock: 10, description: null } as unknown as Product;
+    component.editProduct(product);
+    expect(component.productForm.controls.wholesalePrice.value).toBe(7000);
+    expect(component.productForm.valid).toBe(true);
+    component.productForm.controls.retailPrice.setValue(12500 as never);
+    await component.saveProduct();
+    expect(authorization.open).toHaveBeenCalledWith(expect.objectContaining({ title: 'Autorizar cambio de producto' }));
+    expect(api.updateProduct).toHaveBeenCalledWith(product, expect.objectContaining({ retailPrice: 12500, wholesalePrice: 7000 }),
+      { userName: 'admin', password: 'clave' });
+  });
+
+  it('si el formulario tiene un error, Guardar avisa qué revisar en vez de quedarse callado', async () => {
+    const product = { id: 'product', internalCode: 'P-000001', version: 1, name: 'Original',
+      categoryId: 'category', measurementUnitId: 'unit', supplierId: null, barcode: null, barcodeFormat: null,
+      barcodeGenerated: false, retailPrice: 1000, wholesalePrice: null, taxPercentage: null,
+      minimumStock: 0, description: null } as unknown as Product;
+    component.editProduct(product);
+    component.productForm.controls.name.setValue('');
+    await component.saveProduct();
+    expect(authorization.open).not.toHaveBeenCalled();
+    expect(component.error()).toBe('Revisa los campos marcados en rojo y vuelve a guardar.');
   });
 
   it('muestra Disponible, Stock bajo o Agotado y filtra por existencias (auditoría C.19)', async () => {

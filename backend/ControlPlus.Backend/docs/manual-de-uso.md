@@ -245,7 +245,7 @@ Menú **Clientes** → **Nuevo cliente**. Todo cliente lleva **nombre, documento
 
 Desde el punto de venta (**+ Nuevo cliente**) se piden esos mismos cuatro datos. Si un cliente antiguo no los tiene, al editarlo en Clientes hay que completarlos; sin dirección no sirve para crédito ni apartado.
 
-**¿Está al día o moroso?** Al elegir un cliente en el punto de venta, y en la columna **Crédito** de Clientes, se ve su situación con un color:
+**¿Está al día o moroso?** En la lista **Seleccionar cliente** del punto de venta, al elegir el cliente y en la columna **Crédito** de Clientes, se ve su situación con un color:
 
 | Color | Quiere decir |
 | --- | --- |
@@ -309,7 +309,7 @@ Igual que en 2.2, pero sin ventana de autorización. Al abrir eliges **Turno ind
 
 ## 3.3 Movimientos de caja
 
-En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto** o un **Retiro de efectivo** (dinero que se saca de la caja), con su **concepto**, y pulsa **Registrar movimiento**. Quedan en **Movimientos recientes**. Si el cajón está conectado, se abre solo al registrar el movimiento.
+En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto** o un **Retiro de efectivo** (dinero que se saca de la caja), con su **concepto**, y pulsa **Registrar movimiento**. Se pide la **autorización del Administrador** (su carné, o su usuario y contraseña); el Administrador registra los suyos sin autorización. Quedan en **Movimientos recientes** y en la auditoría queda quién autorizó. Si el cajón está conectado, se abre solo al registrar el movimiento.
 
 **Abrir el cajón sin una venta** (para dar cambio o revisar el efectivo): en **Caja**, bloque **Cajón de dinero**, escribe el **motivo**, pulsa **Abrir cajón** y confirma. Necesita la caja abierta. Queda registrado quién lo abrió, cuándo y por qué.
 
@@ -358,7 +358,7 @@ Menú **Historial de ventas**: lista las ventas con sus pagos y productos. **Ver
 **Corregir el medio de pago** (por ejemplo, el cliente pagó por Nequi y quedó registrado en efectivo)
 
 1. Abre la venta → **Corregir venta** → **Corregir medio de pago**.
-2. Arriba ves cómo quedó registrada. Abajo pon cómo se pagó de verdad: usa **Todo por Nequi**, **Todo en efectivo** o **Todo por transferencia**, o reparte entre varios medios. La suma debe ser el **total de la venta**. La referencia de Nequi o transferencia es opcional.
+2. Arriba ves cómo quedó registrada. Abajo pon cómo se pagó de verdad: elige el **medio de pago** (viene propuesto otro distinto al registrado) o pulsa **Agregar medio** para repartir entre varios. La suma debe ser el **total de la venta**. La referencia de Nequi o transferencia es opcional.
 3. Elige el **motivo** y pide la autorización de un **Administrador**.
 4. La venta, sus productos y su total **no cambian**; solo el medio de pago. Al terminar, el aviso dice cuánto efectivo de más o de menos espera ahora la caja. Queda auditado.
 
@@ -370,6 +370,7 @@ Menú **Historial de ventas**: lista las ventas con sus pagos y productos. **Ver
 2. Se permite hasta **15 días** después de la venta (el Administrador puede cambiar ese plazo).
 3. Elige lo que devuelve el cliente y lo que se lleva. La **diferencia** se paga o se suma al crédito, según corresponda.
    Lo devuelto se recibe por lo que el cliente pagó (**Mismo precio**, marcado). Si la tienda lo recibe por menos (por ejemplo, viene usado), desmarca **Mismo precio** y escribe en cuánto se recibe cada unidad. Nunca puede ser más de lo que pagó.
+   Si el cliente paga la diferencia en efectivo, escribe lo que entrega en **Efectivo recibido**: el **Cambio** que hay que devolverle aparece en grande.
 4. Autoriza un **Administrador**.
 
 En **Corregir venta** cada opción dice qué pasa y quién la autoriza; elige la que corresponda a lo que ocurrió.
@@ -406,7 +407,7 @@ Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor*
 
   Lo recibido entra al inventario y actualiza el costo.
 - **Al enviar un pedido** se descarga solo su **PDF** para mandarlo al proveedor. En el pedido puedes volver a pulsar **Descargar PDF** o **Imprimir documento**.
-- **Si algo se recibió mal:** en **Mercancía recibida** abre esa recepción y pulsa **Corregir recepción**. Te muestra cómo queda el pedido, eliges el motivo y pides la **autorización del Administrador**. Las unidades salen del inventario y vuelven a quedar pendientes en el pedido. Si esos productos ya se vendieron o se ajustaron después, la pantalla explica por qué no se puede deshacer.
+- **Si algo se recibió mal:** en **Mercancía recibida**, en el pedido, pulsa **Ver recepciones**; abre la entrega con **Ver detalle** y pulsa **Corregir recepción**. Te muestra cómo queda el pedido, eliges el motivo y pides la **autorización del Administrador**. Las unidades salen del inventario y vuelven a quedar pendientes en el pedido. Si esos productos ya se vendieron o se ajustaron después, la pantalla explica por qué no se puede deshacer.
 - No creas ni editas proveedores, ni anulas compras: eso es del Administrador.
 
 ---
@@ -539,7 +540,7 @@ Menú **Soporte y continuidad**.
 
 ## 4.12 Auditoría
 
-Administración → **Auditoría**: lista de solo lectura de las acciones críticas (usuarios y permisos, productos, caja, ventas, inventario, créditos, apartados, impresión). Filtra por fecha, usuario y acción: el usuario y la acción se **escriben o se eligen** de la lista (basta escribir una parte, por ejemplo «abono»). Nadie puede modificarla.
+Administración → **Auditoría**: lista de solo lectura de las acciones críticas (usuarios y permisos, productos, caja, ventas, inventario, créditos, apartados, impresión). Filtra por fecha, usuario y acción: el usuario y la acción se **escriben o se eligen**. Mientras escribes aparecen sugerencias (no importan las tildes: «credito» encuentra «Crédito»); muévete con las flechas y elige con **Enter** o con un clic, y la lista se filtra de una vez. Borra el texto para ver todos. Nadie puede modificarla.
 
 ## 4.13 Mantenimiento del equipo
 
@@ -578,7 +579,7 @@ Estas reglas no se pueden cambiar con permisos:
 | Crear un apartado | con autorización | ✔ | ✔ |
 | Cancelar un apartado | — | con Administrador | ✔ |
 | Abrir la caja | con autorización | ✔ | ✔ |
-| Movimientos de caja | — | ✔ | ✔ |
+| Movimientos de caja | — | con Administrador | ✔ |
 | Abrir el cajón sin una venta | — | ✔ | ✔ |
 | Habilitar el cajón de dinero | — | — | ✔ |
 | Cerrar la caja | la suya, con autorización | ✔ (con Administrador si hay diferencia) | ✔ |

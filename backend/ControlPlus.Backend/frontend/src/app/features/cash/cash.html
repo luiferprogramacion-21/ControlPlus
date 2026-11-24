@@ -54,7 +54,7 @@
         <aside class="panel panel--padded terminal-card"><div class="panel-heading"><h2>Resumen del turno</h2></div><dl class="status-list"><div><dt>Responsable</dt><dd>{{ cash.currentShift?.responsibleUserId === session.user()?.id ? session.user()?.displayName : 'Turno compartido' }}</dd></div><div><dt>Día de caja</dt><dd>{{ cash.currentShift?.operatingDate }}</dd></div><div><dt>Fondo inicial</dt><dd>{{ cash.currentShift?.initialAmount | currency:'COP':'symbol':'1.0-0' }}</dd></div><div><dt>Modalidad</dt><dd>{{ modeLabel(cash.currentShift?.mode) }}</dd></div><div><dt>Estado</dt><dd><span class="badge badge--success">Abierto</span></dd></div></dl></aside>
       </div> }
       @if (closingMode() && reconciliation(); as rec) {
-        @if (session.has('CASH.SHIFT_MANAGE')) {
+        @if (canClose) {
           <div class="closing-grid">
             <section class="panel panel--padded closing-form"><div class="panel-heading"><h2>Paso {{ closeStep() }} de 3: {{ closeSteps[closeStep() - 1].label }}</h2><p>{{ closeStep() === 1 ? 'Cuenta el efectivo que hay en la caja y escríbelo.' : closeStep() === 2 ? 'Revisa si lo contado coincide con lo esperado.' : 'Revisa el resumen y confirma el cierre.' }}</p></div><ol class="close-steps" aria-label="Pasos para cerrar la caja">@for (step of closeSteps; track step.number) { <li [class.is-current]="closeStep() === step.number" [class.is-done]="closeStep() > step.number" [attr.aria-current]="closeStep() === step.number ? 'step' : null"><span>{{ step.number }}</span>{{ step.label }}</li> }</ol>
               @if (closeStep() === 1) {

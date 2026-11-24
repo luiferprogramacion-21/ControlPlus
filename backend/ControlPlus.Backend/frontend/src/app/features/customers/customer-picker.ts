@@ -6,12 +6,14 @@ import { errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { Customer, CustomersApi } from './customers-api';
 import { toastSignal } from '../../core/toast';
+import { CreditStageData, creditStageView } from '../../shared/credit-stage';
 
 const SEARCH_DELAY_MS = 250;
 const DOCUMENT_TYPES = ['CC', 'CE', 'NIT', 'PASAPORTE', 'PPT', 'OTRO'];
 
 /** Window to find a customer (or register one without leaving the sale), as in the prototype. */
-@Component({ selector: 'cp-customer-picker', imports: [FormsModule, A11yModule, InputFormat], templateUrl: './customer-picker.html', styles: ['.customer-doc-row { display: grid; grid-template-columns: 150px 1fr; gap: 8px; }'] })
+@Component({ selector: 'cp-customer-picker', imports: [FormsModule, A11yModule, InputFormat], templateUrl: './customer-picker.html', styles: ['.customer-doc-row { display: grid; grid-template-columns: 150px 1fr; gap: 8px; }',
+  '.customer-result__side { align-items: flex-end; max-width: 230px; text-align: right; }'] })
 export class CustomerPicker implements OnInit, OnDestroy {
   private readonly api = inject(CustomersApi);
   readonly session = inject(SessionService);
@@ -21,6 +23,8 @@ export class CustomerPicker implements OnInit, OnDestroy {
   readonly chosen = output<Customer | null>();
   readonly closed = output<void>();
   readonly results = signal<Customer[]>([]);
+  /** Etapa del crédito de cada cliente de la lista: se ve al elegirlo (pruebas del usuario del 24/11/2026, punto 2). */
+  readonly stages = signal<Record<string, CreditStageData>>({});
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly creating = signal(false);
@@ -56,9 +60,22 @@ export class CustomerPicker implements OnInit, OnDestroy {
     const seq = ++this.seq; this.loading.set(true); this.error.set('');
     try {
       const page = await this.api.list({ search: term, status: 'active', page: 1, pageSize: 20 });
-      if (seq === this.seq) this.results.set(page.items);
+      if (seq === this.seq) { this.results.set(page.items); void this.loadStages(seq, page.items.map(customer => customer.id)); }
     } catch (e) { if (seq === this.seq) this.error.set(errorText(e)); }
     finally { if (seq === this.seq) this.loading.set(false); }
+  }
+  /** Si falla o no hay permiso de crédito, la lista se ve igual, solo sin el color. */
+  private async loadStages(seq: number, customerIds: string[]): Promise<void> {
+    if (!customerIds.length || !this.session.has('CREDIT.REQUEST')) { this.stages.set({}); return; }
+    try {
+      const stages = await this.api.creditStages(customerIds);
+      if (seq === this.seq) this.stages.set(Object.fromEntries(stages.map(stage => [stage.customerId, stage])));
+    } catch { if (seq === this.seq) this.stages.set({}); }
+  }
+  /** Solo se resalta quien debe: verde al día, naranja por vencer y rojo moroso. */
+  stageOf(customer: Customer) {
+    const view = creditStageView(this.stages()[customer.id]);
+    return view && view.tone !== 'neutral' ? view : null;
   }
 
   choose(customer: Customer): void { if (this.eligible(customer)) this.chosen.emit(customer); }

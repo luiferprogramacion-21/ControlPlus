@@ -415,8 +415,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             return Invalid<PagedResult<PurchaseSummaryDto>>("La página debe ser positiva y pageSize debe estar entre 1 y 100.");
         var offset = ((long)query.Page - 1) * query.PageSize;
         if (offset > int.MaxValue) return Invalid<PagedResult<PurchaseSummaryDto>>("La página solicitada supera el límite permitido.");
-        if (query.SupplierId == Guid.Empty || query.InvoiceDate == DateOnly.MinValue)
-            return Invalid<PagedResult<PurchaseSummaryDto>>("Los filtros de proveedor o fecha son inválidos.");
+        if (query.SupplierId == Guid.Empty || query.InvoiceDate == DateOnly.MinValue || query.OrderId == Guid.Empty)
+            return Invalid<PagedResult<PurchaseSummaryDto>>("Los filtros de proveedor, pedido o fecha son inválidos.");
         var status = query.Status?.Trim().ToUpperInvariant();
         if (status is not null and not ("BORRADOR" or "CONFIRMADA" or "ANULADA"))
             return Invalid<PagedResult<PurchaseSummaryDto>>("El estado solicitado es inválido.");

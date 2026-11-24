@@ -5,18 +5,17 @@
       <input id="audit-from" class="text-field audit-date" type="date" name="from" [(ngModel)]="filter.from">
       <label class="field-label" for="audit-to">Hasta</label>
       <input id="audit-to" class="text-field audit-date" type="date" name="to" [(ngModel)]="filter.to">
-      <!-- Auditoría A.19: se puede escribir o elegir de la lista; vacío es «todos». -->
+      <!-- Auditoría A.19 y pruebas del 24/11/2026 (punto 15): sugiere mientras se escribe, sin importar tildes; vacío es «todos». -->
       @if (canFilterUsers) {
-        <input class="text-field audit-choice" name="userText" [(ngModel)]="userText" list="audit-user-options" (change)="find()"
-          placeholder="Todos los usuarios (escribe o elige)" aria-label="Usuario" autocomplete="off">
-        <datalist id="audit-user-options">@for (option of userOptions(); track option.id) { <option [value]="option.text"></option> }</datalist>
+        <cp-suggest-field class="audit-choice" name="userText" label="Usuario" placeholder="Todos los usuarios (escribe o elige)"
+          [options]="userSuggestions()" [(text)]="userText" (picked)="pickUser($event)" />
       }
-      <input class="text-field audit-choice" name="actionText" [(ngModel)]="actionText" list="audit-action-options" (change)="find()"
-        placeholder="Todas las acciones (escribe o elige)" aria-label="Acción" autocomplete="off">
-      <datalist id="audit-action-options">@for (option of actionOptions; track option.code) { <option [value]="option.text" [label]="option.module"></option> }</datalist>
+      <cp-suggest-field class="audit-choice" name="actionText" label="Acción" placeholder="Todas las acciones (escribe o elige)"
+        [options]="actionSuggestions" [(text)]="actionText" (picked)="pickAction($event)" />
       <button class="button button--primary" type="submit" [disabled]="loading()">Buscar</button>
     </form>
   </div>
+  @if (filterHint()) { <p class="field-hint audit-filter-hint" role="status">{{ filterHint() }}</p> }
   @if (loading()) { <p class="muted" role="status">Cargando auditoría…</p> }
   <div class="table-wrap module-table-wrap"><table>
     <thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Sobre</th><th>Autorizó</th><th>Motivo</th><th>Resultado</th><th class="align-right">Detalle</th></tr></thead>

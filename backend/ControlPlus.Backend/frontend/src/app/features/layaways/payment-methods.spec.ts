@@ -77,3 +77,24 @@ describe('Medios de pago: componente', () => {
     expect(root.textContent).toContain('Efectivo recibido');
   });
 });
+
+/** Pruebas del usuario del 24/11/2026, punto 12: al cobrar la diferencia de un cambio se ve cuánto devolver. */
+describe('Medios de pago: cambio visible', () => {
+  async function render(showChange: boolean) {
+    const fixture = TestBed.createComponent(PaymentMethods);
+    fixture.componentInstance.drafts = [{ methodCode: 'EFECTIVO', appliedAmount: 12975, receivedAmount: 20000, reference: '' }];
+    fixture.componentInstance.showChange = showChange;
+    fixture.componentInstance.amountLabel = 'Valor que paga el cliente';
+    fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    return (fixture.nativeElement as HTMLElement).textContent ?? '';
+  }
+  it('muestra el cambio en grande cuando se pide', async () => {
+    const text = await render(true);
+    expect(text).toContain('Valor que paga el cliente');
+    expect(text).toContain('Cambio');
+    expect(text.replace(/\s/g, ' ')).toMatch(/7\.025/);
+  });
+  it('no lo muestra donde la pantalla ya tiene su propio cambio', async () => {
+    expect(await render(false)).not.toContain('Cambio');
+  });
+});

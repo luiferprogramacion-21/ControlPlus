@@ -51,6 +51,13 @@ describe('Números con separadores colombianos', () => {
     expect(control.value).toBe(2); expect(control.valid).toBe(true);
     control.disable(); fixture.detectChanges(); expect(inputs[1].disabled).toBe(true);
   });
+  it('acepta un número guardado como texto (precio mayorista al editar) y rechaza texto que no es número', async () => {
+    const { fixture } = await setup(); const control = fixture.componentInstance.quantity;
+    control.setValue('7000' as unknown as number); expect(control.valid).toBe(true);
+    control.setValue('7000.5' as unknown as number); expect(control.hasError('step')).toBe(true);
+    control.setValue('siete' as unknown as number); expect(control.hasError('number')).toBe(true);
+    control.setValue(' ' as unknown as number); expect(control.hasError('number')).toBe(true);
+  });
   it('conserva todos los dígitos y cuatro decimales del costo antes de la conversión de la API', async () => {
     const { fixture, inputs } = await setup();
     await enter(inputs[2], '99.999.999.999.999,9999', true);

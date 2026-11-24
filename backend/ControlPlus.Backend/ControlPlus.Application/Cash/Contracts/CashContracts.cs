@@ -84,7 +84,10 @@ public sealed record CashMovementDto(
 
 public sealed record CashMovementListQuery(int Page = 1, int PageSize = 50);
 
-public sealed record CreateCashMovementRequest(decimal Amount, string? Concept, Guid? OperatorSessionId);
+/// <param name="Authorization">Pruebas del usuario del 24/11/2026 (punto 13): quien no es Administrador registra el movimiento
+/// con la autorización de un usuario de rol superior (carné o usuario y contraseña); el Administrador no la envía.</param>
+public sealed record CreateCashMovementRequest(decimal Amount, string? Concept, Guid? OperatorSessionId,
+    CashOpenAuthorizationRequest? Authorization = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CorrectCashMovementRequest(long ExpectedShiftVersion, string Reason,

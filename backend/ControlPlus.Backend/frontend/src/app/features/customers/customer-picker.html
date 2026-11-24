@@ -12,7 +12,7 @@
         @for (candidate of results(); track candidate.id) {
           <button type="button" class="customer-result" role="option" [disabled]="!eligible(candidate)" (click)="choose(candidate)">
             <span><strong>{{ candidate.fullName }}</strong><small>{{ candidate.documentNumber ? (candidate.documentType + ' ' + candidate.documentNumber) : 'Sin documento' }} · {{ candidate.phone || 'Sin teléfono' }}</small></span>
-            <small>{{ ineligibleReason(candidate) || candidate.address || candidate.phone || '' }}</small>
+            <span class="customer-result__side">@if (stageOf(candidate); as stage) { <span class="status-pill status-pill--{{ stage.tone }}" [title]="stage.detail">{{ stage.label }}</span> }<small>{{ ineligibleReason(candidate) || candidate.address || candidate.phone || '' }}</small></span>
           </button>
         } @empty {
           <p class="empty-customer-result">{{ loading() ? 'Buscando…' : 'No hay clientes que coincidan con la búsqueda.' }}</p>

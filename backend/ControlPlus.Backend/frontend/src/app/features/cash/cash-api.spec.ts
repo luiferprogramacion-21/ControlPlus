@@ -31,4 +31,17 @@ describe('CashApi: cierre con diferencia', () => {
       totalDifference: -10, cashDifference: -10, paymentMethods: [] });
     expect((await close).totalDifference).toBe(-10);
   });
+
+  it('envía la autorización del movimiento de caja solo cuando la hay (punto 13)', async () => {
+    const authorized = api.movement('expenses', 5000, 'Bolsas', null, { credentialToken: '12345678901234' });
+    const first = http.expectOne('/api/cash/movements/expenses');
+    expect(first.request.body).toEqual({ amount: 5000, concept: 'Bolsas', operatorSessionId: null, authorization: { credentialToken: '12345678901234' } });
+    first.flush({ id: 'm1', type: 'GASTO', category: 'GASTO', amount: 5000, concept: 'Bolsas', occurredAtUtc: '' });
+    await authorized;
+    const alone = api.movement('incomes', 1000, 'Base', 'session-1');
+    const second = http.expectOne('/api/cash/movements/incomes');
+    expect(second.request.body).toEqual({ amount: 1000, concept: 'Base', operatorSessionId: 'session-1' });
+    second.flush({ id: 'm2', type: 'INGRESO', category: 'INGRESO', amount: 1000, concept: 'Base', occurredAtUtc: '' });
+    await alone;
+  });
 });

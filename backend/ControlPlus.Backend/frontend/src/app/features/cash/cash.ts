@@ -220,14 +220,43 @@ export class Cash implements OnInit {
       this.notice.set('Turno abierto.'); await this.refresh();
     }, true);
   }
+  /**
+   * Pruebas del usuario del 24/11/2026 (punto 13): todo movimiento (ingreso, gasto o retiro) pide autorizador. El Administrador
+   * lo registra solo; el Supervisor, con el Administrador; el Cajero con permiso, con un Supervisor o el Administrador. En turno
+   * compartido decide el rol de quien pasó su carné, porque el movimiento queda a su nombre.
+   */
+  get movementByAdministrator(): boolean {
+    const cash = this.state();
+    const cardRole = cash?.requiresOperatorSession ? cash.activeOperatorRole : null;
+    return cardRole ? cardRole === 'ADMINISTRADOR' : this.isAdministrator;
+  }
+  readonly movementKinds = { incomes: 'Ingreso', expenses: 'Gasto', 'cash-drops': 'Retiro de efectivo' } as const;
   async move(): Promise<void> {
     if (!this.validMoney(this.amount) || !this.concept.trim() || this.busy()) return;
+    if (this.movementByAdministrator) { await this.submitMove(null); return; }
+    const cardActive = !!this.state()?.requiresOperatorSession && !!this.state()?.activeOperatorRole;
+    await this.authorization.open({ title: 'Autorizar movimiento de caja',
+      description: this.sellerIsSupervisor
+        ? 'Un Supervisor registra movimientos de caja con la autorización del Administrador (carné o usuario y contraseña).'
+        : 'Un movimiento de caja necesita la autorización de un Supervisor o del Administrador (carné o usuario y contraseña).',
+      detail: `${this.movementKinds[this.kind]} de ${groupedNumber(this.amount)} COP · ${this.concept.trim()}`,
+      operatorUserName: cardActive ? '' : this.session.user()?.userName ?? '', requireDifferentUser: !cardActive, allowCredential: true,
+      onError: message => this.error.set(message),
+      run: credentials => this.submitMove(credentials) });
+  }
+  private get sellerIsSupervisor(): boolean {
+    const cash = this.state();
+    const cardRole = cash?.requiresOperatorSession ? cash.activeOperatorRole : null;
+    return cardRole ? cardRole === 'SUPERVISOR' : typeof this.session.hasRole === 'function' && this.session.hasRole('SUPERVISOR');
+  }
+  private async submitMove(credentials: AuthorizationCredentials | null): Promise<void> {
     await this.run(async () => {
-      const movement = await this.api.movement(this.kind, this.amount, this.concept.trim(), this.state()?.ownOperatorSession?.id ?? null);
+      const movement = await this.api.movement(this.kind, this.amount, this.concept.trim(), this.state()?.ownOperatorSession?.id ?? null,
+        credentials ? authorizationBody(credentials) : null);
       this.amount = 0; this.concept = ''; this.notice.set('Movimiento registrado.');
       this.drawerNotice.set(cashDrawerNotice(movement.drawerStatus));
       await this.refresh();
-    });
+    }, !!credentials);
   }
   async startSession(): Promise<void> {
     if (!this.credential.trim() || this.busy()) return;

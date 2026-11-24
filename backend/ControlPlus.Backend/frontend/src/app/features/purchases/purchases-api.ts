@@ -12,9 +12,10 @@ export interface PurchaseCorrectionPreparation { purchaseId: string; purchaseVer
 @Injectable({ providedIn: 'root' })
 export class PurchasesApi {
   private readonly http = inject(HttpClient);
-  list(q: { supplierId?: string; status?: string; invoiceDate?: string; supplierDocumentNumber?: string; page?: number; pageSize?: number } = {}): Promise<Page<PurchaseSummary>> {
+  list(q: { supplierId?: string; status?: string; invoiceDate?: string; supplierDocumentNumber?: string; orderId?: string; page?: number; pageSize?: number } = {}): Promise<Page<PurchaseSummary>> {
     const params: Record<string, string | number> = { page: q.page ?? 1, pageSize: q.pageSize ?? 20 };
     if (q.supplierId) params['supplierId'] = q.supplierId;
+    if (q.orderId) params['orderId'] = q.orderId;
     if (q.status) params['status'] = q.status;
     if (q.invoiceDate) params['invoiceDate'] = q.invoiceDate;
     if (q.supplierDocumentNumber) params['supplierDocumentNumber'] = q.supplierDocumentNumber;

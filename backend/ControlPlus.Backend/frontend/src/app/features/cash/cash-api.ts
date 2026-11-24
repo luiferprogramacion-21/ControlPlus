@@ -39,9 +39,12 @@ export class CashApi {
   openDrawer(reason: string, idempotencyKey: string): Promise<CashDrawerOpenResult> {
     return firstValueFrom(this.http.post<CashDrawerOpenResult>('/api/cash/drawer/open', { reason }, { headers: new HttpHeaders({ 'Idempotency-Key': idempotencyKey }) }));
   }
-  async movement(kind: 'incomes' | 'expenses' | 'cash-drops', amount: number, concept: string, operatorSessionId: string | null): Promise<CashMovement> {
+  /** Quien no es Administrador envía la autorización de un usuario de rol superior (pruebas del usuario del 24/11/2026, punto 13). */
+  async movement(kind: 'incomes' | 'expenses' | 'cash-drops', amount: number, concept: string, operatorSessionId: string | null,
+    authorization: AuthorizationBody | null = null): Promise<CashMovement> {
     const response = await firstValueFrom(this.http.post<CashMovement>(`/api/cash/movements/${kind}`,
-      { amount, concept, operatorSessionId }, { observe: 'response' }));
+      authorization ? { amount, concept, operatorSessionId, authorization } : { amount, concept, operatorSessionId },
+      authorization ? { observe: 'response', context: authorizationContext() } : { observe: 'response' }));
     return withCashDrawerStatus(response);
   }
   reconciliation(): Promise<Reconciliation> { return firstValueFrom(this.http.get<Reconciliation>('/api/cash/reconciliation')); }

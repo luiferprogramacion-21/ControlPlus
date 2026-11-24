@@ -80,7 +80,9 @@ export class NumberInput implements ControlValueAccessor, Validator, OnChanges {
 
   validate(control: AbstractControl): ValidationErrors | null {
     if (control.value == null || control.value === '') return null;
-    const value = this.cpNumberString ? Number(control.value) : control.value;
+    // Un número escrito como texto por la pantalla («7000») también es válido; letras o espacios no.
+    const value = this.cpNumberString || (typeof control.value === 'string' && /^-?\d+(?:\.\d+)?$/.test(control.value))
+      ? Number(control.value) : control.value;
     if (typeof value !== 'number' || !Number.isFinite(value)) return { number: true };
     if (this.min !== null && this.min !== '' && value < Number(this.min)) return { min: { min: Number(this.min), actual: value } };
     if (this.max !== null && this.max !== '' && value > Number(this.max)) return { max: { max: Number(this.max), actual: value } };

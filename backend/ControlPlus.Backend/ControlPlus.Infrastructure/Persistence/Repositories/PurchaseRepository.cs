@@ -62,6 +62,7 @@ public sealed class EfPurchaseRepository(OfficialControlPlusDbContext db) : IPur
     {
         var source = db.Compra.AsNoTracking().AsQueryable();
         if (query.SupplierId is Guid supplierId) source = source.Where(x => x.ProveedorId == supplierId);
+        if (query.OrderId is Guid orderId) source = source.Where(x => x.PedidoCompraId == orderId);
         if (query.Status is not null) source = source.Where(x => x.Estado == query.Status);
         if (query.InvoiceDate is DateOnly date) source = source.Where(x => x.FechaDocumento == date);
         if (query.SupplierDocumentNumber is not null)

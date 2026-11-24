@@ -97,6 +97,15 @@ public sealed partial class PurchasesApiFlowTests : IAsyncLifetime
         Assert.Equal("COMPLETADO", completed.GetProperty("orderStatus").GetString());
         Assert.Equal(4, completed.GetProperty("orderVersion").GetInt64());
         await ProblemAsync(await ReceiveOrderAsync(client, orderId, "partial-3", secondReceipt), HttpStatusCode.Conflict);
+        // Pruebas del usuario del 24/11/2026 (punto 7): «Mercancía recibida» lista las recepciones de un pedido.
+        var receipts = await ReadJsonAsync(await client.GetAsync($"/api/purchases?orderId={orderId}&page=1&pageSize=20"), HttpStatusCode.OK);
+        Assert.Equal(2, receipts.GetProperty("totalCount").GetInt32());
+        Assert.Equal(
+            new[] { partial.GetProperty("purchase").GetProperty("id").GetGuid(), completed.GetProperty("purchase").GetProperty("id").GetGuid() }.Order(),
+            receipts.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).Order());
+        var otherOrder = await ReadJsonAsync(await client.GetAsync($"/api/purchases?orderId={Guid.NewGuid()}"), HttpStatusCode.OK);
+        Assert.Equal(0, otherOrder.GetProperty("totalCount").GetInt32());
+        await ProblemAsync(await client.GetAsync($"/api/purchases?orderId={Guid.Empty}"), HttpStatusCode.BadRequest);
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         var persisted = await db.PedidoCompra.AsNoTracking().SingleAsync(x => x.Id == orderId);

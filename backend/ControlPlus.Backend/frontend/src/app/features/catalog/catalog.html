@@ -145,7 +145,7 @@
           <mat-form-field appearance="outline"><mat-label>Código de barras</mat-label><cp-help matSuffix text="El código que lee el lector. Si el producto no trae uno, deja marcado «Generar código» y el sistema crea uno." /><input matInput formControlName="barcode" [readonly]="!!product.id && product.barcodeGenerated"></mat-form-field>
         }
         <mat-form-field appearance="outline"><mat-label>Descripción</mat-label><textarea matInput formControlName="description"></textarea></mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Precio mayorista</mat-label><cp-help matSuffix text="Precio para quien compra al por mayor. Solo se usa desde el mínimo de unidades de un mismo producto que fija el Administrador." /><input matInput type="text" cpNumberInput step="1" min="0" formControlName="wholesalePrice"></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Precio mayorista</mat-label><cp-help matSuffix text="Precio para quien compra al por mayor. Solo se usa desde el mínimo de unidades de un mismo producto que fija el Administrador." /><input matInput type="text" cpNumberInput step="1" min="0" formControlName="wholesalePrice"><mat-error>Usa un valor entero sin decimales.</mat-error></mat-form-field>
         @if (referenceCost(product) !== null) {
           <div class="price-calculator" role="group" aria-label="Calculadora de precio">
             <strong>Calculadora de precio</strong>
@@ -174,7 +174,6 @@
             @else if (!reconcilingCreate() && !reconciliationQueryFailed()) { <p>Sin coincidencias en la consulta; esto no demuestra que el alta no se haya guardado.</p> }
           }
         </div> }
-        @if (product.id && productEditNeedsAuthorization()) { <p class="field-hint" role="note">Al guardar se pide la autorización del Administrador (carné o usuario y contraseña).</p> }
         <div class="actions form-actions"><button mat-flat-button type="submit" [disabled]="saving() || checkingCreate() || (createOutcomeUncertain() && !product.id)">Guardar</button><button mat-button type="button" (click)="cancel()" [disabled]="saving() || checkingCreate()">{{ createOutcomeUncertain() && !product.id ? 'Cerrar formulario' : 'Cancelar' }}</button></div>
       </form>
     </section>

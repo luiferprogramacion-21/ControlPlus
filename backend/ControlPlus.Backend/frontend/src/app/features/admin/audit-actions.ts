@@ -26,6 +26,11 @@ export const AUDIT_ACTION_GROUPS: AuditActionGroup[] = [
     CashMovementRegistered: 'Movimiento de caja', CashReconciled: 'Arqueo', CashShiftClosed: 'Turno cerrado',
     CashOpenAuthorizationRejected: 'Autorización de apertura rechazada', CashCloseAuthorizationRejected: 'Autorización de cierre rechazada',
     OperatorSessionStarted: 'Sesión de operador iniciada', OperatorSessionClosed: 'Sesión de operador cerrada',
+    CashMovementCorrected: 'Movimiento de caja corregido', CashClosureReviewed: 'Cierre de caja revisado',
+    CashCorrectionAuthorizationRejected: 'Autorización de corrección de caja rechazada',
+    CashDrawerConfigurationUpdated: 'Cajón de dinero configurado', CashDrawerOpeningRequested: 'Apertura del cajón pedida',
+    CashDrawerOpeningAccepted: 'Cajón abierto', CashDrawerOpeningFailed: 'El cajón no abrió',
+    CashDrawerOpeningUncertain: 'Apertura del cajón sin confirmar', CashDrawerOpeningSkipped: 'Cajón sin abrir (desactivado)',
   } },
   { module: 'Ventas', actions: {
     SaleConfirmed: 'Venta confirmada', SaleCancelled: 'Venta anulada', SaleChanged: 'Cambio de venta', SaleReprintRequested: 'Reimpresión de tiquete',
@@ -38,6 +43,7 @@ export const AUDIT_ACTION_GROUPS: AuditActionGroup[] = [
   } },
   { module: 'Inventario', actions: {
     InventoryAdjusted: 'Ajuste de inventario', InventoryAdjustmentAuthorizationRejected: 'Autorización de ajuste rechazada',
+    InventoryAdjustmentCorrected: 'Ajuste de inventario corregido',
   } },
   { module: 'Clientes y créditos', actions: {
     CustomerCreated: 'Cliente creado', CustomerUpdated: 'Cliente modificado', CustomerDeactivated: 'Cliente inactivado',
@@ -52,6 +58,8 @@ export const AUDIT_ACTION_GROUPS: AuditActionGroup[] = [
     LayawayCancelled: 'Apartado cancelado', LayawayAuthorizationRejected: 'Autorización de apartado rechazada',
     LayawaySettingsUpdated: 'Reglas de apartados modificadas', LayawayNumberingCreated: 'Numeración de apartados creada',
     LayawayPaymentNumberingCreated: 'Numeración de abonos de apartados creada',
+    LayawayPaymentCancelled: 'Abono a apartado anulado', LayawayPaymentCancellationAuthorizationRejected: 'Autorización de anulación de abono de apartado rechazada',
+    LayawayProductsCorrected: 'Productos del apartado corregidos',
   } },
   { module: 'Compras y proveedores', actions: {
     SupplierCreated: 'Proveedor creado', SupplierUpdated: 'Proveedor modificado', SupplierDeactivated: 'Proveedor inactivado',

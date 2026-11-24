@@ -34,6 +34,8 @@ export class Purchases implements OnInit {
   readonly session = inject(SessionService); readonly purchases = signal<Page<PurchaseSummary> | null>(null); readonly orders = signal<Page<OrderSummary> | null>(null); readonly selectedPurchase = signal<Purchase | null>(null); readonly selectedOrder = signal<Order | null>(null); readonly suppliers = signal<Supplier[]>([]); readonly products = signal<Product[]>([]); readonly reasons = signal<CancellationReason[]>([]);
   readonly loading = signal(false); readonly saving = signal(false); readonly error = toastSignal('error'); readonly notice = toastSignal('success'); readonly editing = signal(false); readonly receiving = signal(false); readonly cancelling = signal(false); readonly correctingReceipt = signal(false); readonly correctionPreparation = signal<PurchaseCorrectionPreparation | null>(null);
   readonly choosingReceipt = signal(false);
+  /** Recepciones de un pedido, para verlas y corregirlas desde «Mercancía recibida» (pruebas del usuario del 24/11/2026, punto 7). */
+  readonly orderReceipts = signal<{ order: OrderSummary; items: PurchaseSummary[] } | null>(null);
   readonly printingOrder = signal(false);
   readonly editingOrder = signal(false);
   readonly orderTransition = signal<'close' | 'cancel' | null>(null);
@@ -119,6 +121,15 @@ export class Purchases implements OnInit {
   showOrders(): void { this.switchTab('orders'); }
   openOrderForSupplier(supplierId: string): void { void this.newOrder().then(() => this.setOrderSupplier(supplierId)); }
   requestedTotal(order: OrderSummary): number { return order.lines?.reduce((sum, line) => sum + line.requestedQuantity, 0) ?? 0; }
+  async showReceipts(order: OrderSummary): Promise<void> {
+    if (this.loading()) return;
+    this.loading.set(true); this.error.set('');
+    try { this.orderReceipts.set({ order, items: (await this.api.list({ orderId: order.id, pageSize: 100 })).items }); }
+    catch (e) { this.error.set(errorText(e)); }
+    finally { this.loading.set(false); }
+  }
+  /** Abre el detalle de una recepción, donde están «Imprimir etiquetas» y «Corregir recepción». */
+  async openReceipt(purchase: PurchaseSummary): Promise<void> { this.orderReceipts.set(null); await this.detail(purchase); }
   receivedTotal(order: OrderSummary): number { return order.lines?.reduce((sum, line) => sum + line.receivedQuantity, 0) ?? 0; }
   pendingTotal(order: OrderSummary): number { return this.requestedTotal(order) - this.receivedTotal(order); }
   async receiveOrder(order: OrderSummary): Promise<void> { await this.orderDetail(order); if (this.selectedOrder()?.id === order.id) this.startReceipt(); }
