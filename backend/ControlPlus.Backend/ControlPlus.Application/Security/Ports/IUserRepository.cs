@@ -40,6 +40,15 @@ public interface IUserRepository
     /// </summary>
     Task<bool> DeleteWithoutHistoryAsync(Guid userId, CancellationToken cancellationToken = default);
 
+    /// <summary>True si el usuario es responsable de un turno de caja abierto o tiene una sesión de operador activa.</summary>
+    Task<bool> HasOpenCashWorkAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Decisión D6: guarda el usuario ya retirado (<c>Usuario.Retire</c>) quitándole rol, permisos individuales, tokens e
+    /// inicios externos y revocando sus carnés activos, junto con los cambios pendientes (la auditoría), en una transacción.
+    /// </summary>
+    Task RetireAsync(User user, Guid actorUserId, DateTimeOffset retiredAtUtc, CancellationToken cancellationToken = default);
+
     Task SetPermissionOverrideAsync(
         User user,
         Guid permissionId,

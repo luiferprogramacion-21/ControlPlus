@@ -107,7 +107,7 @@ public sealed class UsersController(
         return FromResult(result, Ok);
     }
 
-    /// <summary>Borra un usuario sin historial (solo Administrador). 409 si tiene historial: se inactiva en su lugar.</summary>
+    /// <summary>Elimina un usuario (solo Administrador). Con historial queda retirado y anónimo salvo su nombre (D6). 409 si tiene una caja abierta.</summary>
     [HttpDelete("{userId:guid}")]
     [PermissionAuthorize(PermissionCodes.UsersManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

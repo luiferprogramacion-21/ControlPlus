@@ -189,7 +189,7 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
     }
 
     [Fact, Trait("Category", "Integration")]
-    public async Task CreditSale_AcceptsConfiguredThreeCalendarMonths_AndRejectsLaterDate()
+    public async Task CreditSale_AcceptsConfiguredThreeCalendarMonths_AndRejectsAfterSixMonths()
     {
         using var client = CreateClient();
         var scenario = await BootstrapAsync(client);
@@ -210,7 +210,8 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         _ = await StartSessionAsync(client, scenario, scenario.Cashier);
         SetBearer(client, scenario.Cashier.AccessToken);
         await AssertProblemAsync(await PostSaleAsync(client, "credit-months-too-late",
-            CreditRequest(scenario, scenario.CustomerId, dueOn.AddDays(1))),
+            // Decisión D1: el plazo predeterminado es de 3 meses, pero el crédito puede llegar hasta 6.
+            CreditRequest(scenario, scenario.CustomerId, scenario.Shift.OperatingDate.AddMonths(6).AddDays(1))),
             HttpStatusCode.BadRequest);
         var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client,
             "credit-months-calendar", CreditRequest(scenario, scenario.CustomerId, dueOn)),

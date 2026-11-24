@@ -182,7 +182,7 @@ export class Admin implements OnInit {
     if (!this.canDeleteUsers || this.saving() || this.confirming || this.isSelf(user)) return;
     const userId = user.id;
     const approved = await this.confirmChange({ title: 'Eliminar usuario',
-      message: `¿Eliminar definitivamente a ${user.displayName}? Solo es posible si nunca ha trabajado en el sistema; si ya tiene historial, inactívelo.`,
+      message: `¿Eliminar a ${user.displayName}? Dejará de aparecer, no podrá volver a entrar y el usuario «${user.userName}» quedará libre. Si ya trabajó en el sistema, su nombre se conserva en ventas, caja y auditoría.`,
       confirmText: 'Eliminar usuario', danger: true });
     if (!approved || this.destroyRef.destroyed || this.saving() || !this.canDeleteUsers || this.isSelf(user) || user.id !== userId) return;
     await this.run(() => this.api.deleteUser(userId), 'Usuario eliminado.');

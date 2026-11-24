@@ -43,6 +43,28 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
         }
     }
 
+    public async Task<bool> HasOpenCashWorkAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        await dbContext.TurnoCaja.AnyAsync(
+            x => x.UsuarioResponsableId == userId && x.Estado != CashConstants.ClosedState, cancellationToken) ||
+        await dbContext.SesionOperador.AnyAsync(
+            x => x.UsuarioId == userId && x.Estado == CashConstants.ActiveSessionState, cancellationToken);
+
+    public async Task RetireAsync(User user, Guid actorUserId, DateTimeOffset retiredAtUtc, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        if (user.UsuarioRolUsuario is { } role) dbContext.UsuarioRol.Remove(role);
+        dbContext.UsuarioPermiso.RemoveRange(user.UsuarioPermiso);
+        await dbContext.UsuarioToken.Where(x => x.UsuarioId == user.Id).ExecuteDeleteAsync(cancellationToken);
+        await dbContext.UsuarioLogin.Where(x => x.UsuarioId == user.Id).ExecuteDeleteAsync(cancellationToken);
+        await dbContext.UsuarioClaim.Where(x => x.UsuarioId == user.Id).ExecuteDeleteAsync(cancellationToken);
+        // El carné se revoca (no se borra) porque las autorizaciones y sesiones pasadas lo citan.
+        foreach (var credential in await dbContext.CredencialUsuario
+                     .Where(x => x.UsuarioId == user.Id && x.Estado == "ACTIVA").ToArrayAsync(cancellationToken))
+            credential.Revoke(actorUserId, retiredAtUtc, "Usuario eliminado");
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private static bool IsForeignKeyViolation(Exception exception)
     {
         for (var current = exception; current is not null; current = current.InnerException)
@@ -57,7 +79,9 @@ public sealed class EfUserRepository(OfficialControlPlusDbContext dbContext) : I
             entry.State = entry.State == EntityState.Added ? EntityState.Detached : EntityState.Unchanged;
     }
 
+    // Decisión D6: el usuario eliminado con historial ya no existe para la gestión ni para entrar.
     private IQueryable<User> DetailedUsers => dbContext.Usuario
+        .Where(user => !user.NombreUsuario.StartsWith(User.RetiredUserNamePrefix))
         .Include(user => user.UsuarioRolUsuario)
         .ThenInclude(userRole => userRole!.Rol)
         .Include(user => user.UsuarioPermiso)

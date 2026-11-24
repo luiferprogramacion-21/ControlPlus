@@ -1230,15 +1230,23 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/users/{unused.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync($"/api/users/{unused.Id}")).StatusCode);
 
-        // Con historial (ya inició sesión): 409 y nada cambia; se puede inactivar.
+        // Decisión D6: con historial (ya inició sesión) también se elimina. Desaparece, no vuelve a entrar, su nombre de
+        // usuario queda libre y solo su nombre sigue en el historial.
         var used = await CreateAsync("delete.used.test", cashierRoleId);
         await LoginAsync(client, "delete.used.test", "User-Test-Password-2026!");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
-        var conflict = await client.DeleteAsync($"/api/users/{used.Id}");
-        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
-        Assert.Contains("historial", await conflict.Content.ReadAsStringAsync());
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/users/{used.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await client.PutAsync($"/api/users/{used.Id}/deactivate", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
+            $"/api/cash/operator-credentials/{used.Id}", new { expiresAtUtc = (DateTimeOffset?)null })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/users/{used.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/users/{used.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync($"/api/users/{used.Id}")).StatusCode);
+        Assert.DoesNotContain("delete.used.test", await client.GetStringAsync("/api/users?search=delete.used&pageSize=50"));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/auth/login",
+            new LoginRequest("delete.used.test", "User-Test-Password-2026!"))).StatusCode);
+        var reused = await CreateAsync("delete.used.test", cashierRoleId);
+        Assert.NotEqual(used.Id, reused.Id);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/users", new CreateUserRequest(
+            "~eliminado-x", "Reservado", "User-Test-Password-2026!", [cashierRoleId], null))).StatusCode);
 
         // El Administrador no se borra a sí mismo; un Supervisor no borra a nadie.
         Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync($"/api/users/{administrator.User.Id}")).StatusCode);
@@ -1257,7 +1265,19 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         Assert.False(await context.UsuarioRol.AnyAsync(x => x.UsuarioId == unused.Id));
         Assert.False(await context.CredencialUsuario.AnyAsync(x => x.UsuarioId == unused.Id));
         Assert.Equal(1, await context.EventoAuditoria.CountAsync(x => x.Accion == "USERDELETED" && x.EntidadId == unused.Id));
-        Assert.Equal(0, await context.EventoAuditoria.CountAsync(x => x.Accion == "USERDELETED" && x.EntidadId == used.Id));
+        var retired = await context.Usuario.AsNoTracking().SingleAsync(x => x.Id == used.Id);
+        Assert.Equal("Usuario delete.used.test", retired.NombreCompleto);
+        Assert.StartsWith("~eliminado-", retired.NombreUsuario);
+        Assert.False(retired.Activo);
+        Assert.Null(retired.Correo);
+        Assert.False(await context.UsuarioRol.AnyAsync(x => x.UsuarioId == used.Id));
+        Assert.All(await context.CredencialUsuario.Where(x => x.UsuarioId == used.Id).ToArrayAsync(),
+            x => Assert.Equal("REVOCADA", x.Estado));
+        // Un solo evento: el del retiro (el intento de borrado completo se deshizo con su auditoría).
+        var retiredAudit = Assert.Single(await context.EventoAuditoria.AsNoTracking()
+            .Where(x => x.Accion == "USERDELETED" && x.EntidadId == used.Id).ToArrayAsync());
+        Assert.Contains("delete.used.test", retiredAudit.DatosNuevos);
+        Assert.Contains("true", retiredAudit.DatosNuevos);
         Assert.True(await context.Usuario.AnyAsync(x => x.Id == victim.Id));
     }
 

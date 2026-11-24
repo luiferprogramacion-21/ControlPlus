@@ -124,6 +124,28 @@ public partial class Usuario
         RotateSecurityStamp();
     }
 
+    /// <summary>Prefijo reservado del nombre de usuario de quien se eliminó teniendo historial (decisión D6).</summary>
+    public const string RetiredUserNamePrefix = "~eliminado-";
+
+    public bool IsRetired => NombreUsuario.StartsWith(RetiredUserNamePrefix, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Decisión D6 del 23/11/2026: el usuario con historial se elimina dejando solo su nombre para ese historial. Su nombre
+    /// de usuario queda libre, pierde el correo y la contraseña (recibe una inservible) y no vuelve a entrar.
+    /// </summary>
+    public void Retire(string unusablePasswordHash, DateTimeOffset retiredAtUtc)
+    {
+        NombreUsuario = RetiredUserNamePrefix + Id.ToString("N");
+        NombreUsuarioNormalizado = NombreUsuario.ToUpperInvariant();
+        Correo = null;
+        PasswordHash = DomainGuard.RequiredText(unusablePasswordHash, nameof(unusablePasswordHash));
+        Activo = false;
+        IntentosFallidos = 0;
+        BloqueoHasta = null;
+        Touch(retiredAtUtc);
+        RotateSecurityStamp();
+    }
+
     public bool CanBeReactivatedBy(RoleLevel actingRoleLevel) =>
         IsLocked && RoleHierarchy.IsDefined(actingRoleLevel) && RoleHierarchy.IsHigherThan(actingRoleLevel, HighestRoleLevel);
 

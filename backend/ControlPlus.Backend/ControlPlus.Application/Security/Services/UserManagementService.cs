@@ -62,6 +62,12 @@ public sealed class UserManagementService : IUserManagementService
             return Result.Failure<UserDto>(userName.Error!);
         }
 
+        if (userName.Value!.StartsWith(User.RetiredUserNamePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return Result.Failure<UserDto>(ApplicationError.Validation(
+                $"El nombre de usuario no puede empezar por «{User.RetiredUserNamePrefix}»."));
+        }
+
         var displayName = SecurityInput.RequiredText(request.DisplayName, "nombre visible");
         if (displayName.IsFailure)
         {
@@ -206,15 +212,26 @@ public sealed class UserManagementService : IUserManagementService
             return Result.Failure(ApplicationError.Conflict("No puede eliminar su propio usuario."));
 
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
-        if (user is null) return Result.Failure(ApplicationError.NotFound("el usuario"));
+        if (user is null || user.IsRetired) return Result.Failure(ApplicationError.NotFound("el usuario"));
+        if (await _userRepository.HasOpenCashWorkAsync(user.Id, cancellationToken))
+            return Result.Failure(ApplicationError.Conflict(
+                $"{user.DisplayName} tiene una caja abierta o una sesión de caja activa. Cierre esa caja antes de eliminar el usuario."));
 
-        // La auditoría del borrado se guarda en la misma transacción; si el usuario tiene historial no queda nada.
+        var userName = user.UserName;
+        var role = user.UserRoles.FirstOrDefault()?.Role?.Code;
+        // Sin historial se borra del todo; la auditoría del borrado se guarda en la misma transacción.
         await AuditWriter.WriteAsync(_auditRepository, _clock, actor.UserId, AuditAction.UserDeleted, nameof(User), user.Id,
-            new { user.UserName, user.DisplayName, Role = user.UserRoles.FirstOrDefault()?.Role?.Code }, cancellationToken);
-        return await _userRepository.DeleteWithoutHistoryAsync(user.Id, cancellationToken)
-            ? Result.Success()
-            : Result.Failure(ApplicationError.Conflict(
-                "El usuario ya tiene historial (ventas, caja, autorizaciones o inicios de sesión) y no se puede eliminar. Inactívelo para que no pueda entrar."));
+            new { UserName = userName, user.DisplayName, Role = role, KeptHistory = false }, cancellationToken);
+        if (await _userRepository.DeleteWithoutHistoryAsync(user.Id, cancellationToken)) return Result.Success();
+
+        // Decisión D6: con historial (ventas, caja, autorizaciones…) se elimina igual. Desaparece de la lista, no vuelve a
+        // entrar y su nombre de usuario queda libre; solo su nombre sigue en el historial. Se audita el retiro.
+        var now = _clock.UtcNow;
+        user.Retire(_passwordHasher.Hash(Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(48))), now);
+        await AuditWriter.WriteAsync(_auditRepository, _clock, actor.UserId, AuditAction.UserDeleted, nameof(User), user.Id,
+            new { UserName = userName, user.DisplayName, Role = role, KeptHistory = true }, cancellationToken);
+        await _userRepository.RetireAsync(user, actor.UserId, now, cancellationToken);
+        return Result.Success();
     }
 
     public async Task<Result<UserDto>> ActivateAsync(

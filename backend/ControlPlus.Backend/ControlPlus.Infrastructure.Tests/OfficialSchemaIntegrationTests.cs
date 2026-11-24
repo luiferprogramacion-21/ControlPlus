@@ -80,7 +80,8 @@ public sealed class OfficialSchemaIntegrationTests
               AND r.es_predefinido = true
               AND r.permisos_editables = true
               AND l.codigo_operacion = 'DESCUENTO_PORCENTAJE'
-              AND ((r.codigo = 'ADMINISTRADOR' AND l.valor_maximo = 80)
+              -- Decisión D7 del 23/11/2026: el Administrador sin tope de porcentaje (su piso es el costo).
+              AND ((r.codigo = 'ADMINISTRADOR' AND l.valor_maximo = 100)
                 OR (r.codigo = 'SUPERVISOR' AND l.valor_maximo = 20)
                 OR (r.codigo = 'CAJERO' AND l.valor_maximo = 5))
             """));

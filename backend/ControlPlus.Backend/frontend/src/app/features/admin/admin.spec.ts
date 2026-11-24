@@ -125,16 +125,16 @@ describe('Admin: usuarios, roles y permisos', () => {
     expect(api.updateUser).toHaveBeenCalledWith('ana', expect.any(String), null);
   });
 
-  it('solo el Administrador elimina usuarios, nunca a sí mismo, y el historial lo impide con un mensaje', async () => {
+  it('solo el Administrador elimina usuarios, nunca a sí mismo, y una caja abierta lo impide con un mensaje', async () => {
     await component.ngOnInit();
     api.deleteUser.mockResolvedValueOnce(undefined);
     await component.remove(user('nuevo'));
     expect(api.deleteUser).toHaveBeenCalledWith('nuevo');
     expect(component.notice()).toBe('Usuario eliminado.');
 
-    api.deleteUser.mockRejectedValueOnce(new HttpErrorResponse({ status: 409, error: { title: 'El usuario ya tiene historial y no se puede eliminar.' } }));
+    api.deleteUser.mockRejectedValueOnce(new HttpErrorResponse({ status: 409, error: { title: 'Ana tiene una caja abierta o una sesión de caja activa. Cierre esa caja antes de eliminar el usuario.' } }));
     await component.remove(user('ana'));
-    expect(component.error()).toContain('historial');
+    expect(component.error()).toContain('caja abierta');
 
     await component.remove(user('admin-1'));
     expect(api.deleteUser).toHaveBeenCalledTimes(2);
