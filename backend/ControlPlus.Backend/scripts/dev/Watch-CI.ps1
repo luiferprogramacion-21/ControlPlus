@@ -59,8 +59,16 @@ function Show-Notification([string]$title, [string]$text, [bool]$ok) {
 
 Write-Result @("ESPERANDO", "commit $short", "inicio $(Get-Date -Format 'HH:mm:ss')")
 
-# Un commit que solo toca .md no dispara el CI (paths-ignore).
-$changed = @(git diff --name-only "$Sha~1" $Sha 2>$null)
+# Un push que solo toca .md no dispara el CI (paths-ignore). Un push puede traer varios commits: se mira todo lo
+# subido desde el último commit que ya tuvo CI, no solo el último commit (si no, un lote que termina en documentación
+# se tomaba como «sin CI» aunque trajera código).
+$base = "$Sha~1"
+foreach ($candidate in @(gh run list --limit 30 --json headSha --jq '.[].headSha' 2>$null)) {
+    if (-not $candidate -or $candidate -eq $Sha) { continue }
+    git merge-base --is-ancestor $candidate $Sha 2>$null
+    if ($LASTEXITCODE -eq 0) { $base = $candidate; break }
+}
+$changed = @(git diff --name-only $base $Sha 2>$null)
 if ($changed.Count -gt 0 -and -not ($changed | Where-Object { $_ -notlike '*.md' })) {
     Write-Result @("SIN_CI", "commit $short", "Solo cambió documentación (.md): el CI no corre.")
     Show-Notification "CI $short" "Solo documentación: no hay CI que esperar." $true
