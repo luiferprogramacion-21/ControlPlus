@@ -423,6 +423,14 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         var clean = await ReadAsync<CustomerCreditRiskDto>(await client.GetAsync(checkUrl), HttpStatusCode.OK);
         Assert.Equal((1_000m, 0m, false, false, false), (clean.OutstandingBalance, clean.OverdueBalance, clean.Overdue, clean.ExceedsLimit, clean.Blocked));
         Assert.Null(clean.CreditLimit);
+        // Auditoría C.14: vence mañana, así que está «por vencer»; la lista de Clientes recibe la misma etapa.
+        Assert.Equal(("POR_VENCER", (DateOnly?)today.AddDays(1), (DateOnly?)null), (clean.Stage, clean.NextDueOn, clean.OldestOverdueOn));
+        var noDebtCustomer = Guid.CreateVersion7();
+        var stages = await ReadAsync<CustomerCreditStageDto[]>(await client.GetAsync(
+            $"/api/sales/customer-credit-stages?customerIds={scenario.CustomerId}&customerIds={noDebtCustomer}"), HttpStatusCode.OK);
+        Assert.Equal("POR_VENCER", stages.Single(x => x.CustomerId == scenario.CustomerId).Stage);
+        Assert.Equal(("SIN_DEUDA", 0m), (stages.Single(x => x.CustomerId == noDebtCustomer).Stage,
+            stages.Single(x => x.CustomerId == noDebtCustomer).OutstandingBalance));
 
         // El crédito anterior vence y el cliente tiene cupo de 1 500: moroso y sobre el cupo.
         await using (var scope = _factory!.Services.CreateAsyncScope())
@@ -439,6 +447,7 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         var risky = await ReadAsync<CustomerCreditRiskDto>(await client.GetAsync(checkUrl), HttpStatusCode.OK);
         Assert.Equal((1_000m, 1, true, true, 500m, false, false),
             (risky.OverdueBalance, risky.OverdueCredits, risky.Overdue, risky.ExceedsLimit, risky.AvailableCredit, risky.BlockRiskyCredit, risky.Blocked));
+        Assert.Equal(("VENCIDO", (DateOnly?)today.AddDays(-1)), (risky.Stage, risky.OldestOverdueOn));
 
         // Modo aviso (predeterminado): la venta se permite y queda el aviso en la auditoría.
         _ = await StartSessionAsync(client, scenario, scenario.Supervisor);

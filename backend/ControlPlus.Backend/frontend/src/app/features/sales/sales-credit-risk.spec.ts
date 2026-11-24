@@ -13,7 +13,7 @@ const customer = { id: '019a0000-0000-7000-8000-000000000002', fullName: 'Ana', 
 const cash = { hasOpenShift: true, requiresPreviousShiftClosure: false, requiresOperatorSession: false, currentShift: { operatingDate: '2026-10-24', responsibleUserId: '019a0000-0000-7000-8000-000000000003' } } as any;
 const risk = (over: Partial<CustomerCreditRisk> = {}): CustomerCreditRisk => ({
   customerId: customer.id, outstandingBalance: 60000, overdueBalance: 25000, overdueCredits: 1, creditLimit: null, availableCredit: null,
-  overdue: true, exceedsLimit: false, blockRiskyCredit: false, blocked: false, ...over,
+  overdue: true, exceedsLimit: false, blockRiskyCredit: false, blocked: false, stage: 'VENCIDO', oldestOverdueOn: '2026-10-20', ...over,
 });
 
 describe('Sales: clientes morosos y cupo de crédito', () => {
@@ -44,6 +44,15 @@ describe('Sales: clientes morosos y cupo de crédito', () => {
     expect(creditCheck).toHaveBeenCalledWith(customer.id, 10000);
     expect(component.creditRisk()?.overdue).toBe(true);
     expect(component.creditRiskText).toContain('vencidos en 1 crédito');
+  });
+
+  it('al elegir el cliente muestra si está moroso, aunque la venta sea de contado (C.14)', async () => {
+    await create();
+    component.onCustomerChosen(customer); await loaded();
+    expect(creditCheck).toHaveBeenCalledWith(customer.id, 0);
+    expect(component.creditStageView(component.customerStage())).toMatchObject({ label: 'Moroso', tone: 'error' });
+    component.onCustomerChosen(null); await loaded();
+    expect(component.customerStage()).toBeNull();
   });
 
   it('describe el cupo superado con lo disponible', async () => {

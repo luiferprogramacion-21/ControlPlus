@@ -37,6 +37,8 @@ export interface CustomerCreditRisk {
   customerId: string; outstandingBalance: number; overdueBalance: number; overdueCredits: number;
   creditLimit: number | null; availableCredit: number | null; overdue: boolean; exceedsLimit: boolean;
   blockRiskyCredit: boolean; blocked: boolean;
+  /** Auditoría C.14: SIN_DEUDA, AL_DIA, POR_VENCER o VENCIDO. */
+  stage: string; nextDueOn?: string | null; oldestOverdueOn?: string | null;
 }
 export interface SaleLine { id: string; productId: string; productCode: string; productName: string; measurementUnit: string; quantity: number; priceType: string; unitPrice: number; discountAmount: number; grossAmount: number; netAmount: number; }
 export interface SalePaymentLine { id: string; methodCode: string; methodName: string; appliedAmount: number; receivedAmount: number | null; change: number; reference: string | null; }

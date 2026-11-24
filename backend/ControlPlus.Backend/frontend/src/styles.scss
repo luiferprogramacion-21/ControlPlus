@@ -654,6 +654,12 @@ app-root .cdk-overlay-popover { zoom: calc(1 / var(--cp-zoom)); }
 .module-table-wrap th { position: sticky; top: 0; z-index: 1; box-shadow: 0 1px var(--cp-border); }
 .status-pill { display: inline-flex; min-height: 26px; align-items: center; padding: 3px 9px; border-radius: 999px; background: var(--cp-success-soft); color: var(--cp-success); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .status-pill--warning { background: var(--cp-warning-soft); color: var(--cp-warning); }
+.status-pill--success { background: var(--cp-success-soft); color: var(--cp-success); }
+.status-pill--error { background: var(--cp-error-soft); color: var(--cp-error); }
+.status-pill--neutral { background: var(--cp-surface-muted); color: var(--cp-text-muted); }
+/* Etapa del crédito del cliente (auditoría C.14): etiqueta de color y la frase con lo que debe. */
+.credit-stage { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 13px; color: var(--cp-text-muted); }
+.credit-stage--error { color: var(--cp-error); font-weight: 600; }
 .table-action { min-height: 36px; padding: 0 10px; border: 1px solid var(--cp-control-border); border-radius: 7px; background: var(--cp-surface); color: var(--cp-primary); font-size: 12px; font-weight: 700; }
 .table-action:hover { border-color: var(--cp-primary); background: var(--cp-primary-soft); }
 /* Ventana de abonar: total a pagar, abono y lo que queda pendiente (créditos y apartados). */

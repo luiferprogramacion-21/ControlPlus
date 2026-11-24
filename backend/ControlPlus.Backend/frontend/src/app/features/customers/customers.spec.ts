@@ -5,7 +5,7 @@ import { SessionService } from '../../core/session.service';
 
 describe('Customers', () => {
   let component: Customers;
-  const api = { list: vi.fn(), create: vi.fn(), update: vi.fn(), status: vi.fn(), get: vi.fn() };
+  const api = { list: vi.fn(), create: vi.fn(), update: vi.fn(), status: vi.fn(), get: vi.fn(), creditStages: vi.fn() };
   let permissions = ['CUSTOMERS.MANAGE'];
   const session = { has: (permission: string) => permissions.includes(permission) };
   beforeEach(() => { vi.clearAllMocks(); permissions = ['CUSTOMERS.MANAGE']; TestBed.configureTestingModule({ providers: [{ provide: CustomersApi, useValue: api }, { provide: SessionService, useValue: session }] }); component = TestBed.runInInjectionContext(() => new Customers()); });
@@ -14,6 +14,18 @@ describe('Customers', () => {
     await component.save(); expect(api.create).not.toHaveBeenCalled();
     component.form.address = 'x'.repeat(301); component.form.documentType = null;
     await component.save(); expect(api.create).not.toHaveBeenCalled();
+  });
+  it('muestra si cada cliente está al día, por vencer o moroso (auditoría C.14)', async () => {
+    permissions = ['CUSTOMERS.MANAGE', 'CREDIT.REQUEST'];
+    api.list.mockResolvedValue({ items: [{ id: 'c1' }, { id: 'c2' }], page: 1, pageSize: 20, totalCount: 2, totalPages: 1 });
+    api.creditStages.mockResolvedValue([{ customerId: 'c1', stage: 'VENCIDO', outstandingBalance: 9000, overdueBalance: 9000, oldestOverdueOn: '2026-11-01' }]);
+    await component.reload(); await Promise.resolve();
+    expect(api.creditStages).toHaveBeenCalledWith(['c1', 'c2']);
+    expect(component.creditStageView(component.stages()['c1'])?.label).toBe('Moroso');
+    expect(component.stages()['c2']).toBeUndefined();
+    permissions = ['CUSTOMERS.MANAGE']; api.creditStages.mockClear();
+    await component.reload();
+    expect(api.creditStages).not.toHaveBeenCalled();
   });
   it('envía alta válida normalizada', async () => {
     api.create.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });

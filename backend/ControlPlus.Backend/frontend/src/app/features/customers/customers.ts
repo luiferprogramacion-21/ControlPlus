@@ -13,6 +13,7 @@ import { Icon } from '../../layout/icon';
 import { toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
 import { HelpTip } from '../../shared/help-tip';
+import { CreditStageData, creditStageView } from '../../shared/credit-stage';
 @Component({ selector: 'cp-customers', imports: [WindowSheet, HelpTip, NumberInput, InputFormat, A11yModule, FormsModule, MatPaginatorModule, Icon, CustomerHistory], templateUrl: './customers.html', styleUrls: ['../directory.scss', './customers.scss'] })
 export class Customers implements OnInit {
   private readonly api = inject(CustomersApi);
@@ -26,6 +27,10 @@ export class Customers implements OnInit {
   get canReadHistory(): boolean { return this.session.has('CUSTOMERS.HISTORY_READ'); }
   readonly loading = signal(false);
   readonly saving = signal(false);
+  /** Auditoría C.14: etapa del crédito de cada cliente de la página, con su color. */
+  readonly stages = signal<Record<string, CreditStageData>>({});
+  readonly creditStageView = creditStageView;
+  get canSeeCredit(): boolean { return this.session.has('CREDIT.REQUEST'); }
   readonly error = toastSignal('error');
   readonly notice = toastSignal('success');
   search = ''; status: 'active' | 'inactive' | 'all' = 'active'; page = 1; pageSize = 20;
@@ -36,9 +41,22 @@ export class Customers implements OnInit {
   private empty(): CustomerInput { return { documentType: null, documentNumber: null, fullName: '', phone: null, address: '', email: null, observations: null, creditLimit: null }; }
   async reload(): Promise<void> {
     const id = ++this.requestId; this.loading.set(true); this.error.set('');
-    try { const result = await this.api.list({ search: this.search.trim(), status: this.full ? this.status : 'active', page: this.page, pageSize: this.pageSize }); if (id === this.requestId) this.result.set(result); }
+    try {
+      const result = await this.api.list({ search: this.search.trim(), status: this.full ? this.status : 'active', page: this.page, pageSize: this.pageSize });
+      if (id !== this.requestId) return;
+      this.result.set(result);
+      void this.loadStages(id, result.items.map(customer => customer.id));
+    }
     catch (e) { if (id === this.requestId) this.error.set(errorText(e)); }
     finally { if (id === this.requestId) this.loading.set(false); }
+  }
+  /** Si falla, la lista se ve igual, solo sin la etapa del crédito. */
+  private async loadStages(id: number, customerIds: string[]): Promise<void> {
+    if (!this.canSeeCredit) { this.stages.set({}); return; }
+    try {
+      const stages = await this.api.creditStages(customerIds);
+      if (id === this.requestId) this.stages.set(Object.fromEntries(stages.map(stage => [stage.customerId, stage])));
+    } catch { if (id === this.requestId) this.stages.set({}); }
   }
   find(): void { this.page = 1; void this.reload(); }
   pageChanged(e: PageEvent): void { this.page = e.pageIndex + 1; this.pageSize = e.pageSize; void this.reload(); }

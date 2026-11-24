@@ -8,8 +8,9 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
-import { CatalogApi, Product } from '../catalog/catalog-api';
+import { CatalogApi, Product, productStockState } from '../catalog/catalog-api';
 import { CashApi, CashState } from '../cash/cash-api';
+import { creditStageView } from '../../shared/credit-stage';
 import { CustomerCreditRisk, HeldSale, NO_SALE_DRAFT, Sale, SaleDraft, SaleDraftInput, SaleInput, SalesApi, SalePaymentInput, PrintJob, PrintJobStatus, printStatusLabel } from './sales-api';
 import { Customer } from '../customers/customers-api';
 import { CustomerPicker } from '../customers/customer-picker';
@@ -107,6 +108,11 @@ export class Sales implements OnInit, OnDestroy {
   private dueDateEdited = false;
   /** Moroso o sobre el cupo para la venta a crédito en curso; null si no aplica o no se pudo consultar (el servidor igual decide). */
   readonly creditRisk = signal<CustomerCreditRisk | null>(null);
+  /** Auditoría C.14: etapa del crédito del cliente elegido (al día, por vencer o moroso), visible al vender. */
+  readonly customerStage = signal<CustomerCreditRisk | null>(null);
+  readonly creditStageView = creditStageView;
+  /** Auditoría C.19: Disponible, Stock bajo o Agotado también al buscar para vender. */
+  readonly stockState = productStockState;
   private pending: { key: string; input: SaleInput; authorizerUserName: string | null } | null = null;
   /**
    * Venta recuperable (18 de noviembre) y ventas en espera (19 de noviembre de 2026): cada carrito se guarda solo como un
@@ -320,7 +326,7 @@ export class Sales implements OnInit, OnDestroy {
     this.endCreditRulesRequest(true);
     this.drawerCheckoutKey = null;
     this.cart.set([]); this.results.set([]); this.selectedProductId.set(null);
-    this.generalDiscount = null; this.discountReason = ''; this.customerId = ''; this.customers.set([]); this.dueDate = '';
+    this.generalDiscount = null; this.discountReason = ''; this.customerId = ''; this.customers.set([]); this.customerStage.set(null); this.dueDate = '';
     this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.saleType.set('CONTADO');
     // El enlace a una venta de origen es de esta venta: no pasa a la siguiente ni a una retomada.
     this.sourceSale.set(null);
@@ -336,7 +342,7 @@ export class Sales implements OnInit, OnDestroy {
       const removed = draft.lines.length - usable.length;
       let customerNote = '';
       if (draft.customerId) {
-        try { const customer = await this.api.customer(draft.customerId); this.customers.set([customer]); this.customerId = customer.id; }
+        try { const customer = await this.api.customer(draft.customerId); this.customers.set([customer]); this.customerId = customer.id; void this.loadCustomerStage(); }
         catch { customerNote = ' No se pudo cargar el cliente: elígelo de nuevo.'; }
       }
       this.generalDiscount = draft.generalDiscount;
@@ -439,6 +445,7 @@ export class Sales implements OnInit, OnDestroy {
   /** null means «consumidor final». */
   onCustomerChosen(customer: Customer | null): void {
     this.customers.set(customer ? [customer] : []); this.customerId = customer?.id ?? '';
+    void this.loadCustomerStage();
     this.showCustomer.set(false);
     if (this.continueToCheckout && customer) { this.continueToCheckout = false; this.startCheckout(); return; }
     this.continueToCheckout = false; this.focusSearch();
@@ -584,6 +591,15 @@ export class Sales implements OnInit, OnDestroy {
           ? 'Cajón: no se pudo abrir. Revisa la impresora y el cable; la venta se puede cobrar igual.'
           : 'Cajón: no se pudo confirmar la apertura. Revisa el cajón; la venta se puede cobrar igual.');
     } catch { /* El cajón nunca impide cobrar. */ }
+  }
+  /** Trae la etapa del crédito del cliente elegido; sin cliente o sin permiso de crédito no muestra nada. */
+  async loadCustomerStage(): Promise<void> {
+    const customerId = this.customerId.trim();
+    if (!customerId || !this.canRequestCredit) { this.customerStage.set(null); return; }
+    try {
+      const stage = await this.api.creditCheck(customerId, 0);
+      if (this.customerId.trim() === customerId) this.customerStage.set(stage);
+    } catch { if (this.customerId.trim() === customerId) this.customerStage.set(null); }
   }
   /** Consulta si el cliente está moroso o supera su cupo con esta venta (aviso siempre; bloqueo si está activo). */
   async checkCreditRisk(): Promise<CustomerCreditRisk | null> {
@@ -1029,7 +1045,7 @@ export class Sales implements OnInit, OnDestroy {
   newSale(): void {
     this.endCreditRulesRequest(true);
     this.sale.set(null); this.receipt.set(null); this.showDetail.set(false); this.reprintMessage.set(''); this.drawerStatus.set(null); this.printed.set(false); this.lastJobStatus.set(null);
-    this.customerId = ''; this.customers.set([]); this.discountReason = ''; this.dueDate = '';
+    this.customerId = ''; this.customers.set([]); this.customerStage.set(null); this.discountReason = ''; this.dueDate = '';
     this.concessionAuthorization = null; this.concessionAuthorizedBy.set('');
     this.saleType.set('CONTADO'); this.checkoutMode.set(false); this.feedback.set(''); this.error.set('');
     this.focusField('product-search');

@@ -37,7 +37,20 @@ public sealed record CustomerCreditRiskDto(
     bool Overdue,
     bool ExceedsLimit,
     bool BlockRiskyCredit,
-    bool Blocked);
+    bool Blocked,
+    // Auditoría C.14: SIN_DEUDA, AL_DIA, POR_VENCER o VENCIDO (CustomerCreditStagePolicy), con sus fechas clave.
+    string Stage = "SIN_DEUDA",
+    DateOnly? NextDueOn = null,
+    DateOnly? OldestOverdueOn = null);
+
+/// <summary>Etapa del crédito de un cliente para mostrarla con su color en la lista de Clientes (auditoría C.14).</summary>
+public sealed record CustomerCreditStageDto(
+    Guid CustomerId,
+    string Stage,
+    decimal OutstandingBalance,
+    decimal OverdueBalance,
+    DateOnly? NextDueOn,
+    DateOnly? OldestOverdueOn);
 
 public interface ICreditSettingsService
 {
@@ -51,4 +64,8 @@ public interface ICreditSettingsService
     Task<Result<CustomerCreditRiskDto>> GetCustomerRiskAsync(
         ActorContext actor, Guid customerId, decimal amount,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Etapa del crédito de hasta 100 clientes; los que no tienen deuda vienen como SIN_DEUDA.</summary>
+    Task<Result<IReadOnlyCollection<CustomerCreditStageDto>>> GetCustomerStagesAsync(
+        ActorContext actor, IReadOnlyCollection<Guid> customerIds, CancellationToken cancellationToken = default);
 }

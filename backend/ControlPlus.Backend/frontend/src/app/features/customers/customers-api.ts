@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { Page } from '../../core/api';
+import { CreditStageData } from '../../shared/credit-stage';
 export interface Customer { id: string; documentType: string | null; documentNumber: string | null; fullName: string; phone: string | null; address: string | null; email: string | null; observations: string | null; isActive: boolean; version: number;
   /** Cupo de crédito en pesos (saldo máximo que puede deber); null = sin límite. */
   creditLimit?: number | null; }
@@ -10,6 +11,11 @@ export type CustomerInput = Pick<Customer, 'documentType' | 'documentNumber' | '
 @Injectable({ providedIn: 'root' })
 export class CustomersApi {
   private readonly http = inject(HttpClient);
+  /** Auditoría C.14: etapa del crédito (al día, por vencer o moroso) de los clientes de una página. */
+  creditStages(customerIds: string[]): Promise<(CreditStageData & { customerId: string })[]> {
+    if (customerIds.length === 0) return Promise.resolve([]);
+    return firstValueFrom(this.http.get<(CreditStageData & { customerId: string })[]>('/api/sales/customer-credit-stages', { params: { customerIds } }));
+  }
   list(params: { search?: string; status?: 'active' | 'inactive' | 'all'; page?: number; pageSize?: number } = {}): Promise<Page<Customer>> {
     return firstValueFrom(this.http.get<Page<Customer>>('/api/customers', { params: { search: params.search ?? '', status: params.status ?? 'active', page: params.page ?? 1, pageSize: params.pageSize ?? 20 } }));
   }

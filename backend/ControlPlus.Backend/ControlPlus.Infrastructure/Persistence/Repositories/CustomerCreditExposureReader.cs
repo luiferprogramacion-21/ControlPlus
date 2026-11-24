@@ -6,25 +6,41 @@ using Microsoft.EntityFrameworkCore;
 namespace ControlPlus.Infrastructure.Persistence.Repositories;
 
 /// <summary>
-/// Saldo de los créditos abiertos (PENDIENTE o VENCIDO con saldo) de un cliente. Cuáles están vencidos lo decide
-/// <see cref="CreditStatusPolicy"/> en memoria: un cliente tiene pocos créditos abiertos.
+/// Saldo de los créditos abiertos (PENDIENTE o VENCIDO con saldo) de uno o varios clientes. Cuáles están vencidos lo
+/// decide <see cref="CreditStatusPolicy"/> en memoria: cada cliente tiene pocos créditos abiertos.
 /// </summary>
 public sealed class EfCustomerCreditExposureReader(OfficialControlPlusDbContext dbContext) : ICustomerCreditExposureReader
 {
-    public async Task<CustomerCreditExposure> GetAsync(Guid customerId, DateOnly today, CancellationToken cancellationToken = default)
+    public async Task<CustomerCreditExposure> GetAsync(Guid customerId, DateOnly today, CancellationToken cancellationToken = default) =>
+        (await GetManyAsync([customerId], today, cancellationToken)).TryGetValue(customerId, out var exposure)
+            ? exposure
+            : new CustomerCreditExposure(0, 0, 0);
+
+    public async Task<IReadOnlyDictionary<Guid, CustomerCreditExposure>> GetManyAsync(
+        IReadOnlyCollection<Guid> customerIds, DateOnly today, CancellationToken cancellationToken = default)
     {
+        if (customerIds.Count == 0) return new Dictionary<Guid, CustomerCreditExposure>();
+        var ids = customerIds.Distinct().ToArray();
         var open = await dbContext.Credito.AsNoTracking()
-            .Where(x => x.Venta.ClienteId == customerId && (x.Estado == "PENDIENTE" || x.Estado == "VENCIDO") && x.SaldoPendiente > 0)
-            .Select(x => new { x.Id, x.SaldoPendiente })
+            .Where(x => x.Venta.ClienteId != null && ids.Contains(x.Venta.ClienteId.Value) &&
+                (x.Estado == "PENDIENTE" || x.Estado == "VENCIDO") && x.SaldoPendiente > 0)
+            .Select(x => new { x.Id, CustomerId = x.Venta.ClienteId!.Value, x.SaldoPendiente })
             .ToListAsync(cancellationToken);
-        var ids = open.Select(x => x.Id).ToArray();
+        var creditIds = open.Select(x => x.Id).ToArray();
         var installments = await dbContext.CuotaCredito.AsNoTracking()
-            .Where(x => ids.Contains(x.CreditoId) && x.SaldoPendiente > 0)
+            .Where(x => creditIds.Contains(x.CreditoId) && x.SaldoPendiente > 0)
             .Select(x => new { x.CreditoId, x.FechaVencimiento, x.SaldoPendiente })
             .ToListAsync(cancellationToken);
-        var overdue = installments.Where(x => CreditStatusPolicy.IsOverdue(
-                x.FechaVencimiento, x.SaldoPendiente, today)).ToArray();
-        return new CustomerCreditExposure(open.Sum(x => x.SaldoPendiente),
-            overdue.Sum(x => x.SaldoPendiente), overdue.Select(x => x.CreditoId).Distinct().Count());
+        var customerOf = open.ToDictionary(x => x.Id, x => x.CustomerId);
+        return open.GroupBy(x => x.CustomerId).ToDictionary(group => group.Key, group =>
+        {
+            var own = installments.Where(x => customerOf[x.CreditoId] == group.Key).ToArray();
+            var overdue = own.Where(x => CreditStatusPolicy.IsOverdue(x.FechaVencimiento, x.SaldoPendiente, today)).ToArray();
+            var pending = own.Except(overdue).ToArray();
+            return new CustomerCreditExposure(group.Sum(x => x.SaldoPendiente), overdue.Sum(x => x.SaldoPendiente),
+                overdue.Select(x => x.CreditoId).Distinct().Count(),
+                pending.Length == 0 ? null : pending.Min(x => x.FechaVencimiento),
+                overdue.Length == 0 ? null : overdue.Min(x => x.FechaVencimiento));
+        });
     }
 }

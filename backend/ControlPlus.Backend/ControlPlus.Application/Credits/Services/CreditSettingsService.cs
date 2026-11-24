@@ -120,11 +120,39 @@ public sealed class CreditSettingsService(
         var customer = await sales.GetCustomerAsync(customerId, cancellationToken);
         if (customer is null) return Result.Failure<CustomerCreditRiskDto>(ApplicationError.NotFound("el cliente"));
 
-        var exposure = await exposureReader.GetAsync(customerId, LocalToday(establishment, clock), cancellationToken);
+        var today = LocalToday(establishment, clock);
+        var exposure = await exposureReader.GetAsync(customerId, today, cancellationToken);
         var risk = CreditRiskPolicy.Assess(exposure.OutstandingBalance, exposure.OverdueBalance, customer.CupoCredito, amount);
         return Result.Success(new CustomerCreditRiskDto(customerId, exposure.OutstandingBalance, exposure.OverdueBalance,
             exposure.OverdueCredits, customer.CupoCredito, risk.AvailableCredit, risk.Overdue, risk.ExceedsLimit,
-            establishment.CreditoBloquearRiesgo, risk.HasRisk && establishment.CreditoBloquearRiesgo));
+            establishment.CreditoBloquearRiesgo, risk.HasRisk && establishment.CreditoBloquearRiesgo,
+            CustomerCreditStagePolicy.Resolve(exposure.OutstandingBalance, exposure.OverdueBalance, exposure.NextDueOn, today),
+            exposure.NextDueOn, exposure.OldestOverdueOn));
+    }
+
+    public async Task<Result<IReadOnlyCollection<CustomerCreditStageDto>>> GetCustomerStagesAsync(
+        ActorContext actor, IReadOnlyCollection<Guid> customerIds, CancellationToken cancellationToken = default)
+    {
+        // Auditoría C.14: quien vende o cobra créditos ve en Clientes si cada uno está al día, por vencer o moroso.
+        var snapshot = await users.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
+        if (snapshot is null) return Result.Failure<IReadOnlyCollection<CustomerCreditStageDto>>(ApplicationError.Unauthorized());
+        if (!snapshot.PermissionCodes.Contains(PermissionCodes.CreditRequest, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<IReadOnlyCollection<CustomerCreditStageDto>>(ApplicationError.Forbidden());
+        var ids = (customerIds ?? []).Where(id => id != Guid.Empty).Distinct().ToArray();
+        if (ids.Length > 100)
+            return Result.Failure<IReadOnlyCollection<CustomerCreditStageDto>>(ApplicationError.Validation("Consulte hasta 100 clientes a la vez."));
+        var establishment = await sales.GetActiveEstablishmentAsync(cancellationToken);
+        if (establishment is null)
+            return Result.Failure<IReadOnlyCollection<CustomerCreditStageDto>>(ApplicationError.NotFound("el establecimiento activo"));
+        var today = LocalToday(establishment, clock);
+        var exposures = await exposureReader.GetManyAsync(ids, today, cancellationToken);
+        return Result.Success<IReadOnlyCollection<CustomerCreditStageDto>>(ids.Select(id =>
+        {
+            var exposure = exposures.TryGetValue(id, out var found) ? found : new CustomerCreditExposure(0, 0, 0);
+            return new CustomerCreditStageDto(id,
+                CustomerCreditStagePolicy.Resolve(exposure.OutstandingBalance, exposure.OverdueBalance, exposure.NextDueOn, today),
+                exposure.OutstandingBalance, exposure.OverdueBalance, exposure.NextDueOn, exposure.OldestOverdueOn);
+        }).ToArray());
     }
 
     /// <summary>Fecha local del establecimiento, la misma que usa Créditos para proyectar VENCIDO.</summary>
