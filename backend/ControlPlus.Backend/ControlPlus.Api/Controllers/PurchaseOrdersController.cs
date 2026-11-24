@@ -5,6 +5,9 @@ using ControlPlus.Application.PurchaseOrders.Contracts;
 using ControlPlus.Application.Purchases.Contracts;
 using System.ComponentModel.DataAnnotations;
 using ControlPlus.Application.Security.Contracts;
+using ControlPlus.Application.Security.Ports;
+using ControlPlus.Application.Establishments.Contracts;
+using ControlPlus.Application.Suppliers.Contracts;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ControlPlus.Api.Controllers;
@@ -16,7 +19,7 @@ namespace ControlPlus.Api.Controllers;
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
 public sealed class PurchaseOrdersController(CurrentActorContextResolver actors, IPurchaseOrderService orders,
-    IPurchaseService purchases)
+    IPurchaseService purchases, ISupplierService suppliers, IEstablishmentService establishments, IClock clock)
     : ApiControllerBase(actors)
 {
     [HttpGet]
@@ -35,6 +38,24 @@ public sealed class PurchaseOrdersController(CurrentActorContextResolver actors,
     {
         var actor = await GetActorAsync(ct);
         return actor is null ? MissingActor() : FromResult(await orders.GetAsync(actor, orderId, ct), Ok);
+    }
+
+    /// <summary>PDF del pedido para el proveedor, con el estilo del reporte de ventas (auditoría S.19). Solo lectura.</summary>
+    [HttpGet("{orderId:guid}/document.pdf")]
+    [PermissionAuthorize(PermissionCodes.PurchaseOrdersManage)]
+    [Produces("application/pdf")]
+    [ProducesResponseType<FileContentResult>(StatusCodes.Status200OK, "application/pdf")]
+    public async Task<IActionResult> Document(Guid orderId, CancellationToken ct)
+    {
+        var actor = await GetActorAsync(ct);
+        if (actor is null) return MissingActor();
+        var order = await orders.GetAsync(actor, orderId, ct);
+        if (order.IsFailure) return FromResult(order, Ok);
+        var supplier = await suppliers.GetAsync(actor, order.Value!.SupplierId, ct);
+        if (supplier.IsFailure) return FromResult(supplier, Ok);
+        var business = await establishments.GetAsync(actor, ct);
+        return File(PurchaseOrderPdf.Render(order.Value, supplier.Value!, business.IsSuccess ? business.Value : null, clock.UtcNow),
+            "application/pdf", PurchaseOrderPdf.FileName(order.Value));
     }
 
     [HttpPost]

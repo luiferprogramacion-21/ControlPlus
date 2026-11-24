@@ -56,6 +56,14 @@ public sealed partial class PurchasesApiFlowTests
         var setup = await CreateReceivedPurchaseAsync(client, "CORRECTION-SUPERVISOR", 3);
         var reason = await CorrectionReasonAsync(client);
         Bearer(client, (await LoginAsync(client, SupervisorName, _supervisorPassword)).AccessToken);
+        // Auditoría S.19: el pedido enviado se descarga como PDF.
+        using (var pdf = await client.GetAsync($"/api/purchase-orders/{setup.OrderId}/document.pdf"))
+        {
+            Assert.Equal(HttpStatusCode.OK, pdf.StatusCode);
+            Assert.Equal("application/pdf", pdf.Content.Headers.ContentType?.MediaType);
+            Assert.StartsWith("%PDF-1.4", System.Text.Encoding.Latin1.GetString(await pdf.Content.ReadAsByteArrayAsync()));
+            Assert.StartsWith("pedido-", pdf.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+        }
         var preparation = await ReadAsync<PurchaseCorrectionPreparationDto>(await client.GetAsync(
             $"/api/purchases/{setup.PurchaseId}/correction-preparation"), HttpStatusCode.OK);
         Assert.True(preparation.CanReverse);

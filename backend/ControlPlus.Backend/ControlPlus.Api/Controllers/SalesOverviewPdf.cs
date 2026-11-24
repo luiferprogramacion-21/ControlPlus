@@ -15,9 +15,9 @@ public static class SalesOverviewPdf
     private static readonly TimeZoneInfo LocalZone = TimeZoneInfo.FindSystemTimeZoneById(
         OperatingSystem.IsWindows() ? "SA Pacific Standard Time" : "America/Bogota");
 
-    private const double PageWidth = 595, PageHeight = 842, Margin = 40, BottomLimit = 62;
-    private const double Right = PageWidth - Margin;
-    private const string Blue = "0.157 0.369 0.659", Gray = "0.376 0.447 0.522", Black = "0.141 0.192 0.259",
+    internal const double PageWidth = 595, PageHeight = 842, Margin = 40, BottomLimit = 62;
+    internal const double Right = PageWidth - Margin;
+    internal const string Blue = "0.157 0.369 0.659", Gray = "0.376 0.447 0.522", Black = "0.141 0.192 0.259",
         Amber = "0.522 0.318 0", HeaderFill = "0.910 0.929 0.953", CardFill = "0.945 0.957 0.973",
         WarningFill = "1 0.953 0.855", Rule = "0.78 0.82 0.86", Track = "0.91 0.93 0.95";
 
@@ -226,7 +226,7 @@ public static class SalesOverviewPdf
         doc.Y -= 22;
     }
 
-    private static double Width(string text, double size, bool bold)
+    internal static double Width(string text, double size, bool bold)
     {
         double total = 0;
         foreach (var ch in text)
@@ -237,14 +237,14 @@ public static class SalesOverviewPdf
         return total / 1000d * size;
     }
 
-    private static string Fit(string text, double size, double maxWidth)
+    internal static string Fit(string text, double size, double maxWidth)
     {
         if (Width(text, size, false) <= maxWidth) return text;
         while (text.Length > 1 && Width(text + "...", size, false) > maxWidth) text = text[..^1];
         return text.TrimEnd() + "...";
     }
 
-    private static List<string> Wrap(string text, double size, double maxWidth, bool bold = false)
+    internal static List<string> Wrap(string text, double size, double maxWidth, bool bold = false)
     {
         var lines = new List<string>();
         var current = new StringBuilder();
@@ -279,13 +279,22 @@ public static class SalesOverviewPdf
 
     private static string Number(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
-    private sealed class Document
+    /// <summary>
+    /// Escritor de PDF A4 con Helvetica, compartido con el pedido al proveedor (auditoría S.19) para que ambos documentos
+    /// tengan el mismo estilo. <paramref name="footer"/> va al pie de cada página junto al número de página.
+    /// </summary>
+    internal sealed class Document
     {
         private readonly List<StringBuilder> _pages = [];
         private StringBuilder _page = null!;
+        private readonly string _footer;
         public double Y { get; set; }
 
-        public Document() => NewPage();
+        public Document(string footer = "Baratísimo · Reporte de ventas")
+        {
+            _footer = footer;
+            NewPage();
+        }
 
         private void NewPage()
         {
@@ -324,7 +333,7 @@ public static class SalesOverviewPdf
             {
                 _page = _pages[i];
                 Line(Margin, 44, Right, Rule);
-                Text(Margin, 30, "Baratísimo · Reporte de ventas", 8, color: Gray);
+                Text(Margin, 30, Fit(_footer, 8, 360), 8, color: Gray);
                 TextRight(Right, 30, $"Página {(i + 1).ToString("N0", Culture)} de {_pages.Count.ToString("N0", Culture)}", 8, color: Gray);
             }
 

@@ -3,7 +3,8 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { Page, errorText } from '../../core/api';
+import { Page, errorText, reasonOr } from '../../core/api';
+import { PdfFile, saveFile } from '../reports/reports-api';
 import { SessionService } from '../../core/session.service';
 import { Icon } from '../../layout/icon';
 import { CatalogApi, Product } from '../catalog/catalog-api';
@@ -151,8 +152,20 @@ export class Purchases implements OnInit {
   setOrderSupplier(id: string): void { this.orderSupplierId = id; this.orderLines = this.products().filter(p => p.isActive && p.supplierId === id).map(p => ({ productId: p.id, productName: p.name, productCode: p.internalCode, available: p.availableStock, selected: false, quantity: 1 })); }
   orderValidation(): string { if (!this.orderSupplierId || !this.suppliers().some(s => s.id === this.orderSupplierId && s.isActive)) return 'Selecciona un proveedor activo.'; const lines = this.orderLines.filter(l => l.selected); if (!lines.length || lines.length > 200) return 'Incluye entre 1 y 200 productos.'; if (lines.some(l => !Number.isInteger(l.quantity) || l.quantity <= 0)) return 'Indica cantidades enteras positivas.'; return ''; }
   async saveOrder(): Promise<void> { if (!this.canWriteOrders || this.saving()) return; const issue = this.orderValidation(); if (issue) { this.error.set(issue); return; } this.saving.set(true); this.error.set(''); try { const lines = this.orderLines.filter(l => l.selected).map(l => ({ productId: l.productId, requestedQuantity: l.quantity })); const result = this.orderDraft ? await this.ordersApi.update(this.orderDraft, lines) : await this.ordersApi.create({ supplierId: this.orderSupplierId, lines }); this.selectedOrder.set(result); this.editingOrder.set(false); this.notice.set('Pedido guardado.'); await this.reload(); } catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); } }
-  async sendOrder(): Promise<void> { const order = this.selectedOrder(); if (!order || order.status !== 'BORRADOR' || !this.canWriteOrders || this.saving()) return; this.saving.set(true); this.error.set(''); try { const sent = await this.ordersApi.send(order); this.selectedOrder.set(sent); this.notice.set('Pedido enviado. Generando documento…'); await this.reload(); await this.printOrder(sent, true); } catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); } }
+  async sendOrder(): Promise<void> { const order = this.selectedOrder(); if (!order || order.status !== 'BORRADOR' || !this.canWriteOrders || this.saving()) return; this.saving.set(true); this.error.set(''); try { const sent = await this.ordersApi.send(order); this.selectedOrder.set(sent); this.notice.set('Pedido enviado. Descargando el PDF…'); await this.reload(); await this.downloadOrderPdf(sent, true); } catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); } }
   async printOrder(order: Order | null = this.selectedOrder(), generatedAfterSend = false): Promise<void> { if (!order || this.printingOrder()) return; this.printingOrder.set(true); this.error.set(''); try { const supplier = this.suppliers().find(item => item.id === order.supplierId) ?? await this.suppliersApi.get(order.supplierId); await this.orderDocument.print(order, supplier, this.session.user()?.displayName ?? ''); this.notice.set(generatedAfterSend ? 'Pedido enviado y documento generado.' : 'Documento del pedido listo para imprimir o guardar como PDF.'); } catch (e) { this.error.set(generatedAfterSend ? `El pedido fue enviado, pero no se pudo abrir el documento. ${errorText(e)}` : errorText(e)); } finally { this.printingOrder.set(false); } }
+  /** Auditoría S.19: al enviar, el pedido se descarga solo como PDF; desde el detalle se puede volver a descargar o imprimir. */
+  async downloadOrderPdf(order: Order | null = this.selectedOrder(), afterSend = false): Promise<void> {
+    if (!order || this.printingOrder()) return;
+    this.printingOrder.set(true); if (!afterSend) this.error.set('');
+    try {
+      this.saveDownloaded(await this.ordersApi.documentPdf(order));
+      this.notice.set(afterSend ? 'Pedido enviado. Se descargó el PDF; también puedes imprimirlo desde el pedido.' : 'PDF del pedido descargado.');
+    } catch (e) { this.error.set(afterSend ? `El pedido fue enviado, pero no se pudo descargar el PDF. ${reasonOr(e, 'Vuelve a intentarlo desde el pedido.')}` : reasonOr(e, 'No se pudo descargar el PDF del pedido.')); }
+    finally { this.printingOrder.set(false); }
+  }
+  /** Entrega el archivo al navegador (aparte para poder probarlo). */
+  saveDownloaded(file: PdfFile): void { saveFile(file); }
   async newPurchase(): Promise<void> { if (!this.canReceive) return; this.selectedPurchase.set(null); this.form = this.empty(); this.editing.set(true); await this.loadProducts(); }
   async editPurchase(p: Purchase): Promise<void> { if (!this.canReceive || p.status !== 'BORRADOR') return; this.form = { supplierId: p.supplierId, supplierDocumentNumber: p.supplierDocumentNumber, invoiceDate: p.invoiceDate, vatMode: 'NO_DISCRIMINADO', lines: p.lines.map(l => ({ productId: l.productId, quantity: l.quantity, unitCost: l.unitCost, vatPercentage: null, newRetailPrice: l.newRetailPrice })) }; this.editing.set(true); await this.loadProducts(); }
   private async loadProducts(): Promise<void> { try { const all: Product[] = []; let page = 1, total = 1; do { const result = await this.catalog.products({ includeOutOfStock: true, page, pageSize: 100 }); all.push(...result.items); total = result.totalPages; page++; } while (page <= total); this.products.set(all); } catch (e) { this.error.set(errorText(e)); } }

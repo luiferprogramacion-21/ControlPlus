@@ -31,7 +31,7 @@ export interface PdfFile { blob: Blob; fileName: string; }
 export const salesPdfName = (from: string, to: string): string => `reporte-ventas-${from}_${to}.pdf`;
 
 /** A failed blob download carries its problem+json body as a Blob; this turns it back into a readable error. */
-async function readableError(error: unknown): Promise<unknown> {
+export async function readableError(error: unknown): Promise<unknown> {
   if (!(error instanceof HttpErrorResponse) || !(error.error instanceof Blob)) return error;
   let body: unknown = null;
   try { body = JSON.parse(await error.error.text()); } catch { /* not JSON: keep the status only */ }

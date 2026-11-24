@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { AuthorizationBody, Page, authorizationContext } from '../../core/api';
 import { Purchase } from './purchases-api';
+import { PdfFile, readableError } from '../reports/reports-api';
 export interface OrderLine { id: string; productId: string; productCode: string; productName: string; requestedQuantity: number; receivedQuantity: number; pendingQuantity: number; excessQuantity: number; suggestedQuantity: number; estimatedUnitCost: number | null; observation: string | null; /** Costo actual del producto, para proponerlo al recibir. */ currentUnitCost?: number | null; }
 export interface OrderLineSummary { productCode: string; productName: string; requestedQuantity: number; receivedQuantity: number; }
 export interface OrderSummary { id: string; supplierId: string; status: string; visibleNumber: string; createdAt: string; version: number; lines: OrderLineSummary[]; }
@@ -20,6 +21,13 @@ export class OrdersApi {
   get(id: string): Promise<Order> { return firstValueFrom(this.http.get<Order>(`/api/purchase-orders/${id}`)); }
   create(input: OrderDraftInput): Promise<Order> { return firstValueFrom(this.http.post<Order>('/api/purchase-orders', input)); }
   update(order: Order, lines: OrderDraftLine[]): Promise<Order> { return firstValueFrom(this.http.put<Order>(`/api/purchase-orders/${order.id}`, { expectedVersion: order.version, lines })); }
+  /** Auditoría S.19: PDF del pedido con el estilo del reporte de ventas, para descargarlo al enviarlo. */
+  async documentPdf(order: Order): Promise<PdfFile> {
+    try {
+      const blob = await firstValueFrom(this.http.get(`/api/purchase-orders/${order.id}/document.pdf`, { responseType: 'blob' }));
+      return { blob, fileName: `pedido-${order.visibleNumber.replace(/[^A-Za-z0-9-]/g, '-')}.pdf` };
+    } catch (error) { throw await readableError(error); }
+  }
   send(order: Order): Promise<Order> { return firstValueFrom(this.http.post<Order>(`/api/purchase-orders/${order.id}/send`, { expectedVersion: order.version })); }
   receive(order: Order, key: string, input: Omit<ReceiptInput, 'expectedOrderVersion'>): Promise<{ purchase: Purchase; orderId: string; orderStatus: string; orderVersion: number }> { return firstValueFrom(this.http.post<{ purchase: Purchase; orderId: string; orderStatus: string; orderVersion: number }>(`/api/purchase-orders/${order.id}/receipts`, { ...input, expectedOrderVersion: order.version }, { headers: { 'Idempotency-Key': key } })); }
   closeReasons(): Promise<OrderReason[]> { return firstValueFrom(this.http.get<OrderReason[]>('/api/purchase-orders/reasons/close')); }
