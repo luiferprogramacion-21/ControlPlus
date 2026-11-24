@@ -1,7 +1,8 @@
 import { NumberInput } from '../../shared/number-input';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { LayawayCancellation, LayawayDetail, LayawaysApi } from './layaways-api';
@@ -17,7 +18,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
   templateUrl: './layaway-cancel.html',
   styleUrl: './layaways.scss',
 })
-export class LayawayCancel {
+export class LayawayCancel implements OnInit {
   private readonly api = inject(LayawaysApi);
   private readonly authorization = inject(AuthorizationDialog);
   private readonly session = inject(SessionService);
@@ -37,7 +38,12 @@ export class LayawayCancel {
   get retained(): number { return this.totalPaid() - Number(this.refundAmount || 0); }
   get refundTotal(): number { return appliedTotal(this.drafts); }
 
+  /** Auditoría del 23/11/2026: se propone devolver todo lo abonado; con un solo medio, ese medio lleva el valor completo. */
+  ngOnInit(): void { this.refundAmount = this.totalPaid(); }
+  private syncSingleMethod(): void { if (this.drafts.length === 1) this.drafts[0].appliedAmount = Number(this.refundAmount || 0); }
+
   validation(): string {
+    this.syncSingleMethod();
     const amount = Number(this.refundAmount);
     if (!Number.isSafeInteger(amount) || amount < 0) return 'El valor a devolver debe ser un entero no negativo.';
     if (amount > this.totalPaid()) return 'El valor a devolver no puede superar lo abonado.';
@@ -47,6 +53,7 @@ export class LayawayCancel {
   }
 
   private body() {
+    this.syncSingleMethod();
     const amount = Number(this.refundAmount);
     return { refundAmount: amount, refunds: amount > 0 ? toRefunds(this.drafts) : [], reasonId: null, observation: this.observation.trim() || null };
   }
@@ -84,7 +91,7 @@ export class LayawayCancel {
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 403) {
         this.pending = null;
-        throw new Error(credentials ? 'No se autorizó la cancelación. Verifica el rol, el permiso y las credenciales del autorizador.' : 'No tienes permiso para cancelar apartados ni decidir devoluciones.');
+        throw new Error(reasonOr(error, credentials ? 'No se autorizó la cancelación. Verifica el rol, el permiso y las credenciales del autorizador.' : 'No tienes permiso para cancelar apartados ni decidir devoluciones.'));
       }
       throw error;
     } finally { this.saving.set(false); }

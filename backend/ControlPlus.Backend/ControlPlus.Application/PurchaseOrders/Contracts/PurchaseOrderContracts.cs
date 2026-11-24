@@ -50,7 +50,9 @@ public sealed record PurchaseOrderLineDto(Guid Id, Guid ProductId, string Produc
     string ProductName, int RequestedQuantity, int ReceivedQuantity, int PendingQuantity,
     int ExcessQuantity, int SuggestedQuantity, decimal? EstimatedUnitCost, string? Observation,
     int StockAvailableAtCreation, int MinimumStockAtCreation, int PendingOtherOrdersAtCreation,
-    string NeedOrigin);
+    string NeedOrigin,
+    // Costo actual del producto (promedio), para proponerlo al recibir. Solo en rutas de Compras (auditoría del 23/11/2026).
+    decimal? CurrentUnitCost = null);
 
 public sealed record PurchaseOrderDto(Guid Id, Guid SupplierId, string Status, string Prefix,
     string Series, long Consecutive, string VisibleNumber, long Version,

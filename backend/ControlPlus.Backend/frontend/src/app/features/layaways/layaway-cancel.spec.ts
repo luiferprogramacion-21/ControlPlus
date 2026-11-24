@@ -48,7 +48,7 @@ describe('LayawayCancel: cancelación y reembolso', () => {
     ['decimal', 100.5, [], 'no negativo'],
     ['mayor que lo abonado', 50001, [], 'no puede superar'],
     ['sin medios', 1000, [], 'al menos un medio'],
-    ['suma distinta', 1000, [{ methodCode: 'EFECTIVO', appliedAmount: 800, receivedAmount: null, reference: '' }], 'sumar exactamente'],
+    ['suma distinta', 1000, [{ methodCode: 'EFECTIVO', appliedAmount: 500, receivedAmount: null, reference: '' }, { methodCode: 'NEQUI', appliedAmount: 300, receivedAmount: null, reference: 'N-1' }], 'sumar exactamente'],
     ['electrónico sin referencia', 1000, [{ methodCode: 'NEQUI', appliedAmount: 1000, receivedAmount: null, reference: '' }], 'referencia'],
   ])('valida: %s', async (_name, amount, drafts, text) => {
     const component = open(); component.refundAmount = amount;

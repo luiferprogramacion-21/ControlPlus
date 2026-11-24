@@ -4,7 +4,7 @@ import { CatalogApi, Product } from '../catalog/catalog-api';
 import { CustomersApi, Customer } from '../customers/customers-api';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationDialog, AuthorizationPrompt } from '../../shared/authorization-dialog';
-import { dateInDays, LayawayCreate, minimumInitialPayment } from './layaway-create';
+import { dateInDays, isoDateInDays, LayawayCreate, minimumInitialPayment } from './layaway-create';
 import { LayawaysApi } from './layaways-api';
 
 const product = (extra: Partial<Product> = {}): Product => ({ id: 'p1', internalCode: 'PAP-000001', name: 'Cuaderno', retailPrice: 10000, wholesalePrice: 8000,
@@ -123,7 +123,7 @@ describe('LayawayCreate: nuevo apartado', () => {
     expect(api.create).toHaveBeenCalledWith({
       customerId: 'c1', lines: [{ productId: 'p1', quantity: 1, priceType: 'MINORISTA' }],
       payments: [{ methodCode: 'EFECTIVO', appliedAmount: 5000, receivedAmount: 8000, reference: null }],
-      dueDate: null, authorization: { userName: 'supervisor', password: 'secreto' },
+      dueDate: isoDateInDays(15), authorization: { userName: 'supervisor', password: 'secreto' },
     }, expect.any(String));
   });
 
@@ -187,7 +187,7 @@ describe('LayawayCreate: nuevo apartado', () => {
       expect('authorization' in request).toBe(false);
       expect(request).toEqual({
         customerId: 'c1', lines: [{ productId: 'p1', quantity: 1, priceType: 'MINORISTA' }],
-        payments: [{ methodCode: 'EFECTIVO', appliedAmount: 5000, receivedAmount: 8000, reference: null }], dueDate: null,
+        payments: [{ methodCode: 'EFECTIVO', appliedAmount: 5000, receivedAmount: 8000, reference: null }], dueDate: isoDateInDays(15),
       });
       expect(created).toHaveLength(1);
     });
@@ -264,7 +264,9 @@ describe('LayawayCreate: nuevo apartado', () => {
       expect(component.defaultDue()).toEqual({ days: 15, date: dateInDays(15) }); expect(component.dueRequired).toBe(false);
       const fixture = TestBed.createComponent(LayawayCreate); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
       const text = (fixture.nativeElement.textContent ?? '').replace(/\s+/g, ' ');
-      expect(text).toContain('Plazo predeterminado: 15 días'); expect(text).toContain(dateInDays(15)); expect(text).toContain('elige otra fecha para cambiarlo');
+      // Auditoría del 23/11/2026: la fecha ya viene escrita con el plazo y se lee en palabras.
+      expect(component.dueDate).toBe(isoDateInDays(15));
+      expect(text).toContain('Plazo configurado: 15 días'); expect(text).toContain('Vence el'); expect(text).toContain('Puedes elegir otra fecha');
       expect(text).toContain('opcional'); expect(text).toContain('al menos el 20 % del total');
     });
 

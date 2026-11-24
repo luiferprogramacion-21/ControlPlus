@@ -1,5 +1,6 @@
 import { groupedNumber } from '../../shared/number-input';
 import { readableCode } from '../../core/readable-code';
+import { dayDate } from '../../shared/day-date';
 import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -30,6 +31,7 @@ const STATE_LABELS: Record<string, string> = { ACTIVO: 'Activo', PAGADO: 'Pagado
 })
 export class Layaways implements OnInit {
   readonly readableCode = readableCode;
+  readonly longDate = dayDate;
   private readonly api = inject(LayawaysApi);
   private readonly authorization = inject(AuthorizationDialog);
   private readonly confirmation = inject(ConfirmationDialog);

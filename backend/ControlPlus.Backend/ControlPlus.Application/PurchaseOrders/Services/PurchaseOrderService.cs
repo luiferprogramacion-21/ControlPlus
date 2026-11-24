@@ -482,7 +482,7 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
                 Math.Max(0, x.CantidadSolicitada - x.CantidadRecibida), x.CantidadExcedente,
                 x.CantidadSugerida, x.CostoEstimado, x.Observacion,
                 x.StockDisponibleOrigen, x.StockMinimoOrigen, x.PendienteOtrosPedidos,
-                x.OrigenNecesidad)).ToArray(), order.FechaCancelacion,
+                x.OrigenNecesidad, x.Producto?.CostoPromedio)).ToArray(), order.FechaCancelacion,
         order.MotivoCierreId, order.MotivoCancelacionId,
         order.AutorizacionCierreId, order.AutorizacionCancelacionId);
 

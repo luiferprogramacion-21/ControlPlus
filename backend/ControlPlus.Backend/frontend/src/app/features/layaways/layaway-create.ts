@@ -2,7 +2,7 @@ import { NumberInput, groupedNumber } from '../../shared/number-input';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { errorText } from '../../core/api';
+import { errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { CatalogApi, Product } from '../catalog/catalog-api';
@@ -11,6 +11,7 @@ import { CreateLayawayInput, CreatedLayaway, LayawayCreationRules, LayawayPriceT
 import { appliedTotal, cashChange, emptyDraft, money, PaymentDraft, PaymentMethods, toPayments, validateDrafts } from './payment-methods';
 import { WHOLESALE_MIN_QUANTITY } from '../sales/sale-discount';
 import { toastSignal } from '../../core/toast';
+import { dayDate } from '../../shared/day-date';
 import { WindowSheet } from '../../shared/window-sheet';
 
 export interface CreateLine { product: Product; quantity: number; priceType: LayawayPriceType; }
@@ -29,6 +30,11 @@ export function dateInDays(days: number, from = new Date()): string {
   const date = new Date(from.getFullYear(), from.getMonth(), from.getDate() + days);
   return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
 }
+/** Local calendar date n days from today as aaaa-mm-dd, the value of a date field. */
+export function isoDateInDays(days: number, from = new Date()): string {
+  const date = new Date(from.getFullYear(), from.getMonth(), from.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 interface Pending { key: string; fingerprint: string; authorizerUserName: string | null; }
 
 @Component({
@@ -44,6 +50,7 @@ export class LayawayCreate {
   private readonly authorization = inject(AuthorizationDialog);
   readonly session = inject(SessionService);
   readonly number = groupedNumber;
+  readonly longDate = dayDate;
   readonly created = output<CreatedLayaway>();
   readonly closed = output<void>();
   readonly customer = signal<Customer | null>(null);
@@ -72,7 +79,12 @@ export class LayawayCreate {
   }
 
   private async loadRules(): Promise<void> {
-    try { this.rules.set(await this.api.creationRules()); }
+    try {
+      this.rules.set(await this.api.creationRules());
+      // Auditoría del 23/11/2026: la fecha límite ya viene escrita con el plazo configurado; se puede cambiar.
+      const days = this.rules()?.defaultDays;
+      if (!this.dueDate && days != null) this.dueDate = isoDateInDays(days);
+    }
     catch { /* The server still enforces the rules; the screen keeps its generic texts. */ }
   }
   get dueRequired(): boolean { return this.rules()?.defaultDays === null; }
@@ -189,8 +201,8 @@ export class LayawayCreate {
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 403) {
         this.pending = null;
-        if (!credentials) throw new Error('No tienes permiso para crear apartados.');
-        throw new Error('No se autorizó el apartado. Verifica el rol, el permiso y las credenciales del autorizador.');
+        if (!credentials) throw new Error(reasonOr(error, 'No tienes permiso para crear apartados.'));
+        throw new Error(reasonOr(error, 'No se autorizó el apartado. Verifica el rol, el permiso y las credenciales del autorizador.'));
       }
       throw error;
     } finally { this.saving.set(false); }

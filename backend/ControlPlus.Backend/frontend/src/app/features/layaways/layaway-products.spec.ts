@@ -74,9 +74,10 @@ describe('Corregir productos de un apartado', () => {
     expect(screen.refund).toBe(15000);
     expect(screen.drafts[0].appliedAmount).toBe(15000);
     expect(screen.validation()).toBe('');
-    screen.drafts[0].appliedAmount = 10000;
+    // Con un solo medio, el medio lleva toda la devolución; repartido en dos, la suma debe ser exacta.
+    screen.drafts = [{ methodCode: 'EFECTIVO', appliedAmount: 10000, receivedAmount: null, reference: '' }, { methodCode: 'NEQUI', appliedAmount: 2000, receivedAmount: null, reference: 'N-1' }];
     expect(screen.validation()).toContain('exactamente');
-    screen.drafts[0].appliedAmount = 15000;
+    screen.drafts = [{ methodCode: 'EFECTIVO', appliedAmount: 0, receivedAmount: null, reference: '' }];
     permissions = ['LAYAWAY.MANAGE'];
     expect(screen.validation()).toContain('cancelar apartados');
   });

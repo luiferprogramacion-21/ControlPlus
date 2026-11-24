@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { errorText } from '../../core/api';
+import { errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { toastSignal } from '../../core/toast';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
@@ -105,6 +105,7 @@ export class LayawayProducts implements OnInit {
     if (this.refund > 0) {
       if (!this.session.has('LAYAWAY.CANCEL') || !this.session.has('LAYAWAY.REFUND_DECIDE'))
         return 'Esta corrección devuelve dinero: la debe hacer quien puede cancelar apartados y decidir devoluciones.';
+      if (this.drafts.length === 1) this.drafts[0].appliedAmount = this.refund;
       return validateDrafts(this.drafts, { mode: 'refund', exact: this.refund, exactMessage: 'Los medios deben sumar exactamente la devolución.' });
     }
     return '';
@@ -150,7 +151,7 @@ export class LayawayProducts implements OnInit {
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 403) {
         this.pending = null;
-        throw new Error('No se autorizó la corrección. La autoriza un Administrador vigente; la devolución requiere permiso para cancelar apartados.');
+        throw new Error(reasonOr(error, 'No se autorizó la corrección. La autoriza un Administrador vigente; la devolución requiere permiso para cancelar apartados.'));
       }
       throw error;
     } finally { this.saving.set(false); }

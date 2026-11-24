@@ -106,7 +106,7 @@ describe('Reportes', () => {
       }));
       const fixture = await create(); const content = text(fixture);
       expect(fixture.nativeElement.querySelectorAll('.report-card strong')[1].textContent).toBe('1.234');
-      expect(content).toContain('Cambios de productos (12.345)');
+      expect(content).not.toContain('Ganancia estimada =');
       expect(fixture.nativeElement.querySelector('.bar__value')?.textContent).toMatch(/\$\s?1\.234\.567/);
       expect(fixture.componentInstance.salesBars()[0].label).not.toMatch(/mil|mill|M/);
     });
@@ -116,7 +116,7 @@ describe('Reportes', () => {
       expect(content).toMatch(/Costo productos\s*\$\s?54\.000/); expect(content).toMatch(/Ganancia estimada\s*\$\s?36\.000/); expect(content).toContain('+25 % frente al período anterior');
       expect(content).toContain('Efectivo'); expect(content).toContain('Nequi'); expect(content).not.toContain('Tarjeta');
       expect(content).toContain('62,5 %'); expect(fixture.componentInstance.salesBars().map(b => b.height)).toEqual([100, 0]);
-      expect(content).toContain('Cambios de productos (1)'); expect(content).toContain('Total vendido'); expect(content).not.toContain('Ventas netas');
+      expect(content).not.toContain('Ganancia estimada ='); expect(content).not.toContain('Ventas netas');
     });
     it('costo incompleto: costo y margen aparecen como «No disponible» y no como cero', async () => {
       api.salesOverview.mockResolvedValue(overview({ costCompleteness: 'INCOMPLETE', estimatedCost: null, estimatedMargin: null, estimatedMarginPercentage: null, missingCostLines: 2, missingMovementLines: 1 }));

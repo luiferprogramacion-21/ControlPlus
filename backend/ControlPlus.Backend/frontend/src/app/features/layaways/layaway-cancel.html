@@ -10,9 +10,9 @@
     <label class="field-label field-label--spaced" for="cancel-refund">Valor a devolver</label>
     <input id="cancel-refund" class="text-field" type="text" cpNumberInput min="0" step="1" [max]="totalPaid()" name="refundAmount" [(ngModel)]="refundAmount">
     @if (refundAmount > 0) {
-      <h3>Devolución por medio</h3>
-      <cp-payment-methods [drafts]="drafts" mode="refund" idPrefix="cancel" />
-      <p class="form-hint">Suma de medios: {{ money(refundTotal) }} de {{ money(refundAmount) }}.</p>
+      <h3>¿Cómo se devuelve?</h3>
+      <cp-payment-methods [drafts]="drafts" mode="refund" idPrefix="cancel" [amountFromTotal]="true" />
+      @if (drafts.length > 1) { <p class="form-hint">Repartido: {{ money(refundTotal) }} de {{ money(refundAmount) }}.</p> }
     }
     <label class="field-label field-label--spaced" for="cancel-observation">Observación <span>(opcional)</span></label>
     <textarea id="cancel-observation" class="text-field" name="observation" maxlength="1000" [(ngModel)]="observation"></textarea>

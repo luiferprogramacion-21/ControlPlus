@@ -30,13 +30,15 @@
   </section>
 
   @if (detail(); as d) {
-    <section class="panel module-panel layaway-detail" aria-label="Detalle del apartado">
-      <div class="module-toolbar"><div><h3>Apartado {{ d.layaway.number }}</h3><p>{{ d.layaway.customerName }} · creado {{ d.layaway.createdAtUtc | date:'dd/MM/yyyy HH:mm' }}</p></div><button class="table-action" type="button" (click)="closeDetail()">Cerrar</button></div>
+    <!-- Auditoría del 23/11/2026: el detalle se abre en una ventana flotante, como las demás. -->
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="layaway-detail-title"><div class="module-form-sheet__backdrop" (click)="closeDetail()"></div>
+    <section class="panel panel--padded module-form module-form--wide layaway-detail" aria-label="Detalle del apartado">
+      <div class="module-toolbar"><div><h3 id="layaway-detail-title">Apartado {{ d.layaway.number }}</h3><p>{{ d.layaway.customerName }} · creado {{ d.layaway.createdAtUtc | date:'dd/MM/yyyy HH:mm' }}</p></div><button class="table-action" type="button" (click)="closeDetail()">Cerrar</button></div>
       <div class="layaway-summary">
         <div><span>Total</span><strong>{{ money(d.layaway.total) }}</strong></div>
         <div><span>Abonado</span><strong>{{ money(paid(d.layaway)) }}</strong></div>
         <div><span>Saldo</span><strong>{{ money(d.layaway.balance) }}</strong></div>
-        <div><span>Fecha límite</span><strong>{{ d.layaway.dueOn }}</strong></div>
+        <div><span>Fecha límite</span><strong>{{ longDate(d.layaway.dueOn) }}</strong></div>
       </div>
       <p class="muted">Pago inicial mínimo exigido: {{ number(d.initialMinimumPercentage) }} %. Estado: {{ label(d.layaway.state) }}@if (d.layaway.isOverdue) { · vencido }.</p>
       <div class="layaway-detail-actions">
@@ -71,6 +73,7 @@
         @if (cancellation.observation) { <p class="muted">Observación: {{ cancellation.observation }}</p> }
       }
     </section>
+    </div>
   }
 
   @if (paymentDialog()) {

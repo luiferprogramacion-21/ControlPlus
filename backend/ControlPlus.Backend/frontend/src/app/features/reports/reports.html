@@ -28,7 +28,6 @@
         <article class="report-card"><div><span>Ganancia estimada</span><strong>{{ optionalMoney(s.estimatedMargin) }}</strong>
           @if (s.costCompleteness === 'INCOMPLETE') { <small class="report-warning">No se puede calcular: faltan costos</small> } @else { <small [class.report-positive]="(s.estimatedMarginPercentage ?? 0) > 0">{{ percent(s.estimatedMarginPercentage) }} de las ventas</small> }</div><i class="report-card__badge report-card__badge--success" aria-hidden="true">%</i></article>
       </div>
-      <p class="report-note">Contado {{ money(s.sales.cashTotal) }} · Crédito {{ money(s.sales.creditTotal) }} · Cambios de productos ({{ number(s.changes.transactions) }}) {{ money(s.changes.netTotal) }} · Total vendido {{ money(s.netSalesTotal) }}. Ganancia estimada = total vendido menos lo que costó la mercancía vendida (con el costo guardado al vender). No descuenta gastos ni otros impuestos.</p>
 
       <div class="report-grid">
         <section class="report-box" aria-labelledby="report-chart-title">

@@ -29,8 +29,8 @@
     </div>
     @if (refund > 0) {
       <h3>Devolución por medio</h3>
-      <cp-payment-methods [drafts]="drafts" mode="refund" idPrefix="products" />
-      <p class="form-hint">Suma de medios: {{ money(refundTotal) }} de {{ money(refund) }}.</p>
+      <cp-payment-methods [drafts]="drafts" mode="refund" idPrefix="products" [amountFromTotal]="true" />
+      @if (drafts.length > 1) { <p class="form-hint">Repartido: {{ money(refundTotal) }} de {{ money(refund) }}.</p> }
     }
     <label class="field-label field-label--spaced" for="layaway-products-reason">Motivo</label>
     <input id="layaway-products-reason" class="text-field" name="reason" maxlength="500" [(ngModel)]="reason" placeholder="Ej.: el cliente cambió de talla" autocomplete="off">

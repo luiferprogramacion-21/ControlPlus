@@ -65,8 +65,10 @@ export const toRefunds = (drafts: PaymentDraft[]) => drafts.map(d => ({
         <select class="text-field" [id]="idPrefix + '-method-' + i" [name]="idPrefix + '-method-' + i" [(ngModel)]="draft.methodCode">
           <option value="EFECTIVO">Efectivo</option><option value="TRANSFERENCIA">Transferencia</option><option value="NEQUI">Nequi</option>
         </select>
-        <label class="field-label field-label--spaced" [for]="idPrefix + '-amount-' + i">{{ mode === 'refund' ? 'Valor a devolver' : 'Valor del abono' }}</label>
-        <input class="text-field" [id]="idPrefix + '-amount-' + i" [name]="idPrefix + '-amount-' + i" type="text" cpNumberInput min="1" step="1" [(ngModel)]="draft.appliedAmount">
+        @if (!(amountFromTotal && drafts.length === 1)) {
+          <label class="field-label field-label--spaced" [for]="idPrefix + '-amount-' + i">{{ amountFromTotal ? 'Parte por este medio' : mode === 'refund' ? 'Valor a devolver' : 'Valor del abono' }}</label>
+          <input class="text-field" [id]="idPrefix + '-amount-' + i" [name]="idPrefix + '-amount-' + i" type="text" cpNumberInput min="1" step="1" [(ngModel)]="draft.appliedAmount">
+        }
         @if (draft.methodCode === 'EFECTIVO') {
           @if (mode === 'payment') {
             <label class="field-label field-label--spaced" [for]="idPrefix + '-received-' + i">Efectivo recibido</label>
@@ -86,6 +88,8 @@ export class PaymentMethods {
   @Input({ required: true }) drafts: PaymentDraft[] = [];
   @Input() mode: PaymentMode = 'payment';
   @Input() idPrefix = 'payment';
+  /** Auditoría del 23/11/2026: el valor total se escribe arriba; con un solo medio no se pide otra vez y con varios se reparte. */
+  @Input() amountFromTotal = false;
 
   add(): void {
     if (this.drafts.length >= 3) return;
