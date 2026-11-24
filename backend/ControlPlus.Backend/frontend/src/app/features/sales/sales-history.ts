@@ -101,6 +101,11 @@ export class SalesHistory implements OnInit {
   /** Annulment is for Supervisor and Administrador with the effective permission; the server remains the authority. */
   canCancel(sale: SaleDetail): boolean { return sale.state === 'CONFIRMADA' && this.session.has('SALES.VOID') && this.session.hasRole('ADMINISTRADOR', 'SUPERVISOR'); }
   /** Any seller may start a change; a Cajero needs a higher-role authorizer. The server remains the authority. */
+  /** Quién autoriza quitar o cambiar productos, según el rol de quien corrige (jerarquía del 5 de noviembre de 2026). */
+  get correctionAuthorizer(): string {
+    if (this.session.hasRole('ADMINISTRADOR')) return 'Sin autorización';
+    return this.session.hasRole('SUPERVISOR') ? 'Autoriza: Administrador' : 'Autoriza: Supervisor o Administrador';
+  }
   canChange(sale: SaleDetail): boolean { return sale.state === 'CONFIRMADA' && this.session.has('SALES.CREATE'); }
   beginCorrection(mode: 'remove' | 'exchange'): void { this.correcting.set(false); this.correctionMode.set(mode); this.changing.set(true); }
   get correctionTotal(): number { return this.changes().filter(change => change.state === 'CONFIRMADO').reduce((sum, change) => sum + change.difference, 0); }

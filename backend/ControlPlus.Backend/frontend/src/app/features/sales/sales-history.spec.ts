@@ -59,7 +59,9 @@ describe('SalesHistory: historial y anulación', () => {
     expect(c.correctionTotal).toBe(-2000);
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Quitar producto o reducir cantidad'); expect(text).toContain('Cambiar un producto por otro');
-    expect(text).toContain('venta adicional'); expect(text).toContain('Total después de correcciones');
+    expect(text).toContain('Olvidé cobrar un producto'); expect(text).toContain('Total después de correcciones');
+    // Punto 26: cada opción dice qué pasa y quién autoriza.
+    expect(text).toContain('Se devuelve su dinero y vuelve al inventario'); expect(text).toContain(c.correctionAuthorizer);
     c.beginCorrection('remove'); expect(c.correctionMode()).toBe('remove'); expect(c.correcting()).toBe(false); expect(c.changing()).toBe(true);
   });
 

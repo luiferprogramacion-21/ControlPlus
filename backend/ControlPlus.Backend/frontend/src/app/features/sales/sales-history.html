@@ -72,14 +72,29 @@
 
   @if (correcting() && detail(); as d) {
     <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="correct-sale-title"><div class="module-form-sheet__backdrop" (click)="correcting.set(false)"></div><section class="panel panel--padded module-form"><div class="panel-heading"><h2 id="correct-sale-title">Corregir venta {{ d.visibleNumber }}</h2><p>¿Qué pasó? Elige una opción y revisa el resultado antes de confirmar.</p></div><div class="sale-correction-options">
+      <!-- Auditoría del 23/11/2026 (punto 26): cada opción dice qué pasa y quién la autoriza. -->
       @if (canChange(d)) {
-        <button class="button button--secondary" type="button" (click)="beginCorrection('remove')">Quitar producto o reducir cantidad</button>
-        <button class="button button--secondary" type="button" (click)="beginCorrection('exchange')">Cambiar un producto por otro</button>
-        <a class="button button--secondary" routerLink="/operacion/ventas" [queryParams]="{ ventaOrigen: d.id, numeroOrigen: d.visibleNumber }">Olvidé cobrar un producto · venta adicional</a>
+        <button class="correction-card" type="button" (click)="beginCorrection('remove')"><span class="correction-card__icon" aria-hidden="true">−</span>
+          <span><strong>Quitar producto o reducir cantidad</strong><small>Se lleva menos o se cobró de más. Se devuelve su dinero y vuelve al inventario.</small></span>
+          <em>{{ correctionAuthorizer }}</em></button>
+        <button class="correction-card" type="button" (click)="beginCorrection('exchange')"><span class="correction-card__icon" aria-hidden="true">⇄</span>
+          <span><strong>Cambiar un producto por otro</strong><small>Devuelve uno y se lleva otro. Se cobra o se devuelve la diferencia.</small></span>
+          <em>{{ correctionAuthorizer }}</em></button>
+        <a class="correction-card" routerLink="/operacion/ventas" [queryParams]="{ ventaOrigen: d.id, numeroOrigen: d.visibleNumber }"><span class="correction-card__icon" aria-hidden="true">+</span>
+          <span><strong>Olvidé cobrar un producto</strong><small>Abre una venta nueva unida a esta para cobrar lo que faltó.</small></span>
+          <em>Sin autorización</em></a>
       }
-      @if (canCorrectPayments(d)) { <button class="button button--secondary" type="button" (click)="beginPaymentCorrection()">Corregir medio de pago (por ejemplo, pagaron por Nequi y quedó en efectivo)</button> }
-      @if (canCancel(d)) { <button class="button button--secondary sale-cancel-action" type="button" (click)="startCancel()">Anular la venta completa</button> }
-    </div><p class="form-hint">Se conservan el documento original y sus correcciones. El medio de pago se corrige solo en ventas del turno abierto.</p><div class="form-actions"><button class="button button--secondary" type="button" (click)="correcting.set(false)">Volver</button></div></section></div>
+      @if (canCorrectPayments(d)) {
+        <button class="correction-card" type="button" (click)="beginPaymentCorrection()"><span class="correction-card__icon" aria-hidden="true">$</span>
+          <span><strong>Corregir medio de pago</strong><small>Por ejemplo, pagaron por Nequi y quedó en efectivo. El total no cambia. Solo en ventas de la caja abierta.</small></span>
+          <em>Autoriza: Administrador</em></button>
+      }
+      @if (canCancel(d)) {
+        <button class="correction-card correction-card--danger" type="button" (click)="startCancel()"><span class="correction-card__icon" aria-hidden="true">×</span>
+          <span><strong>Anular la venta completa</strong><small>Devuelve todo el dinero y todos los productos vuelven al inventario.</small></span>
+          <em>Autoriza: Administrador</em></button>
+      }
+    </div><p class="form-hint">La venta original no se borra: cada corrección queda unida a ella y se ve en su historial.</p><div class="form-actions"><button class="button button--secondary" type="button" (click)="correcting.set(false)">Volver</button></div></section></div>
   }
   @if (correctingPayments() && detail(); as d) { <cp-sale-payment-correction [sale]="d" (corrected)="paymentsCorrected($event)" (closed)="correctingPayments.set(false)" /> }
   @if (changing() && detail(); as d) { <cp-sale-change [sale]="d" [mode]="correctionMode()" (changed)="changeDone($event)" (closed)="changing.set(false)" /> }

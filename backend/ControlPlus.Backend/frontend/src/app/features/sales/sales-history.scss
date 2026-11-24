@@ -34,6 +34,16 @@
 .history-toolbar-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .sale-correction-options { display:flex; flex-direction:column; gap:10px; }
 .sale-correction-options .button { justify-content:flex-start; text-align:left; white-space:normal; }
+/* Opciones de «Corregir venta» como tarjetas (auditoría del 23 de noviembre de 2026, punto 26). */
+.correction-card { display:grid; grid-template-columns:40px 1fr auto; align-items:center; gap:14px; width:100%; padding:14px 16px;
+  border:1px solid var(--cp-border); border-radius:12px; background:#fff; color:inherit; font:inherit; text-align:left; text-decoration:none; cursor:pointer; }
+.correction-card:hover, .correction-card:focus-visible { border-color:var(--cp-primary, #2a5ea8); background:var(--cp-primary-soft, #eef4fc); outline:none; }
+.correction-card strong { display:block; font-size:16px; }
+.correction-card small { display:block; margin-top:3px; color:var(--cp-text-muted); font-size:13px; line-height:1.4; }
+.correction-card em { color:var(--cp-text-muted); font-size:12px; font-style:normal; font-weight:600; white-space:nowrap; }
+.correction-card__icon { display:grid; place-items:center; width:40px; height:40px; border-radius:50%; background:var(--cp-surface-muted); color:var(--cp-primary, #2a5ea8); font-size:20px; font-weight:800; }
+.correction-card--danger strong, .correction-card--danger .correction-card__icon { color:var(--cp-error); }
+@container cp (max-width: 560px) { .correction-card { grid-template-columns:40px 1fr; } .correction-card em { grid-column:2; } }
 .sale-correction-entry { padding-bottom:12px; border-bottom:1px solid var(--cp-border); }
 .sale-correction-entry:last-child { border-bottom:0; }
 .sale-correction-entry p, .sale-correction-entry > button { margin:6px 14px; }
