@@ -9,6 +9,7 @@ import { PurchaseOrderDocumentPrinter } from './purchase-order-document';
 describe('Purchase orders', () => {
   let component: Purchases; let create: ReturnType<typeof vi.fn>; let list: ReturnType<typeof vi.fn>; let send: ReturnType<typeof vi.fn>; let print: ReturnType<typeof vi.fn>; let documentPdf: ReturnType<typeof vi.fn>;
   const permissions = new Set(['PURCHASE_ORDERS.MANAGE', 'SUPPLIERS.READ', 'PRODUCTS.READ', 'INVENTORY.READ']);
+  const catalog = { categories: vi.fn(), units: vi.fn(), createProduct: vi.fn() };
   const supervisor = { id: 'operator-1', userName: 'supervisor', roles: ['SUPERVISOR'] };
   const session = {
     has: (permission: string) => permissions.has(permission),
@@ -17,10 +18,32 @@ describe('Purchase orders', () => {
   };
   beforeEach(() => { create = vi.fn(); send = vi.fn(); documentPdf = vi.fn(); print = vi.fn().mockResolvedValue(undefined); list = vi.fn().mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 }); permissions.clear(); ['PURCHASE_ORDERS.MANAGE', 'SUPPLIERS.READ', 'PRODUCTS.READ', 'INVENTORY.READ'].forEach(x => permissions.add(x)); TestBed.configureTestingModule({ providers: [
     { provide: PurchasesApi, useValue: {} }, { provide: OrdersApi, useValue: { create, send, list, documentPdf } },
-    { provide: SuppliersApi, useValue: {} }, { provide: CatalogApi, useValue: {} },
+    { provide: SuppliersApi, useValue: {} }, { provide: CatalogApi, useValue: catalog },
     { provide: PurchaseOrderDocumentPrinter, useValue: { print } },
     { provide: SessionService, useValue: session },
   ] }); component = TestBed.runInInjectionContext(() => new Purchases()); component.suppliers.set([{ id: 'supplier', name: 'Proveedor', isActive: true } as any]); component.orderSupplierId = 'supplier'; component.orderLines = [{ productId: 'product', productCode: 'P1', productName: 'Producto', available: 4, selected: true, quantity: 2 }]; });
+  it('pide un producto que aún no está en el sistema: lo crea con este proveedor y sin precio si no se sabe (punto 17)', async () => {
+    permissions.add('PRODUCTS.CREATE');
+    catalog.categories.mockResolvedValue({ items: [{ id: 'cat', name: 'Juguetes', isActive: true }, { id: 'old', name: 'Vieja', isActive: false }], page: 1, pageSize: 100, totalCount: 2, totalPages: 1 });
+    catalog.units.mockResolvedValue([{ id: 'u-paq', code: 'PAQUETE' }, { id: 'u-und', code: 'UNIDAD' }]);
+    catalog.createProduct.mockResolvedValue({ id: 'new', name: 'Carro nuevo', internalCode: 'JUG-000099', retailPrice: 0, availableStock: 0 });
+    expect(component.canCreateOrderProduct).toBe(true);
+    await component.startOrderProduct();
+    expect(component.orderCategories().map(c => c.id)).toEqual(['cat']);
+    const draft = component.newOrderProduct()!;
+    await component.addOrderProduct();
+    expect(component.error()).toContain('nombre');
+    draft.name = 'Carro nuevo'; draft.categoryId = 'cat'; draft.quantity = 6;
+    await component.addOrderProduct();
+    expect(catalog.createProduct).toHaveBeenCalledWith(expect.objectContaining({ name: 'Carro nuevo', categoryId: 'cat', measurementUnitId: 'u-und',
+      supplierId: 'supplier', retailPrice: 0, initialQuantity: 0, initialUnitCost: null }), true, draft.key);
+    expect(component.orderLines.at(-1)).toEqual({ productId: 'new', productName: 'Carro nuevo', productCode: 'JUG-000099', available: 0, selected: true, quantity: 6 });
+    expect(component.newOrderProduct()).toBeNull();
+    expect(component.notice()).toContain('Todavía no tiene precio de venta');
+    permissions.delete('PRODUCTS.CREATE');
+    expect(component.canCreateOrderProduct).toBe(false);
+  });
+
   it('rechaza cantidades fraccionarias y productos sin seleccionar', async () => { component.orderLines[0].quantity = 1.5; expect(component.orderValidation()).toContain('enteras'); await component.saveOrder(); expect(create).not.toHaveBeenCalled(); component.orderLines[0].selected = false; expect(component.orderValidation()).toContain('Incluye'); });
   it('rechaza creación sin permiso efectivo', async () => { permissions.delete('PURCHASE_ORDERS.MANAGE'); await component.saveOrder(); expect(create).not.toHaveBeenCalled(); expect(component.saving()).toBe(false); });
   it('impide doble envío mientras espera al servidor', async () => {

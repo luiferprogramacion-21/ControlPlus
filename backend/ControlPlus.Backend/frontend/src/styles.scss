@@ -853,3 +853,6 @@ kbd { display: inline-block; min-width: 28px; padding: 2px 7px; border: 1px soli
 .reason-choice:hover { background: var(--cp-primary-soft); }
 .reason-choice--on { border: 2px solid var(--cp-primary); background: var(--cp-primary-soft); font-weight: 600; }
 .reason-choice input { width: 18px; height: 18px; margin: 0; accent-color: var(--cp-primary); }
+
+/* Producto creado desde un pedido sin precio de venta todavía (punto 17, 24 de noviembre de 2026). */
+.no-price { color: var(--cp-error); font-weight: 700; }

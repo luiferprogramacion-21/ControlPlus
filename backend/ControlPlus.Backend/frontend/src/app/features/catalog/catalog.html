@@ -33,7 +33,7 @@
               @for (product of products()?.items ?? []; track product.id) {
                 <tr>
                   <td>{{ product.internalCode }}</td><td>{{ product.barcode || '—' }}</td><td><strong>{{ product.name }}</strong></td>
-                  <td>{{ product.categoryName }}</td><td>{{ product.retailPrice | number:'1.0-0' }}</td><td>{{ product.availableStock | number:'1.0-0' }}</td>
+                  <td>{{ product.categoryName }}</td><td>@if (product.retailPrice > 0) { {{ product.retailPrice | number:'1.0-0' }} } @else { <span class="no-price" title="Ponle precio con Editar para poder venderlo">Sin precio</span> }</td><td>{{ product.availableStock | number:'1.0-0' }}</td>
                   <td>@let state = stockState(product);<span class="status-pill stock-state stock-state--{{ state.tone }}">{{ state.label }}</span></td>
                   <td>@if (canEditProduct()) { <button mat-button type="button" (click)="editProduct(product)">Editar</button> }
                   @if (session.has('PRODUCTS.SENSITIVE_UPDATE')) {

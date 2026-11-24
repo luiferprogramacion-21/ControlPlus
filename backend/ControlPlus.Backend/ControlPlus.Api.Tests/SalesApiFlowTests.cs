@@ -1058,8 +1058,12 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Cashier.AccessToken, scenario.Users.Cashier.Id);
         SetBearer(client, scenario.Cashier.AccessToken);
 
-        await AssertProblemAsync(await PostSaleAsync(client, "zero-total", CashRequest(
-            scenario.Products.ZeroTotal, 1, 0m)), HttpStatusCode.BadRequest);
+        // Punto 17 (24/11/2026): un producto sin precio de venta (por ejemplo, creado desde un pedido) no se vende y se explica.
+        using (var withoutPrice = await PostSaleAsync(client, "zero-total", CashRequest(scenario.Products.ZeroTotal, 1, 0m)))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, withoutPrice.StatusCode);
+            Assert.Contains("todavía no tiene precio de venta", await withoutPrice.Content.ReadAsStringAsync());
+        }
         await AssertProblemAsync(await PostSaleAsync(client, "mixed-discount-scopes", new ConfirmSaleRequest(
             null,
             [new(scenario.Products.Standard, 1, "MINORISTA", new("PORCENTAJE", 1m))],

@@ -99,3 +99,9 @@
 .purchase-steps li { padding:6px 12px; border-radius:999px; background:var(--cp-primary-soft); color:var(--cp-primary); font-size:13px; font-weight:700; }
 .purchase-steps li.is-current { background:var(--cp-primary); color:#fff; }
 .purchase-steps li.is-done { background:var(--cp-success-soft); color:var(--cp-success); }
+
+/* Producto nuevo desde el pedido (punto 17 de la auditoría, 24 de noviembre de 2026). */
+.order-new-product { margin: 12px 0 0; padding: 14px 16px; border: 1px solid var(--cp-border); border-radius: 12px; background: var(--cp-surface-subtle, #f7f9fc); }
+.order-new-product legend { padding: 0 6px; font-weight: 700; }
+.order-new-product__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+

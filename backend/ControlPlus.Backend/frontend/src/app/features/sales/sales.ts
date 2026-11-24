@@ -808,6 +808,8 @@ export class Sales implements OnInit, OnDestroy {
   add(product: Product): void {
     if (this.locked) return;
     if (!product.isActive || product.availableStock < 1) { this.error.set(`${product.name ?? 'El producto'} está agotado o inactivo.`); return; }
+    // Punto 17: un producto creado desde un pedido puede no tener precio de venta todavía.
+    if (!(product.retailPrice > 0)) { this.error.set(`${product.name} todavía no tiene precio de venta. Pídele al Administrador que se lo ponga en Catálogo.`); return; }
     const lines = this.cart(); const existing = lines.find(line => line.product.id === product.id && line.priceType === 'MINORISTA' && !line.discount);
     if (existing && existing.quantity + 1 > product.availableStock) { this.error.set(`Solo hay ${groupedNumber(product.availableStock)} unidades disponibles de ${product.name}.`); return; }
     if (existing) this.cart.set(lines.map(line => line === existing ? { ...line, quantity: line.quantity + 1 } : line));

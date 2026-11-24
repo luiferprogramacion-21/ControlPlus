@@ -926,6 +926,7 @@ Aprobado también: el nuevo «Resumen de la venta» al cobrar (Codex, `5cf4e17`)
 - El arqueo (`CashRepository.GetExpectedAmountsAsync`) y el flujo de caja diario cuentan cada pago de venta en el turno de **su movimiento de caja**, no en el de la venta. En los datos anteriores siempre coinciden.
 - La caja de hoy queda con la diferencia: si se pasa de efectivo a Nequi, hoy se espera menos efectivo. Junto con el faltante que quedó en el cierre de ese día, el total de los dos días cuadra.
 
-**Pendiente de decisión del usuario:**
+**Punto 17 (opción A aprobada el 24 de noviembre de 2026, sin migración):**
 
-- **Punto 17:** pedir al proveedor un producto que aún no está en el sistema.
+- En «Nuevo pedido al proveedor», «+ Producto nuevo» (requiere `PRODUCTS.CREATE`) crea el producto en Catálogo con nombre, categoría, unidad «Unidad», el proveedor del pedido, código de barras generado y sin existencias, y lo agrega marcado al pedido con la cantidad indicada.
+- **El precio de venta es opcional** (pedido del usuario). Vacío se guarda como 0, que la base ya admite (`ck_producto_precio_minorista >= 0`). Un producto sin precio aparece como «Sin precio» en Catálogo, en la búsqueda del punto de venta y al recibir. No se puede vender ni apartar: el servidor responde «… todavía no tiene precio de venta» y el punto de venta no lo agrega. El precio se pone al recibir la mercancía (Administrador) o en Catálogo (Administrador, o Supervisor con su autorización).

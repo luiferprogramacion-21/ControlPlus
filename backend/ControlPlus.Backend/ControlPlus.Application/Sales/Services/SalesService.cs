@@ -808,6 +808,9 @@ public sealed partial class SalesService(
             var unitPrice = requested.PriceType == "MAYORISTA"
                 ? product.PrecioMayorista ?? throw new DomainRuleViolationException($"El producto {product.CodigoInterno} no tiene precio mayorista.")
                 : product.PrecioMinorista;
+            // Punto 17 (24/11/2026): un producto creado desde un pedido puede quedar sin precio de venta hasta que se lo pongan.
+            if (unitPrice <= 0)
+                throw new DomainRuleViolationException($"{product.Nombre} todavía no tiene precio de venta. Ponle precio en Catálogo antes de venderlo.");
             CashMoney.Require(unitPrice, allowNegative: false);
             if (requested.PriceType == "MAYORISTA" && requested.Quantity < wholesaleMinimumQuantity)
                 throw new DomainRuleViolationException(

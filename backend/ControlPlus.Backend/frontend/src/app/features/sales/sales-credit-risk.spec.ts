@@ -55,6 +55,14 @@ describe('Sales: clientes morosos y cupo de crédito', () => {
     expect(component.customerStage()).toBeNull();
   });
 
+  it('no agrega un producto sin precio de venta y explica qué hacer (punto 17)', async () => {
+    await create();
+    const before = component.cart().length;
+    component.add({ ...product, id: '019a0000-0000-7000-8000-000000000009', name: 'Carro nuevo', retailPrice: 0 });
+    expect(component.cart().length).toBe(before);
+    expect(component.error()).toContain('todavía no tiene precio de venta');
+  });
+
   it('describe el cupo superado con lo disponible', async () => {
     creditCheck.mockResolvedValue(risk({ overdue: false, overdueBalance: 0, overdueCredits: 0, exceedsLimit: true, creditLimit: 65000, availableCredit: 5000 }));
     await create(); component.startCheckout(); await loaded();

@@ -399,6 +399,7 @@ En **Créditos y abonos** puedes registrar abonos (como el Cajero) y además:
 Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor**, **Mercancía recibida** y **Compras sin pedido**.
 
 - **Pedir mercancía:** **Nuevo pedido al proveedor** (al lado de Recibir mercancía) → elige el proveedor, agrega productos con su cantidad → **Crear pedido**.
+- **Pedir algo que aún no está en el sistema:** en el mismo pedido pulsa **+ Producto nuevo**, escribe el nombre, elige la categoría y la cantidad y pulsa **Agregar al pedido**. Queda creado en Catálogo con ese proveedor. El **precio de venta es opcional**: si aún no lo sabes, déjalo vacío. Mientras no tenga precio se ve como **Sin precio** y **no se puede vender**; el Administrador se lo pone al recibir la mercancía o en Catálogo.
 - **Cuando llega mercancía:** pulsa **Recibir mercancía** (también en Inicio). Son tres pasos, que se ven arriba de cada ventana: **1. ¿De dónde viene?**, **2. Productos y cantidades** y **3. Confirmar**. El sistema pregunta si viene de un pedido:
   - **Sí, viene de un pedido:** eliges el pedido; las cantidades pendientes **vienen listas**. Si llegó menos (recepción **parcial**), corrígelas.
   - **No, es una compra sin pedido:** anotas el proveedor, el número de factura, los productos y sus costos.

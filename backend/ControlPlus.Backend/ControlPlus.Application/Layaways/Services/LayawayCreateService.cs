@@ -202,6 +202,8 @@ public sealed class LayawayCreateService(
                 var unitPrice = line.PriceType == "MAYORISTA" ? product.PrecioMayorista : product.PrecioMinorista;
                 if (unitPrice is null)
                     return Fail(ApplicationError.Validation("El producto no tiene precio mayorista configurado."));
+                if (unitPrice <= 0)
+                    return Fail(ApplicationError.Validation($"{product.Nombre} todavía no tiene precio de venta. Ponle precio en Catálogo antes de apartarlo."));
                 if (line.PriceType == "MAYORISTA" && line.Quantity < establishment.MinimoUnidadesMayorista)
                     return Fail(ApplicationError.Validation(
                         $"El precio mayorista exige al menos {establishment.MinimoUnidadesMayorista} unidades de {product.CodigoInterno}."));
