@@ -60,12 +60,12 @@ import { HelpTip } from '../../shared/help-tip';
             @if (!creditChooseEachTime) {
               <div class="rule-field rule-field--nested"><span class="rule-field__label">Vencimiento sugerido</span>
                 <span class="rule-term-controls">
-                  @if (creditUnit === 'days') { <span class="rule-input"><input id="credit-days" name="creditDays" type="text" cpNumberInput min="1" max="90" step="1" [(ngModel)]="creditDays" aria-label="Cantidad de días"><b>días</b></span> }
-                  @else { <span class="rule-input"><input id="credit-months" name="creditMonths" type="text" cpNumberInput min="1" max="3" step="1" [(ngModel)]="creditMonths" aria-label="Cantidad de meses"><b>meses</b></span> }
+                  @if (creditUnit === 'days') { <span class="rule-input"><input id="credit-days" name="creditDays" type="text" cpNumberInput min="1" max="180" step="1" [(ngModel)]="creditDays" aria-label="Cantidad de días"><b>días</b></span> }
+                  @else { <span class="rule-input"><input id="credit-months" name="creditMonths" type="text" cpNumberInput min="1" max="6" step="1" [(ngModel)]="creditMonths" aria-label="Cantidad de meses"><b>meses</b></span> }
                   <select id="credit-unit" class="rule-unit" name="creditUnit" [(ngModel)]="creditUnit" aria-label="Unidad del plazo de crédito"><option value="days">Días</option><option value="months">Meses</option></select>
                 </span></div>
             }
-            <p class="rule-note">Quien vende puede cambiar la fecha entre mañana y {{ creditUnit === 'months' && !creditChooseEachTime ? '3 meses calendario' : '90 días' }}. El plazo se cuenta desde la fecha de la venta.</p>
+            <p class="rule-note">Quien vende puede cambiar la fecha entre mañana y {{ creditUnit === 'months' && !creditChooseEachTime ? '6 meses calendario' : '180 días' }}. El plazo se cuenta desde la fecha de la venta.</p>
             <div class="rule-divider"></div>
             <label class="rule-switch"><input type="checkbox" role="switch" name="creditBlock" [(ngModel)]="creditBlock"><span class="rule-switch__track" aria-hidden="true"></span><span>Bloquear créditos a morosos o por encima del cupo</span></label>
             <p class="rule-note rule-note--nested">{{ creditBlock ? 'Solo el Administrador puede autorizar esas ventas.' : 'Se avisa, pero se puede vender.' }}</p>
@@ -173,10 +173,10 @@ export class SettingsPanel implements OnInit {
     if (this.creditChooseEachTime) return '';
     if (this.creditUnit === 'months') {
       const months = Number(this.creditMonths);
-      return Number.isInteger(months) && months >= 1 && months <= 3 ? '' : 'El plazo debe ser un entero entre 1 y 3 meses.';
+      return Number.isInteger(months) && months >= 1 && months <= 6 ? '' : 'El plazo debe ser un entero entre 1 y 6 meses.';
     }
     const days = Number(this.creditDays);
-    return Number.isInteger(days) && days >= 1 && days <= 90 ? '' : 'El plazo debe ser un entero entre 1 y 90 días.';
+    return Number.isInteger(days) && days >= 1 && days <= 180 ? '' : 'El plazo debe ser un entero entre 1 y 180 días.';
   }
   async saveCredit(): Promise<void> {
     const current = this.credit(); if (!current || this.savingCredit()) return;

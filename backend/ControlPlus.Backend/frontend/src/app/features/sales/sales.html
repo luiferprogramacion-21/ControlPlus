@@ -201,7 +201,7 @@
             @if (creditRulesLoading()) { <p class="form-hint" role="status">Consultando el plazo configurado…</p> }
             @else if (defaultCreditTermText) { <p class="form-hint">Plazo predeterminado: <strong>{{ defaultCreditTermText }}</strong>@if (defaultDueDateText) { (vence el <strong>{{ defaultDueDateText }}</strong>) }. Puedes cambiar la fecha entre mañana y {{ creditDueWindowText }}.</p> }
             @else if (creditRulesKnown()) { <p class="form-hint">No hay un plazo predeterminado: elige la fecha de vencimiento, entre mañana y {{ creditDueWindowText }}.</p> }
-            @else { <p class="form-hint">No se pudo consultar el plazo configurado. Elige la fecha entre mañana y 90 días.</p> }
+            @else { <p class="form-hint">No se pudo consultar el plazo configurado. Elige la fecha entre mañana y 180 días.</p> }
           </div>
           @if (creditRisk(); as risk) {
             <div class="inline-feedback" [class.inline-feedback--error]="risk.blocked" [class.inline-feedback--warning]="!risk.blocked" role="alert">

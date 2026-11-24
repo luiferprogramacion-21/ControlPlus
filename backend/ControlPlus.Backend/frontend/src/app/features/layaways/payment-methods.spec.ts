@@ -20,7 +20,7 @@ describe('Medios de pago: funciones', () => {
     ['supera el máximo', [draft({ appliedAmount: 6000, receivedAmount: 6000 })], { mode: 'payment' as const, max: 5000, overMessage: 'Supera el saldo.' }, 'Supera el saldo'],
     ['suma distinta a la exacta', [draft({ appliedAmount: 3000 })], { mode: 'refund' as const, exact: 4000, exactMessage: 'No suma.' }, 'No suma'],
     ['efectivo recibido menor', [draft({ appliedAmount: 5000, receivedAmount: 4000 })], { mode: 'payment' as const }, 'efectivo recibido'],
-    ['devolución electrónica sin referencia', [draft({ methodCode: 'NEQUI', reference: ' ' })], { mode: 'refund' as const }, 'referencia'],
+    ['devolución electrónica con referencia larga', [draft({ methodCode: 'NEQUI', reference: 'x'.repeat(201) })], { mode: 'refund' as const }, 'referencia'],
     ['electrónico con referencia larga', [draft({ methodCode: 'TRANSFERENCIA', reference: 'x'.repeat(201) })], { mode: 'refund' as const }, 'referencia'],
   ])('rechaza: %s', (_name, rows, rules, text) => {
     expect(validateDrafts(rows as PaymentDraft[], rules)).toContain(text);

@@ -30,7 +30,7 @@ export interface ChangePolicy { days: number; version: number; }
 export interface LayawaySettings { minimumPercentage: number; defaultDays: number | null; requireMinimumInitial: boolean; version: number; }
 
 
-/** Credit due-date suggestion: either 1–90 days, 1–3 calendar months, or neither. */
+/** Credit due-date suggestion: either 1–180 days, 1–6 calendar months, or neither (decisión D1 del 23/11/2026). */
 /** blockRiskyCredit: con true, vender a crédito a un moroso o sobre el cupo exige autorización de un Administrador. */
 export interface CreditSettings { defaultDays: number | null; defaultMonths?: number | null; version: number; blockRiskyCredit: boolean; }
 /** Units of the same product required for the wholesale price in sales, layaways and changes (1 to 999). */

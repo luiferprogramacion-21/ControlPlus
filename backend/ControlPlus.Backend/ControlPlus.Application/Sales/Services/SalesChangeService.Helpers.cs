@@ -114,8 +114,7 @@ public sealed partial class SalesService
         foreach (var payment in payments)
         {
             var method = byCode[payment.MethodCode];
-            if (!method.AfectaEfectivo && string.IsNullOrWhiteSpace(payment.Reference))
-                return Fail("La referencia del medio electrónico es obligatoria.");
+            // Decisión D8 del 23/11/2026: la referencia de Nequi y transferencia es opcional también en los cambios.
             if (method.AfectaEfectivo && payment.Reference is not null)
                 return Fail("El efectivo no admite referencia electrónica.");
             if (difference < 0 && payment.ReceivedAmount is not null ||

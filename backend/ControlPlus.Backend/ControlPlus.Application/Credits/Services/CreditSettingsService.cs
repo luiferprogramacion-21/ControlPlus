@@ -25,8 +25,9 @@ public sealed class CreditSettingsService(
     IClock clock,
     ICustomerCreditExposureReader exposureReader) : ICreditSettingsService
 {
-    private const int MaximumDays = 90;
-    private const int MaximumMonths = 3;
+    // Decisión D1 del 23/11/2026: hasta 180 días o 6 meses calendario (antes 90 días o 3 meses).
+    private const int MaximumDays = 180;
+    private const int MaximumMonths = 6;
 
     public async Task<Result<CreditSettingsDto>> GetAsync(
         ActorContext actor, CancellationToken cancellationToken = default)

@@ -152,7 +152,7 @@ export class SaleChange implements OnInit {
     const payments: ChangePaymentInput[] = s.mode === 'none' ? [] : this.drafts.map(d => ({
       methodCode: d.methodCode, amount: Number(d.appliedAmount),
       receivedAmount: s.mode === 'payment' && d.methodCode === 'EFECTIVO' ? Number(d.receivedAmount) : null,
-      reference: d.methodCode === 'EFECTIVO' ? null : d.reference.trim(),
+      reference: d.methodCode === 'EFECTIVO' ? null : d.reference.trim() || null,
     }));
     return {
       expectedSaleVersion: prep.saleVersion, expectedCreditVersion: prep.creditVersion,

@@ -268,7 +268,7 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
             ("customer-unidentified", CreditRequest(scenario, unidentified, date.AddDays(1)), HttpStatusCode.BadRequest),
             ("due-yesterday", CreditRequest(scenario, scenario.CustomerId, date.AddDays(-1)), HttpStatusCode.BadRequest),
             ("due-today", CreditRequest(scenario, scenario.CustomerId, date), HttpStatusCode.BadRequest),
-            ("due-91", CreditRequest(scenario, scenario.CustomerId, date.AddDays(91)), HttpStatusCode.BadRequest)
+            ("due-181", CreditRequest(scenario, scenario.CustomerId, date.AddDays(181)), HttpStatusCode.BadRequest)
         };
         foreach (var item in cases)
         {
@@ -280,13 +280,13 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
             CreditRequest(scenario, scenario.CustomerId, date.AddDays(1))), HttpStatusCode.Created);
         _ = await StartSessionAsync(client, scenario, scenario.Cashier);
         SetBearer(client, scenario.Cashier.AccessToken);
-        var ninety = await ReadAsync<SaleDto>(await PostSaleAsync(client, "due-90",
-            CreditRequest(scenario, scenario.CustomerId, date.AddDays(90))), HttpStatusCode.Created);
+        var ninety = await ReadAsync<SaleDto>(await PostSaleAsync(client, "due-180",
+            CreditRequest(scenario, scenario.CustomerId, date.AddDays(180))), HttpStatusCode.Created);
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         Assert.Equal(date.AddDays(1), await db.Credito.Where(x => x.Id == tomorrow.CreditId)
             .Select(x => x.FechaVencimiento).SingleAsync());
-        Assert.Equal(date.AddDays(90), await db.Credito.Where(x => x.Id == ninety.CreditId)
+        Assert.Equal(date.AddDays(180), await db.Credito.Where(x => x.Id == ninety.CreditId)
             .Select(x => x.FechaVencimiento).SingleAsync());
     }
 

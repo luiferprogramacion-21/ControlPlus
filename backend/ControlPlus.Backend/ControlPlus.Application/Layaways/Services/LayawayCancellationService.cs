@@ -114,8 +114,7 @@ public sealed class LayawayCancellationService(
             : await sales.GetPaymentMethodsAsync(input.Refunds!.Select(x => x.MethodCode).ToArray(), cancellationToken);
         if (methods.Count != input.Refunds!.Length || methods.Any(x => !x.Activo) ||
             methods.Any(x => x.Codigo == "EFECTIVO" ? !x.AfectaEfectivo : x.AfectaEfectivo) ||
-            input.Refunds.Any(x => methods.All(method => method.Codigo != x.MethodCode ||
-                (method.RequiereReferencia && x.Reference is null))))
+            input.Refunds.Any(x => methods.All(method => method.Codigo != x.MethodCode)))
             return Fail(ApplicationError.Validation("Los medios de reembolso deben estar activos y conservar su clasificación."));
 
         if (shift is not null)
@@ -315,7 +314,7 @@ public sealed class LayawayCancellationService(
             var reference = string.IsNullOrWhiteSpace(refund.Reference) ? null : refund.Reference.Trim();
             if (code is not "EFECTIVO" and not "TRANSFERENCIA" and not "NEQUI" ||
                 !CashMoney.IsValid(refund.Amount, allowNegative: false) || refund.Amount <= 0 ||
-                reference?.Length > 200 || (code == "EFECTIVO" ? reference is not null : reference is null))
+                reference?.Length > 200 || (code == "EFECTIVO" && reference is not null))
                 return NormalizedCancellation.Fail("Método, importe o referencia de reembolso inválidos.");
             refunds.Add(new LayawayRefundRequest(code, refund.Amount, reference));
         }

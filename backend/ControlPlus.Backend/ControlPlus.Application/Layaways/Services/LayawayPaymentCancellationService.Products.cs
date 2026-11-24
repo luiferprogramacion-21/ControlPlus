@@ -49,8 +49,9 @@ public sealed partial class LayawayPaymentCancellationService
                 return ProductFail(ApplicationError.Validation("Revisa los medios e importes de devolución."));
             var code = row.MethodCode.Trim().ToUpperInvariant();
             var reference = string.IsNullOrWhiteSpace(row.Reference) ? null : row.Reference.Trim();
-            if ((code == "EFECTIVO" && reference is not null) || (code != "EFECTIVO" && reference is null))
-                return ProductFail(ApplicationError.Validation("La devolución electrónica requiere referencia; efectivo no la usa."));
+            // Decisión D8 del 23/11/2026: la referencia de una devolución electrónica es opcional.
+            if (code == "EFECTIVO" && reference is not null)
+                return ProductFail(ApplicationError.Validation("La devolución en efectivo no lleva referencia."));
             refunds.Add(new(code, row.Amount, reference));
         }
         if (refunds.Select(r => r.MethodCode).Distinct().Count() != refunds.Count)

@@ -927,7 +927,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
             ("installments-unordered", new ConfirmSaleRequest(setup.CustomerId, [line], null, null, [], "CREDITO",
                 null, null, [day.AddDays(20), day.AddDays(10)])),
             ("installments-too-late", new ConfirmSaleRequest(setup.CustomerId, [line], null, null, [], "CREDITO",
-                null, null, [day.AddDays(10), day.AddDays(91)])),
+                null, null, [day.AddDays(10), day.AddDays(181)])),
             ("installments-cash", new ConfirmSaleRequest(setup.CustomerId, [line], null, null,
                 [new SalePaymentRequest("EFECTIVO", 1_000m, 1_000m, null)], "CONTADO", null, null, dates)),
         })

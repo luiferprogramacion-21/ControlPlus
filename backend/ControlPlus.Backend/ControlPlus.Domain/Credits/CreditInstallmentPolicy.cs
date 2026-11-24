@@ -5,7 +5,9 @@ public sealed record PlannedCreditInstallment(int Number, DateOnly DueOn, decima
 public static class CreditInstallmentPolicy
 {
     public const int MaximumInstallments = 90;
-    public const int MaximumCalendarMonths = 3;
+    // Decisión D1 del 23/11/2026: un crédito puede durar hasta 6 meses calendario o 180 días.
+    public const int MaximumCalendarMonths = 6;
+    public const int MaximumDays = 180;
 
     public static IReadOnlyCollection<PlannedCreditInstallment> Build(decimal total,
         DateOnly operatingDate, DateOnly? singleDueDate, IReadOnlyCollection<DateOnly>? installmentDueDates,
@@ -15,7 +17,7 @@ public static class CreditInstallmentPolicy
             throw new ArgumentOutOfRangeException(nameof(maximumCalendarMonths));
         var maximumDueDate = maximumCalendarMonths is { } months
             ? operatingDate.AddMonths(months)
-            : operatingDate.AddDays(90);
+            : operatingDate.AddDays(MaximumDays);
         var dates = installmentDueDates?.ToArray() ?? [];
         if (dates.Length == 0)
         {
@@ -29,7 +31,7 @@ public static class CreditInstallmentPolicy
             dates.Any(x => x <= operatingDate || x > maximumDueDate) ||
             dates.Zip(dates.Skip(1)).Any(x => x.First >= x.Second))
             throw new ArgumentException(maximumCalendarMonths is null
-                ? "Las cuotas deben tener fechas crecientes entre mañana y 90 días, sin superar el total en pesos."
+                ? $"La fecha de vencimiento debe estar entre mañana y {MaximumDays} días, sin superar el total en pesos."
                 : $"Las cuotas deben tener fechas crecientes entre mañana y {maximumCalendarMonths} meses calendario, sin superar el total en pesos.");
 
         var wholeTotal = decimal.Truncate(total);

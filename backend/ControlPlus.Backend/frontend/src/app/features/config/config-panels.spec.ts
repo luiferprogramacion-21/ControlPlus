@@ -48,9 +48,9 @@ describe('Configuración', () => {
       expect(c.creditChooseEachTime).toBe(false); expect(c.creditChanged(c.credit()!)).toBe(false);
     });
 
-    it.each([[0], [4], [1.5], ['']])('rechaza %s meses de crédito', async value => {
+    it.each([[0], [7], [1.5], ['']])('rechaza %s meses de crédito', async value => {
       const c = await open(); c.creditUnit = 'months'; c.creditMonths = value as number;
-      expect(c.validateCredit()).toContain('entre 1 y 3');
+      expect(c.validateCredit()).toContain('entre 1 y 6');
       await c.saveCredit(); expect(api.updateCreditSettings).not.toHaveBeenCalled();
     });
 
@@ -60,9 +60,9 @@ describe('Configuración', () => {
       expect(api.updateCreditSettings).toHaveBeenCalledWith(null, 1, false, null); expect(c.creditChooseEachTime).toBe(true); expect(c.creditChanged(c.credit()!)).toBe(false);
     });
 
-    it.each([[0], [91], [2.5], ['']])('rechaza el plazo de crédito %s', async value => {
+    it.each([[0], [181], [2.5], ['']])('rechaza el plazo de crédito %s', async value => {
       const c = await open(); c.creditDays = value as number; c.creditChooseEachTime = false;
-      expect(c.validateCredit()).toContain('entre 1 y 90'); await c.saveCredit(); expect(api.updateCreditSettings).not.toHaveBeenCalled();
+      expect(c.validateCredit()).toContain('entre 1 y 180'); await c.saveCredit(); expect(api.updateCreditSettings).not.toHaveBeenCalled();
     });
 
     it('un conflicto de versión muestra el error y recarga lo vigente', async () => {

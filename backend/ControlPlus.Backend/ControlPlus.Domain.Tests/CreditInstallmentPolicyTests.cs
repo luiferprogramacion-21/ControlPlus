@@ -36,15 +36,18 @@ public sealed class CreditInstallmentPolicyTests
     }
 
     [Fact]
-    public void Build_AcceptsThreeCalendarMonthsOnlyWhenThatCreditRuleIsActive()
+    public void Build_AcceptsSixCalendarMonthsOnlyWhenThatCreditRuleIsActive()
     {
+        // Decisión D1 del 23/11/2026: hasta 180 días, o 6 meses calendario cuando el plazo se configura en meses.
         var grantedOn = new DateOnly(2026, 11, 21);
-        var dueOn = new DateOnly(2027, 2, 21);
+        var dueOn = new DateOnly(2027, 5, 21);
+        Assert.Equal(grantedOn.AddDays(180), Assert.Single(CreditInstallmentPolicy.Build(2_200, grantedOn,
+            grantedOn.AddDays(180), null)).DueOn);
         Assert.Throws<ArgumentException>(() => CreditInstallmentPolicy.Build(2_200, grantedOn, dueOn, null));
-        var installment = Assert.Single(CreditInstallmentPolicy.Build(2_200, grantedOn, dueOn, null, 3));
+        var installment = Assert.Single(CreditInstallmentPolicy.Build(2_200, grantedOn, dueOn, null, 6));
         Assert.Equal(dueOn, installment.DueOn);
         Assert.Throws<ArgumentException>(() => CreditInstallmentPolicy.Build(2_200, grantedOn,
-            dueOn.AddDays(1), null, 3));
+            dueOn.AddDays(1), null, 6));
     }
 
     [Fact]

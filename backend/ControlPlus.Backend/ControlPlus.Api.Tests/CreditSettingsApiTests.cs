@@ -131,7 +131,7 @@ public sealed class CreditSettingsApiTests : IAsyncLifetime
 
     [Theory, Trait("Category", "Integration")]
     [InlineData(0)]
-    [InlineData(4)]
+    [InlineData(7)] // Decisión D1 del 23/11/2026: hasta 6 meses.
     public async Task InvalidCalendarMonths_AreRejectedWithoutChangingSettings(int months)
     {
         using var client = CreateClient();
@@ -177,7 +177,7 @@ public sealed class CreditSettingsApiTests : IAsyncLifetime
 
     [Theory, Trait("Category", "Integration")]
     [InlineData(0)]
-    [InlineData(91)]
+    [InlineData(181)] // Decisión D1 del 23/11/2026: hasta 180 días.
     public async Task ValuesOutsideRange_AreRejectedWithoutChanges(int days)
     {
         using var client = CreateClient();

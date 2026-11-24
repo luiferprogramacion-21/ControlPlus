@@ -884,3 +884,14 @@ Aprobado también: el nuevo «Resumen de la venta» al cobrar (Codex, `5cf4e17`)
 - Comprobante de corrección en formato de ticket de 80 mm, compacto y sin «localhost».
 - Anular venta: los motivos se eligen con botones de opción siempre visibles.
 - Se quitó «Para terminar…» del cobro.
+
+**Segunda y tercera entrega (23 y 24 de noviembre de 2026; el usuario pidió que Claude hiciera también la parte de Codex):**
+
+- Apartados: el detalle se abre en ventana flotante. La fecha límite ya viene escrita y se lee con el día de la semana (`shared/day-date.ts`). Cancelar o corregir un apartado pide una sola vez el valor a devolver; con varios medios se reparte (`amountFromTotal` en `cp-payment-methods`).
+- Recibir un pedido: el detalle trae `currentUnitCost` (costo promedio, solo en rutas de Compras) para proponer el costo; el precio de venta viene con el actual y solo se envía si cambió.
+- Reportes: sin el párrafo «Contado… Ganancia estimada = …».
+- **Migración `20261124010000_AuditDecisionsV1` (historial 37 → 38), activador `scripts/audit-decisions/Invoke-Activation.ps1 -UsePostgresCredential`**, que el operador corre antes de instalar:
+  - D1: los CHECK de plazo de crédito pasan a 1–180 días y 1–6 meses; el servidor (`CreditSettingsService`, `CreditInstallmentPolicy`) y la pantalla usan los mismos límites.
+  - D8: `ventas.validar_referencia_reembolso()` y `ventas.validar_datos_pago_cambio()` ya no exigen la referencia; siguen rechazando una escrita en blanco. El servidor de apartados y cambios también la deja opcional.
+  - D7 (parte de datos): el límite de descuento del Administrador en `seguridad.limite_operacion_rol` pasa a 100 %. La configuración de los límites de Cajero y Supervisor y su lectura desde la base quedan para la siguiente entrega.
+  - `AuditDecisionsActivationTests` prueba preflight, postflight y huellas (establecimiento, devoluciones de apartados, pagos de cambios y límites de los otros roles).

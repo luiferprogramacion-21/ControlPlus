@@ -160,7 +160,7 @@ export class Sales implements OnInit, OnDestroy {
       if (sequence !== this.creditRulesSequence || this.destroyRef.destroyed) return;
       const months = rules.defaultMonths == null ? null : Math.max(1, Math.min(rules.defaultMonths, 3));
       this.creditDefaultMonths.set(months);
-      this.creditDefaultDays.set(months !== null || rules.defaultDays == null ? null : Math.max(1, Math.min(rules.defaultDays, 90)));
+      this.creditDefaultDays.set(months !== null || rules.defaultDays == null ? null : Math.max(1, Math.min(rules.defaultDays, 180)));
       this.creditRulesKnown.set(true);
     } catch {
       if (sequence !== this.creditRulesSequence || this.destroyRef.destroyed) return;
@@ -354,8 +354,8 @@ export class Sales implements OnInit, OnDestroy {
   get canRequestCredit(): boolean { return this.session.has('SALES.CREATE') && this.session.has('CREDIT.REQUEST'); }
   get operatingDate(): string { return this.cashState()?.currentShift?.operatingDate ?? ''; }
   get minimumDueDate(): string { return this.offsetDate(this.operatingDate, 1); }
-  get maximumDueDate(): string { return this.creditDefaultMonths() !== null ? this.addCalendarMonths(this.operatingDate, 3) : this.offsetDate(this.operatingDate, 90); }
-  get creditDueWindowText(): string { return this.creditDefaultMonths() !== null ? '3 meses calendario' : '90 días'; }
+  get maximumDueDate(): string { return this.creditDefaultMonths() !== null ? this.addCalendarMonths(this.operatingDate, 6) : this.offsetDate(this.operatingDate, 180); }
+  get creditDueWindowText(): string { return this.creditDefaultMonths() !== null ? '6 meses calendario' : '180 días'; }
   get defaultCreditTermText(): string {
     const months = this.creditDefaultMonths();
     if (months !== null) return `${months} ${months === 1 ? 'mes' : 'meses'}`;

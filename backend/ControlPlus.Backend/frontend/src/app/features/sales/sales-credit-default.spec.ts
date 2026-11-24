@@ -59,13 +59,15 @@ describe('Sales: plazo predeterminado del vencimiento del crédito', () => {
     expect(component.defaultCreditTermText).toBe('3 meses');
     expect(component.defaultDueDate).toBe('2027-02-21');
     expect(component.defaultDueDateText).toBe('21/02/2027');
-    expect(component.maximumDueDate).toBe('2027-02-21');
+    // Decisión D1 del 23/11/2026: con meses configurados se puede elegir hasta 6 meses calendario.
+    expect(component.maximumDueDate).toBe('2027-05-21');
 
     component.startCheckout(); await loaded();
     expect(component.dueDate).toBe('2027-02-21');
     expect(component.canConfirm).toBe(true);
     component.setDueDate('2027-02-20'); expect(component.canConfirm).toBe(true);
-    component.setDueDate('2027-02-22'); expect(component.canConfirm).toBe(false);
+    component.setDueDate('2027-05-21'); expect(component.canConfirm).toBe(true);
+    component.setDueDate('2027-05-22'); expect(component.canConfirm).toBe(false);
   });
 
   it('ajusta al último día del mes si el mes de vencimiento no tiene ese día', async () => {
@@ -94,9 +96,9 @@ describe('Sales: plazo predeterminado del vencimiento del crédito', () => {
     component.dueDate = '2026-12-01'; expect(component.dueDate).toBe('2026-12-01');
   });
 
-  it('un plazo mayor a 90 días se propone como máximo en 90 días', async () => {
-    creditRules.mockResolvedValue({ defaultDays: 120 }); await create();
-    expect(component.defaultDueDate).toBe('2027-01-22'); expect(component.defaultDueDate).toBe(component.maximumDueDate);
+  it('un plazo mayor a 180 días se propone como máximo en 180 días', async () => {
+    creditRules.mockResolvedValue({ defaultDays: 200 }); await create();
+    expect(component.defaultDueDate).toBe('2027-04-22'); expect(component.defaultDueDate).toBe(component.maximumDueDate);
   });
 
   it('sin plazo predeterminado no propone fecha y sigue siendo obligatoria', async () => {

@@ -243,17 +243,14 @@ public sealed partial class SalesApiFlowTests
             new(SupervisorUser, SupervisorPassword));
         await AssertProblemAsync(await PostChangeAsync(client, sale.Id,
             "change-net-medium-over-refund", baseRequest), HttpStatusCode.BadRequest);
-        await AssertProblemAsync(await PostChangeAsync(client, sale.Id,
-            "change-net-medium-no-reference", baseRequest with
-            { Payments = [new("EFECTIVO", 900m, null, null),
-                new("TRANSFERENCIA", 50m, null, null)] }), HttpStatusCode.BadRequest);
+        // Decisión D8 del 23/11/2026: la devolución por transferencia sin referencia se acepta y se guarda nula.
         var refund = await ReadAsync<SaleChangeDto>(await PostChangeAsync(client, sale.Id,
             "change-net-medium-refund", baseRequest with
             { Payments = [new("EFECTIVO", 900m, null, null),
-                new("TRANSFERENCIA", 50m, null, "NET-REFUND")] }), HttpStatusCode.Created);
+                new("TRANSFERENCIA", 50m, null, null)] }), HttpStatusCode.Created);
         Assert.Equal(-950m, refund.Difference);
         Assert.Equal(900m, refund.Payments.Single(x => x.MethodCode == "EFECTIVO").Amount);
-        Assert.Equal("NET-REFUND", refund.Payments.Single(x => x.MethodCode == "TRANSFERENCIA").Reference);
+        Assert.Null(refund.Payments.Single(x => x.MethodCode == "TRANSFERENCIA").Reference);
         var thirdPreparation = await ReadAsync<SaleChangePreparationDto>(await client.GetAsync(
             $"/api/sales/{sale.Id}/change-preparation"), HttpStatusCode.OK);
         _ = await StartSessionAsync(client, setup.Admin.AccessToken, setup.Cashier.AccessToken, setup.Users.Cashier.Id);

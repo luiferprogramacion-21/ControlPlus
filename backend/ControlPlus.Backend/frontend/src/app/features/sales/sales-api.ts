@@ -30,7 +30,7 @@ export interface Sale extends CashDrawerDispatch {
 export interface SaleReprintRequest { requestId: string; saleId: string; requestedAtUtc: string; status: string; }
 
 export interface SaleSummary { id: string; visibleNumber: string; userId: string; customerId: string | null; occurredAtUtc: string; operatingDate: string; total: number; state: string; saleType?: string; paymentMethods?: string[] | null; }
-/** Default due-date term of a credit sale in days; null when the seller must choose the date. The range of 1 to 90 days is enforced by the server. */
+/** Default due-date term of a credit sale in days; null when the seller must choose the date. The range of 1 to 180 days is enforced by the server. */
 export interface CreditRules { defaultDays: number | null; defaultMonths?: number | null; blockRiskyCredit?: boolean; }
 /** Situación de crédito de un cliente frente a una venta nueva (GET /api/sales/credit-check). */
 export interface CustomerCreditRisk {

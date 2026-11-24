@@ -39,8 +39,8 @@ export function validateDrafts(drafts: PaymentDraft[], rules: DraftRules): strin
   for (const d of drafts) {
     if (d.methodCode === 'EFECTIVO') {
       if (rules.mode === 'payment' && (!Number.isSafeInteger(Number(d.receivedAmount)) || Number(d.receivedAmount) < Number(d.appliedAmount) || Number(d.receivedAmount) > LIMIT)) return 'El efectivo recibido debe cubrir el importe aplicado.';
-    // Propuesta 7 (21 de noviembre de 2026): en abonos la referencia es opcional; la devolución la sigue pidiendo.
-    } else if (d.reference.trim().length > 200 || (rules.mode !== 'payment' && !d.reference.trim())) return rules.mode === 'payment' ? 'La referencia admite hasta 200 caracteres.' : 'Ingresa una referencia de hasta 200 caracteres para el pago electrónico.';
+    // Propuesta 7 (21/11/2026) y decisión D8 (23/11/2026): la referencia es opcional en abonos y en devoluciones.
+    } else if (d.reference.trim().length > 200) return 'La referencia admite hasta 200 caracteres.';
   }
   return '';
 }
@@ -51,7 +51,7 @@ export const toPayments = (drafts: PaymentDraft[]) => drafts.map(d => ({
   reference: d.methodCode === 'EFECTIVO' ? null : d.reference.trim() || null,
 }));
 export const toRefunds = (drafts: PaymentDraft[]) => drafts.map(d => ({
-  methodCode: d.methodCode, amount: Number(d.appliedAmount), reference: d.methodCode === 'EFECTIVO' ? null : d.reference.trim(),
+  methodCode: d.methodCode, amount: Number(d.appliedAmount), reference: d.methodCode === 'EFECTIVO' ? null : d.reference.trim() || null,
 }));
 
 /** Editable list of up to three distinct payment methods; it edits the array it receives in place. */
@@ -75,7 +75,7 @@ export const toRefunds = (drafts: PaymentDraft[]) => drafts.map(d => ({
             <input class="text-field" [id]="idPrefix + '-received-' + i" [name]="idPrefix + '-received-' + i" type="text" cpNumberInput min="1" step="1" [(ngModel)]="draft.receivedAmount">
           }
         } @else {
-          <label class="field-label field-label--spaced" [for]="idPrefix + '-reference-' + i">Referencia @if (mode === 'payment') { <span>(opcional)</span> }</label>
+          <label class="field-label field-label--spaced" [for]="idPrefix + '-reference-' + i">Referencia <span>(opcional)</span></label>
           <input class="text-field" [id]="idPrefix + '-reference-' + i" [name]="idPrefix + '-reference-' + i" maxlength="200" [(ngModel)]="draft.reference">
         }
         @if (drafts.length > 1) { <button class="table-action" type="button" (click)="remove(i)">Quitar medio</button> }

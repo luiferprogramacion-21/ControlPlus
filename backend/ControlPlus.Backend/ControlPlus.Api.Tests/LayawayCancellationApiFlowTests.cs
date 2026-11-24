@@ -225,7 +225,8 @@ public sealed partial class LayawayCreateApiFlowTests
         var valid = CancellationRequest(created.Version, 100, 100, 0);
         var invalid = new[]
         {
-            valid with { Refunds = [new("NEQUI", 100m, null)] },
+            // Decisión D8 del 23/11/2026: sin referencia se acepta; una de más de 200 caracteres no.
+            valid with { Refunds = [new("NEQUI", 100m, new string('r', 201))] },
             valid with { Refunds = [new("EFECTIVO", 99m, null)] },
             valid with { Refunds = [new("EFECTIVO", 50m, null), new("EFECTIVO", 50m, null)] },
             valid with { RefundAmount = 1002m, Refunds = [new("EFECTIVO", 1002m, null)] },
