@@ -9,7 +9,7 @@ public sealed class SalePricingPolicyTests
     [Theory]
     [InlineData(RoleLevel.Cajero, 5)]
     [InlineData(RoleLevel.Supervisor, 20)]
-    [InlineData(RoleLevel.Administrador, 80)]
+    [InlineData(RoleLevel.Administrador, 100)] // D7: sin porcentaje máximo, lo limita el costo
     public void MaximumDiscount_UsesApprovedRoleLimits(RoleLevel role, decimal expected) =>
         Assert.Equal(expected, SalePricingPolicy.MaximumDiscountPercentage(role));
 

@@ -34,7 +34,7 @@ export interface LayawaySettings { minimumPercentage: number; defaultDays: numbe
 /** blockRiskyCredit: con true, vender a crédito a un moroso o sobre el cupo exige autorización de un Administrador. */
 export interface CreditSettings { defaultDays: number | null; defaultMonths?: number | null; version: number; blockRiskyCredit: boolean; }
 /** Units of the same product required for the wholesale price in sales, layaways and changes (1 to 999). */
-export interface SalesSettings { wholesaleMinimumQuantity: number; version: number; }
+export interface SalesSettings { wholesaleMinimumQuantity: number; version: number; /** D7 (23/11/2026). */ cashierMaxDiscountPercent?: number; supervisorMaxDiscountPercent?: number; }
 
 export interface ReasonItem { id: string; code: string; name: string; displayOrder?: number; isActive?: boolean; }
 export interface ReasonGroup { key: string; label: string; list: string; initialize: string; }
@@ -75,8 +75,10 @@ export class ConfigApi {
 
   creditSettings(): Promise<CreditSettings> { return firstValueFrom(this.http.get<CreditSettings>('/api/credits/settings')); }
   salesSettings(): Promise<SalesSettings> { return firstValueFrom(this.http.get<SalesSettings>('/api/sales/settings')); }
-  updateSalesSettings(wholesaleMinimumQuantity: number, expectedVersion: number): Promise<SalesSettings> {
-    return firstValueFrom(this.http.put<SalesSettings>('/api/sales/settings', { wholesaleMinimumQuantity, expectedVersion }));
+  updateSalesSettings(wholesaleMinimumQuantity: number, expectedVersion: number, cashierMaxDiscountPercent?: number, supervisorMaxDiscountPercent?: number): Promise<SalesSettings> {
+    return firstValueFrom(this.http.put<SalesSettings>('/api/sales/settings', { wholesaleMinimumQuantity, expectedVersion,
+      ...(cashierMaxDiscountPercent === undefined ? {} : { cashierMaxDiscountPercent }),
+      ...(supervisorMaxDiscountPercent === undefined ? {} : { supervisorMaxDiscountPercent }) }));
   }
   updateCreditSettings(defaultDays: number | null, expectedVersion: number, blockRiskyCredit: boolean, defaultMonths: number | null = null): Promise<CreditSettings> {
     return firstValueFrom(this.http.put<CreditSettings>('/api/credits/settings', { defaultDays, defaultMonths, expectedVersion, blockRiskyCredit }));

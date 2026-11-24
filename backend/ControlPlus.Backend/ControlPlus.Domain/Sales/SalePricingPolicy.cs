@@ -17,7 +17,7 @@ public static class SalePricingPolicy
     {
         RoleLevel.Cajero => 5m,
         RoleLevel.Supervisor => 20m,
-        RoleLevel.Administrador => 80m,
+        RoleLevel.Administrador => 100m, // D7 (23/11/2026): sin porcentaje máximo; lo limita el costo.
         _ => 0m
     };
 
@@ -31,8 +31,8 @@ public static class SalePricingPolicy
     {
         if (grossAmount <= 0 || discountAmount <= 0 || discountAmount > grossAmount)
             throw new DomainRuleViolationException("El descuento debe ser positivo y no puede superar el valor bruto.");
-        if (maximumPercentage is < 0 or > 80)
-            throw new DomainRuleViolationException("El límite de descuento debe estar entre cero y 80 por ciento.");
+        if (maximumPercentage is < 0 or > 100)
+            throw new DomainRuleViolationException("El límite de descuento debe estar entre cero y 100 por ciento.");
         if (discountAmount * 100m > grossAmount * maximumPercentage)
             throw new DomainRuleViolationException("El descuento supera el límite aplicable al rol.");
     }

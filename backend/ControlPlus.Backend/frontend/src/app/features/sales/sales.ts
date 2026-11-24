@@ -14,7 +14,7 @@ import { CustomerCreditRisk, HeldSale, NO_SALE_DRAFT, Sale, SaleDraft, SaleDraft
 import { Customer } from '../customers/customers-api';
 import { CustomerPicker } from '../customers/customer-picker';
 import { buildTicketHtml, TicketPrinter } from './ticket';
-import { describeDiscount, Discount, discountAmount, maxDiscountPercent, validateDiscount, WHOLESALE_MIN_QUANTITY } from './sale-discount';
+import { DEFAULT_DISCOUNT_LIMITS, describeDiscount, Discount, DiscountLimits, discountAmount, maxDiscountPercent, validateDiscount, WHOLESALE_MIN_QUANTITY } from './sale-discount';
 import { DiscountApplied, DiscountDialog } from './discount-dialog';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { statusKind, toastSignal } from '../../core/toast';
@@ -149,7 +149,13 @@ export class Sales implements OnInit, OnDestroy {
     if (origin) this.sourceSale.set({ id: origin, number: params.get('numeroOrigen') ?? '' });
     if (params.get('modalidad') === 'credito' && this.canRequestCredit) this.saleType.set('CREDITO'); void this.refreshCash(); if (this.canRequestCredit) void this.loadCreditRules(); void this.loadPricingRules(); void this.loadHeldSales(true); }
   private async loadPricingRules(): Promise<void> {
-    try { this.wholesaleMin.set((await this.api.pricingRules()).wholesaleMinimumQuantity); }
+    try {
+      const rules = await this.api.pricingRules();
+      this.wholesaleMin.set(rules.wholesaleMinimumQuantity);
+      this.discountLimits = { cashier: rules.cashierMaxDiscountPercent ?? DEFAULT_DISCOUNT_LIMITS.cashier,
+        supervisor: rules.supervisorMaxDiscountPercent ?? DEFAULT_DISCOUNT_LIMITS.supervisor,
+        administrator: rules.administratorMaxDiscountPercent ?? DEFAULT_DISCOUNT_LIMITS.administrator };
+    }
     catch { /* The server still enforces the minimum; the screen keeps the default. */ }
   }
   private async loadCreditRules(): Promise<void> {
@@ -392,7 +398,9 @@ export class Sales implements OnInit, OnDestroy {
     const role = this.cashState()?.requiresOperatorSession ? this.cashState()?.activeOperatorRole : null;
     return role ? codes.includes(role) : this.session.hasRole(...codes);
   }
-  get maxDiscount(): number { return maxDiscountPercent(this.sellerHasRole('ADMINISTRADOR'), this.sellerHasRole('SUPERVISOR')); }
+  /** Límites de descuento configurados por el Administrador (D7); hasta leerlos se usan los iniciales. */
+  private discountLimits: DiscountLimits = DEFAULT_DISCOUNT_LIMITS;
+  get maxDiscount(): number { return maxDiscountPercent(this.sellerHasRole('ADMINISTRADOR'), this.sellerHasRole('SUPERVISOR'), this.discountLimits); }
   get estimate(): number { return Math.max(0, this.subtotal - this.discounts); }
   get applied(): number { return this.activePayments().reduce((sum, method) => sum + this.paymentAmount(method), 0); }
   get receivedTotal(): number {

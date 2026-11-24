@@ -83,8 +83,8 @@ describe('Configuración', () => {
       const c = await open(); expect(c.wholesaleMinimum).toBe(12);
       api.updateSalesSettings.mockResolvedValue({ wholesaleMinimumQuantity: 6, version: 2 });
       c.wholesaleMinimum = 6; await c.saveSales();
-      expect(api.updateSalesSettings).toHaveBeenCalledWith(6, 1); expect(c.sales()).toEqual({ wholesaleMinimumQuantity: 6, version: 2 });
-      expect(c.salesNotice()).toContain('Mínimo guardado');
+      expect(api.updateSalesSettings).toHaveBeenCalledWith(6, 1, 5, 20); expect(c.sales()).toEqual({ wholesaleMinimumQuantity: 6, version: 2 });
+      expect(c.salesNotice()).toContain('Guardado');
     });
 
     it.each([[0], [1000], [2.5], ['']])('rechaza el mínimo mayorista %s sin llamar a la API', async value => {

@@ -22,6 +22,11 @@ public interface ISalesRepository
     Task<Instalacion?> GetActiveInstallationAsync(CancellationToken cancellationToken = default);
     Task<Instalacion?> GetActiveInstallationForUpdateAsync(CancellationToken cancellationToken = default);
     Task<Establecimiento?> GetActiveEstablishmentAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Límites de descuento por rol (seguridad.limite_operacion_rol, DESCUENTO_PORCENTAJE). Decisión D7 del 23/11/2026: el
+    /// Administrador configura los del Cajero y el Supervisor; la base los usa también al validar cada venta.
+    /// </summary>
+    Task<IReadOnlyCollection<LimiteOperacionRol>> GetDiscountLimitsAsync(bool forUpdate, CancellationToken cancellationToken = default);
     Task<Establecimiento?> GetActiveEstablishmentForUpdateAsync(
         CancellationToken cancellationToken = default);
     Task<Terminal?> GetActiveTerminalAsync(Guid installationId, CancellationToken cancellationToken = default);

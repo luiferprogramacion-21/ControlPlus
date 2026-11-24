@@ -83,6 +83,34 @@ public sealed class SalesSettingsApiTests : IAsyncLifetime
         Assert.Equal(6, data.RootElement.GetProperty("New").GetProperty("WholesaleMinimumQuantity").GetInt32());
     }
 
+    /// <summary>Decisión D7 del 23/11/2026: el Administrador configura el descuento máximo del Cajero y del Supervisor.</summary>
+    [Fact, Trait("Category", "Integration")]
+    public async Task Administrator_ConfiguresCashierAndSupervisorDiscountLimits()
+    {
+        using var client = CreateClient();
+        var (admin, _, cashier) = await BootstrapAsync(client);
+        SetBearer(client, admin);
+        var initial = await ReadAsync<SalesSettingsDto>(await client.GetAsync("/api/sales/settings"), HttpStatusCode.OK);
+        Assert.Equal(5m, initial.CashierMaxDiscountPercent);
+        Assert.Equal(20m, initial.SupervisorMaxDiscountPercent);
+
+        await AssertProblemAsync(await client.PutAsJsonAsync("/api/sales/settings",
+            new UpdateSalesSettingsRequest(12, initial.Version, CashierMaxDiscountPercent: 101m)),
+            HttpStatusCode.BadRequest, "validation.failed");
+        var updated = await ReadAsync<SalesSettingsDto>(await client.PutAsJsonAsync("/api/sales/settings",
+            new UpdateSalesSettingsRequest(12, initial.Version, CashierMaxDiscountPercent: 10m,
+                SupervisorMaxDiscountPercent: 25m)), HttpStatusCode.OK);
+        Assert.Equal(10m, updated.CashierMaxDiscountPercent);
+        Assert.Equal(25m, updated.SupervisorMaxDiscountPercent);
+
+        // Quien vende recibe los límites vigentes; el del Administrador es 100 % (lo frena el costo).
+        SetBearer(client, cashier);
+        var rules = await ReadAsync<SalesPricingRulesDto>(await client.GetAsync("/api/sales/pricing-rules"), HttpStatusCode.OK);
+        Assert.Equal(10m, rules.CashierMaxDiscountPercent);
+        Assert.Equal(25m, rules.SupervisorMaxDiscountPercent);
+        Assert.Equal(100m, rules.AdministratorMaxDiscountPercent);
+    }
+
     [Fact, Trait("Category", "Integration")]
     public async Task EstablishmentData_AreReadableByTheOperation_AndOnlyAdministratorUpdatesThem()
     {

@@ -209,7 +209,7 @@ public sealed partial class SalesService(
         var productsById = products.ToDictionary(x => x.Id);
         var unitNames = await repository.GetMeasurementUnitNamesAsync(products.Select(x => x.UnidadMedidaId).Distinct().ToArray(), cancellationToken);
 
-        var maximumDiscount = SalePricingPolicy.MaximumDiscountPercentage(authorization.HighestRoleLevel);
+        var maximumDiscount = await DiscountLimitAsync(authorization.HighestRoleLevel, cancellationToken);
         var hasAnyDiscount = input.GeneralDiscount is not null || normalizedLines.Any(x => x.Discount is not null);
         if (hasAnyDiscount && !authorization.PermissionCodes.Contains(PermissionCodes.SalesDiscountApply, StringComparer.OrdinalIgnoreCase))
             return Result.Failure<SaleDto>(ApplicationError.Forbidden("No tiene permiso efectivo para aplicar descuentos."));

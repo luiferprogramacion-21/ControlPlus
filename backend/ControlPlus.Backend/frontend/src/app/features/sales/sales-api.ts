@@ -64,6 +64,8 @@ export interface ConfirmChangeInput {
 }
 export interface ChangeDetail { id: string; type: string; productId: string; originalSaleLineId: string | null; quantity: number; unitPrice: number; discount: number; netAmount: number; productCode?: string | null; productName?: string | null; measurementUnit?: string | null; }
 export interface ConfirmedChange extends CashDrawerDispatch { id: string; saleId: string; visibleNumber: string; totalReturned: number; totalDelivered: number; difference: number; treatment: string; creditAdjustment: number; paidOrRefunded: number; state?: string; occurredAtUtc?: string; details?: ChangeDetail[]; payments?: ChangePaymentInput[]; reason?: string | null; }
+/** Reglas para vender: mínimo mayorista y descuento máximo de cada rol (decisión D7 del 23/11/2026). */
+export interface PricingRules { wholesaleMinimumQuantity: number; cashierMaxDiscountPercent?: number; supervisorMaxDiscountPercent?: number; administratorMaxDiscountPercent?: number; }
 export interface CorrectionReceipt { requestId: string; saleId: string; saleNumber: string; requestedAtUtc: string; correction: ConfirmedChange; establishmentName: string; }
 
 export interface PrintProfile {
@@ -158,7 +160,7 @@ export class SalesApi {
     return firstValueFrom(this.http.get<CustomerCreditRisk>('/api/sales/credit-check', { params: { customerId, amount } }));
   }
   /** Units of the same product required for the wholesale price (configured by the Administrator). */
-  pricingRules(): Promise<{ wholesaleMinimumQuantity: number }> { return firstValueFrom(this.http.get<{ wholesaleMinimumQuantity: number }>('/api/sales/pricing-rules')); }
+  pricingRules(): Promise<PricingRules> { return firstValueFrom(this.http.get<PricingRules>('/api/sales/pricing-rules')); }
   customers(search: string): Promise<Page<Customer>> { return this.customersApi.list({ search, status: 'active', page: 1, pageSize: 20 }); }
   printJobs(saleId: string, page = 1, pageSize = 20): Promise<Page<PrintJob>> { return firstValueFrom(this.http.get<Page<PrintJob>>(`/api/sales/${saleId}/print-jobs`, { params: { page, pageSize } })); }
   printingStatus(): Promise<PrintStatus> { return firstValueFrom(this.http.get<PrintStatus>('/api/printing/status')); }

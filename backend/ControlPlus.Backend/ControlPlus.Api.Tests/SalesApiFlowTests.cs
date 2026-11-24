@@ -795,10 +795,11 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
 
         _ = await StartSessionAsync(client, scenario.Admin.AccessToken, scenario.Admin.AccessToken, scenario.Admin.User.Id);
         SetBearer(client, scenario.Admin.AccessToken);
-        await AssertProblemAsync(await PostSaleAsync(client, "admin-over-limit", DiscountRequest(
-            scenario.Products.RoleDiscount, 81m, 190m)), HttpStatusCode.BadRequest);
-        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(client, "admin-limit", DiscountRequest(
-            scenario.Products.RoleDiscount, 80m, 200m))).StatusCode);
+        // Decisión D7 del 23/11/2026: el Administrador no tiene porcentaje máximo; lo frena el costo (100 de 1.000).
+        await AssertProblemAsync(await PostSaleAsync(client, "admin-below-cost", DiscountRequest(
+            scenario.Products.RoleDiscount, 91m, 90m)), HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.Created, (await PostSaleAsync(client, "admin-over-old-limit", DiscountRequest(
+            scenario.Products.RoleDiscount, 85m, 150m))).StatusCode);
     }
 
     [Fact]

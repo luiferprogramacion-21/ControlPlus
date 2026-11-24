@@ -36,7 +36,7 @@ public sealed class SalesSettingsService(
         var establishment = await ActiveEstablishmentAsync(cancellationToken);
         return establishment is null
             ? Result.Failure<SalesSettingsDto>(ApplicationError.NotFound("el establecimiento activo"))
-            : Result.Success(Map(establishment));
+            : Result.Success(Map(establishment, await LimitsAsync(false, cancellationToken)));
     }
 
     public async Task<Result<SalesPricingRulesDto>> GetPricingRulesAsync(ActorContext actor,
@@ -49,7 +49,7 @@ public sealed class SalesSettingsService(
         var establishment = await ActiveEstablishmentAsync(cancellationToken);
         return establishment is null
             ? Result.Failure<SalesPricingRulesDto>(ApplicationError.NotFound("el establecimiento activo"))
-            : Result.Success(new SalesPricingRulesDto(establishment.MinimoUnidadesMayorista));
+            : Result.Success(PricingRules(establishment, await LimitsAsync(false, cancellationToken)));
     }
 
     public async Task<Result<SalesSettingsDto>> UpdateAsync(ActorContext actor, UpdateSalesSettingsRequest request,
@@ -60,6 +60,10 @@ public sealed class SalesSettingsService(
         if (request.WholesaleMinimumQuantity is < MinimumAllowed or > MaximumAllowed)
             return Result.Failure<SalesSettingsDto>(ApplicationError.Validation(
                 $"El mínimo de unidades para precio mayorista debe estar entre {MinimumAllowed} y {MaximumAllowed}."));
+        foreach (var (value, who) in new[] { (request.CashierMaxDiscountPercent, "del Cajero"), (request.SupervisorMaxDiscountPercent, "del Supervisor") })
+            if (value is { } percent && (percent < 0 || percent > 100 || decimal.Round(percent, 2) != percent))
+                return Result.Failure<SalesSettingsDto>(ApplicationError.Validation(
+                    $"El descuento máximo {who} debe estar entre 0 y 100 %, con hasta dos decimales."));
 
         await using var transaction = await transactionManager.BeginAsync(IsolationLevel.ReadCommitted, cancellationToken);
         var installation = await sales.GetActiveInstallationForUpdateAsync(cancellationToken);
@@ -74,19 +78,24 @@ public sealed class SalesSettingsService(
             return Result.Failure<SalesSettingsDto>(ApplicationError.ConcurrencyConflict("La configuración fue modificada."));
 
         var previous = establishment.MinimoUnidadesMayorista;
+        var limits = await LimitsAsync(true, cancellationToken);
+        var previousLimits = new { Cashier = Limit(limits, "CAJERO", 5m), Supervisor = Limit(limits, "SUPERVISOR", 20m) };
+        var now = clock.UtcNow.UtcDateTime;
+        SetLimit(limits, "CAJERO", request.CashierMaxDiscountPercent, now);
+        SetLimit(limits, "SUPERVISOR", request.SupervisorMaxDiscountPercent, now);
         establishment.MinimoUnidadesMayorista = request.WholesaleMinimumQuantity;
-        establishment.FechaModificacion = clock.UtcNow.UtcDateTime;
+        establishment.FechaModificacion = now;
         await AuditWriter.WriteCashAsync(audits, clock, actor.UserId,
             AuditAction.SalesSettingsUpdated, nameof(Establecimiento), establishment.Id,
             new
             {
-                Previous = new { WholesaleMinimumQuantity = previous },
-                New = new { request.WholesaleMinimumQuantity }
+                Previous = new { WholesaleMinimumQuantity = previous, CashierMaxDiscountPercent = previousLimits.Cashier, SupervisorMaxDiscountPercent = previousLimits.Supervisor },
+                New = new { request.WholesaleMinimumQuantity, CashierMaxDiscountPercent = Limit(limits, "CAJERO", 5m), SupervisorMaxDiscountPercent = Limit(limits, "SUPERVISOR", 20m) }
             },
             Guid.CreateVersion7(), null, null, null, null, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return Result.Success(Map(establishment));
+        return Result.Success(Map(establishment, limits));
     }
 
     private async Task<Establecimiento?> ActiveEstablishmentAsync(CancellationToken cancellationToken)
@@ -107,6 +116,28 @@ public sealed class SalesSettingsService(
                 : null;
     }
 
-    private static SalesSettingsDto Map(Establecimiento establishment) =>
-        new(establishment.MinimoUnidadesMayorista, establishment.Version);
+    private async Task<IReadOnlyCollection<LimiteOperacionRol>> LimitsAsync(bool forUpdate, CancellationToken cancellationToken) =>
+        await sales.GetDiscountLimitsAsync(forUpdate, cancellationToken);
+
+    private static decimal Limit(IReadOnlyCollection<LimiteOperacionRol> limits, string role, decimal fallback) =>
+        limits.Where(x => string.Equals(x.Rol?.Codigo, role, StringComparison.OrdinalIgnoreCase))
+            .Select(x => (decimal?)x.ValorMaximo).FirstOrDefault() ?? fallback;
+
+    /// <summary>Cambia el límite de un rol si se envió y existe su fila (sembrada con la instalación).</summary>
+    private static void SetLimit(IReadOnlyCollection<LimiteOperacionRol> limits, string role, decimal? value, DateTime now)
+    {
+        if (value is not { } percent) return;
+        var row = limits.FirstOrDefault(x => string.Equals(x.Rol?.Codigo, role, StringComparison.OrdinalIgnoreCase));
+        if (row is null || row.ValorMaximo == percent) return;
+        row.ValorMaximo = percent;
+        row.FechaModificacion = now;
+    }
+
+    private static SalesSettingsDto Map(Establecimiento establishment, IReadOnlyCollection<LimiteOperacionRol> limits) =>
+        new(establishment.MinimoUnidadesMayorista, establishment.Version,
+            Limit(limits, "CAJERO", 5m), Limit(limits, "SUPERVISOR", 20m));
+
+    private static SalesPricingRulesDto PricingRules(Establecimiento establishment, IReadOnlyCollection<LimiteOperacionRol> limits) =>
+        new(establishment.MinimoUnidadesMayorista, Limit(limits, "CAJERO", 5m), Limit(limits, "SUPERVISOR", 20m),
+            Limit(limits, "ADMINISTRADOR", 100m));
 }

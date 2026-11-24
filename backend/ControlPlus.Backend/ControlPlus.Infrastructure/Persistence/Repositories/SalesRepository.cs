@@ -52,6 +52,14 @@ public sealed class EfSalesRepository(OfficialControlPlusDbContext dbContext) : 
             .OrderBy(x => x.FechaCreacion).ThenBy(x => x.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<IReadOnlyCollection<LimiteOperacionRol>> GetDiscountLimitsAsync(bool forUpdate,
+        CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.LimiteOperacionRol.Include(x => x.Rol)
+            .Where(x => x.Activo && x.CodigoOperacion == "DESCUENTO_PORCENTAJE" && x.TipoLimite == "PORCENTAJE");
+        return await (forUpdate ? query.AsTracking() : query.AsNoTracking()).ToArrayAsync(cancellationToken);
+    }
+
     public async Task<Establecimiento?> GetActiveEstablishmentForUpdateAsync(
         CancellationToken cancellationToken = default)
     {

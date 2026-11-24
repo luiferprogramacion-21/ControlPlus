@@ -8,9 +8,16 @@ namespace ControlPlus.Domain.Tests;
 public sealed class CommercialAuthorizationPolicyTests
 {
     [Fact]
-    public void DiscountLimit_CannotExceedEightyPercent() =>
+    // Decisión D7 del 23/11/2026: ya no hay tope del 80 %; un límite de rol mayor a 100 % se rechaza y el costo sigue
+    // siendo el piso: el Administrador puede llegar a 85 % si el precio final no queda bajo el costo.
+    public void DiscountLimit_CannotExceedOneHundredPercent_AndCostIsTheFloor()
+    {
         Assert.Throws<DomainRuleViolationException>(() =>
-            CommercialAuthorizationPolicy.CalculateFinalPrice(10m, 100m, 81m, 81m, false));
+            CommercialAuthorizationPolicy.CalculateFinalPrice(10m, 100m, 101m, 101m, false));
+        Assert.Equal(15m, CommercialAuthorizationPolicy.CalculateFinalPrice(10m, 100m, 85m, 100m, false));
+        Assert.Throws<DomainRuleViolationException>(() =>
+            CommercialAuthorizationPolicy.CalculateFinalPrice(20m, 100m, 85m, 100m, false));
+    }
 
     [Fact]
     public void SaleBelowCost_IsRejected() =>

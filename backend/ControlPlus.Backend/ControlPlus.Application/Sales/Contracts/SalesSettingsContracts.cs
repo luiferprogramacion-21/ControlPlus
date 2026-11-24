@@ -5,15 +5,22 @@ using ControlPlus.Application.Security.Contracts;
 namespace ControlPlus.Application.Sales.Contracts;
 
 /// <summary>Configuración de precios del establecimiento activo que administra el Administrador.</summary>
-public sealed record SalesSettingsDto(int WholesaleMinimumQuantity, long Version);
+/// Decisión D7 del 23/11/2026: incluye el descuento máximo del Cajero y del Supervisor, que configura el Administrador.
+public sealed record SalesSettingsDto(int WholesaleMinimumQuantity, long Version,
+    decimal CashierMaxDiscountPercent = 5m, decimal SupervisorMaxDiscountPercent = 20m);
 
-/// <summary>Regla mínima que necesita quien vende, aparta o cambia productos.</summary>
-public sealed record SalesPricingRulesDto(int WholesaleMinimumQuantity);
+/// <summary>Reglas que necesita quien vende, aparta o cambia productos, con el descuento máximo de cada rol.</summary>
+public sealed record SalesPricingRulesDto(int WholesaleMinimumQuantity,
+    decimal CashierMaxDiscountPercent = 5m, decimal SupervisorMaxDiscountPercent = 20m,
+    decimal AdministratorMaxDiscountPercent = 100m);
 
+/// <summary>Los dos límites son opcionales: si no se envían, se conservan.</summary>
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record UpdateSalesSettingsRequest(
     [property: JsonRequired] int WholesaleMinimumQuantity,
-    [property: JsonRequired] long ExpectedVersion);
+    [property: JsonRequired] long ExpectedVersion,
+    decimal? CashierMaxDiscountPercent = null,
+    decimal? SupervisorMaxDiscountPercent = null);
 
 public interface ISalesSettingsService
 {

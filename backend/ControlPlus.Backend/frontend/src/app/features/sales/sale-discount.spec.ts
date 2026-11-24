@@ -1,8 +1,10 @@
 import { describeDiscount, discountAmount, maxDiscountAmount, maxDiscountPercent, validateDiscount } from './sale-discount';
 
 describe('sale-discount', () => {
-  it('el límite por rol es 5 % Cajero, 20 % Supervisor y 80 % Administrador', () => {
-    expect(maxDiscountPercent(false, false)).toBe(5); expect(maxDiscountPercent(false, true)).toBe(20); expect(maxDiscountPercent(true, false)).toBe(80);
+  it('el límite inicial por rol es 5 % Cajero y 20 % Supervisor; el Administrador no tiene tope (D7) y se usan los configurados', () => {
+    expect(maxDiscountPercent(false, false)).toBe(5); expect(maxDiscountPercent(false, true)).toBe(20); expect(maxDiscountPercent(true, false)).toBe(100);
+    expect(maxDiscountPercent(false, false, { cashier: 10, supervisor: 25, administrator: 100 })).toBe(10);
+    expect(maxDiscountPercent(false, true, { cashier: 10, supervisor: 25, administrator: 100 })).toBe(25);
   });
 
   describe('discountAmount', () => {

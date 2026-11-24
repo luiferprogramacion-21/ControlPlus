@@ -94,6 +94,13 @@ export class Inventory implements OnInit {
   }
   async chooseAdjustmentProduct(id: string): Promise<void> { const stock = this.stocks()?.items.find(x => x.productId === id) ?? null; if (await this.selectStock(stock) && this.selected() === stock) this.adjustmentProductId.set(stock?.productId ?? ''); }
   closeHistory(): void { this.historyOpen.set(false); this.selected.set(null); this.movements.set(null); this.historyLoading.set(false); ++this.movementRequestId; this.error.set(''); }
+  /** Auditoría del 23/11/2026: el resultado con su signo, «+» al agregar igual que «−» al retirar. */
+  get adjustmentText(): string {
+    const delta = Number(this.quantityDelta); const stock = this.selected();
+    if (!Number.isSafeInteger(delta) || delta === 0 || !stock) return '';
+    const sign = delta > 0 ? 'Se agregan +' : 'Se retiran −';
+    return `${sign}${groupedNumber(Math.abs(delta))} · quedará en ${groupedNumber(stock.currentStock + delta)}`;
+  }
   private resetForm(): void { this.quantityDelta = 0; this.reasonId = ''; this.observation = ''; this.correctingMovementId = null; }
   async loadMovements(): Promise<void> { const stock = this.selected(); if (!stock) return; const id = ++this.movementRequestId; this.historyLoading.set(true); this.error.set(''); try { const result = await this.api.movements({ productId: stock.productId, type: this.movementType || undefined, fromUtc: this.from ? new Date(this.from).toISOString() : undefined, toUtc: this.to ? new Date(this.to).toISOString() : undefined, page: this.movementPage, pageSize: 20 }); if (id === this.movementRequestId && this.selected()?.productId === stock.productId) this.movements.set(result); } catch (e) { if (id === this.movementRequestId) this.error.set(errorText(e)); } finally { if (id === this.movementRequestId) this.historyLoading.set(false); } }
   historyPage(e: PageEvent): void { this.movementPage = e.pageIndex + 1; void this.loadMovements(); }

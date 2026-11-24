@@ -5,7 +5,8 @@ namespace ControlPlus.Domain.Security;
 
 public static class CommercialAuthorizationPolicy
 {
-    public const decimal AbsoluteMaximumDiscountPercentage = 80m;
+    // Decisión D7 del 23/11/2026: el Administrador no tiene porcentaje máximo; lo que frena el descuento es el costo.
+    public const decimal AbsoluteMaximumDiscountPercentage = 100m;
 
     public static decimal CalculateFinalPrice(
         decimal unitCost,
@@ -17,7 +18,7 @@ public static class CommercialAuthorizationPolicy
         if (unitCost < 0 || basePrice < 0) throw new DomainRuleViolationException("Cost and price cannot be negative.");
         if (discountPercentage < 0) throw new DomainRuleViolationException("Discount cannot be negative.");
         if (roleMaximumPercentage is < 0 or > AbsoluteMaximumDiscountPercentage)
-            throw new DomainRuleViolationException("Role discount limit cannot exceed 80 percent.");
+            throw new DomainRuleViolationException("Role discount limit cannot exceed 100 percent.");
         if (discountPercentage > roleMaximumPercentage || discountPercentage > AbsoluteMaximumDiscountPercentage)
             throw new DomainRuleViolationException("Discount exceeds the applicable limit.");
         if (wholesalePriceApplied && discountPercentage > 0)

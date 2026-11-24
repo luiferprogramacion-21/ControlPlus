@@ -78,14 +78,19 @@ import { HelpTip } from '../../shared/help-tip';
 
       <section class="rule-card" aria-labelledby="rule-wholesale-title">
         <header class="rule-card__head"><span class="rule-card__icon rule-card__icon--navy" aria-hidden="true">≡</span>
-          <div><h3 id="rule-wholesale-title">Precio mayorista</h3><p>Desde cuántas unidades de un mismo producto aplica.</p></div></header>
+          <div><h3 id="rule-wholesale-title">Precio mayorista y descuentos</h3><p>Desde cuántas unidades aplica el mayorista y cuánto descuento puede dar cada rol.</p></div></header>
         @if (sales(); as current) {
           <form class="rule-card__body" (submit)="$event.preventDefault(); saveSales()">
             <label class="rule-field"><span class="rule-field__label">Mínimo para mayorista<cp-help text="Unidades de un mismo producto que debe llevar el cliente para cobrarle el precio mayorista." /></span>
               <span class="rule-input"><input id="wholesale-minimum" name="wholesaleMinimum" type="text" cpNumberInput min="1" max="999" step="1" [(ngModel)]="wholesaleMinimum"><b>unidades</b></span></label>
             <p class="rule-note">Aplica en ventas, apartados y cambios. Lo ya registrado no cambia.</p>
+            <label class="rule-field"><span class="rule-field__label">Descuento máximo del Cajero<cp-help text="Lo más que puede descontar un Cajero, con la autorización de un Supervisor o del Administrador." /></span>
+              <span class="rule-input"><input id="cashier-max-discount" name="cashierMaxDiscount" type="text" cpNumberInput min="0" max="100" step="1" [(ngModel)]="cashierMaxDiscount"><b>%</b></span></label>
+            <label class="rule-field"><span class="rule-field__label">Descuento máximo del Supervisor<cp-help text="Lo más que puede descontar un Supervisor sin pedir autorización." /></span>
+              <span class="rule-input"><input id="supervisor-max-discount" name="supervisorMaxDiscount" type="text" cpNumberInput min="0" max="100" step="1" [(ngModel)]="supervisorMaxDiscount"><b>%</b></span></label>
+            <p class="rule-note">El Administrador no tiene un porcentaje máximo. Nadie puede vender por debajo del costo.</p>
             @if (salesError()) { <p class="field-error" role="alert">{{ salesError() }}</p> }
-            <div class="rule-card__foot"><button class="button button--primary" type="submit" [disabled]="savingSales() || Number(wholesaleMinimum) === current.wholesaleMinimumQuantity">{{ savingSales() ? 'Guardando…' : 'Guardar' }}</button></div>
+            <div class="rule-card__foot"><button class="button button--primary" type="submit" [disabled]="savingSales() || !salesChanged(current)">{{ savingSales() ? 'Guardando…' : 'Guardar' }}</button></div>
           </form>
         } @else if (salesLoadError()) { <div class="inline-feedback inline-feedback--error rule-card__loading" role="alert">{{ salesLoadError() }} <button class="link-button" type="button" (click)="loadSales()">Reintentar</button></div>
         } @else { <p class="muted rule-card__loading" role="status">Cargando…</p> }
@@ -123,23 +128,39 @@ export class SettingsPanel implements OnInit {
   readonly savingSales = signal(false);
   readonly salesError = toastSignal('error'); readonly salesNotice = toastSignal('success');
   wholesaleMinimum: number | null = 12;
+  cashierMaxDiscount: number | null = 5;
+  supervisorMaxDiscount: number | null = 20;
+  salesChanged(current: SalesSettings): boolean {
+    return Number(this.wholesaleMinimum) !== current.wholesaleMinimumQuantity ||
+      Number(this.cashierMaxDiscount) !== (current.cashierMaxDiscountPercent ?? 5) ||
+      Number(this.supervisorMaxDiscount) !== (current.supervisorMaxDiscountPercent ?? 20);
+  }
   ngOnInit(): void { void this.load(); void this.loadCredit(); void this.loadSales(); }
   async loadSales(): Promise<void> {
     this.salesLoadError.set('');
     try { this.applySales(await this.api.salesSettings()); } catch (e) { this.salesLoadError.set(errorText(e)); }
   }
-  private applySales(settings: SalesSettings): void { this.sales.set(settings); this.wholesaleMinimum = settings.wholesaleMinimumQuantity; }
+  private applySales(settings: SalesSettings): void {
+    this.sales.set(settings); this.wholesaleMinimum = settings.wholesaleMinimumQuantity;
+    this.cashierMaxDiscount = settings.cashierMaxDiscountPercent ?? 5; this.supervisorMaxDiscount = settings.supervisorMaxDiscountPercent ?? 20;
+  }
   validateSales(): string {
     const value = Number(this.wholesaleMinimum);
-    return Number.isInteger(value) && value >= 1 && value <= 999 ? '' : 'El mínimo debe ser un número entero entre 1 y 999.';
+    if (!(Number.isInteger(value) && value >= 1 && value <= 999)) return 'El mínimo debe ser un número entero entre 1 y 999.';
+    for (const [percent, who] of [[this.cashierMaxDiscount, 'del Cajero'], [this.supervisorMaxDiscount, 'del Supervisor']] as const) {
+      const n = Number(percent);
+      if (percent === null || `${percent}` === '' || !Number.isFinite(n) || n < 0 || n > 100) return `El descuento máximo ${who} debe estar entre 0 y 100 %.`;
+    }
+    return '';
   }
   async saveSales(): Promise<void> {
     const current = this.sales(); if (!current || this.savingSales()) return;
     const issue = this.validateSales(); if (issue) { this.salesError.set(issue); return; }
     this.savingSales.set(true); this.salesError.set(''); this.salesNotice.set('');
     try {
-      this.applySales(await this.api.updateSalesSettings(Number(this.wholesaleMinimum), current.version));
-      this.salesNotice.set('Mínimo guardado. Aplica a las ventas, apartados y cambios nuevos.');
+      this.applySales(await this.api.updateSalesSettings(Number(this.wholesaleMinimum), current.version,
+        Number(this.cashierMaxDiscount), Number(this.supervisorMaxDiscount)));
+      this.salesNotice.set('Guardado. Aplica a las ventas, apartados y cambios nuevos.');
     } catch (e) { this.salesError.set(errorText(e)); try { this.sales.set(await this.api.salesSettings()); } catch { /* el error ya se muestra */ } }
     finally { this.savingSales.set(false); }
   }

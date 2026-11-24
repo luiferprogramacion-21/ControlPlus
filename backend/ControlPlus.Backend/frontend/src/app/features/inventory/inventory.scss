@@ -47,3 +47,7 @@
 .filter-field label { color:var(--cp-text-secondary); font-weight:600; white-space:nowrap; }
 .stock-steps { display:inline-flex; gap:4px; margin:0 4px; }
 .stock-step { min-width:36px; font-size:18px; line-height:1; }
+
+/* Resultado del ajuste con su signo (auditoría del 23/11/2026). */
+.adjustment-preview { margin: 6px 0 0; color: var(--cp-error); font-weight: 700; }
+.adjustment-preview--add { color: var(--cp-success); }
