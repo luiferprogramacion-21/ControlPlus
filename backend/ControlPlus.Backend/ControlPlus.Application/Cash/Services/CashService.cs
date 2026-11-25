@@ -772,12 +772,16 @@ public sealed partial class CashService(
         var credential = await repository.GetActiveCredentialForUserAsync(user.Id, forUpdate: true, cancellationToken);
         if (credential is null || credential.FormatoCodigo != "CODE128" ||
             (credential.FechaVencimiento is not null && credential.FechaVencimiento <= now.UtcDateTime))
-            return Result.Failure<OperatorSessionDto>(ApplicationError.Conflict(
-                "Ese usuario no tiene carné vigente. El Administrador puede emitírselo en Administración → Usuarios → Carné."));
+            // 25/11/2026: código propio para que la ventana explique los pasos y quién los hace.
+            return Result.Failure<OperatorSessionDto>(new ApplicationError(OperatorCardMissingCode,
+                "Ese usuario no tiene un carné vigente. Lo emite el Administrador en Administración → Usuarios → Abrir ficha → pestaña Carné → Emitir carné."));
         user.RegisterSuccessfulLogin(now);
         await userRepository.UpdateAsync(user, cancellationToken);
         return await OpenOperatorSessionAsync(actor, shift, credential, "CONTRASENA", now, cancellationToken);
     }
+
+    /// <summary>Quien escribió su usuario y contraseña no tiene carné vigente (409).</summary>
+    public const string OperatorCardMissingCode = "operator.card_missing";
 
     private async Task<Result<OperatorSessionDto>> OpenOperatorSessionAsync(ActorContext actor, TurnoCaja shift,
         CredencialUsuario credential, string method, DateTimeOffset now, CancellationToken cancellationToken)

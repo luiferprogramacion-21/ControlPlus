@@ -108,6 +108,22 @@ describe('Ventana «Pasa tu carné»', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  it('si el usuario no tiene carné explica los pasos y quién los hace (25/11/2026)', async () => {
+    const fixture = create(); const component = fixture.componentInstance;
+    api.startSessionWithPassword.mockRejectedValue(new HttpErrorResponse({ status: 409,
+      error: { code: 'operator.card_missing', title: 'Ese usuario no tiene un carné vigente.' } }));
+    component.userName = 'cajera'; component.password = '1234';
+    await component.submit();
+    fixture.detectChanges();
+    expect(component.missingCard()).toBe(true);
+    expect(component.error()).toBe('Ese usuario no tiene un carné vigente.');
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('lo hace el Administrador');
+    expect(text).toContain('Abrir ficha');
+    expect(text).toContain('Emitir carné');
+    expect(close).not.toHaveBeenCalled();
+  });
+
   it('sin carné pide pasarlo y cancelar cierra sin abrir sesión', async () => {
     const component = create().componentInstance;
     await component.submit();

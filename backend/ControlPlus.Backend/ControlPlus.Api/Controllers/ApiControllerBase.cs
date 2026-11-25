@@ -61,7 +61,7 @@ public abstract class ApiControllerBase(CurrentActorContextResolver actorContext
         {
             "resource.not_found" => StatusCodes.Status404NotFound,
             "resource.conflict" or "concurrency.conflict" or "numbering.exhausted" or
-                "authentication.bootstrap_completed" => StatusCodes.Status409Conflict,
+                "authentication.bootstrap_completed" or "operator.card_missing" => StatusCodes.Status409Conflict,
             "authorization.forbidden" or "authorization.insufficient_role_level" => StatusCodes.Status403Forbidden,
             "authentication.invalid_credentials" or "authentication.unauthorized" => StatusCodes.Status401Unauthorized,
             "security.bootstrap_role_missing" or "email.not_configured" or "email.delivery_failed" =>

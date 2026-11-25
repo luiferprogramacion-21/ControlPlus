@@ -60,7 +60,9 @@ public sealed partial class SalesApiFlowTests
         var withoutCard = await client.PostAsJsonAsync("/api/cash/operator-sessions",
             new StartOperatorSessionRequest(null, CashierUser, CashierPassword));
         Assert.Equal(HttpStatusCode.Conflict, withoutCard.StatusCode);
-        Assert.Contains("no tiene carné vigente", await withoutCard.Content.ReadAsStringAsync());
+        var withoutCardBody = await withoutCard.Content.ReadAsStringAsync();
+        Assert.Contains("operator.card_missing", withoutCardBody);
+        Assert.Contains("no tiene un carné vigente", withoutCardBody);
 
         var card = await IssueCredentialAsync(client, setup.Admin.AccessToken, setup.Users.Cashier.Id);
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/cash/operator-sessions",

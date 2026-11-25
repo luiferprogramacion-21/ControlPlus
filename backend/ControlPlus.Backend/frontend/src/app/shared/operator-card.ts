@@ -38,6 +38,18 @@ export interface OperatorContext {
           <input id="operator-card-password" class="text-field" type="password" name="password" [(ngModel)]="password" autocomplete="off" [disabled]="busy()">
         </form>
         @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+        @if (missingCard()) {
+          <div class="card-steps" role="note">
+            <strong>Cómo darle un carné (lo hace el Administrador):</strong>
+            <ol>
+              <li>Entra al sistema con el usuario del <b>Administrador</b>, o pídeselo a él.</li>
+              <li>Ve a <b>Administración → Usuarios</b> y, en la fila de esa persona, pulsa <b>Abrir ficha</b>.</li>
+              <li>Abre la pestaña <b>Carné</b> y pulsa <b>Emitir carné</b>.</li>
+              <li>Pulsa <b>Imprimir carné</b> o <b>Descargar PDF</b> y entrégaselo.</li>
+            </ol>
+            <span>Mientras tanto, la operación la puede hacer otra persona que sí tenga carné.</span>
+          </div>
+        }
         @if (busy()) { <p role="status">Revisando el carné…</p> }
       </mat-dialog-content>
       <mat-dialog-actions align="end">
@@ -53,6 +65,8 @@ export interface OperatorContext {
     .text-field { width:100%; box-sizing:border-box; }
     .field-error { color:var(--cp-error); }
     form { display:grid; gap:6px; }
+    .card-steps { display:grid; gap:6px; padding:12px 14px; border-radius:10px; background:var(--cp-primary-soft); color:var(--cp-text); }
+    .card-steps ol { margin:0; padding-left:20px; display:grid; gap:4px; }
     .scan-hint { margin:6px 0 0; color:var(--cp-text-muted, inherit); font-size:.9em; }
   `],
 })
@@ -62,6 +76,8 @@ export class OperatorCardDialogComponent {
   private readonly cash = inject(CashApi);
   readonly busy = signal(false);
   readonly error = toastSignal('error');
+  /** Quien escribió su usuario no tiene carné: se muestran los pasos para emitirlo (25/11/2026). */
+  readonly missingCard = signal(false);
   token = '';
   userName = '';
   password = '';
@@ -78,13 +94,19 @@ export class OperatorCardDialogComponent {
     const userName = this.userName.trim();
     if (this.busy()) return;
     if (!token && (!userName || !this.password)) { this.error.set('Pasa tu carné por el lector, o escribe tu usuario y tu contraseña.'); return; }
-    this.busy.set(true); this.error.set(''); this.ref.disableClose = true;
+    this.busy.set(true); this.error.set(''); this.missingCard.set(false); this.ref.disableClose = true;
     try {
       if (token) await this.cash.startSession(token);
       else await this.cash.startSessionWithPassword(userName, this.password);
       this.token = ''; this.password = ''; this.ref.close(true);
     } catch (error) {
       const unauthorized = error instanceof HttpErrorResponse && error.status === 401;
+      if (error instanceof HttpErrorResponse && error.error?.code === 'operator.card_missing') {
+        this.missingCard.set(true);
+        this.error.set('Ese usuario no tiene un carné vigente.');
+        this.token = ''; this.password = '';
+        return;
+      }
       this.error.set(!unauthorized ? errorText(error) : token
         ? 'El carné no es válido, fue reemplazado o venció. Pásalo de nuevo o pide uno nuevo al Administrador.'
         : reasonOr(error, 'Usuario o contraseña incorrectos.') + ' Recuerda: 5 intentos fallidos bloquean al usuario.');
