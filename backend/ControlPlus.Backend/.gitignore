@@ -13,7 +13,10 @@ appsettings.Local.json
 **/obj/
 **/node_modules/
 **/.angular/
+**/.sonarqube/
 frontend/dist/
+frontend/coverage/
+TestResults/Sonar/
 .vs/
 *.user
 *.suo
