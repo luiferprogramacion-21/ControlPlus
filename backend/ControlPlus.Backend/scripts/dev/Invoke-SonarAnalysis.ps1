@@ -32,8 +32,29 @@ if (-not (Test-Path -LiteralPath (Join-Path $solutionDir 'ControlPlus.Backend.sl
 Write-Output "ANALYSIS_WORKTREE=$solutionDir"
 Write-Output "ANALYSIS_REVISION=$revision"
 
+$previousTestConnection = [Environment]::GetEnvironmentVariable('CONTROLPLUS_TEST_ADMIN_CONNECTION', 'Process')
+$testPassword = $null
+$testCredential = $null
+$testConnection = $null
+
 Push-Location $solutionDir
 try {
+    if ([string]::IsNullOrWhiteSpace($previousTestConnection)) {
+        $testPassword = Read-Host 'Contraseña del rol controlplus_test_admin (solo bases temporales)' -AsSecureString
+        if ($testPassword.Length -eq 0) {
+            throw 'La contraseña del rol de pruebas está vacía.'
+        }
+        $testCredential = [pscredential]::new('controlplus_test_admin', $testPassword)
+        $testConnection = [System.Data.Common.DbConnectionStringBuilder]::new()
+        $testConnection['Host'] = '127.0.0.1'
+        $testConnection['Port'] = 5432
+        $testConnection['Database'] = 'postgres'
+        $testConnection['Username'] = 'controlplus_test_admin'
+        $testConnection['Password'] = $testCredential.GetNetworkCredential().Password
+        [Environment]::SetEnvironmentVariable(
+            'CONTROLPLUS_TEST_ADMIN_CONNECTION', $testConnection.psbase.ConnectionString, 'Process')
+    }
+
     Push-Location 'frontend'
     try {
         & npm.cmd ci
@@ -68,13 +89,13 @@ try {
         /d:sonar.exclusions='**/bin/**,**/obj/**,**/TestResults/**,**/node_modules/**,**/.angular/**,**/dist/**,**/.sonarqube/**,**/coverage/**'
     Assert-LastExitCode 'SonarScanner begin'
 
-    & dotnet build ControlPlus.Backend.slnx -m:1 --no-incremental --disable-build-servers
+    & dotnet build ControlPlus.Backend.slnx -m:1 /warnaserror --no-incremental --disable-build-servers
     Assert-LastExitCode 'la compilación .NET'
 
-    & dotnet test ControlPlus.Backend.slnx --no-build --filter 'Category!=Integration' `
+    & dotnet test ControlPlus.Backend.slnx --no-build -m:1 /p:BuildInParallel=false `
         --collect:'XPlat Code Coverage' --results-directory 'TestResults/Sonar' `
         -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
-    Assert-LastExitCode 'las pruebas .NET con cobertura'
+    Assert-LastExitCode 'las pruebas .NET completas con cobertura'
 
     & dotnet sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
     Assert-LastExitCode 'SonarScanner end'
@@ -84,5 +105,9 @@ try {
 }
 finally {
     Remove-Item Env:SONAR_TOKEN -ErrorAction SilentlyContinue
+    [Environment]::SetEnvironmentVariable('CONTROLPLUS_TEST_ADMIN_CONNECTION', $previousTestConnection, 'Process')
+    if ($null -ne $testConnection) { $testConnection.Clear() }
+    if ($null -ne $testPassword) { $testPassword.Dispose() }
+    $testCredential = $null
     Pop-Location
 }
