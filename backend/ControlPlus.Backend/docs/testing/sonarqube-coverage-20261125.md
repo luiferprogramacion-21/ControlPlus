@@ -4,7 +4,7 @@
 
 El proyecto `controlplus` quedó con Quality Gate **ERROR**. La cobertura del código nuevo fue **2,9 %**, frente al mínimo de **80 %**. Las otras condiciones pasaron: duplicación nueva **1,82013 %** frente al máximo de **3 %**, y **0** infracciones nuevas. La cobertura total fue **19,0 %** sobre 52.766 líneas de código. SonarQube informó **0** bugs, **0** vulnerabilidades y **0** code smells abiertos.
 
-La respuesta de `/api/issues/search?componentKeys=controlplus&ps=500` contenía 193 registros históricos: **193 CLOSED/FIXED**, de los cuales 165 eran code smells, 18 bugs y 10 vulnerabilidades. Ese `total` no representa problemas abiertos. La consulta inicial de puntos críticos de seguridad usó el parámetro incorrecto `projectKey`; su respuesta fue un error de parámetros. Por tanto, el número de puntos críticos sigue sin comprobarse. La URL correcta es `http://localhost:9000/api/hotspots/search?project=controlplus&ps=500`.
+La respuesta de `/api/issues/search?componentKeys=controlplus&ps=500` contenía 193 registros históricos: **193 CLOSED/FIXED**, de los cuales 165 eran code smells, 18 bugs y 10 vulnerabilidades. Ese `total` no representa problemas abiertos. La consulta inicial de puntos críticos de seguridad usó el parámetro incorrecto `projectKey`; la consulta corregida `http://localhost:9000/api/hotspots/search?project=controlplus&ps=500` devolvió `total: 0` y listas `hotspots` y `components` vacías. Hay **0 puntos críticos de seguridad** en este análisis.
 
 El análisis enviado el 25 de noviembre a las 09:23 se ejecutó en un worktree del commit `178ab98`. No representa los cambios posteriores de `main` ni los cambios locales sin confirmar.
 
