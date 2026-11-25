@@ -111,7 +111,9 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
         {
             var term = query.Search!.Trim();
             var pattern = $"%{term}%";
-            var exactId = await dbContext.ProductoCodigo.Where(c => c.Codigo.Equals(term, StringComparison.CurrentCultureIgnoreCase))
+            var exactPattern = PostgresLikePattern.Escape(term);
+            var exactId = await dbContext.ProductoCodigo
+                .Where(c => EF.Functions.ILike(c.Codigo, exactPattern, PostgresLikePattern.EscapeCharacter))
                 .Select(c => (Guid?)c.ProductoId).SingleOrDefaultAsync(cancellationToken);
             products = exactId is not null ? products.Where(x => x.Id == exactId) :
                 products.Where(x => EF.Functions.ILike(x.Nombre, pattern) ||
@@ -177,12 +179,22 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
             .FirstOrDefaultAsync(cancellationToken);
 
     public Task<bool> ProductInternalCodeExistsAsync(
-        string code, Guid? excludedId = null, CancellationToken cancellationToken = default) =>
-        dbContext.ProductoCodigo.AnyAsync(x => x.Codigo.Equals(code.Trim(), StringComparison.CurrentCultureIgnoreCase) && (excludedId == null || x.ProductoId != excludedId), cancellationToken);
+        string code, Guid? excludedId = null, CancellationToken cancellationToken = default)
+    {
+        var pattern = PostgresLikePattern.Escape(code.Trim());
+        return dbContext.ProductoCodigo.AnyAsync(x =>
+            EF.Functions.ILike(x.Codigo, pattern, PostgresLikePattern.EscapeCharacter) &&
+            (excludedId == null || x.ProductoId != excludedId), cancellationToken);
+    }
 
     public Task<bool> ProductBarcodeExistsAsync(
-        string barcode, Guid? excludedId = null, CancellationToken cancellationToken = default) =>
-        dbContext.ProductoCodigo.AnyAsync(x => x.Codigo.Equals(barcode.Trim(), StringComparison.CurrentCultureIgnoreCase) && (excludedId == null || x.ProductoId != excludedId), cancellationToken);
+        string barcode, Guid? excludedId = null, CancellationToken cancellationToken = default)
+    {
+        var pattern = PostgresLikePattern.Escape(barcode.Trim());
+        return dbContext.ProductoCodigo.AnyAsync(x =>
+            EF.Functions.ILike(x.Codigo, pattern, PostgresLikePattern.EscapeCharacter) &&
+            (excludedId == null || x.ProductoId != excludedId), cancellationToken);
+    }
 
     public Task AddProductAsync(Producto product, CancellationToken cancellationToken = default) =>
         dbContext.Producto.AddAsync(product, cancellationToken).AsTask();

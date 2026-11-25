@@ -10,6 +10,7 @@ using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Domain.Security;
 using ControlPlus.Domain.Security.Enums;
 using ControlPlus.Infrastructure.Persistence.Official;
+using ControlPlus.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace ControlPlus.Infrastructure.Printing;
@@ -69,7 +70,10 @@ public sealed partial class ProductLabelPrintingService(
             if (term.Length > 100)
                 return Result.Failure<PagedResult<ProductLabelProductDto>>(
                     ApplicationError.Validation("La búsqueda no puede superar 100 caracteres."));
-            var exactId = await db.ProductoCodigo.AsNoTracking().Where(code => code.Codigo.Equals(term, StringComparison.CurrentCultureIgnoreCase))
+            var exactPattern = PostgresLikePattern.Escape(term);
+            var exactId = await db.ProductoCodigo.AsNoTracking()
+                .Where(code => EF.Functions.ILike(
+                    code.Codigo, exactPattern, PostgresLikePattern.EscapeCharacter))
                 .Select(code => (Guid?)code.ProductoId).SingleOrDefaultAsync(cancellationToken);
             if (exactId is not null) products = products.Where(product => product.Id == exactId);
             else

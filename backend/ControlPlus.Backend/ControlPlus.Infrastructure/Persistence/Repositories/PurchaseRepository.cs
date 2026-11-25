@@ -67,9 +67,9 @@ public sealed class EfPurchaseRepository(OfficialControlPlusDbContext db) : IPur
         if (query.InvoiceDate is DateOnly date) source = source.Where(x => x.FechaDocumento == date);
         if (query.SupplierDocumentNumber is not null)
         {
-            var documentPattern = EscapeLikePattern(query.SupplierDocumentNumber);
+            var documentPattern = PostgresLikePattern.Escape(query.SupplierDocumentNumber);
             source = source.Where(x => x.NumeroDocumentoProveedor != null &&
-                EF.Functions.ILike(x.NumeroDocumentoProveedor, documentPattern, "\\"));
+                EF.Functions.ILike(x.NumeroDocumentoProveedor, documentPattern, PostgresLikePattern.EscapeCharacter));
         }
         var count = await source.CountAsync(ct);
         var items = await source.OrderByDescending(x => x.FechaDocumento).ThenByDescending(x => x.Id)
@@ -96,9 +96,10 @@ public sealed class EfPurchaseRepository(OfficialControlPlusDbContext db) : IPur
     public Task<bool> DocumentExistsAsync(Guid supplierId, string document, Guid? excludingId,
         CancellationToken ct = default)
     {
-        var documentPattern = EscapeLikePattern(document);
+        var documentPattern = PostgresLikePattern.Escape(document);
         return db.Compra.AsNoTracking().AnyAsync(x => x.ProveedorId == supplierId &&
-            x.NumeroDocumentoProveedor != null && EF.Functions.ILike(x.NumeroDocumentoProveedor, documentPattern, "\\") &&
+            x.NumeroDocumentoProveedor != null &&
+            EF.Functions.ILike(x.NumeroDocumentoProveedor, documentPattern, PostgresLikePattern.EscapeCharacter) &&
             (excludingId == null || x.Id != excludingId), ct);
     }
 
@@ -118,11 +119,6 @@ public sealed class EfPurchaseRepository(OfficialControlPlusDbContext db) : IPur
 
     public Task AddIdempotencyAsync(OperacionIdempotente operation, CancellationToken ct = default) =>
         db.OperacionIdempotente.AddAsync(operation, ct).AsTask();
-
-    private static string EscapeLikePattern(string value) => value
-        .Replace("\\", "\\\\", StringComparison.Ordinal)
-        .Replace("%", "\\%", StringComparison.Ordinal)
-        .Replace("_", "\\_", StringComparison.Ordinal);
 
     public async Task<IReadOnlyCollection<MotivoOperacion>> ListCancellationReasonsAsync(Guid establishmentId, CancellationToken ct = default) =>
         await db.MotivoOperacion.AsNoTracking().Where(x => x.EstablecimientoId == establishmentId &&
