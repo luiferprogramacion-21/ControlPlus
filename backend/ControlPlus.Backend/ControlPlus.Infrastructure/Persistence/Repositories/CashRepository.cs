@@ -145,6 +145,16 @@ public sealed partial class EfCashRepository(OfficialControlPlusDbContext dbCont
     public Task AddCashRegisterAsync(Caja cashRegister, CancellationToken cancellationToken = default) =>
         dbContext.Caja.AddAsync(cashRegister, cancellationToken).AsTask();
 
+    public Task<int> DiscardSaleDraftsOfClosedShiftsAsync(DateTime nowUtc, CancellationToken cancellationToken = default) =>
+        dbContext.BorradorVenta
+            .Where(x => (x.Estado == "ACTIVO" || x.Estado == "RECUPERADO") &&
+                !dbContext.TurnoCaja.Any(t => t.Id == x.TurnoCajaId && t.Estado == CashConstants.OpenState))
+            .ExecuteUpdateAsync(set => set.SetProperty(x => x.Estado, "DESCARTADO").SetProperty(x => x.FechaCierre, nowUtc),
+                cancellationToken);
+
+    public Task<bool> HasActiveOperatorSessionAsync(CancellationToken cancellationToken = default) =>
+        dbContext.SesionOperador.AnyAsync(x => x.Estado == CashConstants.ActiveSessionState, cancellationToken);
+
     public async Task<TurnoCaja?> GetOpenShiftAsync(
         bool forUpdate,
         CancellationToken cancellationToken = default)

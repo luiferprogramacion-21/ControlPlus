@@ -225,6 +225,36 @@ public sealed class SaleDraftApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/sales/drafts/current")).StatusCode);
     }
 
+    [Fact, Trait("Category", "Integration")]
+    public async Task HeldSaleOfAClosedShift_DoesNotBlockChangingTheShiftMode()
+    {
+        // 25/11/2026: una venta en espera que quedó al cerrar la caja ya no se ve ni se puede retomar, y la base impedía
+        // cambiar el modo del turno con un mensaje genérico. Al cambiar el modo sin caja abierta, se descarta.
+        using var client = Client();
+        var setup = await BootstrapAsync(client, openShift: true);
+        var held = await CreateAsync(client, new SaveSaleDraftRequest("CONTADO", null,
+            [new SaleDraftLineRequest(setup.ProductA, 1, "MINORISTA")]));
+        var state = (await client.GetFromJsonAsync<CashStateDto>("/api/cash/state"))!;
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync("/api/cash/shift-mode",
+            new UpdateCashShiftModeRequest("COMPARTIDO", state.ConfigurationVersion!.Value))).StatusCode);
+
+        var reconciliation = (await client.GetFromJsonAsync<CashReconciliationDto>("/api/cash/reconciliation"))!;
+        var counts = reconciliation.PaymentMethods.Where(m => m.AffectsCash)
+            .Select(m => new CountedPaymentMethodRequest(m.PaymentMethodId, m.ExpectedAmount)).ToArray();
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync($"/api/cash/shifts/{reconciliation.ShiftId}/close",
+            new CloseCashShiftRequest(reconciliation.ShiftVersion, counts, null, null, null))).StatusCode);
+        Assert.Empty(await ListAsync(client));
+
+        state = (await client.GetFromJsonAsync<CashStateDto>("/api/cash/state"))!;
+        var changed = await client.PutAsJsonAsync("/api/cash/shift-mode",
+            new UpdateCashShiftModeRequest("COMPARTIDO", state.ConfigurationVersion!.Value));
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+        Assert.Equal("COMPARTIDO", (await changed.Content.ReadFromJsonAsync<CashStateDto>())!.DefaultShiftMode);
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        Assert.Equal("DESCARTADO", (await db.BorradorVenta.AsNoTracking().SingleAsync(x => x.Id == held.Id)).Estado);
+    }
+
     private sealed record Setup(AuthenticationResult Admin, AuthenticationResult Supervisor, Guid ProductA, Guid ProductB, Guid CustomerId);
 
     private HttpClient Client() => _factory!.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

@@ -307,7 +307,7 @@ El Supervisor hace todo lo que hace un Cajero, **sin necesitar la autorización 
 
 Igual que en 2.2, pero sin ventana de autorización. Al abrir eliges **Turno individual** (por defecto) o **Turno compartido** para ese turno.
 
-**Modalidad predeterminada del negocio:** Configuración → **Caja y turnos**. Elige individual o compartido. Solo se puede cambiar **sin turno abierto** y vale desde el siguiente turno.
+**Modalidad predeterminada del negocio:** Configuración → **Caja y turnos**. Elige individual o compartido. Solo se puede cambiar **sin turno abierto** y vale desde el siguiente turno. Si quedaron **ventas en espera** sin terminar de un turno ya cerrado, al cambiar el modo se descartan: ya no se podían retomar.
 
 ## 3.3 Movimientos de caja
 

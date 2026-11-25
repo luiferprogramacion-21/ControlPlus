@@ -216,6 +216,13 @@ public sealed partial class CashService(
         if (await repository.GetOpenShiftAsync(false, cancellationToken) is not null)
             return Result.Failure<CashStateDto>(ApplicationError.Conflict(
                 "Hay un turno abierto. Ciérrelo primero en Caja; el nuevo modo aplica desde el próximo turno."));
+        // 25/11/2026: la base no deja cambiar el modo con una sesión de operador activa ni con ventas sin terminar. Cerrar el turno
+        // finaliza sus sesiones, así que una activa aquí es una anomalía. Sin turno
+        // abierto, las ventas en espera de turnos cerrados ya no se pueden retomar: se descartan, como al guardar otra venta.
+        if (await repository.HasActiveOperatorSessionAsync(cancellationToken))
+            return Result.Failure<CashStateDto>(ApplicationError.Conflict(
+                "No se puede cambiar el modo: quedó activa la sesión de un operador de un turno anterior. Pide ayuda al soporte técnico."));
+        await repository.DiscardSaleDraftsOfClosedShiftsAsync(clock.UtcNow.UtcDateTime, cancellationToken);
 
         Usuario? authorizer = null;
         if (needsAuthorization)

@@ -39,6 +39,15 @@ public interface ICashRepository
     Task AddCashRegisterAsync(Caja cashRegister, CancellationToken cancellationToken = default);
 
     Task<TurnoCaja?> GetOpenShiftAsync(bool forUpdate, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Descarta las ventas sin terminar o en espera de turnos ya cerrados (25/11/2026): ya no se pueden retomar y, abiertas,
+    /// impiden cambiar el modo del turno. Devuelve cuántas se descartaron.
+    /// </summary>
+    Task<int> DiscardSaleDraftsOfClosedShiftsAsync(DateTime nowUtc, CancellationToken cancellationToken = default) => Task.FromResult(0);
+
+    /// <summary>Sesiones de operador que quedaron activas aunque su turno ya no esté abierto.</summary>
+    Task<bool> HasActiveOperatorSessionAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
     Task<TurnoCaja?> GetShiftForUpdateAsync(Guid shiftId, CancellationToken cancellationToken = default);
     Task AddShiftAsync(TurnoCaja shift, CancellationToken cancellationToken = default);
     void MarkShiftChanged(TurnoCaja shift);
