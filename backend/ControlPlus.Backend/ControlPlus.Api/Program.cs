@@ -53,7 +53,7 @@ var controlledCommand = ControlledExecutionCommand.Parse(
     Environment.GetEnvironmentVariable(ControlledExecutionCommand.EnabledEnvironmentVariable));
 if (!controlledCommand.IsValid)
 {
-    Console.Error.WriteLine(controlledCommand.Message);
+    await Console.Error.WriteLineAsync(controlledCommand.Message);
     Environment.ExitCode = ControlledMigrationRunner.RejectedExitCode;
     return;
 }
@@ -66,7 +66,7 @@ if (controlledCommand.Mode == ControlledExecutionMode.Preflight)
         controlledCommand.TargetMigration!);
 
     var preflightOutput = preflightResult.ExitCode == 0 ? Console.Out : Console.Error;
-    preflightOutput.WriteLine(preflightResult.Message);
+    await preflightOutput.WriteLineAsync(preflightResult.Message);
     Environment.ExitCode = preflightResult.ExitCode;
     return;
 }
@@ -80,7 +80,7 @@ if (controlledCommand.Mode == ControlledExecutionMode.Postflight)
         controlledCommand.ExpectedUnrelatedReasonsSha256);
 
     var postflightOutput = postflightResult.ExitCode == 0 ? Console.Out : Console.Error;
-    postflightOutput.WriteLine(postflightResult.Message);
+    await postflightOutput.WriteLineAsync(postflightResult.Message);
     Environment.ExitCode = postflightResult.ExitCode;
     return;
 }
@@ -93,7 +93,7 @@ if (controlledCommand.Mode == ControlledExecutionMode.Migration)
         controlledCommand.TargetMigration!);
 
     var migrationOutput = migrationResult.ExitCode == 0 ? Console.Out : Console.Error;
-    migrationOutput.WriteLine(migrationResult.Message);
+    await migrationOutput.WriteLineAsync(migrationResult.Message);
     Environment.ExitCode = migrationResult.ExitCode;
     return;
 }
@@ -158,7 +158,7 @@ builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();
 // Contraseñas de 4 números: el servicio instalado activa la regla en appsettings.Production.json.
 builder.Services.AddSingleton<IPasswordPolicy>(new PasswordPolicy(string.Equals(
-    builder.Configuration["Security:PasswordFormat"], PasswordPolicy.PinFormat, StringComparison.OrdinalIgnoreCase)));
+    builder.Configuration["Security:CredentialFormat"], PasswordPolicy.PinFormat, StringComparison.OrdinalIgnoreCase)));
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 builder.Services.AddScoped<IRoleManagementService, RoleManagementService>();
 builder.Services.AddScoped<IAuditQueryService, AuditQueryService>();
@@ -273,7 +273,7 @@ app.UseAuthorization();
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path;
-    if (context.User.HasClaim(JwtClaimTypes.PasswordChange, JwtClaimTypes.PasswordChangeRequiredValue) &&
+    if (context.User.HasClaim(JwtClaimTypes.CredentialRenewal, JwtClaimTypes.CredentialRenewalRequiredValue) &&
         path.StartsWithSegments("/api") &&
         !path.StartsWithSegments("/api/auth/password-change") &&
         !path.StartsWithSegments("/api/auth/me") &&
@@ -299,6 +299,4 @@ if (hasFrontend)
     app.MapFallbackToFile("{**path:nonfile:regex(^(?!api(/|$)).*$)}", "index.html").AllowAnonymous();
 }
 
-app.Run();
-
-public partial class Program;
+await app.RunAsync();

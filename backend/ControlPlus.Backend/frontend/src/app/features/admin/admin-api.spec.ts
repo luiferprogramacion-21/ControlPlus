@@ -63,9 +63,13 @@ describe('AdminApi: usuarios y roles', () => {
 
   it('activa o inactiva según el estado vigente', async () => {
     const off = api.setUserActive(user);
-    http.expectOne('/api/users/u1/deactivate').flush(user); await off;
+    const deactivate = http.expectOne('/api/users/u1/deactivate');
+    expect(deactivate.request.method).toBe('PUT');
+    deactivate.flush(user); await off;
     const on = api.setUserActive({ ...user, isActive: false });
-    http.expectOne('/api/users/u1/activate').flush(user); await on;
+    const activate = http.expectOne('/api/users/u1/activate');
+    expect(activate.request.method).toBe('PUT');
+    activate.flush(user); await on;
   });
 
   it('cambia la contraseña con currentPassword y newPassword', async () => {

@@ -101,7 +101,7 @@
         <div class="search-area">
           <form class="scanner" (submit)="$event.preventDefault(); find()">
             <label class="field-label" for="product-search">Buscar producto o leer código de barras</label>
-            <div class="scanner__field"><input #productSearch id="product-search" name="search" [ngModel]="search" (ngModelChange)="onSearchInput($event)" (keydown)="onSearchKey($event)" placeholder="Escanee o escriba código, nombre o referencia" autocomplete="off" autofocus role="combobox" aria-autocomplete="list" [attr.aria-expanded]="results().length > 0" aria-controls="catalog-results">
+            <div class="scanner__field"><input #productSearch id="product-search" name="search" [ngModel]="search" (ngModelChange)="onSearchInput($event)" (keydown)="onSearchKey($event)" placeholder="Escanee o escriba código, nombre o referencia" autocomplete="off" role="combobox" aria-autocomplete="list" [attr.aria-expanded]="results().length > 0" aria-controls="catalog-results">
               <button class="catalog-toggle" type="button" (click)="toggleCatalog()" [disabled]="loading()" [attr.aria-expanded]="results().length > 0" aria-controls="catalog-results">Ver productos</button><button class="scanner-submit" type="submit" [disabled]="loading()">Agregar · Enter</button><kbd>F2</kbd>
             </div>
           </form>
@@ -110,7 +110,7 @@
         </div>
         @if (feedback() && !error()) { <div class="inline-feedback" [class.inline-feedback--success]="feedbackKind() === 'success'" [class.inline-feedback--error]="feedbackKind() === 'error'" role="status" aria-live="polite"><span aria-hidden="true">{{ feedbackKind() === 'error' ? '!' : feedbackKind() === 'success' ? '✓' : 'i' }}</span>{{ feedback() }}</div> }
 
-        <div class="table-wrap cart-table" role="region" aria-label="Productos de la venta" tabindex="0">
+        <div class="table-wrap cart-table" role="region" aria-label="Productos de la venta">
           <table aria-label="Carrito de venta"><thead><tr><th>Producto</th><th class="align-right">Cant.</th><th class="align-right">Tipo de precio</th><th class="align-right">Precio</th><th class="align-right">Desc.</th><th class="align-right">Subtotal</th><th class="cart-remove-cell"><span class="sr-only">Quitar</span></th></tr></thead>
             <tbody>@for (line of cart(); track line.product.id) {
               <tr tabindex="0" [id]="'line-' + line.product.id" [class.is-wholesale]="line.priceType === 'MAYORISTA'" [class.is-selected]="selectedProductId() === line.product.id" (click)="selectedProductId.set(line.product.id)" (focusin)="selectedProductId.set(line.product.id)"><td><strong>{{ line.product.name }}</strong><small>{{ line.product.internalCode }} · {{ line.product.measurementUnitCode }}</small></td>

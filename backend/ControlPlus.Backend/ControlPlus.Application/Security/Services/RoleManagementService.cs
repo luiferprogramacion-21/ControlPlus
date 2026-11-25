@@ -745,11 +745,11 @@ public sealed class RoleManagementService : IRoleManagementService
         _ => RoleLevel.None
     };
 
-    private static readonly IReadOnlySet<string> ReservedNonAssignablePermissionCodes = new HashSet<string>(
+    private static readonly HashSet<string> ReservedNonAssignablePermissionCodes = new(
         ["MASTER_KEY", "MASTER.KEY", "CONTROLPLUS_MASTER_KEY", "INSTALLATION.MASTER_KEY", "AUTH.RECOVER_INITIAL_ADMINISTRATOR"],
         StringComparer.OrdinalIgnoreCase);
 
-    private static readonly IReadOnlySet<string> SecurityAdministratorPermissionCodes = new HashSet<string>(
+    private static readonly HashSet<string> SecurityAdministratorPermissionCodes = new(
         [PermissionCodes.UsersManage, PermissionCodes.RolesManage, PermissionCodes.PermissionsManage, PermissionCodes.UserPermissionsManage],
         StringComparer.OrdinalIgnoreCase);
 }

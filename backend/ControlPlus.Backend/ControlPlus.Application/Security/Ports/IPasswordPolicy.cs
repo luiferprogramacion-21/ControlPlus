@@ -2,7 +2,7 @@ namespace ControlPlus.Application.Security.Ports;
 
 /// <summary>
 /// Contraseñas de 4 números (decisión del 19 de noviembre de 2026, para todos los roles). Se activa con
-/// <c>Security:PasswordFormat = PIN4</c> (el servicio instalado lo trae en appsettings.Production.json). Las contraseñas
+/// <c>Security:CredentialFormat = PIN4</c> (el servicio instalado lo trae en appsettings.Production.json). Las contraseñas
 /// anteriores siguen sirviendo para entrar, pero la sesión obliga a cambiarlas antes de usar el sistema.
 /// </summary>
 public interface IPasswordPolicy

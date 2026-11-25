@@ -22,6 +22,11 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
     private const string InternalDocumentPrefix = "CP-INTERNO-";
     private static readonly (string Code, string Name)[] CancellationCatalog =
         ApprovedReasonCatalogs.PurchaseCancellation;
+    private static readonly string[] PurchaseDraftModifiedFields =
+        ["supplierId", "supplierDocumentNumber", "invoiceDate", "vatMode", "lines"];
+    private static readonly string[] PurchaseConfirmationModifiedFields =
+        ["status", "prefix", "series", "consecutive", "supplierDocumentNumber", "stock", "averageCost"];
+    private static readonly string[] RetailPriceModifiedFields = ["retailPrice"];
 
     public async Task<Result<PurchaseCorrectionPreparationDto>> PrepareCorrectionAsync(ActorContext actor,
         Guid id, CancellationToken ct = default)
@@ -471,7 +476,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         await AuditWriter.WriteAsync(audit, clock, actor.UserId, AuditAction.PurchaseDraftCreated,
             nameof(Compra), purchase.Id,
             new { PurchaseId = purchase.Id, State = purchase.Estado, purchase.Version,
-                ModifiedFields = new[] { "supplierId", "supplierDocumentNumber", "invoiceDate", "vatMode", "lines" },
+                ModifiedFields = PurchaseDraftModifiedFields,
                 CorrelationId = correlationId }, ct);
         await unitOfWork.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -520,7 +525,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         await AuditWriter.WriteAsync(audit, clock, actor.UserId, AuditAction.PurchaseDraftUpdated,
             nameof(Compra), purchase.Id,
             new { PurchaseId = purchase.Id, State = purchase.Estado, Version = purchase.Version,
-                ModifiedFields = new[] { "supplierId", "supplierDocumentNumber", "invoiceDate", "vatMode", "lines" },
+                ModifiedFields = PurchaseDraftModifiedFields,
                 CorrelationId = correlationId }, ct);
         await unitOfWork.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -665,7 +670,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         await AuditWriter.WriteCashAsync(audit, clock, actor.UserId, AuditAction.PurchaseConfirmed,
             nameof(Compra), purchase.Id,
             new { PurchaseId = purchase.Id, State = purchase.Estado, Version = purchase.Version,
-                ModifiedFields = new[] { "status", "prefix", "series", "consecutive", "supplierDocumentNumber", "stock", "averageCost" },
+                ModifiedFields = PurchaseConfirmationModifiedFields,
                 ProductIds = lineIds.Order().ToArray(), CorrelationId = correlationId },
             correlationId, null, null, terminal.Id, null, ct);
         await unitOfWork.SaveChangesAsync(ct);
@@ -963,7 +968,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                 nameof(Producto), change.ProductId,
                 new { PurchaseId = purchaseId, OrderId = orderId, ProductId = change.ProductId,
                     PreviousRetailPrice = change.PreviousRetailPrice, NewRetailPrice = change.NewRetailPrice,
-                    ChangeSource = "PURCHASE_RECEIPT", ModifiedFields = new[] { "retailPrice" },
+                    ChangeSource = "PURCHASE_RECEIPT", ModifiedFields = RetailPriceModifiedFields,
                     CorrelationId = correlationId },
                 ct, correlationId, terminalId);
         }

@@ -1,5 +1,6 @@
 using ControlPlus.Domain.OfficialModel;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics.CodeAnalysis;
 
 namespace ControlPlus.Infrastructure.Persistence.Official;
 
@@ -12,6 +13,8 @@ public partial class OfficialControlPlusDbContext
 
     public virtual DbSet<AutorizacionCierreTurno> AutorizacionCierreTurno { get; set; }
 
+    [SuppressMessage("Performance", "CA1822:Mark members as static",
+        Justification = "La firma implementa el método parcial generado por EF Core y debe permanecer como miembro de instancia.")]
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Categoria>(entity =>

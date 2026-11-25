@@ -675,7 +675,7 @@ public sealed class DocumentNumberingApiTests : IAsyncLifetime
         var body = await response.Content.ReadAsStringAsync();
         Assert.True(response.StatusCode == expected,
             $"Expected {(int)expected} ({expected}) but received {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
-        var value = JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var value = JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web);
         Assert.NotNull(value);
         return value;
     }

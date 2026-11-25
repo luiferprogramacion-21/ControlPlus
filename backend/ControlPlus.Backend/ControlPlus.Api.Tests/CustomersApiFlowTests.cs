@@ -656,9 +656,9 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
             new AuthUser(await LoginAsync(client, CashierName, _cashierPassword), cashierUser));
     }
 
-    private async Task<CustomerDto> CreateAsync(HttpClient client, CreateCustomerRequest request) =>
+    private static async Task<CustomerDto> CreateAsync(HttpClient client, CreateCustomerRequest request) =>
         await ReadAsync<CustomerDto>(await client.PostAsJsonAsync("/api/customers", request), HttpStatusCode.Created);
-    private async Task<CustomerDto> SetStatusAsync(HttpClient client, Guid id, bool active, long version) =>
+    private static async Task<CustomerDto> SetStatusAsync(HttpClient client, Guid id, bool active, long version) =>
         await ReadAsync<CustomerDto>(await client.PutAsJsonAsync($"/api/customers/{id}/status", new SetCustomerStatusRequest(active, version)), HttpStatusCode.OK);
     private static async Task<PagedResult<CustomerDto>> SearchAsync(HttpClient client, string search) =>
         await ReadAsync<PagedResult<CustomerDto>>(
@@ -784,7 +784,7 @@ public sealed class CustomersApiFlowTests : IAsyncLifetime
     private static async Task<Guid> RoleIdAsync(HttpClient client, string code) => (await ReadAsync<PagedResult<RoleDto>>(await client.GetAsync("/api/roles?pageSize=100"), HttpStatusCode.OK)).Items.Single(x => x.Code == code).Id;
     private static async Task<Guid> PermissionIdAsync(HttpClient client, string code) => (await ReadAsync<PagedResult<PermissionDto>>(await client.GetAsync("/api/permissions?pageSize=100"), HttpStatusCode.OK)).Items.Single(x => x.Code == code).Id;
     private static async Task<UserDto> UsersAsync(HttpClient client, string name) => (await ReadAsync<PagedResult<UserDto>>(await client.GetAsync("/api/users?pageSize=100"), HttpStatusCode.OK)).Items.Single(x => x.UserName == name);
-    private static async Task<T> ReadAsync<T>(HttpResponseMessage response, HttpStatusCode expected) { var body = await response.Content.ReadAsStringAsync(); Assert.True(response.StatusCode == expected, $"Expected {expected}, got {response.StatusCode}: {body}"); return JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web))!; }
+    private static async Task<T> ReadAsync<T>(HttpResponseMessage response, HttpStatusCode expected) { var body = await response.Content.ReadAsStringAsync(); Assert.True(response.StatusCode == expected, $"Expected {expected}, got {response.StatusCode}: {body}"); return JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web)!; }
     private static void SetBearer(HttpClient client, string token) => client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     private static string RandomSecret(int bytes) => Convert.ToBase64String(RandomNumberGenerator.GetBytes(bytes));
     private static void AssertSanitizedCustomerAudit(EventoAuditoria audit)

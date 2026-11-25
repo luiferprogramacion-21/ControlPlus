@@ -95,7 +95,9 @@ export class Home implements OnInit {
   readonly firstName = computed(() => (this.session.user()?.displayName ?? '').trim().split(/\s+/)[0] || 'de nuevo');
   readonly tasks = computed(() => homeTasks(permission => this.session.has(permission), this.session.has('CASH.OWN_READ') ? this.cash() : null, this.session.user()?.id ?? null));
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void { void this.loadCashState(); }
+
+  private async loadCashState(): Promise<void> {
     if (!this.session.has('CASH.OWN_READ')) return;
     this.loadingCash.set(true);
     try { this.cash.set(await this.cashApi.state()); } catch { this.cash.set(null); } finally { this.loadingCash.set(false); }

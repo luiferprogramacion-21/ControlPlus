@@ -114,7 +114,7 @@ public sealed class CustomerService(ICustomerRepository repository, IPermissionC
         return (type, number, name, phone, address, email, observations, null);
     }
     private static string? Optional(string? x) => string.IsNullOrWhiteSpace(x) ? null : x.Trim();
-    private static IReadOnlyCollection<string> Changed(Cliente x, (string? Type,string? Number,string? Name,string? Phone,string? Address,string? Email,string? Observations,ApplicationError? Error) i) => new[] { (x.TipoDocumento != i.Type,"tipoDocumento"), (x.NumeroDocumento != i.Number,"numeroDocumento"), (x.NombreCompleto != i.Name,"nombreCompleto"), (x.Telefono != i.Phone,"telefono"), (x.Direccion != i.Address,"direccion"), (x.Correo != i.Email,"correo"), (x.Observaciones != i.Observations,"observaciones") }.Where(x => x.Item1).Select(x => x.Item2).ToArray();
+    private static string[] Changed(Cliente x, (string? Type,string? Number,string? Name,string? Phone,string? Address,string? Email,string? Observations,ApplicationError? Error) i) => new[] { (x.TipoDocumento != i.Type,"tipoDocumento"), (x.NumeroDocumento != i.Number,"numeroDocumento"), (x.NombreCompleto != i.Name,"nombreCompleto"), (x.Telefono != i.Phone,"telefono"), (x.Direccion != i.Address,"direccion"), (x.Correo != i.Email,"correo"), (x.Observaciones != i.Observations,"observaciones") }.Where(x => x.Item1).Select(x => x.Item2).ToArray();
     private static CustomerDto Map(Cliente x) => new(x.Id, x.TipoDocumento, x.NumeroDocumento, x.NombreCompleto, x.Telefono, x.Direccion, x.Correo, x.Observaciones, x.Activo, x.Version, x.CupoCredito);
 
     /// <summary>Cupo de crédito (16 de noviembre de 2026): vacío o pesos enteros positivos.</summary>

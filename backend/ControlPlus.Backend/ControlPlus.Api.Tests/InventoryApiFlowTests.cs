@@ -617,7 +617,7 @@ public sealed partial class InventoryApiFlowTests : IAsyncLifetime
     }
 
     /// <summary>Grants the Supervisor INVENTORY.ADJUST (it is not part of its role) and signs it in; the Administrators then authorize.</summary>
-    private async Task<string> GrantedSupervisorTokenAsync(HttpClient client, Scenario scenario)
+    private static async Task<string> GrantedSupervisorTokenAsync(HttpClient client, Scenario scenario)
     {
         SetBearer(client, scenario.Admin.AccessToken);
         var permissionId = await GetPermissionIdAsync(client, PermissionCodes.InventoryAdjust);
@@ -691,7 +691,7 @@ public sealed partial class InventoryApiFlowTests : IAsyncLifetime
             version);
     }
 
-    private async Task<ForeignFixtureIds> PrepareForeignSaleFixtureAsync(HttpClient client, Scenario scenario)
+    private static async Task<ForeignFixtureIds> PrepareForeignSaleFixtureAsync(HttpClient client, Scenario scenario)
     {
         SetBearer(client, scenario.Admin.AccessToken);
         _ = await ReadAsync<CashRegisterDto>(await client.PostAsJsonAsync(
@@ -1067,7 +1067,7 @@ public sealed partial class InventoryApiFlowTests : IAsyncLifetime
         var body = await response.Content.ReadAsStringAsync();
         Assert.True(response.StatusCode == expected,
             $"Expected {(int)expected} ({expected}) but received {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
-        var value = JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var value = JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web);
         Assert.NotNull(value);
         return value;
     }

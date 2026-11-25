@@ -43,6 +43,7 @@ describe('LayawayCreate: nuevo apartado', () => {
       { provide: AuthorizationDialog, useValue: dialog }, { provide: SessionService, useValue: session },
     ] });
     component = TestBed.runInInjectionContext(() => new LayawayCreate());
+    component.ngOnInit();
     created = []; component.created.subscribe(x => created.push(x));
   });
 
@@ -253,7 +254,7 @@ describe('LayawayCreate: nuevo apartado', () => {
 
     it('con la exigencia apagada el mínimo es un peso', async () => {
       api.creationRules.mockResolvedValue({ requireMinimumInitial: false, minimumPercentage: 20, defaultDays: 15 });
-      component = TestBed.runInInjectionContext(() => new LayawayCreate()); await loaded(); fill();
+      component = TestBed.runInInjectionContext(() => new LayawayCreate()); component.ngOnInit(); await loaded(); fill();
       expect(component.minimumInitial()).toBe(1);
       component.drafts = [{ methodCode: 'EFECTIVO', appliedAmount: 1, receivedAmount: 1, reference: '' }];
       expect(component.validation()).toBe('');
@@ -272,7 +273,7 @@ describe('LayawayCreate: nuevo apartado', () => {
 
     it('sin plazo predeterminado la fecha es obligatoria', async () => {
       api.creationRules.mockResolvedValue({ requireMinimumInitial: true, minimumPercentage: 20, defaultDays: null });
-      component = TestBed.runInInjectionContext(() => new LayawayCreate()); await loaded(); fill();
+      component = TestBed.runInInjectionContext(() => new LayawayCreate()); component.ngOnInit(); await loaded(); fill();
       expect(component.dueRequired).toBe(true); expect(component.defaultDue()).toBeNull();
       expect(component.validation()).toContain('fecha límite'); component.dueDate = '2026-12-01'; expect(component.validation()).toBe('');
       const fixture = TestBed.createComponent(LayawayCreate); fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
@@ -282,7 +283,7 @@ describe('LayawayCreate: nuevo apartado', () => {
 
     it('si no se pueden leer las reglas conserva el texto genérico y no bloquea (decide el servidor)', async () => {
       api.creationRules.mockRejectedValue(new HttpErrorResponse({ status: 403 }));
-      component = TestBed.runInInjectionContext(() => new LayawayCreate()); await loaded(); fill();
+      component = TestBed.runInInjectionContext(() => new LayawayCreate()); component.ngOnInit(); await loaded(); fill();
       expect(component.rules()).toBeNull(); expect(component.minimumInitial()).toBeNull(); expect(component.dueRequired).toBe(false);
       expect(component.validation()).toBe('');
     });

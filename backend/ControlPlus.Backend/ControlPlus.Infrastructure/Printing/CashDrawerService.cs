@@ -258,7 +258,7 @@ public sealed class CashDrawerService(
     /// concurrent operation waits instead of deadlocking; key-share stays compatible with the audit writes of
     /// operations that lock the shift first.
     /// </summary>
-    private Task LockInstallationAsync(CancellationToken ct) => db.Database.ExecuteSqlRawAsync("""
+    private Task<int> LockInstallationAsync(CancellationToken ct) => db.Database.ExecuteSqlRawAsync("""
         SELECT 1 FROM configuracion.instalacion
         WHERE activo ORDER BY fecha_instalacion, id LIMIT 1 FOR KEY SHARE
         """, ct);

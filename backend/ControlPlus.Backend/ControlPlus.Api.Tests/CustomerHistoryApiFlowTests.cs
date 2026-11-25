@@ -391,7 +391,7 @@ public sealed class CustomerHistoryApiFlowTests : IAsyncLifetime
             HttpStatusCode.Created);
     }
 
-    private async Task StartSessionAsync(HttpClient client, Scenario scenario, AuthenticationResult actor)
+    private static async Task StartSessionAsync(HttpClient client, Scenario scenario, AuthenticationResult actor)
     {
         SetBearer(client, scenario.Admin.AccessToken);
         var credential = await ReadAsync<IssuedOperatorCredentialDto>(await client.PostAsJsonAsync(
@@ -416,7 +416,7 @@ public sealed class CustomerHistoryApiFlowTests : IAsyncLifetime
             $"/api/users/{scenario.Cashier.User.Id}/permissions/{_permissionIds[code]}", new SetUserPermissionRequest(granted))).StatusCode);
     }
 
-    private async Task<CustomerDto> CreateCustomerAsync(HttpClient client, string token, string name)
+    private static async Task<CustomerDto> CreateCustomerAsync(HttpClient client, string token, string name)
     {
         SetBearer(client, token);
         return await ReadAsync<CustomerDto>(await client.PostAsJsonAsync("/api/customers", new CreateCustomerRequest(

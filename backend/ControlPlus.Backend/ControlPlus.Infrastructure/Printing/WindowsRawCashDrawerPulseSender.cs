@@ -22,7 +22,7 @@ public sealed class WindowsRawCashDrawerPulseSender : ICashDrawerPulseSender
 
         // Winspool calls are synchronous. Once scheduled, cancellation cannot safely
         // distinguish a queued pulse from an unsent pulse, so it does not abort the job.
-        return Task.Run(() => Submit(queueName, pulse));
+        return Task.Run(() => Submit(queueName, pulse), cancellationToken);
     }
 
     private static void Submit(string queueName, CashDrawerPulse pulse)

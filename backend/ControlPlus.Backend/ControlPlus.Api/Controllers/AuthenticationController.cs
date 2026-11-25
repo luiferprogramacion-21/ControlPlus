@@ -32,6 +32,7 @@ public sealed class AuthenticationController(
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> SetupFirstAdministrator(
         [FromBody] SetupFirstAdministratorRequest request,
+        [FromHeader(Name = "X-ControlPlus-Master-Key")] string? masterKey,
         CancellationToken cancellationToken)
     {
         if (!bootstrapAccessValidator.IsConfigured)
@@ -42,7 +43,7 @@ public sealed class AuthenticationController(
                 type: "https://controlplus.local/problems/bootstrap-not-configured");
         }
 
-        if (!bootstrapAccessValidator.IsValid(Request.Headers["X-ControlPlus-Master-Key"].ToString()))
+        if (!bootstrapAccessValidator.IsValid(masterKey))
         {
             return Problem(
                 statusCode: StatusCodes.Status403Forbidden,
@@ -103,6 +104,7 @@ public sealed class AuthenticationController(
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> RecoverInitialAdministrator(
         [FromBody] RecoverInitialAdministratorRequest request,
+        [FromHeader(Name = "X-ControlPlus-Master-Key")] string? masterKey,
         CancellationToken cancellationToken)
     {
         if (!bootstrapAccessValidator.IsConfigured)
@@ -113,7 +115,7 @@ public sealed class AuthenticationController(
                 type: "https://controlplus.local/problems/bootstrap-not-configured");
         }
 
-        if (!bootstrapAccessValidator.IsValid(Request.Headers["X-ControlPlus-Master-Key"].ToString()))
+        if (!bootstrapAccessValidator.IsValid(masterKey))
         {
             return Problem(
                 statusCode: StatusCodes.Status403Forbidden,
@@ -187,7 +189,7 @@ public sealed class AuthenticationController(
         }
 
         // Una sesión que debe cambiar la contraseña sigue igual al renovarse.
-        var changeRequired = User.HasClaim(JwtClaimTypes.PasswordChange, JwtClaimTypes.PasswordChangeRequiredValue);
+        var changeRequired = User.HasClaim(JwtClaimTypes.CredentialRenewal, JwtClaimTypes.CredentialRenewalRequiredValue);
         return FromResult(await authenticationService.RenewAsync(actor.UserId, changeRequired, cancellationToken), Ok);
     }
 

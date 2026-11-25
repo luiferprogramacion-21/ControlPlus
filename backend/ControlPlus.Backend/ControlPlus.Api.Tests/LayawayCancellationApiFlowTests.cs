@@ -478,7 +478,7 @@ public sealed partial class LayawayCreateApiFlowTests
         return (bool)(await command.ExecuteScalarAsync())!;
     }
 
-    private async Task<CreatedLayawayDto> CreateForCancellationAsync(HttpClient client,
+    private static async Task<CreatedLayawayDto> CreateForCancellationAsync(HttpClient client,
         Scenario scenario, string key)
     {
         SetBearer(client, scenario.Admin.AccessToken);

@@ -96,7 +96,7 @@ public sealed class WindowsGdiPrintSpooler : IPrintSpooler
         {
             if (oldFont != IntPtr.Zero && oldFont != new IntPtr(-1)) SelectObject(device, oldFont);
             if (font != IntPtr.Zero) DeleteObject(font);
-            if (documentStarted) AbortDoc(device);
+            if (documentStarted) _ = AbortDoc(device);
             DeleteDC(device);
         }
     }
@@ -151,7 +151,7 @@ public sealed class WindowsGdiPrintSpooler : IPrintSpooler
         }
         finally
         {
-            if (documentStarted) AbortDoc(device);
+            if (documentStarted) _ = AbortDoc(device);
             DeleteDC(device);
         }
     }
@@ -164,7 +164,7 @@ public sealed class WindowsGdiPrintSpooler : IPrintSpooler
             Math.Max(9, dpiY * 13 / 72));
         var priceHeight = Math.Clamp(height / 7, Math.Max(10, dpiY * 9 / 72),
             Math.Max(12, dpiY * 18 / 72));
-        SetBkMode(device, 1); // TRANSPARENT
+        _ = SetBkMode(device, 1); // TRANSPARENT
         var price = "$ " + decimal.Round(item.RetailPrice, 0, MidpointRounding.AwayFromZero)
             .ToString("N0", ColombianCulture);
         // Measure the actual selected font so the business and price never overlap.

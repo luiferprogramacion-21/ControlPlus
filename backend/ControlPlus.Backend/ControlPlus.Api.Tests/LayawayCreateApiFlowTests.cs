@@ -812,7 +812,7 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
         await db.SaveChangesAsync();
     }
 
-    private async Task<OperatorSessionDto> StartSessionAsync(
+    private static async Task<OperatorSessionDto> StartSessionAsync(
         HttpClient client, Scenario scenario, AuthenticationResult? cashier = null)
     {
         SetBearer(client, scenario.Admin.AccessToken);
@@ -936,7 +936,7 @@ public sealed partial class LayawayCreateApiFlowTests : IAsyncLifetime
         var body = await response.Content.ReadAsStringAsync();
         Assert.True(response.StatusCode == expected,
             $"Expected {(int)expected} ({expected}) but received {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
-        var value = JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var value = JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web);
         Assert.NotNull(value);
         return value;
     }

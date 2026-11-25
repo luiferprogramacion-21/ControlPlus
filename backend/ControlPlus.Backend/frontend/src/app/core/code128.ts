@@ -54,3 +54,8 @@ export function code128Svg(text: string, moduleWidth = 2, height = 60): string {
   const total = (x + quiet) * moduleWidth;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${height}" style="display:block;width:100%;height:auto" role="img" aria-label="Código de barras" shape-rendering="crispEdges" fill="#000">${bars}</svg>`;
 }
+
+/** URL de imagen autocontenida; evita insertar HTML confiable en el DOM. */
+export function code128DataUrl(text: string, moduleWidth = 2, height = 60): string {
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(code128Svg(text, moduleWidth, height))}`;
+}

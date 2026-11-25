@@ -109,7 +109,7 @@ public sealed class PinPasswordApiTests : IAsyncLifetime
         builder.UseSetting("Jwt:SigningKey", _signingKey);
         builder.UseSetting("Jwt:AccessTokenMinutes", "30");
         builder.UseSetting("Jwt:ClockSkewSeconds", "0");
-        if (pin) builder.UseSetting("Security:PasswordFormat", "PIN4");
+        if (pin) builder.UseSetting("Security:CredentialFormat", "PIN4");
     });
 
     private static async Task<AuthenticationResult> LoginAsync(HttpClient client, string userName, string password)

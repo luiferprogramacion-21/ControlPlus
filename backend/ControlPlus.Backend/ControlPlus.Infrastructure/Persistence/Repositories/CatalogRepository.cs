@@ -111,7 +111,7 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
         {
             var term = query.Search!.Trim();
             var pattern = $"%{term}%";
-            var exactId = await dbContext.ProductoCodigo.Where(c => c.Codigo == term.ToUpper())
+            var exactId = await dbContext.ProductoCodigo.Where(c => c.Codigo.Equals(term, StringComparison.CurrentCultureIgnoreCase))
                 .Select(c => (Guid?)c.ProductoId).SingleOrDefaultAsync(cancellationToken);
             products = exactId is not null ? products.Where(x => x.Id == exactId) :
                 products.Where(x => EF.Functions.ILike(x.Nombre, pattern) ||
@@ -178,11 +178,11 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
 
     public Task<bool> ProductInternalCodeExistsAsync(
         string code, Guid? excludedId = null, CancellationToken cancellationToken = default) =>
-        dbContext.ProductoCodigo.AnyAsync(x => x.Codigo == code.Trim().ToUpper() && (excludedId == null || x.ProductoId != excludedId), cancellationToken);
+        dbContext.ProductoCodigo.AnyAsync(x => x.Codigo.Equals(code.Trim(), StringComparison.CurrentCultureIgnoreCase) && (excludedId == null || x.ProductoId != excludedId), cancellationToken);
 
     public Task<bool> ProductBarcodeExistsAsync(
         string barcode, Guid? excludedId = null, CancellationToken cancellationToken = default) =>
-        dbContext.ProductoCodigo.AnyAsync(x => x.Codigo == barcode.Trim().ToUpper() && (excludedId == null || x.ProductoId != excludedId), cancellationToken);
+        dbContext.ProductoCodigo.AnyAsync(x => x.Codigo.Equals(barcode.Trim(), StringComparison.CurrentCultureIgnoreCase) && (excludedId == null || x.ProductoId != excludedId), cancellationToken);
 
     public Task AddProductAsync(Producto product, CancellationToken cancellationToken = default) =>
         dbContext.Producto.AddAsync(product, cancellationToken).AsTask();

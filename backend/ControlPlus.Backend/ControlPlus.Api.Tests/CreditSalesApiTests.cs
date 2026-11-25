@@ -634,7 +634,7 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         _ = await StartSessionAsync(client, scenario, scenario.Cashier);
         SetBearer(client, scenario.Cashier.AccessToken);
         var request = CreditRequest(scenario, scenario.CustomerId, scenario.Shift.OperatingDate.AddDays(1));
-        var json = JsonSerializer.Serialize(request, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var json = JsonSerializer.Serialize(request, JsonSerializerOptions.Web);
         foreach (var altered in new[]
         {
             json.Replace("\"saleType\":\"CREDITO\"", "\"saleType\":\"CREDITO\",\"internalState\":1", StringComparison.Ordinal),
@@ -751,7 +751,7 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         null, [new SaleLineRequest(productId, 1, "MINORISTA")], null, null,
         [new SalePaymentRequest("EFECTIVO", 1_000m, 1_000m, null)]);
 
-    private async Task<OperatorSessionDto> StartSessionAsync(
+    private static async Task<OperatorSessionDto> StartSessionAsync(
         HttpClient client, Scenario scenario, AuthenticationResult actor)
     {
         SetBearer(client, scenario.Admin.AccessToken);
@@ -889,7 +889,7 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
         var body = await response.Content.ReadAsStringAsync();
         Assert.True(response.StatusCode == expected,
             $"Expected {(int)expected} ({expected}) but received {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
-        var value = JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var value = JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web);
         Assert.NotNull(value);
         return value;
     }

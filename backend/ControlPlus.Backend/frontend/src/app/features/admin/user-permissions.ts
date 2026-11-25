@@ -75,7 +75,7 @@ export class UserPermissions implements OnInit {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([module, rows]) => ({ module, rows }));
   });
 
-  ngOnInit(): Promise<void> { return this.load(); }
+  ngOnInit(): void { void this.load(); }
 
   origin(row: EffectivePermission): string {
     if (row.source !== 'INDIVIDUAL') return 'Por rol';

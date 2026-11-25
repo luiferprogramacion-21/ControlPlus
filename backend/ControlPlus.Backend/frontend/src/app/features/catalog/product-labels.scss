@@ -37,7 +37,7 @@
 .product-label-header strong { flex-shrink: 0; font-size: 16px; white-space: nowrap; }
 .product-label-name { flex-shrink: 0; overflow: hidden; margin-bottom: 4px; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 1.2; }
 .product-label-preview .barcode { width: 100%; flex-shrink: 0; min-height: 34px; overflow: hidden; padding: 3px 6px 2px; border: 1px solid #d6dde8; border-radius: 7px; }
-.product-label-preview .barcode svg { width: 100%; height: 42px; }
+.product-label-preview .barcode img { display: block; width: 100%; height: 42px; }
 .product-label-preview small { flex-shrink: 0; margin-top: 3px; font-size: 10px; line-height: 1.2; text-align: center; letter-spacing: .5px; }
 .product-label-preview--empty { align-items: center; color: var(--cp-text-muted); text-align: center; }
 .active-profile, .profile-help { margin: 0 0 12px; color: var(--cp-text-secondary); font-size: 13px; }

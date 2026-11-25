@@ -24,7 +24,7 @@ public sealed class CatalogService(
     IAuthorizerCredentialResolver credentialResolver,
     ILoginAttemptCoordinator loginAttemptCoordinator) : ICatalogService
 {
-    private static readonly IReadOnlySet<string> BarcodeFormats = new HashSet<string>(
+    private static readonly HashSet<string> BarcodeFormats = new(
         ["CODE128", "EAN13", "EAN8", "UPC_A", "OTRO"], StringComparer.OrdinalIgnoreCase);
 
     public async Task<Result<PagedResult<CategoryDto>>> ListCategoriesAsync(
@@ -207,8 +207,8 @@ public sealed class CatalogService(
     }
 
     public async Task<Result<ProductDto>> CreateProductAsync(
-        ActorContext actor, CreateProductRequest request, CancellationToken cancellationToken = default,
-        string? idempotencyKey = null)
+        ActorContext actor, CreateProductRequest request, string? idempotencyKey = null,
+        CancellationToken cancellationToken = default)
     {
         var key = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim();
         if (idempotencyKey is not null && (key is null || key.Length > 100))

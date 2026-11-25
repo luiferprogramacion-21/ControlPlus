@@ -17,7 +17,6 @@ public sealed class EmailOptions
 
     public string? SmtpHost { get; init; }
     public int SmtpPort { get; init; } = 587;
-    public bool EnableSsl { get; init; } = true;
     public string? UserName { get; init; }
     public string? Password { get; init; }
     public string? FromAddress { get; init; }
@@ -47,7 +46,7 @@ public sealed class SmtpEmailSender(IOptions<EmailOptions> options, ILogger<Smtp
         {
             using var client = new SmtpClient(value.SmtpHost!.Trim(), value.SmtpPort)
             {
-                EnableSsl = value.EnableSsl,
+                EnableSsl = true,
                 DeliveryMethod = SmtpDeliveryMethod.Network,
                 UseDefaultCredentials = false,
                 Credentials = new NetworkCredential(value.UserName!.Trim(), value.Password),

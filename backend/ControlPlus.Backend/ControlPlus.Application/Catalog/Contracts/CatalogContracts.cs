@@ -137,7 +137,7 @@ public interface ICatalogService
     Task<Result<PagedResult<ProductDto>>> ListProductsAsync(ActorContext actor, ProductListQuery query, CancellationToken cancellationToken = default);
     Task<Result<ProductDto>> GetProductAsync(ActorContext actor, Guid productId, CancellationToken cancellationToken = default);
     Task<Result<ProductPurchaseCostHistoryDto>> GetProductPurchaseCostHistoryAsync(ActorContext actor, Guid productId, ProductPurchaseCostHistoryQuery query, CancellationToken cancellationToken = default);
-    Task<Result<ProductDto>> CreateProductAsync(ActorContext actor, CreateProductRequest request, CancellationToken cancellationToken = default, string? idempotencyKey = null);
+    Task<Result<ProductDto>> CreateProductAsync(ActorContext actor, CreateProductRequest request, string? idempotencyKey = null, CancellationToken cancellationToken = default);
     Task<Result<ProductDto>> UpdateProductAsync(ActorContext actor, Guid productId, UpdateProductRequest request, CancellationToken cancellationToken = default);
     Task<Result<ProductDto>> SetProductActiveAsync(ActorContext actor, Guid productId, bool active, CancellationToken cancellationToken = default);
     Task<Result> DeleteProductAsync(ActorContext actor, Guid productId, long expectedVersion, CancellationToken cancellationToken = default);

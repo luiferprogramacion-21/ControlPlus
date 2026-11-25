@@ -14,6 +14,7 @@ import { toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
 import { HelpTip } from '../../shared/help-tip';
 import { CreditStageData, creditStageView } from '../../shared/credit-stage';
+import { isEmailAddress } from '../../shared/email-address';
 @Component({ selector: 'cp-customers', imports: [WindowSheet, HelpTip, NumberInput, InputFormat, A11yModule, FormsModule, MatPaginatorModule, Icon, CustomerHistory], templateUrl: './customers.html', styleUrls: ['../directory.scss', './customers.scss'] })
 export class Customers implements OnInit {
   private readonly api = inject(CustomersApi);
@@ -72,7 +73,7 @@ export class Customers implements OnInit {
     if (applyFormat(f.documentNumber, documentRule(f.documentType)) !== f.documentNumber) return 'Revisa el número de documento: tiene caracteres que no van o es muy largo.';
     if (!/^\d{7,10}$/.test(f.phone ?? '')) return 'El teléfono debe tener entre 7 y 10 números.';
     if (!f.address || f.address.length > 300) return 'Indica la dirección (hasta 300 caracteres).';
-    if (f.email && (f.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email))) return 'Revisa el correo.';
+    if (f.email && !isEmailAddress(f.email)) return 'Revisa el correo.';
     if (f.creditLimit != null && (!Number.isInteger(f.creditLimit) || f.creditLimit <= 0)) return 'El cupo de crédito debe ser un valor en pesos enteros mayor que cero, o vacío para no tener límite.';
     return '';
   }

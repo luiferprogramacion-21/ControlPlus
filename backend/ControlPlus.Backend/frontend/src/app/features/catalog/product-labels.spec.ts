@@ -31,7 +31,9 @@ describe('Etiquetas de productos', () => {
     component.search = product.barcode; await component.find(); fixture.detectChanges();
     expect(component.selected()).toEqual([{ product, quantity: 1 }]);
     expect(fixture.nativeElement.textContent).toContain('Cable eléctrico 10 m');
-    expect(fixture.nativeElement.querySelector('.barcode svg')).not.toBeNull();
+    const barcode = fixture.nativeElement.querySelector('.barcode img') as HTMLImageElement | null;
+    expect(barcode).not.toBeNull();
+    expect(barcode!.src).toContain('data:image/svg+xml');
     expect(fixture.nativeElement.querySelector('.product-label-header').textContent).toContain('Variedades del Centro');
     expect(fixture.nativeElement.querySelector('.product-label-header strong').textContent.replace(/\D/g, '')).toBe('48000');
   });

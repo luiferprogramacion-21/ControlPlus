@@ -157,7 +157,9 @@ export class AuditLog implements OnInit {
   /** The user filter needs the user list, which only USERS.READ may read. */
   get canFilterUsers(): boolean { return this.session.has('USERS.READ'); }
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void { void this.initialize(); }
+
+  private async initialize(): Promise<void> {
     if (this.canFilterUsers) {
       try { this.users.set((await this.admin.users({ page: 1, pageSize: 100 })).items); }
       catch { this.users.set([]); }

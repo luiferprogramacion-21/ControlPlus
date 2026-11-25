@@ -1235,7 +1235,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Created, (await client.SendAsync(request)).StatusCode);
     }
 
-    private async Task OpenSharedShiftAsync(HttpClient client, string adminToken)
+    private static async Task OpenSharedShiftAsync(HttpClient client, string adminToken)
     {
         SetBearer(client, adminToken);
         await ReadAsync<CashRegisterDto>(await client.PostAsJsonAsync(
@@ -1259,7 +1259,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
             new CloseCashShiftRequest(reconciliation.ShiftVersion, counts, null, null, null)), HttpStatusCode.OK);
     }
 
-    private async Task<Users> CreateUsersAsync(HttpClient client)
+    private static async Task<Users> CreateUsersAsync(HttpClient client)
     {
         var supervisorRole = await GetRoleIdAsync(client, RoleCodes.Supervisor);
         var cashierRole = await GetRoleIdAsync(client, RoleCodes.Cashier);
@@ -1583,7 +1583,7 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         var body = await response.Content.ReadAsStringAsync();
         Assert.True(response.StatusCode == expected,
             $"Expected {(int)expected} ({expected}) but received {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
-        var value = JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var value = JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web);
         Assert.NotNull(value);
         return value;
     }

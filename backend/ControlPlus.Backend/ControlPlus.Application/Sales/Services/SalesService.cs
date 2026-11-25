@@ -794,7 +794,7 @@ public sealed partial class SalesService(
     private static PreparedSale PrepareSale(
         IReadOnlyCollection<NormalizedLine> requestedLines,
         NormalizedDiscount? generalDiscount,
-        IReadOnlyDictionary<Guid, Producto> products,
+        Dictionary<Guid, Producto> products,
         decimal maximumDiscount, decimal? vatPercentage, int wholesaleMinimumQuantity)
     {
         var lines = new List<PreparedLine>(requestedLines.Count);
@@ -881,7 +881,7 @@ public sealed partial class SalesService(
 
     private static ApplicationError? ValidatePayments(
         IReadOnlyCollection<NormalizedPayment> payments,
-        IReadOnlyDictionary<string, MetodoPago> methods,
+        Dictionary<string, MetodoPago> methods,
         decimal saleTotal)
     {
         var appliedTotal = 0m;

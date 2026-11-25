@@ -58,7 +58,7 @@ public sealed class ProductsController(
     {
         var actor = await GetActorAsync(cancellationToken);
         if (actor is null) return MissingActor();
-        var result = await catalogService.CreateProductAsync(actor, request, cancellationToken, idempotencyKey);
+        var result = await catalogService.CreateProductAsync(actor, request, idempotencyKey, cancellationToken);
         return FromResult(result, x => CreatedAtAction(nameof(Get), new { productId = x.Id }, x));
     }
 

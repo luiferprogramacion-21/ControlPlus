@@ -117,7 +117,7 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, replaceRole.StatusCode);
         var reassignedCashier = await replaceRole.Content.ReadFromJsonAsync<UserDto>();
         Assert.NotNull(reassignedCashier);
-        Assert.Collection(reassignedCashier.Roles, role => Assert.Equal("SUPERVISOR", role.Code));
+        Assert.Equal("SUPERVISOR", Assert.Single(reassignedCashier.Roles).Code);
         Assert.Equal(
             HttpStatusCode.NotFound,
             (await client.DeleteAsync($"/api/users/{cashier.Id}/roles/{cashierRoleId}")).StatusCode);

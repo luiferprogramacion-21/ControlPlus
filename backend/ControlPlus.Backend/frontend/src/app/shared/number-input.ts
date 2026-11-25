@@ -50,7 +50,7 @@ export class NumberInput implements ControlValueAccessor, Validator, OnChanges {
     }
     const normalized = raw.replace(/\./g, '');
     const [integer, decimals] = normalized.split(',');
-    const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const grouped = groupIntegerDigits(integer);
     this.render(grouped + (decimals === undefined ? '' : ',' + decimals));
     const parsed = normalized === '' || normalized === '-' || normalized === ',' || normalized === '-,'
       ? null : this.cpNumberString ? normalized.replace(',', '.') : Number(normalized.replace(',', '.'));
@@ -97,7 +97,15 @@ export class NumberInput implements ControlValueAccessor, Validator, OnChanges {
     if (!this.cpNumberString) return groupedNumber(this.value == null ? null : Number(this.value));
     if (this.value == null) return '';
     const [integer, decimals] = String(this.value).split('.');
-    return integer.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (decimals === undefined ? '' : ',' + decimals);
+    return groupIntegerDigits(integer) + (decimals === undefined ? '' : ',' + decimals);
   }
   private render(text: string): void { this.lastText = text; this.element.nativeElement.value = text; }
+}
+
+function groupIntegerDigits(value: string): string {
+  const negative = value.startsWith('-');
+  const digits = negative ? value.slice(1) : value;
+  const groups: string[] = [];
+  for (let end = digits.length; end > 0; end -= 3) groups.unshift(digits.slice(Math.max(0, end - 3), end));
+  return (negative ? '-' : '') + groups.join('.');
 }

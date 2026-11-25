@@ -45,7 +45,10 @@ public sealed class SecurityStartupConfigurationTests
     {
         var configuration = new ConfigurationBuilder().Build();
 
-        StartupSecurityConfiguration.EnsureRequiredSecrets(configuration, "Testing");
+        var exception = Record.Exception(() =>
+            StartupSecurityConfiguration.EnsureRequiredSecrets(configuration, "Testing"));
+
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -77,7 +80,10 @@ public sealed class SecurityStartupConfigurationTests
             })
             .Build();
 
-        StartupSecurityConfiguration.EnsureRequiredSecrets(configuration, "Development");
+        var exception = Record.Exception(() =>
+            StartupSecurityConfiguration.EnsureRequiredSecrets(configuration, "Development"));
+
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -91,6 +97,9 @@ public sealed class SecurityStartupConfigurationTests
             })
             .Build();
 
-        StartupSecurityConfiguration.EnsureRequiredSecrets(configuration, "Production");
+        var exception = Record.Exception(() =>
+            StartupSecurityConfiguration.EnsureRequiredSecrets(configuration, "Production"));
+
+        Assert.Null(exception);
     }
 }

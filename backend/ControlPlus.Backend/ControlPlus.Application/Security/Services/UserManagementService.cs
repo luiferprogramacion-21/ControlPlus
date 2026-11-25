@@ -687,7 +687,7 @@ public sealed class UserManagementService : IUserManagementService
             PermissionCodes.UsersManage,
             cancellationToken);
 
-    private static readonly IReadOnlySet<string> SecurityAdministratorPermissions = new HashSet<string>(
+    private static readonly HashSet<string> SecurityAdministratorPermissions = new(
         [PermissionCodes.UsersManage, PermissionCodes.RolesManage, PermissionCodes.PermissionsManage, PermissionCodes.UserPermissionsManage],
         StringComparer.OrdinalIgnoreCase);
 

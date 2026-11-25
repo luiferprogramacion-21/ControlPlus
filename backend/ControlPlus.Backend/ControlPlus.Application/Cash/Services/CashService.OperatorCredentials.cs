@@ -17,7 +17,7 @@ public sealed partial class CashService
         if (error is not null) return Result.Failure<OperatorCredentialDto?>(error);
         if (await userRepository.GetByIdAsync(userId, cancellationToken) is null)
             return Result.Failure<OperatorCredentialDto?>(ApplicationError.NotFound("el usuario"));
-        var credential = await repository.GetActiveCredentialForUserAsync(userId, cancellationToken);
+        var credential = await repository.GetActiveCredentialForUserAsync(userId, cancellationToken: cancellationToken);
         if (credential is null) return Result.Success<OperatorCredentialDto?>(null);
         var token = await credentialStore.ReadAsync(userId, credential.Id, cancellationToken);
         // A protected copy is useful only when it still matches the canonical credential hash.
@@ -49,7 +49,7 @@ public sealed partial class CashService
             var shift = await repository.GetOpenShiftAsync(true, token);
             if (await repository.GetUserForUpdateAsync(userId, token) is null)
                 return Result.Failure(ApplicationError.NotFound("el usuario"));
-            var credential = await repository.GetActiveCredentialForUserAsync(userId, token);
+            var credential = await repository.GetActiveCredentialForUserAsync(userId, cancellationToken: token);
             if (credential is null) return Result.Success();
             if (credential.Id != credentialId || credential.Version != expectedVersion)
                 return Result.Failure(ApplicationError.Conflict("El carné cambió. Cierra esta ventana y vuelve a abrirlo antes de eliminarlo."));

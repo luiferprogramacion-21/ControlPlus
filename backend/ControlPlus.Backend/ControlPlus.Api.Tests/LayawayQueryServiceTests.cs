@@ -111,7 +111,7 @@ public sealed class LayawayQueryServiceTests
         Assert.All(dto.Payments, x => Assert.Equal(correlation, x.CorrelationId));
         Assert.Equal(99m, dto.Payments.Single(x => x.MethodCode == "EFECTIVO").Change);
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(dto,
-            new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            JsonSerializerOptions.Web));
         var detail = json.RootElement;
         AssertProperties(detail, "layaway", "initialMinimumPercentage", "lines", "payments", "delivery", "cancellation");
         Assert.Equal(JsonValueKind.Null, detail.GetProperty("delivery").ValueKind);
@@ -203,7 +203,7 @@ public sealed class LayawayQueryServiceTests
         Assert.Equal(2, product.Quantity);
 
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(result.Value,
-            new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            JsonSerializerOptions.Web));
         var deliveryJson = json.RootElement.GetProperty("delivery");
         Assert.Equal(new[] { "correlationId", "deliveredAtUtc", "deliveredByUserId", "layawayId",
                 "number", "products", "state", "version" },

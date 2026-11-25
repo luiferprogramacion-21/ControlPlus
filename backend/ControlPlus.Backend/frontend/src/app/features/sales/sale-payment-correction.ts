@@ -65,7 +65,9 @@ export class SalePaymentCorrection implements OnInit {
   observation = '';
   private pending: Pending | null = null;
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void { void this.initialize(); }
+
+  private async initialize(): Promise<void> {
     this.allWith(this.sale().payments.some(p => p.methodCode === 'EFECTIVO') ? 'NEQUI' : 'EFECTIVO');
     try {
       this.reasons.set(await this.api.cancellationReasons());
@@ -90,7 +92,7 @@ export class SalePaymentCorrection implements OnInit {
     });
     if (issue) return issue;
     const signature = (rows: { methodCode: string; appliedAmount: number }[]) =>
-      rows.map(r => `${r.methodCode}:${Number(r.appliedAmount)}`).sort().join('|');
+      rows.map(r => `${r.methodCode}:${Number(r.appliedAmount)}`).sort((a, b) => a.localeCompare(b)).join('|');
     if (signature(this.drafts) === signature(this.sale().payments)) return 'Es igual a como quedó registrada: cambia el medio de pago.';
     if (!this.reasonId) return 'Elige el motivo.';
     if (this.selectedReason?.code === 'OTRO' && !this.observation.trim()) return 'Escribe una observación para el motivo «Otro».';

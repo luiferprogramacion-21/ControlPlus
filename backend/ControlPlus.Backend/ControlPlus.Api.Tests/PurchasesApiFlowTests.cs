@@ -1506,7 +1506,7 @@ public sealed partial class PurchasesApiFlowTests : IAsyncLifetime
         return new AdditionalAdmin(new AuthUser(token, user), password);
     }
 
-    private async Task<JsonElement> CreateConfirmedAsync(HttpClient client, Guid supplierId, Guid productId,
+    private static async Task<JsonElement> CreateConfirmedAsync(HttpClient client, Guid supplierId, Guid productId,
         string key, int quantity = 2)
     {
         var draft = await CreateDraftAsync(client, Body(supplierId, null, "NO_DISCRIMINADO",
@@ -1734,7 +1734,7 @@ public sealed partial class PurchasesApiFlowTests : IAsyncLifetime
             new AuthUser(await LoginAsync(client, CashierName, _cashierPassword), cashierUser));
     }
 
-    private async Task<SupplierDto> SupplierAsync(HttpClient client, string name) =>
+    private static async Task<SupplierDto> SupplierAsync(HttpClient client, string name) =>
         await ReadAsync<SupplierDto>(await client.PostAsJsonAsync("/api/suppliers",
             new CreateSupplierRequest(null, null, name, null, null, null, null)), HttpStatusCode.Created);
 
@@ -1863,7 +1863,7 @@ public sealed partial class PurchasesApiFlowTests : IAsyncLifetime
         var body = await response.Content.ReadAsStringAsync();
         Assert.True(response.StatusCode == expected, $"Expected {expected}, got {response.StatusCode}: {body}");
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
-        return JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        return JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web)!;
     }
 
     private static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response, HttpStatusCode expected)

@@ -44,7 +44,7 @@
         } @else {
         <form (submit)="$event.preventDefault(); find()">
           <label class="field-label" for="label-product-search">Buscar o escanear producto</label>
-          <div class="label-search-row"><input #productSearch id="label-product-search" class="text-field" name="search" [(ngModel)]="search" placeholder="Código, nombre o código de barras" autocomplete="off" autofocus><button class="button button--secondary" type="submit" [disabled]="loading()">{{ loading() ? 'Buscando…' : 'Agregar' }}</button></div>
+          <div class="label-search-row"><input #productSearch id="label-product-search" class="text-field" name="search" [(ngModel)]="search" placeholder="Código, nombre o código de barras" autocomplete="off"><button class="button button--secondary" type="submit" [disabled]="loading()">{{ loading() ? 'Buscando…' : 'Agregar' }}</button></div>
         </form>
         }
         @if (results().length) {
@@ -73,7 +73,7 @@
           <div class="product-label-preview" [style.aspect-ratio]="selectedProfile()?.widthMm && selectedProfile()?.heightMm ? selectedProfile()!.widthMm + ' / ' + selectedProfile()!.heightMm : '5 / 3'">
             <div class="product-label-header"><span>{{ establishment.name() }}</span><strong>{{ product.retailPrice | currency:'COP':'symbol':'1.0-0' }}</strong></div>
             <span class="product-label-name">{{ product.name }}</span>
-            @if (previewBarcode()) { <div class="barcode" [innerHTML]="previewBarcode()"></div><small>{{ product.barcode }}</small> }
+            @if (previewBarcode(); as barcodeUrl) { <div class="barcode"><img [src]="barcodeUrl" alt="Vista previa del código de barras"></div><small>{{ product.barcode }}</small> }
           </div>
         } @else { <div class="product-label-preview product-label-preview--empty">La primera etiqueta aparecerá aquí.</div> }
         <p class="active-profile"><strong>Perfil activo:</strong> {{ selectedProfile()?.labelTemplateName || 'Ninguno' }}</p>

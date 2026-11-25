@@ -448,8 +448,8 @@ public sealed partial class EfCashRepository(OfficialControlPlusDbContext dbCont
 
     public async Task<CredencialUsuario?> GetActiveCredentialForUserAsync(
         Guid userId,
-        CancellationToken cancellationToken = default,
-        bool forUpdate = false)
+        bool forUpdate = false,
+        CancellationToken cancellationToken = default)
     {
         if (!forUpdate)
             return await dbContext.CredencialUsuario.SingleOrDefaultAsync(
@@ -522,7 +522,7 @@ public sealed partial class EfCashRepository(OfficialControlPlusDbContext dbCont
         CancellationToken cancellationToken = default) =>
         dbContext.SesionOperador.AddAsync(session, cancellationToken).AsTask();
 
-    private static void AddAmount(IDictionary<Guid, decimal> totals, Guid methodId, decimal amount) =>
+    private static void AddAmount(Dictionary<Guid, decimal> totals, Guid methodId, decimal amount) =>
         totals[methodId] = CashMoney.Add(totals[methodId], amount);
 
     private sealed record PaymentMethodRow(Guid Id, string Code, string Name, bool AffectsCash);

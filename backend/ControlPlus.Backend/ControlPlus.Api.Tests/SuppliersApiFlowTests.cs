@@ -359,7 +359,7 @@ public sealed class SuppliersApiFlowTests : IAsyncLifetime
             new AuthUser(await LoginAsync(client, CashierName, _cashierPassword), cashierUser));
     }
 
-    private async Task<SupplierDto> CreateAsync(HttpClient client, CreateSupplierRequest request) =>
+    private static async Task<SupplierDto> CreateAsync(HttpClient client, CreateSupplierRequest request) =>
         await ReadAsync<SupplierDto>(await client.PostAsJsonAsync("/api/suppliers", request), HttpStatusCode.Created);
     private async Task<(int Suppliers, int Audits)> StateAsync()
     {
@@ -463,7 +463,7 @@ public sealed class SuppliersApiFlowTests : IAsyncLifetime
     private static async Task SetPermissionAsync(HttpClient client, Guid user, Guid permission, bool grant) => Assert.Equal(HttpStatusCode.NoContent,
         (await client.PutAsJsonAsync($"/api/users/{user}/permissions/{permission}", new SetUserPermissionRequest(grant))).StatusCode);
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response, HttpStatusCode expected)
-    { var body = await response.Content.ReadAsStringAsync(); Assert.True(response.StatusCode == expected, $"Expected {expected}, got {response.StatusCode}: {body}"); return JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web))!; }
+    { var body = await response.Content.ReadAsStringAsync(); Assert.True(response.StatusCode == expected, $"Expected {expected}, got {response.StatusCode}: {body}"); return JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web)!; }
     private static void Bearer(HttpClient client, string token) => client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     private static string Secret(int bytes) => Convert.ToBase64String(RandomNumberGenerator.GetBytes(bytes));
     private sealed record AuthUser(AuthenticationResult Token, UserDto User);

@@ -62,7 +62,7 @@ public interface ICashRepository
     Task<Guid?> GetActiveSharedOperatorUserIdAsync(CancellationToken cancellationToken = default);
     /// <summary>Fondo inicial del último turno abierto, para ofrecerlo al abrir la caja (21 de noviembre de 2026).</summary>
     Task<decimal?> GetLastInitialAmountAsync(CancellationToken cancellationToken = default);
-    Task<CredencialUsuario?> GetActiveCredentialForUserAsync(Guid userId, CancellationToken cancellationToken = default, bool forUpdate = false);
+    Task<CredencialUsuario?> GetActiveCredentialForUserAsync(Guid userId, bool forUpdate = false, CancellationToken cancellationToken = default);
     Task AddCredentialAsync(CredencialUsuario credential, CancellationToken cancellationToken = default);
 
     Task<SesionOperador?> GetActiveOperatorSessionForUpdateAsync(Guid terminalId, CancellationToken cancellationToken = default);

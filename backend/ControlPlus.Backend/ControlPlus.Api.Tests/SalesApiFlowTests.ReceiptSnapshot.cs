@@ -59,7 +59,7 @@ public sealed partial class SalesApiFlowTests
         {
             Assert.Equal(1, data.RootElement.GetProperty("schemaVersion").GetInt32());
             var historical = data.RootElement.GetProperty("receipt").Deserialize<SaleReceiptDto>(
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                JsonSerializerOptions.Web);
             Assert.Equal(JsonSerializer.Serialize(before), JsonSerializer.Serialize(historical));
             var methods = data.RootElement.GetProperty("paymentMethods").EnumerateArray().ToArray();
             Assert.Contains(methods, x => x.GetProperty("code").GetString() == "EFECTIVO" &&

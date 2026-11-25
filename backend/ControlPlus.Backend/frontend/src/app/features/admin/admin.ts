@@ -18,6 +18,7 @@ import { toastSignal } from '../../core/toast';
 import { ConfirmationDialog, ConfirmationOptions } from '../../shared/confirmation-dialog';
 import { WindowSheet } from '../../shared/window-sheet';
 import { UserTab, UserTabOption, UserTabs } from './user-tabs';
+import { isEmailAddress } from '../../shared/email-address';
 
 type Mode = 'create' | 'edit' | 'role' | 'password';
 type Tab = 'users' | 'roles' | 'audit';
@@ -62,7 +63,9 @@ export class Admin implements OnInit {
   get canManageUserPermissions(): boolean { return this.session.has('USER_PERMISSIONS.MANAGE') && this.session.has('PERMISSIONS.READ'); }
   get canEditTemplates(): boolean { return this.session.has('ROLES.MANAGE') && this.session.has('PERMISSIONS.READ'); }
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void { void this.initialize(); }
+
+  private async initialize(): Promise<void> {
     if (!this.canReadUsers) this.tab.set(this.canReadRoles ? 'roles' : 'audit');
     await Promise.all([this.reload(), this.canReadRoles ? this.loadRoles() : Promise.resolve()]);
   }
@@ -135,7 +138,7 @@ export class Admin implements OnInit {
   /** El correo es opcional; si se escribe, debe parecer una dirección (el servidor también lo valida). */
   private emailIssue(): string {
     const email = this.form.email.trim();
-    return !email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? '' : 'El correo no es válido.';
+    return !email || isEmailAddress(email) ? '' : 'El correo no es válido.';
   }
   private passwordIssue(): string {
     if (!this.form.password.trim()) return 'Indica la contraseña.';

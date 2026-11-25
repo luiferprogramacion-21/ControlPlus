@@ -311,7 +311,7 @@ public sealed partial class LayawayCreateApiFlowTests
             key, Request(scenario, [new("EFECTIVO", 1001m, 1001m, null)])), HttpStatusCode.Created);
     }
 
-    private async Task CloseDeliveryShiftAsync(HttpClient client, Scenario scenario)
+    private static async Task CloseDeliveryShiftAsync(HttpClient client, Scenario scenario)
     {
         SetBearer(client, scenario.Admin.AccessToken);
         var reconciliation = await ReadAsync<CashReconciliationDto>(

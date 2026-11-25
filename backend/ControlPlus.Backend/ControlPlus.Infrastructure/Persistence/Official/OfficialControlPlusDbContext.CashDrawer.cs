@@ -7,7 +7,7 @@ public partial class OfficialControlPlusDbContext
 {
     public virtual DbSet<AperturaCajon> AperturaCajon { get; set; }
 
-    private void ConfigureCashDrawerModel(ModelBuilder modelBuilder)
+    private static void ConfigureCashDrawerModel(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<PerfilImpresora>(entity =>
         {

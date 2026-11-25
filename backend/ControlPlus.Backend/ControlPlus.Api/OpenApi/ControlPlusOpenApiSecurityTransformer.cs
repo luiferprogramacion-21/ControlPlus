@@ -74,6 +74,6 @@ internal sealed class ControlPlusOpenApiSecurityTransformer(IAuthenticationSchem
     private static string NormalizePath(string? path)
     {
         var route = path?.Split('?', 2)[0].Trim() ?? string.Empty;
-        return route.StartsWith("/", StringComparison.Ordinal) ? route : $"/{route}";
+        return route.StartsWith('/') ? route : $"/{route}";
     }
 }

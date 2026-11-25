@@ -1,4 +1,4 @@
-import { Component, computed, ElementRef, HostListener, inject, signal } from '@angular/core';
+import { Component, computed, ElementRef, HostListener, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
@@ -117,7 +117,7 @@ function readCollapsed(): boolean { try { return localStorage.getItem(COLLAPSED_
       </div>
     }`,
 })
-export class Shell {
+export class Shell implements OnInit {
   readonly session = inject(SessionService);
   readonly establishment = inject(EstablishmentService);
   readonly displayScale = inject(DisplayScaleService);
@@ -159,11 +159,12 @@ export class Shell {
     inject(WindowsShortcuts).start();
     inject(RowActions).start();
     inject(ListHelpers).start();
-    void this.establishment.load().catch(() => undefined);
     this.syncHeader(this.router.url);
     this.router.events.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd), takeUntilDestroyed())
       .subscribe(event => { this.userMenuOpen.set(false); this.syncHeader(event.urlAfterRedirects); });
   }
+
+  ngOnInit(): void { void this.establishment.load().catch(() => undefined); }
 
   toggleCollapsed(): void {
     const next = !this.collapsed();

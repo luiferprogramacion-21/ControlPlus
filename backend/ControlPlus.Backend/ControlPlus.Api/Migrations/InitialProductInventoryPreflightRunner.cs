@@ -8,7 +8,7 @@ using Npgsql;
 
 namespace ControlPlus.Api.Migrations;
 
-internal static class InitialProductInventoryPreflightRunner
+internal static partial class InitialProductInventoryPreflightRunner
 {
     public const string TargetMigration = ControlledMigrationRunner.InitialProductInventoryMigration;
     private static readonly string[] PreviousMigrations =
@@ -101,8 +101,8 @@ internal static class InitialProductInventoryPreflightRunner
 
         void FlushOutside()
         {
-            var text = Regex.Replace(outside.ToString(), @"::(?:character varying|text|varchar)(?:\[\])?", "", RegexOptions.CultureInvariant);
-            normalized.Append(Regex.Replace(text, @"[\s()]", "", RegexOptions.CultureInvariant));
+            var text = PostgreSqlCastPattern().Replace(outside.ToString(), "");
+            normalized.Append(WhitespaceOrParenthesisPattern().Replace(text, ""));
             outside.Clear();
         }
 
@@ -126,6 +126,12 @@ internal static class InitialProductInventoryPreflightRunner
         FlushOutside();
         return string.Equals(normalized.ToString(), OfficialExpression, StringComparison.Ordinal);
     }
+
+    [GeneratedRegex(@"::(?:character varying|text|varchar)(?:\[\])?", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex PostgreSqlCastPattern();
+
+    [GeneratedRegex(@"[\s()]", RegexOptions.CultureInvariant, 1000)]
+    private static partial Regex WhitespaceOrParenthesisPattern();
 
     private static async Task<bool> HasReservedObjectsAsync(
         NpgsqlConnection connection, NpgsqlTransaction transaction, CancellationToken cancellationToken)

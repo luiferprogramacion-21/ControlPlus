@@ -112,7 +112,7 @@ public sealed class InstallationBootstrapper(OfficialControlPlusDbContext dbCont
     private static Guid DeterministicInventoryReasonId(Guid establishmentId, string code)
     {
         var value = $"controlplus.inventory-reason.{establishmentId:D}.{code}";
-        var hexadecimal = Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(value)));
+        var hexadecimal = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)), 0, 16);
         return Guid.ParseExact(hexadecimal, "N");
     }
 

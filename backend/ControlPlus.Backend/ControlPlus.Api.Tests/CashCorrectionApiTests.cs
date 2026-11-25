@@ -624,7 +624,7 @@ public sealed partial class CashApiFlowTests
         string userName,
         string password,
         CorrectionScenario scenario,
-        IReadOnlyDictionary<string, Guid> permissionIds,
+        Dictionary<string, Guid> permissionIds,
         IPAddress remoteIp)
     {
         using var targetClient = CreateClient(remoteIp);

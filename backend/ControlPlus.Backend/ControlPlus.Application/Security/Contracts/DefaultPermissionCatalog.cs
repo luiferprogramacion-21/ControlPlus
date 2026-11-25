@@ -66,7 +66,7 @@ public static class DefaultPermissionCatalog
         new(PermissionCodes.UpdatesManage, "Gestionar actualizaciones", "CONFIGURACION")
     ];
 
-    private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> RoleTemplates =
+    private static readonly Dictionary<string, IReadOnlySet<string>> RoleTemplates =
         new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
         {
             [RoleCodes.Administrator] = Permissions.Select(x => x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase),
@@ -99,6 +99,6 @@ public static class DefaultPermissionCatalog
             ? permissions
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-    private static IReadOnlySet<string> Set(params string[] codes) =>
+    private static HashSet<string> Set(params string[] codes) =>
         codes.ToHashSet(StringComparer.OrdinalIgnoreCase);
 }

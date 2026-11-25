@@ -576,7 +576,7 @@ public sealed partial class CashApiFlowTests : IAsyncLifetime
         return new ReconciliationCatalog(paymentMethods.Select(x => x.Id).ToArray(), reason.Id);
     }
 
-    private async Task<OperationalUsers> CreateOperationalUsersAsync(HttpClient client)
+    private static async Task<OperationalUsers> CreateOperationalUsersAsync(HttpClient client)
     {
         var supervisorRoleId = await GetRoleIdAsync(client, RoleCodes.Supervisor);
         var cashierRoleId = await GetRoleIdAsync(client, RoleCodes.Cashier);

@@ -1,9 +1,8 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, DestroyRef, inject, input, OnDestroy, OnInit, output, signal } from '@angular/core';
-import { DomSanitizer } from '@angular/platform-browser';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 import { errorText } from '../../core/api';
-import { code128Svg } from '../../core/code128';
+import { code128DataUrl } from '../../core/code128';
 import { EstablishmentService } from '../../core/establishment';
 import { TicketPrinter } from '../sales/ticket';
 import { AdminApi, AdminUser, IssuedCredential, OperatorCredential } from './admin-api';
@@ -43,7 +42,7 @@ import { WindowSheet } from '../../shared/window-sheet';
           <div class="credential-preview" aria-label="Vista previa del carné">
             <div class="credential-preview__head"><strong>{{ establishment.name() }}</strong><span>Carné de operador</span></div>
             <p><b>{{ user().displayName }}</b><br><small>{{ roleName() }} · {{ user().userName }}</small></p>
-            <div class="credential-preview__barcode" [innerHTML]="barcode()"></div>
+            <div class="credential-preview__barcode"><img [src]="barcode()" alt="Código de barras del carné"></div>
             <small>…{{ issued()!.visibleFragment }}</small>
           </div>
           <p class="form-hint">Emitido el {{ issued()!.issuedAtUtc | date:'dd/MM/yyyy HH:mm' }}. Puedes volver a consultarlo desde Usuarios → Carné.</p>
@@ -61,7 +60,6 @@ import { WindowSheet } from '../../shared/window-sheet';
 export class UserCredential implements OnInit, OnDestroy {
   private readonly api = inject(AdminApi);
   private readonly printer = inject(TicketPrinter);
-  private readonly sanitizer = inject(DomSanitizer);
   private readonly exporter = inject(CredentialCardExporter);
   private readonly confirmation = inject(ConfirmationDialog);
   private readonly destroyRef = inject(DestroyRef);
@@ -77,10 +75,12 @@ export class UserCredential implements OnInit, OnDestroy {
   readonly error = toastSignal('error');
   readonly notice = toastSignal('success');
   readonly roleName = computed(() => this.user().roles[0]?.name ?? 'Sin rol');
-  /** The SVG is generated here from the token (digits only), so it is trusted; Angular would strip the <svg> otherwise. */
-  readonly barcode = computed(() => { const value = this.issued(); return this.sanitizer.bypassSecurityTrustHtml(value ? code128Svg(value.credentialToken, 1.6, 70) : ''); });
+  /** El SVG generado se muestra como imagen autocontenida, sin insertar HTML en el DOM. */
+  readonly barcode = computed(() => { const value = this.issued(); return value ? code128DataUrl(value.credentialToken, 1.6, 70) : ''; });
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void { void this.loadCurrentCredential(); }
+
+  private async loadCurrentCredential(): Promise<void> {
     this.loading.set(true); this.error.set('');
     try {
       const card = await this.api.currentCredential(this.user().id);

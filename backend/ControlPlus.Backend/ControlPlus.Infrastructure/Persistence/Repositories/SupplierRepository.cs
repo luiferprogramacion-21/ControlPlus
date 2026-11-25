@@ -14,7 +14,7 @@ public sealed class EfSupplierRepository(OfficialControlPlusDbContext dbContext)
     {
         var rows = dbContext.Proveedor.AsNoTracking().AsQueryable();
         if (query.IsActive is bool active) rows = rows.Where(x => x.Activo == active);
-        if (query.Name is not null) rows = rows.Where(x => x.NombreRazonSocial.ToLower() == query.Name);
+        if (query.Name is not null) rows = rows.Where(x => x.NombreRazonSocial.Equals(query.Name, StringComparison.CurrentCultureIgnoreCase));
         if (query.DocumentType is not null)
             rows = rows.Where(x => x.TipoDocumento == query.DocumentType && x.NumeroDocumento == query.DocumentNumber);
         var total = await rows.CountAsync(ct);

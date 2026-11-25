@@ -84,7 +84,7 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(HttpStatusCode.OK, race[1].StatusCode);
 
         var sender = (FakeCashDrawerPulseSender)_factory!.Services.GetRequiredService<ICashDrawerPulseSender>();
-        Assert.Equal(2, sender.Pulses.Count);
+        Assert.Equal(2, sender.Pulses.Length);
         Assert.All(sender.Pulses, pulse =>
         {
             Assert.Equal("COLA_CAJON", pulse.Queue);
@@ -121,7 +121,7 @@ public sealed partial class SalesApiFlowTests
         using var cashier = CreateClient(scenario.Cashier.AccessToken);
         Assert.Equal(HttpStatusCode.Forbidden,
             (await OpenDrawerAsync(cashier, Guid.NewGuid().ToString(), "Sin permiso")).StatusCode);
-        Assert.Equal(3, sender.Pulses.Count);
+        Assert.Equal(3, sender.Pulses.Length);
     }
 
     private static async Task<HttpResponseMessage> CheckoutAsync(HttpClient client, string idempotencyKey)
@@ -145,7 +145,7 @@ public sealed partial class SalesApiFlowTests
     {
         private readonly ConcurrentQueue<(string Queue, byte[] Bytes)> _pulses = new();
 
-        public IReadOnlyList<(string Queue, byte[] Bytes)> Pulses => _pulses.ToArray();
+        public (string Queue, byte[] Bytes)[] Pulses => _pulses.ToArray();
 
         public Task SendPulseAsync(string queueName, CashDrawerPulse pulse,
             CancellationToken cancellationToken = default)

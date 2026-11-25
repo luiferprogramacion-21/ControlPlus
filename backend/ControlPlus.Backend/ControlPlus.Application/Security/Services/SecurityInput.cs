@@ -3,7 +3,7 @@ using ControlPlus.Application.Security.Ports;
 
 namespace ControlPlus.Application.Security.Services;
 
-internal static class SecurityInput
+internal static partial class SecurityInput
 {
     public static Result<string> RequiredText(string? value, string fieldName)
     {
@@ -19,13 +19,16 @@ internal static class SecurityInput
     {
         var normalized = value?.Trim();
         if (string.IsNullOrEmpty(normalized)) return Result.Success<string?>(null);
-        return normalized.Length <= 254 && EmailPattern.IsMatch(normalized)
+        return normalized.Length <= 254 && EmailPattern().IsMatch(normalized)
             ? Result.Success<string?>(normalized)
             : Result.Failure<string?>(ApplicationError.Validation("El correo no es válido."));
     }
 
-    private static readonly System.Text.RegularExpressions.Regex EmailPattern = new(
-        @"^[^@\s]+@[^@\s]+\.[^@\s]+$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    [System.Text.RegularExpressions.GeneratedRegex(
+        @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+        1000)]
+    private static partial System.Text.RegularExpressions.Regex EmailPattern();
 
     /// <summary>Contraseña nueva: obligatoria y, con la regla de 4 números, exactamente 4 dígitos.</summary>
     public static Result<string> NewPassword(string? value, IPasswordPolicy policy, string fieldName = "contraseña")

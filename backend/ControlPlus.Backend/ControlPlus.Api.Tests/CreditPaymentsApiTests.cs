@@ -1084,7 +1084,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         return new Setup(admin, supervisor, cashier, supervisorUser, cashierUser, product.Id, customer.Id, shift, shared);
     }
 
-    private async Task<SaleDto> CreateCreditAsync(HttpClient client, Setup setup, string key)
+    private static async Task<SaleDto> CreateCreditAsync(HttpClient client, Setup setup, string key)
     {
         if (setup.Shared) await StartAdminSessionAsync(client, setup);
         SetBearer(client, setup.Admin.AccessToken);
@@ -1249,7 +1249,7 @@ public sealed class CreditPaymentsApiTests : IAsyncLifetime
         var body = await response.Content.ReadAsStringAsync();
         Assert.True(response.StatusCode == expected,
             $"Expected {(int)expected} ({expected}), received {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
-        var value = JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var value = JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web);
         Assert.NotNull(value);
         return value;
     }

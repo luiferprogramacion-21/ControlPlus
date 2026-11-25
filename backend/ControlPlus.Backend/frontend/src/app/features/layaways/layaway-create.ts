@@ -1,6 +1,6 @@
 import { NumberInput, groupedNumber } from '../../shared/number-input';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, inject, output, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
@@ -43,7 +43,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
   templateUrl: './layaway-create.html',
   styleUrl: './layaways.scss',
 })
-export class LayawayCreate {
+export class LayawayCreate implements OnInit {
   private readonly api = inject(LayawaysApi);
   private readonly customersApi = inject(CustomersApi);
   private readonly catalog = inject(CatalogApi);
@@ -72,7 +72,7 @@ export class LayawayCreate {
 
   /** Units required for the wholesale price; 12 is only the fallback if the rule cannot be read. */
   readonly wholesaleMin = signal(WHOLESALE_MIN_QUANTITY);
-  constructor() { void this.loadRules(); void this.loadPricingRules(); }
+  ngOnInit(): void { void this.loadRules(); void this.loadPricingRules(); }
   private async loadPricingRules(): Promise<void> {
     try { this.wholesaleMin.set((await this.api.pricingRules()).wholesaleMinimumQuantity); }
     catch { /* The server still enforces the minimum. */ }

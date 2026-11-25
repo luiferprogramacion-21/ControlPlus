@@ -96,7 +96,7 @@ public sealed class DashboardSummaryService(IPermissionChecker permissions, IClo
     /// Una barra por hora local desde la primera venta hasta la hora actual (o la última venta), con las horas
     /// sin ventas en cero. Sin ventas no hay barras.
     /// </summary>
-    private static IReadOnlyList<DashboardHour> BuildHourlySales(IReadOnlyList<DashboardSaleTime> sales,
+    private static List<DashboardHour> BuildHourlySales(IReadOnlyList<DashboardSaleTime> sales,
         TimeZoneInfo zone, DateTime localNow)
     {
         if (sales.Count == 0) return [];

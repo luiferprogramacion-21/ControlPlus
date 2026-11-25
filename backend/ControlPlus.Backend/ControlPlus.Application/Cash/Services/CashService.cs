@@ -651,7 +651,7 @@ public sealed partial class CashService(
         if (user is null) return Result.Failure<IssuedOperatorCredentialDto>(ApplicationError.NotFound("el usuario"));
         if (!user.IsActive) return Result.Failure<IssuedOperatorCredentialDto>(ApplicationError.Conflict("Solo un usuario activo y no bloqueado puede recibir credencial."));
         var now = clock.UtcNow;
-        var existing = await repository.GetActiveCredentialForUserAsync(userId, cancellationToken);
+        var existing = await repository.GetActiveCredentialForUserAsync(userId, cancellationToken: cancellationToken);
         existing?.Revoke(actor.UserId, now, "REEMPLAZO");
 
         var token = tokenGenerator.Generate();
@@ -709,7 +709,7 @@ public sealed partial class CashService(
         // Lock the credential too: a revocation committed during that wait must abort the stale
         // start with a concurrency conflict, rather than create a session from its old ACTIVA row.
         var credential = ownerId is Guid owner
-            ? await repository.GetActiveCredentialForUserAsync(owner, cancellationToken, forUpdate: true)
+            ? await repository.GetActiveCredentialForUserAsync(owner, forUpdate: true, cancellationToken)
             : null;
         if (credential is null || credential.FormatoCodigo != "CODE128" ||
             (credential.FechaVencimiento is not null && credential.FechaVencimiento <= now.UtcDateTime) ||

@@ -539,7 +539,7 @@ public sealed class SaleDiscountAuthorizationApiTests : IAsyncLifetime
         return customer.Id;
     }
 
-    private async Task<OperatorSessionDto> StartSessionAsync(HttpClient client, Scenario scenario, AuthenticationResult actor)
+    private static async Task<OperatorSessionDto> StartSessionAsync(HttpClient client, Scenario scenario, AuthenticationResult actor)
     {
         SetBearer(client, scenario.Admin.AccessToken);
         var credential = await ReadAsync<IssuedOperatorCredentialDto>(await client.PostAsJsonAsync(
@@ -574,7 +574,7 @@ public sealed class SaleDiscountAuthorizationApiTests : IAsyncLifetime
         var body = await response.Content.ReadAsStringAsync();
         Assert.True(response.StatusCode == expected,
             $"Expected {(int)expected} ({expected}) but received {(int)response.StatusCode} ({response.StatusCode}). Body: {body}");
-        var value = JsonSerializer.Deserialize<T>(body, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var value = JsonSerializer.Deserialize<T>(body, JsonSerializerOptions.Web);
         Assert.NotNull(value);
         return value;
     }

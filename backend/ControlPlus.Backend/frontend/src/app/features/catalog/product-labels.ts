@@ -3,10 +3,9 @@ import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, ElementRef, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { errorText, Page } from '../../core/api';
-import { code128Svg } from '../../core/code128';
+import { code128DataUrl } from '../../core/code128';
 import { Icon } from '../../layout/icon';
 import { ProductLabelJobInput, ProductLabelProduct, ProductLabelProfile, ProductLabelQueueItem, ProductLabelReceipt, ProductLabelsApi } from './product-labels-api';
 import { toastSignal } from '../../core/toast';
@@ -32,7 +31,6 @@ export class ProductLabels implements OnInit {
   private readonly api = inject(ProductLabelsApi);
   private readonly route = inject(ActivatedRoute, { optional: true });
   readonly establishment = inject(EstablishmentService);
-  private readonly sanitizer = inject(DomSanitizer);
   @ViewChild('productSearch') private searchInput?: ElementRef<HTMLInputElement>;
 
   readonly profiles = signal<ProductLabelProfile[]>([]);
@@ -53,17 +51,19 @@ export class ProductLabels implements OnInit {
   readonly totalLabels = computed(() => this.selected().reduce((total, item) => total + item.quantity, 0));
   readonly preview = computed(() => this.selected()[0]?.product ?? null);
   readonly selectedProfile = computed(() => this.profiles().find(profile => profile.id === this.selectedProfileId()) ?? null);
-  readonly previewBarcode = computed<SafeHtml | null>(() => {
+  readonly previewBarcode = computed<string | null>(() => {
     const barcode = this.preview()?.barcode;
     if (!barcode) return null;
-    try { return this.sanitizer.bypassSecurityTrustHtml(code128Svg(barcode, 1.5, 40)); }
+    try { return code128DataUrl(barcode, 1.5, 40); }
     catch { return null; }
   });
 
   search = '';
   private attempt: PrintAttempt | null = null;
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void { void this.initialize(); }
+
+  private async initialize(): Promise<void> {
     this.loading.set(true);
     try {
       await this.establishment.load();

@@ -147,8 +147,8 @@ public sealed partial class SalesService
 
     private async Task ApplyChangeInventoryAsync(Guid actorId, Guid authorizationId,
         Guid changeId, Guid? sessionId, Guid correlation, DateTime now,
-        ConfirmSaleChangeRequest request, IReadOnlyDictionary<Guid, DetalleVenta> sold,
-        IReadOnlyDictionary<Guid, Producto> products, CancellationToken ct)
+        ConfirmSaleChangeRequest request, Dictionary<Guid, DetalleVenta> sold,
+        Dictionary<Guid, Producto> products, CancellationToken ct)
     {
         var movements = new List<MovimientoInventario>();
         foreach (var returned in request.Returned.OrderBy(x => sold[x.SaleLineId].ProductoId))

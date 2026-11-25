@@ -130,7 +130,9 @@ export class Catalog implements OnInit {
     control.updateValueAndValidity();
   }
 
-  async ngOnInit(): Promise<void> {
+  ngOnInit(): void { void this.initialize(); }
+
+  private async initialize(): Promise<void> {
     if (!this.session.has('PRODUCTS.READ') && this.session.has('CATEGORIES.READ')) this.tab.set('categories');
     await Promise.all([this.reload(), this.loadOptions()]);
     this.restorePendingCreate();

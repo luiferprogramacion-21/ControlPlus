@@ -148,14 +148,14 @@ public static class ControlledMigrationRunner
         }
     }
 
-    private static bool IsCoherentPrefix(IReadOnlyList<string> migrations, IReadOnlyList<string> applied)
+    private static bool IsCoherentPrefix(string[] migrations, string[] applied)
     {
-        if (applied.Count > migrations.Count)
+        if (applied.Length > migrations.Length)
         {
             return false;
         }
 
-        for (var index = 0; index < applied.Count; index++)
+        for (var index = 0; index < applied.Length; index++)
         {
             if (!string.Equals(applied[index], migrations[index], StringComparison.Ordinal))
             {
