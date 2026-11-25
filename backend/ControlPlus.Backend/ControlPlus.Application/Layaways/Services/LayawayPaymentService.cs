@@ -62,7 +62,7 @@ public sealed class LayawayPaymentService(ILayawayPaymentRepository layaways,
             session = await creation.GetActiveOperatorSessionForUpdateAsync(
                 shift.Id, terminal.Id, actor.UserId, cancellationToken);
             if (session is null)
-                return Fail(ApplicationError.Conflict("Se requiere una sesión activa del operador."));
+                return Fail(SharedShift.CardRequired());
         }
         else return Fail(ApplicationError.Conflict("La modalidad del turno no es válida."));
 

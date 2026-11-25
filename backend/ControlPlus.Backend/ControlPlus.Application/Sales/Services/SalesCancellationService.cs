@@ -233,7 +233,7 @@ public sealed partial class SalesService
             {
                 operatorSession = await repository.GetActiveOperatorSessionForUpdateAsync(shift.Id, terminal.Id, actor.UserId, ct);
                 if (operatorSession is null)
-                    return Result.Failure<CancelSaleDto>(ApplicationError.Conflict("Se requiere una sesión activa del operador."));
+                    return Result.Failure<CancelSaleDto>(SharedShift.CardRequired());
             }
             else return Result.Failure<CancelSaleDto>(ApplicationError.Conflict("La modalidad del turno no es válida."));
             var expected = await cashRepository.GetExpectedAmountsAsync(shift.Id, ct);

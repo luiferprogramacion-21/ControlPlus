@@ -129,7 +129,7 @@ export class LayawayProducts implements OnInit {
       description: 'Se ajustan las reservas y el saldo del apartado' + (this.refund > 0 ? ' y se devuelve el dinero sobrante por los medios elegidos.' : '.'),
       detail: `${layaway.number} · total ${money(layaway.total)} → ${money(this.newTotal)}` + (this.refund > 0 ? ` · devolver ${money(this.refund)}` : ''),
       operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
-      selfAuthorizedRoles: ['ADMINISTRADOR'], onError: message => this.error.set(message),
+      selfAuthorizedRoles: ['ADMINISTRADOR'], operatorScoped: true, onError: message => this.error.set(message),
       run: credentials => this.execute(credentials),
     });
   }

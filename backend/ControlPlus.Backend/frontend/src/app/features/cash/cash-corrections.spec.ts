@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationDialog, AuthorizationPrompt } from '../../shared/authorization-dialog';
+import { OperatorCard } from '../../shared/operator-card';
 import { CashCorrections, movementKindLabel } from './cash-corrections';
 
 describe('Corregir un error de caja (auditoría A.16)', () => {
@@ -21,7 +22,8 @@ describe('Corregir un error de caja (auditoría A.16)', () => {
     prompt = null; roles = ['SUPERVISOR'];
     TestBed.configureTestingModule({ imports: [CashCorrections], providers: [provideHttpClient(), provideHttpClientTesting(),
       { provide: SessionService, useValue: { has: () => true, hasRole: (...codes: string[]) => codes.some(code => roles.includes(code)), user: () => ({ userName: 'super' }) } },
-      { provide: AuthorizationDialog, useValue: { open: vi.fn(async (value: AuthorizationPrompt) => { prompt = value; return true; }) } }] });
+      { provide: AuthorizationDialog, useValue: { open: vi.fn(async (value: AuthorizationPrompt) => { prompt = value; return true; }) } },
+      { provide: OperatorCard, useValue: { ensure: vi.fn(async () => ({ shared: true, role: 'SUPERVISOR', sessionId: 'session-7' })) } }] });
   });
 
   it('propone el mismo movimiento, dice qué pasa con el efectivo y muestra el antes y el después', () => {
@@ -51,7 +53,7 @@ describe('Corregir un error de caja (auditoría A.16)', () => {
     const run = prompt!.run({ userName: 'admin', password: 'clave' });
     const request = http.expectOne('/api/cash/movements/m1/correction');
     expect(request.request.body).toMatchObject({ expectedShiftVersion: 3, replacementKind: 'GASTO', replacementAmount: 15000,
-      replacementConcept: 'Almuerzo', reason: 'El gasto era de 15.000', authorization: { userName: 'admin', password: 'clave' } });
+      replacementConcept: 'Almuerzo', reason: 'El gasto era de 15.000', operatorSessionId: 'session-7', authorization: { userName: 'admin', password: 'clave' } });
     request.flush({}); await run;
     expect(c.opened()).toBe(false);
   });

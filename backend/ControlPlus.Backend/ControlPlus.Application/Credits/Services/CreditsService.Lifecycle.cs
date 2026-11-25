@@ -157,8 +157,7 @@ public sealed partial class CreditsService
             operatorSession = await sales.GetActiveOperatorSessionForUpdateAsync(
                 shift.Id, terminal.Id, actor.UserId, cancellationToken);
             if (operatorSession is null)
-                return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
-                    "Se requiere una sesión activa del operador."));
+                return Result.Failure<CancelCreditPaymentDto>(SharedShift.CardRequired());
         }
         else return Result.Failure<CancelCreditPaymentDto>(ApplicationError.Conflict(
             "La modalidad del turno no es válida."));

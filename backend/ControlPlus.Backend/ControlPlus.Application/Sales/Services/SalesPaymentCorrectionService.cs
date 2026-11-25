@@ -126,7 +126,7 @@ public sealed partial class SalesService
         else if (shift.ModoOperacion == CashConstants.SharedMode)
         {
             operatorSession = await repository.GetActiveOperatorSessionForUpdateAsync(shift.Id, terminal.Id, actor.UserId, ct);
-            if (operatorSession is null) return Fail(ApplicationError.Conflict("Pasa tu carné en Caja antes de corregir."));
+            if (operatorSession is null) return Fail(SharedShift.CardRequired());
         }
         else return Fail(ApplicationError.Conflict("La modalidad del turno no es válida."));
 

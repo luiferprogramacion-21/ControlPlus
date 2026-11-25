@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
+import { OperatorCard } from '../../shared/operator-card';
 import { CatalogApi, Product } from '../catalog/catalog-api';
 import { Customer, CustomersApi } from '../customers/customers-api';
 import { CreateLayawayInput, CreatedLayaway, LayawayCreationRules, LayawayPriceType, LayawaysApi } from './layaways-api';
@@ -48,6 +49,7 @@ export class LayawayCreate implements OnInit {
   private readonly customersApi = inject(CustomersApi);
   private readonly catalog = inject(CatalogApi);
   private readonly authorization = inject(AuthorizationDialog);
+  private readonly operatorCard = inject(OperatorCard);
   readonly session = inject(SessionService);
   readonly number = groupedNumber;
   readonly longDate = dayDate;
@@ -169,7 +171,11 @@ export class LayawayCreate implements OnInit {
     if (this.saving()) return;
     const issue = this.validation(); if (issue) { this.error.set(issue); return; }
     this.error.set('');
-    if (this.selfAuthorized) {
+    const detail = `${this.customer()!.fullName} · total ${money(this.total())} · pago inicial ${money(this.initialPayment)}`;
+    // 25/11/2026: en turno compartido el apartado queda a nombre de quien pasa su carné y se decide con su rol.
+    const operator = await this.operatorCard.ensure(detail);
+    if (!operator) return;
+    if (operator.shared ? operator.role === 'ADMINISTRADOR' || operator.role === 'SUPERVISOR' : this.selfAuthorized) {
       try { await this.submit(null); }
       catch (e) { this.error.set(e instanceof Error && !(e instanceof HttpErrorResponse) ? e.message : errorText(e)); }
       return;
@@ -177,8 +183,8 @@ export class LayawayCreate implements OnInit {
     await this.authorization.open({
       title: 'Autorizar apartado',
       description: 'Se registrará el apartado, se reservará el inventario y se cobrará el pago inicial en Caja.',
-      detail: `${this.customer()!.fullName} · total ${money(this.total())} · pago inicial ${money(this.initialPayment)}`,
-      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
+      detail,
+      operatorUserName: operator.shared ? '' : this.session.user()?.userName ?? '', requireDifferentUser: !operator.shared, allowCredential: true,
       run: credentials => this.submit(credentials),
     });
   }

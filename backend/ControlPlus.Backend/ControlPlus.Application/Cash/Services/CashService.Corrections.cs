@@ -200,7 +200,7 @@ public sealed partial class CashService
             ? (null, null) : (null, ApplicationError.Forbidden("Opera desde tu turno individual."));
         var session = id is Guid sessionId ? await repository.GetOperatorSessionForUpdateAsync(sessionId, ct) : null;
         return session is { IsActive: true } && session.TurnoCajaId == shift.Id && session.TerminalId == shift.TerminalId && session.UsuarioId == actor.UserId
-            ? (session, null) : (null, ApplicationError.Conflict("Inicia tu sesión de operador para corregir."));
+            ? (session, null) : (null, SharedShift.CardRequired());
     }
     private Task AddCorrectionReceiptAsync<T>(Guid installation, Guid terminal, Guid actor, Guid entity, string key,
         string type, string hash, T response, Guid correlation, CancellationToken ct) => repository.AddCorrectionIdempotencyAsync(new OperacionIdempotente

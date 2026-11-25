@@ -190,7 +190,7 @@ export class SaleChange implements OnInit {
       title: this.mode() === 'remove' ? 'Confirmar corrección de la venta' : 'Autorizar cambio de productos',
       description: this.mode() === 'remove' ? 'Las unidades seleccionadas vuelven al inventario y se devuelve el cobro o se reduce la deuda. Se conserva la venta original y se registra esta corrección con su propio número.' : 'Los productos devueltos vuelven al inventario, los entregados salen y la diferencia se liquida. La venta original no cambia. Esta acción no se puede deshacer.',
       detail: `${prep.visibleNumber} · devuelto ${money(this.totalReturned)} · entregado ${money(this.totalDelivered)} · diferencia ${money(this.difference)}${s.creditAdjustment ? ` · crédito ${money(s.creditAdjustment)}` : ''}`,
-      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
+      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'], operatorScoped: true,
       onError: message => this.error.set(message),
       run: credentials => this.submit(credentials),
     });

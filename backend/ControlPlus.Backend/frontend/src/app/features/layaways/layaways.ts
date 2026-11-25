@@ -11,6 +11,7 @@ import { Icon } from '../../layout/icon';
 import { Customer, CustomersApi } from '../customers/customers-api';
 import { CreatedLayaway, Layaway, LayawayCancellation, LayawayDetail, LayawayPayment, LayawayPaymentCancellationReason, LayawayPaymentInput, LayawayProductCorrection, LayawaysApi } from './layaways-api';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
+import { OperatorCard } from '../../shared/operator-card';
 import { LayawayCancel } from './layaway-cancel';
 import { LayawayProducts } from './layaway-products';
 import { LayawayCreate } from './layaway-create';
@@ -34,6 +35,7 @@ export class Layaways implements OnInit {
   readonly longDate = dayDate;
   private readonly api = inject(LayawaysApi);
   private readonly authorization = inject(AuthorizationDialog);
+  private readonly operatorCard = inject(OperatorCard);
   private readonly confirmation = inject(ConfirmationDialog);
   private readonly owner = inject(DestroyRef);
   private readonly customersApi = inject(CustomersApi);
@@ -115,7 +117,7 @@ export class Layaways implements OnInit {
       description: 'Se anula el abono completo con sus medios originales en la caja actual. Los productos siguen reservados. Después podrás registrar el abono correcto.',
       detail: `${payment.number} · ${this.money(this.correctingPaymentTotal)}`,
       operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
-      selfAuthorizedRoles: ['ADMINISTRADOR'], onError: message => this.error.set(message),
+      selfAuthorizedRoles: ['ADMINISTRADOR'], operatorScoped: true, onError: message => this.error.set(message),
       run: credentials => this.executePaymentCorrection(layaway, payment, credentials) });
   }
   private async executePaymentCorrection(layaway: Layaway, payment: LayawayPayment, credentials: AuthorizationCredentials | null): Promise<void> {
@@ -204,6 +206,8 @@ export class Layaways implements OnInit {
     if (fingerprint !== this.paymentFingerprint) { this.paymentKey = crypto.randomUUID(); this.paymentFingerprint = fingerprint; }
     this.saving.set(true); this.error.set('');
     try {
+      // 25/11/2026: en turno compartido el abono queda a nombre de quien pasa su carné; si nadie lo ha pasado, se pide antes.
+      if (!await this.operatorCard.ensure(`Abono de ${this.money(payments.reduce((sum, p) => sum + p.appliedAmount, 0))}`)) return;
       const result = await this.api.applyPayment(layaway, payments, this.paymentKey!);
       this.paymentKey = null; this.paymentFingerprint = ''; this.paymentDialog.set(false);
       this.notice.set(result.state === 'PAGADO' ? 'Abono registrado. El apartado quedó pagado y listo para entregar.' : 'Abono registrado.');

@@ -6,6 +6,9 @@ import { Cash } from './cash';
 import { AuthorizationDialog, AuthorizationPrompt } from '../../shared/authorization-dialog';
 import { EstablishmentService } from '../../core/establishment';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
+import { OperatorCard, OperatorContext } from '../../shared/operator-card';
+
+const individual: OperatorContext = { shared: false, role: null, sessionId: null };
 
 describe('Cierre de caja', () => {
   const reconciliation: Reconciliation = {
@@ -30,6 +33,7 @@ describe('Cierre de caja', () => {
       { provide: CashApi, useValue: api },
       { provide: SessionService, useValue: { has: (permission: string) => permission === 'CASH.SHIFT_MANAGE', user: () => ({ userName: 'operador' }) } },
       { provide: AuthorizationDialog, useValue: dialog },
+      { provide: OperatorCard, useValue: { ensure: vi.fn(async () => individual) } },
       { provide: EstablishmentService, useValue: { name: () => 'Tienda', load: () => Promise.resolve() } },
     ] });
     screen = TestBed.runInInjectionContext(() => new Cash());
@@ -178,9 +182,11 @@ describe('Cajón de dinero en Caja', () => {
   let screen: Cash;
   let roles: string[];
   const authorize = vi.fn(async (prompt: AuthorizationPrompt) => { await prompt.run({ userName: 'admin', password: 'clave' }); return true; });
+  let operator: OperatorContext | null;
+  const ensure = vi.fn(async () => operator);
 
   beforeEach(() => {
-    confirm.mockReset().mockResolvedValue(true); authorize.mockClear(); roles = ['ADMINISTRADOR'];
+    confirm.mockReset().mockResolvedValue(true); authorize.mockClear(); ensure.mockClear(); roles = ['ADMINISTRADOR']; operator = individual;
     api = {
       openDrawer: vi.fn().mockResolvedValue({ status: 'ENVIADO' }),
       movement: vi.fn().mockResolvedValue({ id: 'm1', type: 'INGRESO', category: 'MANUAL', amount: 5000, concept: 'Base', occurredAtUtc: '', drawerStatus: 'ENVIADO' }),
@@ -194,6 +200,7 @@ describe('Cajón de dinero en Caja', () => {
       { provide: SessionService, useValue: { has: (permission: string) => ['CASH.SHIFT_MANAGE', 'CASH.MOVEMENTS_MANAGE'].includes(permission),
         hasRole: (...codes: string[]) => codes.some(code => roles.includes(code)), user: () => ({ userName: 'supervisor' }) } },
       { provide: AuthorizationDialog, useValue: { open: authorize } },
+      { provide: OperatorCard, useValue: { ensure } },
       { provide: ConfirmationDialog, useValue: { confirm } },
       { provide: EstablishmentService, useValue: { name: () => 'Tienda', load: () => Promise.resolve() } },
     ] });
@@ -255,11 +262,31 @@ describe('Cajón de dinero en Caja', () => {
   });
 
   it('en turno compartido decide el rol de quien pasó su carné, aunque la sesión sea del Administrador', async () => {
-    screen.state.set({ ...openState, requiresOperatorSession: true, activeOperatorRole: 'CAJERO', ownOperatorSession: { id: 'session-1', state: 'ACTIVA' } });
+    operator = { shared: true, role: 'CAJERO', sessionId: 'session-1' };
+    api.state.mockResolvedValue({ ...openState, requiresOperatorSession: true, activeOperatorRole: 'CAJERO', ownOperatorSession: { id: 'session-1', state: 'ACTIVA' } });
     screen.kind = 'incomes'; screen.amount = 1000; screen.concept = 'Base';
     await screen.move();
+    expect(ensure).toHaveBeenCalledWith('Ingreso de 1.000 COP · Base');
     expect(authorize).toHaveBeenCalledWith(expect.objectContaining({ requireDifferentUser: false, description: expect.stringContaining('Supervisor o del Administrador') }));
     expect(api.movement).toHaveBeenCalledWith('incomes', 1000, 'Base', 'session-1', { userName: 'admin', password: 'clave' });
+    expect(screen.state()?.ownOperatorSession?.id).toBe('session-1');
+  });
+
+  it('en turno compartido el carné del Administrador registra el movimiento sin pedir autorización', async () => {
+    roles = ['SUPERVISOR'];
+    operator = { shared: true, role: 'ADMINISTRADOR', sessionId: 'session-2' };
+    screen.kind = 'expenses'; screen.amount = 3000; screen.concept = 'Bolsas';
+    await screen.move();
+    expect(authorize).not.toHaveBeenCalled();
+    expect(api.movement).toHaveBeenCalledWith('expenses', 3000, 'Bolsas', 'session-2', null);
+  });
+
+  it('si se cancela el carné, no registra nada (pruebas del usuario del 25/11/2026)', async () => {
+    operator = null;
+    screen.kind = 'incomes'; screen.amount = 1000; screen.concept = 'Base';
+    await screen.move();
+    expect(authorize).not.toHaveBeenCalled();
+    expect(api.movement).not.toHaveBeenCalled();
   });
 });
 
@@ -279,6 +306,7 @@ describe('Cierre de caja del Cajero (pruebas del usuario del 24/11/2026, punto 4
       { provide: CashApi, useValue: api },
       { provide: SessionService, useValue: { has: (permission: string) => permission === 'CASH.OWN_READ', hasRole: () => false, user: () => ({ id: 'cajero-1', userName: 'cajero', displayName: 'Cajero' }) } },
       { provide: AuthorizationDialog, useValue: { open: vi.fn() } },
+      { provide: OperatorCard, useValue: { ensure: vi.fn(async () => individual) } },
       { provide: ConfirmationDialog, useValue: { confirm: vi.fn() } },
       { provide: EstablishmentService, useValue: { name: () => 'Tienda', load: () => Promise.resolve() } },
     ] });

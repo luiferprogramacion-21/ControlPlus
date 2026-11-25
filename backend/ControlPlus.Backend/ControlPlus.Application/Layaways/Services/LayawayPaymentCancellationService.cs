@@ -94,7 +94,7 @@ public sealed partial class LayawayPaymentCancellationService(ILayawayPaymentCor
         else if (shift.ModoOperacion == CashConstants.SharedMode)
         {
             session = await sales.GetActiveOperatorSessionForUpdateAsync(shift.Id, terminal.Id, actor.UserId, ct);
-            if (session is null) return Fail(ApplicationError.Conflict("Identifícate con tu carné en el turno compartido."));
+            if (session is null) return Fail(SharedShift.CardRequired());
         }
         else return Fail(ApplicationError.Conflict("La modalidad del turno no es válida."));
         var layaway = await layaways.GetForUpdateAsync(layawayId, ct);

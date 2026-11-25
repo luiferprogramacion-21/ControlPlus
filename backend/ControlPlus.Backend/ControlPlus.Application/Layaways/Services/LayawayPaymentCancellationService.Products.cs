@@ -95,7 +95,7 @@ public sealed partial class LayawayPaymentCancellationService
         if (shift.ModoOperacion == CashConstants.IndividualMode)
         { if (shift.UsuarioResponsableId != actor.UserId) return ProductFail(ApplicationError.Forbidden("El turno individual pertenece a otro responsable.")); }
         else if (shift.ModoOperacion == CashConstants.SharedMode)
-        { session = await sales.GetActiveOperatorSessionForUpdateAsync(shift.Id, terminal.Id, actor.UserId, ct); if (session is null) return ProductFail(ApplicationError.Conflict("Identifícate con tu carné en el turno compartido.")); }
+        { session = await sales.GetActiveOperatorSessionForUpdateAsync(shift.Id, terminal.Id, actor.UserId, ct); if (session is null) return ProductFail(SharedShift.CardRequired()); }
         else return ProductFail(ApplicationError.Conflict("La modalidad del turno no es válida."));
         var layaway = await layaways.GetForUpdateAsync(layawayId, ct);
         if (layaway is null || layaway.InstalacionId != installation.Id) return ProductFail(ApplicationError.NotFound("el apartado"));

@@ -108,7 +108,7 @@ export class SalePaymentCorrection implements OnInit {
       title: 'Autorizar corrección de medio de pago',
       description: 'La venta y su total no cambian. Se anulan los pagos registrados y se guardan los correctos; la caja esperará el efectivo nuevo.',
       detail: `${sale.visibleNumber} · total ${money(sale.total)}`,
-      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
+      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'], operatorScoped: true,
       onError: message => this.error.set(message),
       run: credentials => this.submit(sale, credentials),
     });

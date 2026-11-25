@@ -46,6 +46,18 @@ describe('Corrección de recepción de compra', () => {
     expect(component.canCorrectReceipt).toBe(true);
   });
 
+  it('ofrece «Recibir mercancía» solo si falta algo por recibir (pruebas del usuario del 25/11/2026)', () => {
+    type Order = Parameters<Purchases['canReceiveOrder']>[0];
+    const line = (requested: number, received: number) => ({ requestedQuantity: requested, receivedQuantity: received });
+    const order = (status: string, requested: number, received: number) => ({ id: 'o', status, lines: [line(requested, received)] }) as unknown as Order;
+    expect(component.canReceiveOrder(order('ENVIADO', 4, 0))).toBe(true);
+    expect(component.canReceiveOrder(order('RECIBIDO_PARCIAL', 9, 5))).toBe(true);
+    expect(component.canReceiveOrder(order('RECIBIDO_COMPLETO', 9, 9))).toBe(false);
+    expect(component.canReceiveOrder(order('BORRADOR', 4, 0))).toBe(false);
+    permissions = ['PURCHASES.CANCEL'];
+    expect(component.canReceiveOrder(order('ENVIADO', 4, 0))).toBe(false);
+  });
+
   it('muestra la explicación cuando hay movimientos posteriores y no solicita autorización', async () => {
     api.correctionPreparation.mockResolvedValueOnce({ ...preparation, canReverse: false, blockReason: 'Estos productos ya tuvieron movimientos posteriores.' });
     await component.startReceiptCorrection();

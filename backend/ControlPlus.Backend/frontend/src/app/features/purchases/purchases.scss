@@ -100,6 +100,10 @@
 .purchase-steps li.is-current { background:var(--cp-primary); color:#fff; }
 .purchase-steps li.is-done { background:var(--cp-success-soft); color:var(--cp-success); }
 
+/* Acciones de «Mercancía recibida» (pruebas del usuario del 25 de noviembre de 2026): una al lado de la otra y con espacio. */
+.receipt-row-actions { white-space:nowrap; }
+.receipt-row-actions > .table-action + .table-action { margin-left:8px; }
+
 /* Producto nuevo desde el pedido (punto 17 de la auditoría, 24 de noviembre de 2026). */
 .order-new-product { margin: 12px 0 0; padding: 14px 16px; border: 1px solid var(--cp-border); border-radius: 12px; background: var(--cp-surface-subtle, #f7f9fc); }
 .order-new-product legend { padding: 0 6px; font-weight: 700; }

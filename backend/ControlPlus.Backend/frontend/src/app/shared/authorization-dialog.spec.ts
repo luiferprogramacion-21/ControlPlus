@@ -4,6 +4,8 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatDialog } from '@angular/material/dialog';
 import { SessionService } from '../core/session.service';
 import { AuthorizationDialog, AuthorizationDialogComponent, AuthorizationPrompt, authorizationBody, authorizationIdentity } from './authorization-dialog';
+import { of } from 'rxjs';
+import { OperatorCard } from './operator-card';
 
 describe('Ventana de autorización', () => {
   let component: AuthorizationDialogComponent;
@@ -136,5 +138,49 @@ describe('Servicio de autorización: roles sin segundo autorizador', () => {
   it('sin onError relanza el error', async () => {
     roles = ['ADMINISTRADOR']; run.mockRejectedValue(new Error('fallo'));
     await expect(service().open({ ...base, selfAuthorizedRoles: ['ADMINISTRADOR'], run })).rejects.toThrow('fallo');
+  });
+});
+
+describe('Servicio de autorización: operación a nombre de quien opera (25/11/2026)', () => {
+  const open = vi.fn();
+  const run = vi.fn();
+  const ensure = vi.fn();
+  let roles: string[];
+  const base: Omit<AuthorizationPrompt, 'run'> = { title: 't', description: 'd', detail: 'Venta 1', operatorUserName: 'supervisor', requireDifferentUser: true,
+    selfAuthorizedRoles: ['ADMINISTRADOR'], operatorScoped: true };
+  const service = () => {
+    TestBed.configureTestingModule({ providers: [
+      { provide: MatDialog, useValue: { open } },
+      { provide: SessionService, useValue: { hasRole: (...codes: string[]) => codes.some(c => roles.includes(c)) } },
+      { provide: OperatorCard, useValue: { ensure } },
+    ] });
+    return TestBed.inject(AuthorizationDialog);
+  };
+  beforeEach(() => { vi.clearAllMocks(); run.mockResolvedValue(undefined); open.mockReturnValue({ afterClosed: () => of(true) }); });
+
+  it('si se cancela el carné no ejecuta nada', async () => {
+    roles = ['ADMINISTRADOR']; ensure.mockResolvedValue(null);
+    expect(await service().open({ ...base, run })).toBe(false);
+    expect(ensure).toHaveBeenCalledWith('Venta 1');
+    expect(run).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
+  });
+
+  it('en turno compartido decide el rol del dueño del carné: Administrador sin segundo autorizador', async () => {
+    roles = ['SUPERVISOR']; ensure.mockResolvedValue({ shared: true, role: 'ADMINISTRADOR', sessionId: 's1' });
+    expect(await service().open({ ...base, run })).toBe(true);
+    expect(run).toHaveBeenCalledWith(null); expect(open).not.toHaveBeenCalled();
+  });
+
+  it('en turno compartido un Cajero pide autorizador aunque la sesión sea del Administrador', async () => {
+    roles = ['ADMINISTRADOR']; ensure.mockResolvedValue({ shared: true, role: 'CAJERO', sessionId: 's1' });
+    await service().open({ ...base, run });
+    expect(run).not.toHaveBeenCalled();
+    expect(open).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ data: expect.objectContaining({ requireDifferentUser: false, operatorUserName: '' }) }));
+  });
+
+  it('en turno individual decide el rol de la sesión, como siempre', async () => {
+    roles = ['ADMINISTRADOR']; ensure.mockResolvedValue({ shared: false, role: null, sessionId: null });
+    expect(await service().open({ ...base, run })).toBe(true);
+    expect(run).toHaveBeenCalledWith(null);
   });
 });

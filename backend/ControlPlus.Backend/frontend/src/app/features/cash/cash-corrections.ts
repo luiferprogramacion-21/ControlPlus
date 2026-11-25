@@ -8,6 +8,7 @@ import { SessionService } from '../../core/session.service';
 import { AuthorizationDialog, authorizationBody } from '../../shared/authorization-dialog';
 import { dayDate } from '../../shared/day-date';
 import { NumberInput } from '../../shared/number-input';
+import { OperatorCard } from '../../shared/operator-card';
 import { WindowSheet } from '../../shared/window-sheet';
 import { CashMovement, CashState } from './cash-api';
 
@@ -107,6 +108,7 @@ export class CashCorrections {
   readonly opened = signal(false); readonly busy = signal(false); readonly error = signal(''); readonly notice = signal('');
   readonly closedShifts = signal<ClosedShift[]>([]); readonly reviews = signal<Review[]>([]);
   private readonly http = inject(HttpClient); private readonly session = inject(SessionService); private readonly authorization = inject(AuthorizationDialog);
+  private readonly operatorCard = inject(OperatorCard);
   mode: 'movement' | 'review' = 'movement'; movementId = ''; kind: Kind = ''; amount = 0; concept = ''; reason = ''; shiftId = ''; reviewedCount = 0;
   private pending: { fingerprint: string; key: string } | null = null;
   readonly kindLabel = movementKindLabel;
@@ -156,6 +158,13 @@ export class CashCorrections {
       this.kind === (this.selectedMovement!.category === 'INGRESO_MANUAL' ? 'INGRESO' : this.selectedMovement!.category)) { this.error.set('No cambiaste nada: ajusta el monto, el tipo o el concepto, o elige «Nada».'); return; }
     if (this.mode === 'review' && (!this.selectedShift || !Number.isSafeInteger(this.reviewedCount) || this.reviewedCount < 0)) { this.error.set('Elige el día y escribe cuánto efectivo había, en pesos enteros.'); return; }
     const review = this.mode === 'review';
+    // 25/11/2026: en turno compartido la corrección se hace con la sesión del carné; si nadie lo ha pasado, se pide antes.
+    let sessionId: string | null = null;
+    if (!review) {
+      const operator = await this.operatorCard.ensure(this.cashEffect);
+      if (!operator) return;
+      sessionId = operator.sessionId;
+    }
     await this.authorization.open({ title: review ? 'Registrar revisión del cierre' : 'Autorizar corrección de caja',
       description: review ? 'Se añade la revisión al historial sin cambiar el cierre ni el dinero de la caja de hoy.' : 'Se anula el movimiento equivocado y se registra el correcto, sin borrar el original.',
       detail: review ? `Había: $${this.reviewedCount.toLocaleString('es-CO')}` : this.cashEffect,
@@ -164,7 +173,7 @@ export class CashCorrections {
         const body = review ? { expectedShiftVersion: this.selectedShift!.version, reviewedCount: this.reviewedCount, reason: this.reason.trim() }
           : { expectedShiftVersion: shift!.version, reason: this.reason.trim(), replacementKind: this.kind || null,
               replacementAmount: this.kind ? this.amount : null, replacementConcept: this.kind ? this.concept.trim() : null,
-              operatorSessionId: this.state()?.ownOperatorSession?.id ?? null, ...(credentials ? { authorization: authorizationBody(credentials) } : {}) };
+              operatorSessionId: sessionId, ...(credentials ? { authorization: authorizationBody(credentials) } : {}) };
         const url = review ? `/api/cash/shifts/${this.shiftId}/reviews` : `/api/cash/movements/${this.movementId}/correction`;
         const fingerprint = JSON.stringify({ url, ...body, authorization: undefined });
         if (this.pending?.fingerprint !== fingerprint) this.pending = { fingerprint, key: crypto.randomUUID() };

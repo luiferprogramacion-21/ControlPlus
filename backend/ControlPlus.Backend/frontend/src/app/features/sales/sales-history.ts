@@ -217,7 +217,7 @@ export class SalesHistory implements OnInit {
       title: 'Autorizar anulación de venta',
       description: 'Se anulará la venta, se repondrá el inventario y se revertirán sus pagos o el crédito pendiente. Esta acción no se puede deshacer.',
       detail: `${sale.visibleNumber} · total ${this.money(sale.total)}`,
-      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
+      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'], operatorScoped: true,
       onError: message => this.formError.set(message),
       run: credentials => this.submit(sale, credentials),
     });

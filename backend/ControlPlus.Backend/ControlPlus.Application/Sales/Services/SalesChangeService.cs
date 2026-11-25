@@ -102,7 +102,7 @@ public sealed partial class SalesService
             session = await repository.GetActiveOperatorSessionForUpdateAsync(shift.Id, terminal.Id,
                 actor.UserId, ct);
             if (session is null)
-                return Result.Failure<SaleChangeDto>(ApplicationError.Conflict("Se requiere una sesión activa del operador."));
+                return Result.Failure<SaleChangeDto>(SharedShift.CardRequired());
         }
         else return Result.Failure<SaleChangeDto>(ApplicationError.Conflict("La modalidad de Caja es inválida."));
         var sequence = await repository.GetChangeSequenceForUpdateAsync(installation.Id, installation.Serie, ct);

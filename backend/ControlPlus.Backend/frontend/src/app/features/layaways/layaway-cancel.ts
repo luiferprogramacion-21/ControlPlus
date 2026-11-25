@@ -67,7 +67,7 @@ export class LayawayCancel implements OnInit {
       title: 'Autorizar cancelación de apartado',
       description: 'Se cancelará el apartado, se liberará la reserva de inventario y se registrará la devolución indicada. La existencia real no cambia.',
       detail: `${layaway.number} · abonado ${money(this.totalPaid())} · devolver ${money(Number(this.refundAmount))} · retenido ${money(this.retained)}`,
-      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
+      operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'], operatorScoped: true,
       onError: message => this.error.set(message),
       run: credentials => this.submit(credentials),
     });

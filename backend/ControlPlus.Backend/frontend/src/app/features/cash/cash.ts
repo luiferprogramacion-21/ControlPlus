@@ -12,6 +12,7 @@ import { AuthorizationCredentials, AuthorizationDialog, authorizationBody } from
 import { statusKind, toastSignal } from '../../core/toast';
 import { cashDrawerNotice } from '../../shared/cash-drawer-feedback';
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
+import { OperatorCard } from '../../shared/operator-card';
 import { CashCorrections } from './cash-corrections';
 
 @Component({
@@ -24,6 +25,7 @@ export class Cash implements OnInit {
   readonly readableCode = readableCode;
   readonly api = inject(CashApi);
   private readonly authorization = inject(AuthorizationDialog);
+  private readonly operatorCard = inject(OperatorCard);
   private readonly confirmations = inject(ConfirmationDialog);
   private readonly destroyRef = inject(DestroyRef);
   readonly session = inject(SessionService);
@@ -222,36 +224,37 @@ export class Cash implements OnInit {
   }
   /**
    * Pruebas del usuario del 24/11/2026 (punto 13): todo movimiento (ingreso, gasto o retiro) pide autorizador. El Administrador
-   * lo registra solo; el Supervisor, con el Administrador; el Cajero con permiso, con un Supervisor o el Administrador. En turno
-   * compartido decide el rol de quien pasó su carné, porque el movimiento queda a su nombre.
+   * lo registra solo; el Supervisor, con el Administrador; el Cajero con permiso, con un Supervisor o el Administrador.
+   * 25/11/2026: el botón ya no se bloquea en turno compartido. Si nadie ha pasado su carné, se pide antes de la autorización y
+   * decide el rol de su dueño, porque el movimiento queda a su nombre.
    */
-  get movementByAdministrator(): boolean {
-    const cash = this.state();
-    const cardRole = cash?.requiresOperatorSession ? cash.activeOperatorRole : null;
-    return cardRole ? cardRole === 'ADMINISTRADOR' : this.isAdministrator;
-  }
   readonly movementKinds = { incomes: 'Ingreso', expenses: 'Gasto', 'cash-drops': 'Retiro de efectivo' } as const;
+  private movementAsked = false;
   async move(): Promise<void> {
-    if (!this.validMoney(this.amount) || !this.concept.trim() || this.busy()) return;
-    if (this.movementByAdministrator) { await this.submitMove(null); return; }
-    const cardActive = !!this.state()?.requiresOperatorSession && !!this.state()?.activeOperatorRole;
-    await this.authorization.open({ title: 'Autorizar movimiento de caja',
-      description: this.sellerIsSupervisor
-        ? 'Un Supervisor registra movimientos de caja con la autorización del Administrador (carné o usuario y contraseña).'
-        : 'Un movimiento de caja necesita la autorización de un Supervisor o del Administrador (carné o usuario y contraseña).',
-      detail: `${this.movementKinds[this.kind]} de ${groupedNumber(this.amount)} COP · ${this.concept.trim()}`,
-      operatorUserName: cardActive ? '' : this.session.user()?.userName ?? '', requireDifferentUser: !cardActive, allowCredential: true,
-      onError: message => this.error.set(message),
-      run: credentials => this.submitMove(credentials) });
+    if (!this.validMoney(this.amount) || !this.concept.trim() || this.busy() || this.movementAsked) return;
+    const detail = `${this.movementKinds[this.kind]} de ${groupedNumber(this.amount)} COP · ${this.concept.trim()}`;
+    this.movementAsked = true;
+    try {
+      const operator = await this.operatorCard.ensure(detail);
+      if (!operator) return;
+      if (operator.shared) await this.refresh();
+      const role = operator.shared ? operator.role : this.loggedRole;
+      if (role === 'ADMINISTRADOR') { await this.submitMove(null, operator.sessionId); return; }
+      await this.authorization.open({ title: 'Autorizar movimiento de caja',
+        description: role === 'SUPERVISOR'
+          ? 'Un Supervisor registra movimientos de caja con la autorización del Administrador (carné o usuario y contraseña).'
+          : 'Un movimiento de caja necesita la autorización de un Supervisor o del Administrador (carné o usuario y contraseña).',
+        detail, operatorUserName: operator.shared ? '' : this.session.user()?.userName ?? '', requireDifferentUser: !operator.shared, allowCredential: true,
+        onError: message => this.error.set(message),
+        run: credentials => this.submitMove(credentials, operator.sessionId) });
+    } finally { this.movementAsked = false; }
   }
-  private get sellerIsSupervisor(): boolean {
-    const cash = this.state();
-    const cardRole = cash?.requiresOperatorSession ? cash.activeOperatorRole : null;
-    return cardRole ? cardRole === 'SUPERVISOR' : typeof this.session.hasRole === 'function' && this.session.hasRole('SUPERVISOR');
+  private get loggedRole(): string {
+    return this.isAdministrator ? 'ADMINISTRADOR' : typeof this.session.hasRole === 'function' && this.session.hasRole('SUPERVISOR') ? 'SUPERVISOR' : 'CAJERO';
   }
-  private async submitMove(credentials: AuthorizationCredentials | null): Promise<void> {
+  private async submitMove(credentials: AuthorizationCredentials | null, sessionId: string | null): Promise<void> {
     await this.run(async () => {
-      const movement = await this.api.movement(this.kind, this.amount, this.concept.trim(), this.state()?.ownOperatorSession?.id ?? null,
+      const movement = await this.api.movement(this.kind, this.amount, this.concept.trim(), sessionId,
         credentials ? authorizationBody(credentials) : null);
       this.amount = 0; this.concept = ''; this.notice.set('Movimiento registrado.');
       this.drawerNotice.set(cashDrawerNotice(movement.drawerStatus));

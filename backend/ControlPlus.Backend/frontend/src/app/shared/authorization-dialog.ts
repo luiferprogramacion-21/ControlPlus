@@ -1,4 +1,4 @@
-import { Component, inject, Injectable, OnDestroy, signal } from '@angular/core';
+import { Component, inject, Injectable, Injector, OnDestroy, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { AuthorizationBody, errorText } from '../core/api';
 import { SessionService } from '../core/session.service';
 import { toastSignal } from '../core/toast';
+import { OperatorCard, OperatorContext } from './operator-card';
 
 /** User name and password, or (userName/password empty) the Code 128 credential scanned from the authorizer's card. */
 export interface AuthorizationCredentials { userName: string; password: string; credentialToken?: string; }
@@ -29,6 +30,11 @@ export interface AuthorizationPrompt {
   allowCredential?: boolean;
   /** Roles that run the operation without a second authorizer (run receives null). Business limits and audit still apply on the server. */
   selfAuthorizedRoles?: string[];
+  /**
+   * La operación queda a nombre de quien opera (turno compartido: el dueño del carné). Si nadie ha pasado su carné, se pide
+   * antes de la autorización, y los roles que se autorizan solos se miden con el rol de ese dueño (25/11/2026).
+   */
+  operatorScoped?: boolean;
   /** Shows errors of the dialog-less path; without it they are rethrown. */
   onError?: (message: string) => void;
   run: (credentials: AuthorizationCredentials | null) => Promise<void>;
@@ -119,13 +125,27 @@ export class AuthorizationDialogComponent implements OnDestroy {
 export class AuthorizationDialog {
   private readonly dialog = inject(MatDialog);
   private readonly session = inject(SessionService);
+  /** Se obtiene al usarla: la mayoría de las autorizaciones no son de turno. */
+  private readonly injector = inject(Injector);
   private openDialog = false;
   /** True when the current user may run the operation without a second authorizer. */
   isSelfAuthorized(prompt: Pick<AuthorizationPrompt, 'selfAuthorizedRoles'>): boolean {
     return !!prompt.selfAuthorizedRoles?.length && this.session.hasRole(...prompt.selfAuthorizedRoles);
   }
   async open(prompt: AuthorizationPrompt): Promise<boolean> {
-    if (this.isSelfAuthorized(prompt)) {
+    if (this.openDialog) return false;
+    let selfAuthorized = this.isSelfAuthorized(prompt);
+    if (prompt.operatorScoped) {
+      this.openDialog = true;
+      let operator: OperatorContext | null;
+      try { operator = await this.injector.get(OperatorCard).ensure(prompt.detail); } finally { this.openDialog = false; }
+      if (!operator) return false;
+      if (operator.shared) {
+        selfAuthorized = !!operator.role && !!prompt.selfAuthorizedRoles?.includes(operator.role);
+        prompt = { ...prompt, operatorUserName: '', requireDifferentUser: false };
+      }
+    }
+    if (selfAuthorized) {
       if (this.openDialog) return false;
       this.openDialog = true;
       try { await prompt.run(null); return true; }

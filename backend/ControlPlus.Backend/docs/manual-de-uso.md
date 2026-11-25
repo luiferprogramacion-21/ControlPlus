@@ -141,6 +141,8 @@ Si quedó **una caja abierta del día anterior**, el sistema te lo avisa: hay qu
 
 **En turno compartido**, antes de vender cada persona se identifica: en el punto de venta aparece **«Escanee el carné del empleado»**. Cualquier empleado pasa **su propio carné**, sin cerrar la sesión que esté abierta en el computador: **la venta queda a nombre de quien pasó el carné** y solo puede hacer lo que su rol permite. Arriba, en «Operador», aparece quién está vendiendo. Cada venta confirmada **cierra esa sesión** y el punto de venta se bloquea para el siguiente. Si el carné no sirve (ajeno, vencido o dañado), el sistema lo explica y **no te saca del sistema**.
 
+Lo mismo pasa con las demás operaciones con dinero o productos (movimientos de caja, abonos, apartados, cambios, anulaciones y correcciones): si nadie ha pasado su carné, al pulsar el botón aparece **«Pasa tu carné»**. Pásalo y sigue: la operación queda a tu nombre y, si tu rol lo necesita, después se pide la autorización. **Cancelar** no registra nada.
+
 ## 2.3 Vender de contado
 
 Menú **Punto de venta**.
@@ -309,7 +311,7 @@ Igual que en 2.2, pero sin ventana de autorización. Al abrir eliges **Turno ind
 
 ## 3.3 Movimientos de caja
 
-En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto** o un **Retiro de efectivo** (dinero que se saca de la caja), con su **concepto**, y pulsa **Registrar movimiento**. Se pide la **autorización del Administrador** (su carné, o su usuario y contraseña); el Administrador registra los suyos sin autorización. Quedan en **Movimientos recientes** y en la auditoría queda quién autorizó. Si el cajón está conectado, se abre solo al registrar el movimiento.
+En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto** o un **Retiro de efectivo** (dinero que se saca de la caja), con su **concepto**, y pulsa **Registrar movimiento**. Se pide la **autorización del Administrador** (su carné, o su usuario y contraseña); el Administrador registra los suyos sin autorización. En turno compartido, si nadie ha pasado su carné, primero se pide el carné de quien hace el movimiento. Quedan en **Movimientos recientes** y en la auditoría queda quién autorizó. Si el cajón está conectado, se abre solo al registrar el movimiento.
 
 **Abrir el cajón sin una venta** (para dar cambio o revisar el efectivo): en **Caja**, bloque **Cajón de dinero**, escribe el **motivo**, pulsa **Abrir cajón** y confirma. Necesita la caja abierta. Queda registrado quién lo abrió, cuándo y por qué.
 
@@ -407,6 +409,7 @@ Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor*
 
   Lo recibido entra al inventario y actualiza el costo.
 - **Al enviar un pedido** se descarga solo su **PDF** para mandarlo al proveedor. En el pedido puedes volver a pulsar **Descargar PDF** o **Imprimir documento**.
+- En **Mercancía recibida**, cada pedido muestra **Recibir mercancía** (en azul) solo si todavía falta algo por recibir, y **Ver recepciones** si ya llegó algo.
 - **Si algo se recibió mal:** en **Mercancía recibida**, en el pedido, pulsa **Ver recepciones**; abre la entrega con **Ver detalle** y pulsa **Corregir recepción**. Te muestra cómo queda el pedido, eliges el motivo y pides la **autorización del Administrador**. Las unidades salen del inventario y vuelven a quedar pendientes en el pedido. Si esos productos ya se vendieron o se ajustaron después, la pantalla explica por qué no se puede deshacer.
 - No creas ni editas proveedores, ni anulas compras: eso es del Administrador.
 

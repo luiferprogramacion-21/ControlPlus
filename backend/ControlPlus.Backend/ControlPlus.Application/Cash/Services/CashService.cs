@@ -846,12 +846,12 @@ public sealed partial class CashService(
         else
         {
             if (request.OperatorSessionId is not Guid sessionId)
-                return Result.Failure<CashMovementDto>(ApplicationError.Conflict("El turno compartido requiere una sesión de operador activa."));
+                return Result.Failure<CashMovementDto>(SharedShift.CardRequired());
             session = await repository.GetOperatorSessionForUpdateAsync(sessionId, cancellationToken);
             if (session is not null && session.UsuarioId != actor.UserId)
                 return Result.Failure<CashMovementDto>(ApplicationError.Forbidden("La sesión de operador no pertenece al usuario autenticado."));
             if (session is null || !session.IsActive || session.TurnoCajaId != shift.Id || session.TerminalId != shift.TerminalId || session.UsuarioId != actor.UserId)
-                return Result.Failure<CashMovementDto>(ApplicationError.Conflict("La sesión de operador no está activa o no corresponde al turno, terminal y usuario."));
+                return Result.Failure<CashMovementDto>(SharedShift.CardRequired());
             session.FechaUltimoUso = clock.UtcNow.UtcDateTime;
         }
 

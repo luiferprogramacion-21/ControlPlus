@@ -11,6 +11,7 @@ import { SessionService } from '../../core/session.service';
 import { CustomersApi, Customer } from '../customers/customers-api';
 import { Icon } from '../../layout/icon';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
+import { OperatorCard } from '../../shared/operator-card';
 import { Credit, CreditPayment, CreditPaymentCancellationReason, CreditsApi, PaymentMethodInput } from './credits-api';
 import { statusKind, toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
@@ -23,6 +24,7 @@ export class Credits implements OnInit {
   private readonly api = inject(CreditsApi);
   private readonly customersApi = inject(CustomersApi);
   private readonly authorization = inject(AuthorizationDialog);
+  private readonly operatorCard = inject(OperatorCard);
   readonly session = inject(SessionService);
   readonly result = signal<Page<Credit> | null>(null);
   readonly selected = signal<Credit | null>(null);
@@ -137,6 +139,8 @@ export class Credits implements OnInit {
     if (fingerprint !== this.pendingFingerprint) { this.pendingKey = crypto.randomUUID(); this.pendingFingerprint = fingerprint; }
     this.saving.set(true); this.error.set('');
     try {
+      // 25/11/2026: en turno compartido el abono queda a nombre de quien pasa su carné; si nadie lo ha pasado, se pide antes.
+      if (!await this.operatorCard.ensure(`Abono de ${this.money(payments.reduce((sum, p) => sum + p.appliedAmount, 0))}`)) return;
       const result = await this.api.applyPayment(credit, payments, this.pendingKey!);
       this.pendingKey = null; this.pendingFingerprint = ''; this.dialog.set(false); this.notice.set('Abono registrado.');
       this.drawerNotice.set(cashDrawerNotice(result.drawerStatus));
@@ -171,7 +175,7 @@ export class Credits implements OnInit {
       description: 'Se restituirá el saldo y se registrará el reverso en el turno de Caja abierto. Si el abono usó varios medios, se anularán juntos.',
       detail: `${payment.number} · ${this.money(payment.appliedAmount)}`,
       operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true,
-      allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'],
+      allowCredential: true, selfAuthorizedRoles: ['ADMINISTRADOR'], operatorScoped: true,
       onError: message => this.error.set(message),
       run: credentials => this.submitCancellation(credit, payment, credentials),
     });

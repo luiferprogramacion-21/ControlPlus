@@ -673,6 +673,9 @@ app-root .cdk-overlay-popover { zoom: calc(1 / var(--cp-zoom)); }
 .payment-balance__remaining--over { background: var(--cp-error-soft) !important; }
 .payment-balance__remaining--over strong { color: var(--cp-error); }
 @container cp (max-width: 560px) { .payment-balance { grid-template-columns: 1fr; } }
+/* Acción principal de una fila (por ejemplo «Recibir mercancía»): resalta lo que se hace normalmente. */
+.table-action--primary { border-color: var(--cp-primary); background: var(--cp-primary); color: white; }
+.table-action--primary:hover:not(:disabled) { border-color: var(--cp-primary-hover); background: var(--cp-primary-hover); }
 .table-action--danger { color: var(--cp-error); }
 .table-action--danger:hover { border-color: var(--cp-error); background: #fdecec; }
 .plain-list { display: grid; gap: 0; margin: 14px 0 0; padding: 0; list-style: none; }

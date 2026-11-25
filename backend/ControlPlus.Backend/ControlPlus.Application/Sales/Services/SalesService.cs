@@ -133,7 +133,7 @@ public sealed partial class SalesService(
         {
             operatorSession = await repository.GetActiveOperatorSessionAsync(shift.Id, terminal.Id, actor.UserId, cancellationToken);
             if (operatorSession is null)
-                return Result.Failure<SaleDto>(ApplicationError.Conflict("La modalidad compartida exige una sesión activa del operador."));
+                return Result.Failure<SaleDto>(SharedShift.CardRequired());
         }
         else
         {

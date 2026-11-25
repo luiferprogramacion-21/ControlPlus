@@ -132,6 +132,8 @@ export class Purchases implements OnInit {
   async openReceipt(purchase: PurchaseSummary): Promise<void> { this.orderReceipts.set(null); await this.detail(purchase); }
   receivedTotal(order: OrderSummary): number { return order.lines?.reduce((sum, line) => sum + line.receivedQuantity, 0) ?? 0; }
   pendingTotal(order: OrderSummary): number { return this.requestedTotal(order) - this.receivedTotal(order); }
+  /** Solo se ofrece «Recibir mercancía» cuando el pedido tiene algo por recibir (no un botón apagado al lado de «Ver recepciones»). */
+  canReceiveOrder(order: OrderSummary): boolean { return this.canReceive && (order.status === 'ENVIADO' || order.status === 'RECIBIDO_PARCIAL') && this.pendingTotal(order) > 0; }
   async receiveOrder(order: OrderSummary): Promise<void> { await this.orderDetail(order); if (this.selectedOrder()?.id === order.id) this.startReceipt(); }
   filteredOrders(): OrderSummary[] {
     const term = this.orderSearch.trim().toLocaleLowerCase('es');

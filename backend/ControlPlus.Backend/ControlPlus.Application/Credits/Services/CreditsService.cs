@@ -144,7 +144,7 @@ public sealed partial class CreditsService(ICreditsRepository credits, ISalesRep
         else if (shift.ModoOperacion == CashConstants.SharedMode)
         {
             session = await sales.GetActiveOperatorSessionAsync(shift.Id, terminal.Id, actor.UserId, cancellationToken);
-            if (session is null) return Result.Failure<CreditPaymentOperationDto>(ApplicationError.Conflict("Se requiere sesión activa del operador."));
+            if (session is null) return Result.Failure<CreditPaymentOperationDto>(SharedShift.CardRequired());
         }
         else return Result.Failure<CreditPaymentOperationDto>(ApplicationError.Conflict("Modalidad de turno inválida."));
 
