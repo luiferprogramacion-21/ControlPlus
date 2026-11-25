@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using ControlPlus.Application.Common;
 using ControlPlus.Application.Sales.Contracts;
 using ControlPlus.Infrastructure.Persistence.Official;
 using Microsoft.EntityFrameworkCore;
@@ -139,7 +140,8 @@ public sealed partial class SalesApiFlowTests
             CashRequest(scenario.Products.Standard, 1, 1_000m));
         await AssertProblemAsync(rejected, HttpStatusCode.Conflict);
         using (var problem = JsonDocument.Parse(await rejected.Content.ReadAsStringAsync()))
-            Assert.Contains("sesión activa", problem.RootElement.GetProperty("title").GetString());
+            // 25/11/2026: el mensaje dice qué hacer cuando nadie ha pasado su carné en turno compartido.
+            Assert.Contains(SharedShift.CardRequiredMessage, problem.RootElement.GetProperty("title").GetString());
         Assert.Equal(beforeRejected, await ReadReceiptPersistenceStateAsync(db, scenario.Products.Standard));
 
         var rollbackSession = await StartSessionAsync(client, scenario.Admin.AccessToken,
