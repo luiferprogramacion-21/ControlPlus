@@ -141,7 +141,7 @@ Si quedó **una caja abierta del día anterior**, el sistema te lo avisa: hay qu
 
 **En turno compartido**, antes de vender cada persona se identifica: en el punto de venta aparece **«Escanee el carné del empleado»**. Cualquier empleado pasa **su propio carné**, sin cerrar la sesión que esté abierta en el computador: **la venta queda a nombre de quien pasó el carné** y solo puede hacer lo que su rol permite. Arriba, en «Operador», aparece quién está vendiendo. Cada venta confirmada **cierra esa sesión** y el punto de venta se bloquea para el siguiente. Si el carné no sirve (ajeno, vencido o dañado), el sistema lo explica y **no te saca del sistema**.
 
-Lo mismo pasa con las demás operaciones con dinero o productos (movimientos de caja, abonos, apartados, cambios, anulaciones y correcciones): si nadie ha pasado su carné, al pulsar el botón aparece **«Pasa tu carné»**. Pásalo y sigue: la operación queda a tu nombre y, si tu rol lo necesita, después se pide la autorización. **Cancelar** no registra nada.
+Lo mismo pasa con las demás operaciones con dinero o productos (movimientos de caja, abonos, apartados, cambios, anulaciones y correcciones): si nadie ha pasado su carné, al pulsar el botón aparece **«Pasa tu carné»**. Pásalo, o escribe tu **usuario y contraseña** si no tienes el carné a mano, y sigue: la operación queda a tu nombre y, si tu rol lo necesita, después se pide la autorización. Para entrar con usuario y contraseña igual necesitas tener un carné emitido. **Cancelar** no registra nada.
 
 ## 2.3 Vender de contado
 
@@ -311,7 +311,7 @@ Igual que en 2.2, pero sin ventana de autorización. Al abrir eliges **Turno ind
 
 ## 3.3 Movimientos de caja
 
-En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto** o un **Retiro de efectivo** (dinero que se saca de la caja), con su **concepto**, y pulsa **Registrar movimiento**. Se pide la **autorización del Administrador** (su carné, o su usuario y contraseña); el Administrador registra los suyos sin autorización. En turno compartido, si nadie ha pasado su carné, primero se pide el carné de quien hace el movimiento. Quedan en **Movimientos recientes** y en la auditoría queda quién autorizó. Si el cajón está conectado, se abre solo al registrar el movimiento.
+En **Caja**, bloque **Movimiento de caja**: registra un **Ingreso**, un **Gasto** o un **Retiro de efectivo** (dinero que se saca de la caja), con su **concepto**, y pulsa **Registrar movimiento**. Se pide la **autorización del Administrador** (su carné, o su usuario y contraseña), también para el Cajero: un Supervisor no autoriza movimientos de caja. El Administrador registra los suyos sin autorización. En turno compartido, si nadie ha pasado su carné, primero se pide el carné de quien hace el movimiento. Quedan en **Movimientos recientes** y en la auditoría queda quién autorizó. Si el cajón está conectado, se abre solo al registrar el movimiento.
 
 **Abrir el cajón sin una venta** (para dar cambio o revisar el efectivo): en **Caja**, bloque **Cajón de dinero**, escribe el **motivo**, pulsa **Abrir cajón** y confirma. Necesita la caja abierta. Queda registrado quién lo abrió, cuándo y por qué.
 
@@ -405,6 +405,7 @@ Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor*
 - **Pedir algo que aún no está en el sistema:** en el mismo pedido pulsa **+ Producto nuevo**, escribe el nombre, elige la categoría y la cantidad y pulsa **Agregar al pedido**. Queda creado en Catálogo con ese proveedor. El **precio de venta es opcional**: si aún no lo sabes, déjalo vacío. Mientras no tenga precio se ve como **Sin precio** y **no se puede vender**; el Administrador se lo pone al recibir la mercancía o en Catálogo.
 - **Cuando llega mercancía:** pulsa **Recibir mercancía** (también en Inicio). Son tres pasos, que se ven arriba de cada ventana: **1. ¿De dónde viene?**, **2. Productos y cantidades** y **3. Confirmar**. El sistema pregunta si viene de un pedido:
   - **Sí, viene de un pedido:** eliges el pedido; las cantidades pendientes **vienen listas**. Si llegó menos (recepción **parcial**), corrígelas.
+    En **Precio de venta**, cada producto trae marcada la casilla **Mismo precio**. Si el precio cambió, desmárcala y escribe el **precio nuevo** (o calcúlalo con el **% de ganancia**). Si eres Supervisor, al guardar se pide la **autorización del Administrador** (su carné, o su usuario y contraseña).
   - **No, es una compra sin pedido:** anotas el proveedor, el número de factura, los productos y sus costos.
 
   Lo recibido entra al inventario y actualiza el costo.

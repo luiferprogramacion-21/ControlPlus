@@ -1,9 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { Purchases } from './purchases';
 import { Purchase, PurchaseCorrectionPreparation, PurchasesApi } from './purchases-api';
-import { OrdersApi } from './orders-api';
+import { Order, OrdersApi } from './orders-api';
 import { SuppliersApi } from '../suppliers/suppliers-api';
-import { CatalogApi } from '../catalog/catalog-api';
+import { CatalogApi, Product } from '../catalog/catalog-api';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationDialog, AuthorizationPrompt } from '../../shared/authorization-dialog';
 
@@ -44,6 +44,43 @@ describe('Corrección de recepción de compra', () => {
     expect(component.orderReceipts()).toBeNull();
     expect(component.selectedPurchase()).toEqual(purchase);
     expect(component.canCorrectReceipt).toBe(true);
+  });
+
+  it('al recibir viene «Mismo precio»; el Supervisor pone un precio nuevo con la autorización del Administrador (25/11/2026)', async () => {
+    roles = ['SUPERVISOR']; permissions = ['PURCHASES.RECEIVE'];
+    const orders = TestBed.inject(OrdersApi) as unknown as Record<string, unknown>;
+    const receive = vi.fn().mockResolvedValue({ purchase, orderId: 'order', orderStatus: 'RECIBIDO_COMPLETO', orderVersion: 3 });
+    const order = { id: 'order', visibleNumber: 'PED-1', supplierId: 's', status: 'ENVIADO', version: 2,
+      lines: [{ id: 'l1', productId: 'p1', productName: 'Bolso', requestedQuantity: 2, receivedQuantity: 0, pendingQuantity: 2, estimatedUnitCost: 3000 }] } as unknown as Order;
+    orders['receive'] = receive; orders['get'] = vi.fn().mockResolvedValue(order); orders['list'] = vi.fn().mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    component.products.set([{ id: 'p1', name: 'Bolso', retailPrice: 5000 } as unknown as Product]);
+    component.selectedOrder.set(order);
+    component.startReceipt();
+    const line = component.receipt.lines[0];
+    expect(component.canSetReceiptPrice).toBe(true);
+    expect(component.newPrice['l1']).toBeFalsy();
+    expect(line.newRetailPrice).toBeNull();
+
+    component.setSamePrice(line, false);
+    expect(line.newRetailPrice).toBe(5000);
+    line.newRetailPrice = null;
+    expect(component.receiptValidation()).toContain('Escribe el precio nuevo de Bolso');
+    line.newRetailPrice = 6000;
+    await component.receive();
+    expect(prompt?.title).toBe('Autorizar precio de venta nuevo');
+    expect(prompt?.detail).toBe('Bolso: 5.000 → 6.000');
+    expect(receive).not.toHaveBeenCalled();
+    await prompt!.run({ userName: 'admin', password: 'clave' });
+    expect(receive).toHaveBeenCalledWith(order, expect.any(String), expect.objectContaining({
+      authorization: { userName: 'admin', password: 'clave' },
+      lines: [expect.objectContaining({ orderLineId: 'l1', quantity: 2, newRetailPrice: 6000 })] }));
+
+    // Con «Mismo precio» marcado no se envía precio ni se pide autorización.
+    receive.mockClear(); prompt = null;
+    component.selectedOrder.set(order); component.startReceipt();
+    await component.receive();
+    expect(prompt).toBeNull();
+    expect(receive).toHaveBeenCalledWith(order, expect.any(String), expect.objectContaining({ lines: [expect.objectContaining({ newRetailPrice: null })] }));
   });
 
   it('ofrece «Recibir mercancía» solo si falta algo por recibir (pruebas del usuario del 25/11/2026)', () => {

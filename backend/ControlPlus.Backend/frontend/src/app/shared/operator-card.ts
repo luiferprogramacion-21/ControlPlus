@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
-import { errorText } from '../core/api';
+import { errorText, reasonOr } from '../core/api';
 import { toastSignal } from '../core/toast';
 import { CashApi, CashState } from '../features/cash/cash-api';
 
@@ -31,6 +31,11 @@ export interface OperatorContext {
           <label for="operator-card-scan">Carné de quien hace la operación</label>
           <input id="operator-card-scan" class="text-field" type="password" name="scan" [(ngModel)]="token" autocomplete="off" cdkFocusInitial
             placeholder="Pase el carné por el lector" [disabled]="busy()">
+          <p class="scan-hint">o escribe tu usuario y tu contraseña:</p>
+          <label for="operator-card-user">Usuario</label>
+          <input id="operator-card-user" class="text-field" name="user" [(ngModel)]="userName" autocomplete="off" [disabled]="busy()">
+          <label for="operator-card-password">Contraseña</label>
+          <input id="operator-card-password" class="text-field" type="password" name="password" [(ngModel)]="password" autocomplete="off" [disabled]="busy()">
         </form>
         @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
         @if (busy()) { <p role="status">Revisando el carné…</p> }
@@ -47,6 +52,8 @@ export interface OperatorContext {
     label { font-weight:600; margin-top:6px; }
     .text-field { width:100%; box-sizing:border-box; }
     .field-error { color:var(--cp-error); }
+    form { display:grid; gap:6px; }
+    .scan-hint { margin:6px 0 0; color:var(--cp-text-muted, inherit); font-size:.9em; }
   `],
 })
 export class OperatorCardDialogComponent {
@@ -56,23 +63,32 @@ export class OperatorCardDialogComponent {
   readonly busy = signal(false);
   readonly error = toastSignal('error');
   token = '';
+  userName = '';
+  password = '';
 
   constructor() { this.ref.keydownEvents().subscribe(event => { if (event.key === 'Escape') this.cancel(); }); }
 
-  cancel(): void { if (this.busy()) return; this.token = ''; this.ref.close(false); }
-  /** El lector escribe el código y pulsa Enter: se inicia la sesión de quien pasó el carné. */
+  cancel(): void { if (this.busy()) return; this.token = ''; this.password = ''; this.ref.close(false); }
+  /**
+   * El lector escribe el código y pulsa Enter: se inicia la sesión de quien pasó el carné. Sin carné, se usan el usuario y la
+   * contraseña escritos (25/11/2026).
+   */
   async submit(): Promise<void> {
     const token = this.token.trim();
+    const userName = this.userName.trim();
     if (this.busy()) return;
-    if (!token) { this.error.set('Pasa tu carné por el lector.'); return; }
+    if (!token && (!userName || !this.password)) { this.error.set('Pasa tu carné por el lector, o escribe tu usuario y tu contraseña.'); return; }
     this.busy.set(true); this.error.set(''); this.ref.disableClose = true;
     try {
-      await this.cash.startSession(token);
-      this.token = ''; this.ref.close(true);
+      if (token) await this.cash.startSession(token);
+      else await this.cash.startSessionWithPassword(userName, this.password);
+      this.token = ''; this.password = ''; this.ref.close(true);
     } catch (error) {
-      this.token = '';
-      this.error.set(error instanceof HttpErrorResponse && error.status === 401
-        ? 'El carné no es válido, fue reemplazado o venció. Pásalo de nuevo o pide uno nuevo al Administrador.' : errorText(error));
+      const unauthorized = error instanceof HttpErrorResponse && error.status === 401;
+      this.error.set(!unauthorized ? errorText(error) : token
+        ? 'El carné no es válido, fue reemplazado o venció. Pásalo de nuevo o pide uno nuevo al Administrador.'
+        : reasonOr(error, 'Usuario o contraseña incorrectos.') + ' Recuerda: 5 intentos fallidos bloquean al usuario.');
+      this.token = ''; this.password = '';
     } finally { this.busy.set(false); this.ref.disableClose = false; }
   }
 }

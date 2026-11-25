@@ -682,6 +682,17 @@ public sealed partial class CashService(
     {
         var error = await RequireAsync(actor, PermissionCodes.CashOwnRead, cancellationToken);
         if (error is not null) return Result.Failure<OperatorSessionDto>(error);
+        // Pruebas del usuario del 25/11/2026: quien opera también puede escribir su usuario y contraseña en lugar del carné.
+        if (!string.IsNullOrWhiteSpace(request?.UserName) || !string.IsNullOrEmpty(request?.Password))
+        {
+            if (!string.IsNullOrWhiteSpace(request!.CredentialToken))
+                return Result.Failure<OperatorSessionDto>(Validation("Pase el carné o escriba usuario y contraseña, no ambos."));
+            if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrEmpty(request.Password))
+                return Result.Failure<OperatorSessionDto>(Validation("Escriba el usuario y la contraseña de quien hace la operación."));
+            var userName = request.UserName.Trim();
+            return await loginAttemptCoordinator.ExecuteAsync(userName.ToUpperInvariant(),
+                token => StartPasswordOperatorSessionAsync(actor, userName, request.Password, token), cancellationToken);
+        }
         if (request is null || string.IsNullOrWhiteSpace(request.CredentialToken))
             return Result.Failure<OperatorSessionDto>(Validation("La credencial Code 128 es obligatoria."));
 
@@ -718,6 +729,52 @@ public sealed partial class CashService(
         // The owner must be an active, unlocked user (the snapshot excludes inactive and locked accounts).
         if (await userRepository.GetAuthorizationSnapshotAsync(credential.UsuarioId, cancellationToken) is null)
             return Result.Failure<OperatorSessionDto>(ApplicationError.Unauthorized("El dueño de este carné está inactivo o bloqueado."));
+        var started = await OpenOperatorSessionAsync(actor, shift, credential, "CARNE", now, cancellationToken);
+        if (started.IsSuccess) await transaction.CommitAsync(cancellationToken);
+        return started;
+    }
+
+    /// <summary>
+    /// Sesión de operador con usuario y contraseña (25/11/2026). Corre dentro del coordinador de intentos de inicio de sesión:
+    /// una contraseña errada guarda su intento fallido (5 bloquean al usuario), como al ingresar al sistema.
+    /// </summary>
+    private async Task<Result<OperatorSessionDto>> StartPasswordOperatorSessionAsync(
+        ActorContext actor, string userName, string password, CancellationToken cancellationToken)
+    {
+        var shift = await repository.GetOpenShiftAsync(true, cancellationToken);
+        if (shift is null) return Result.Failure<OperatorSessionDto>(ApplicationError.NotFound("un turno abierto"));
+        if (shift.ModoOperacion != CashConstants.SharedMode)
+            return Result.Failure<OperatorSessionDto>(ApplicationError.Conflict("Las sesiones rápidas solo están disponibles en turnos compartidos."));
+        var invalid = ApplicationError.Unauthorized("Usuario o contraseña incorrectos.");
+        var user = await userRepository.GetByUserNameAsync(userName, cancellationToken);
+        if (user is null) return Result.Failure<OperatorSessionDto>(invalid);
+        user = await repository.GetUserForUpdateAsync(user.Id, cancellationToken) ?? user;
+        var now = clock.UtcNow;
+        if (!passwordHasher.Verify(password, user.PasswordHash))
+        {
+            var wasLocked = user.RegisterFailedLogin(now);
+            await userRepository.UpdateAsync(user, cancellationToken);
+            if (wasLocked)
+                await AuditWriter.WriteAsync(auditRepository, clock, user.Id, AuditAction.UserLocked, nameof(Usuario), user.Id,
+                    new { user.UserName, FailedLoginAttempts = user.FailedLoginAttempts }, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result.Failure<OperatorSessionDto>(invalid);
+        }
+        if (!user.IsActive || await userRepository.GetAuthorizationSnapshotAsync(user.Id, cancellationToken) is null)
+            return Result.Failure<OperatorSessionDto>(ApplicationError.Unauthorized("Ese usuario está inactivo o bloqueado."));
+        var credential = await repository.GetActiveCredentialForUserAsync(user.Id, forUpdate: true, cancellationToken);
+        if (credential is null || credential.FormatoCodigo != "CODE128" ||
+            (credential.FechaVencimiento is not null && credential.FechaVencimiento <= now.UtcDateTime))
+            return Result.Failure<OperatorSessionDto>(ApplicationError.Conflict(
+                "Ese usuario no tiene carné vigente. El Administrador puede emitírselo en Administración → Usuarios → Carné."));
+        user.RegisterSuccessfulLogin(now);
+        await userRepository.UpdateAsync(user, cancellationToken);
+        return await OpenOperatorSessionAsync(actor, shift, credential, "CONTRASENA", now, cancellationToken);
+    }
+
+    private async Task<Result<OperatorSessionDto>> OpenOperatorSessionAsync(ActorContext actor, TurnoCaja shift,
+        CredencialUsuario credential, string method, DateTimeOffset now, CancellationToken cancellationToken)
+    {
         if (await repository.GetActiveOperatorSessionForUpdateAsync(shift.TerminalId, cancellationToken) is not null)
             return Result.Failure<OperatorSessionDto>(ApplicationError.Conflict("La terminal ya tiene una sesión de operador activa."));
 
@@ -731,10 +788,9 @@ public sealed partial class CashService(
         };
         await repository.AddOperatorSessionAsync(session, cancellationToken);
         await AuditWriter.WriteCashAsync(auditRepository, clock, actor.UserId, AuditAction.OperatorSessionStarted,
-            nameof(SesionOperador), session.Id, new { session.TurnoCajaId, session.TerminalId, credential.FragmentoVisible, OperatorUserId = session.UsuarioId },
+            nameof(SesionOperador), session.Id, new { session.TurnoCajaId, session.TerminalId, credential.FragmentoVisible, OperatorUserId = session.UsuarioId, IdentifiedWith = method },
             correlationId, null, session.Id, session.TerminalId, null, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
         return Result.Success(Map(session));
     }
 
@@ -776,8 +832,8 @@ public sealed partial class CashService(
             return Result.Failure<CashMovementDto>(Validation("El concepto es obligatorio y admite hasta 500 caracteres."));
 
         // Pruebas del usuario del 24/11/2026 (punto 13): todo movimiento manual (ingreso, gasto o retiro) pide autorizador.
-        // El Administrador lo registra solo; el Supervisor, con el Administrador; el Cajero con permiso, con un Supervisor o el
-        // Administrador. Es la misma jerarquía de las demás autorizaciones.
+        // El Administrador lo registra solo. 25/11/2026: el Supervisor y también el Cajero con permiso necesitan al
+        // Administrador; un Supervisor no autoriza movimientos de caja.
         var actorLevel = (await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken))?.HighestRoleLevel;
         if (actorLevel == RoleLevel.Administrador)
         {
@@ -790,9 +846,8 @@ public sealed partial class CashService(
         }
 
         if (request.Authorization is null)
-            return Result.Failure<CashMovementDto>(ApplicationError.Forbidden(actorLevel == RoleLevel.Supervisor
-                ? "Para registrar un movimiento de caja, un Supervisor necesita la autorización del Administrador (carné o usuario y contraseña)."
-                : "Para registrar un movimiento de caja se necesita la autorización de un Supervisor o del Administrador (carné o usuario y contraseña)."));
+            return Result.Failure<CashMovementDto>(ApplicationError.Forbidden(
+                "Para registrar un movimiento de caja se necesita la autorización del Administrador (carné o usuario y contraseña)."));
         if (request.Authorization.UsesCredential())
         {
             if (request.Authorization.MixesCredentialWithPassword())
@@ -823,7 +878,7 @@ public sealed partial class CashService(
         Usuario? authorizer = null;
         if (needsAuthorization)
         {
-            var validated = await ValidateAuthorizerAsync(actor, request.Authorization, cancellationToken);
+            var validated = await ValidateAuthorizerAsync(actor, request.Authorization, cancellationToken, administratorOnly: true);
             if (validated.IsFailure)
             {
                 await AuditWriter.WriteCashFailureAsync(auditRepository, clock, actor.UserId,
@@ -900,10 +955,12 @@ public sealed partial class CashService(
         return Result.Success(Map(movement));
     }
 
+    /// <param name="administratorOnly">Solo el Administrador autoriza (movimientos de caja, 25/11/2026).</param>
     private async Task<Result<Usuario>> ValidateAuthorizerAsync(
         ActorContext actor,
         IAuthorizerCredentials? request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool administratorOnly = false)
     {
         if (request is null || !request.IsComplete())
             return Result.Failure<Usuario>(ApplicationError.Forbidden("Se requieren credenciales de autorización."));
@@ -918,6 +975,8 @@ public sealed partial class CashService(
         if (!RoleHierarchy.IsHigherThan(user.HighestRoleLevel,
             (await userRepository.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken))!.HighestRoleLevel))
             return Result.Failure<Usuario>(ApplicationError.AuthorizerRoleInsufficient());
+        if (administratorOnly && user.HighestRoleLevel != RoleLevel.Administrador)
+            return Result.Failure<Usuario>(ApplicationError.Forbidden("Los movimientos de caja solo los autoriza el Administrador (su carné, o su usuario y contraseña)."));
         var now = clock.UtcNow;
         if (!request.UsesCredential() && !passwordHasher.Verify(request.Password!, user.PasswordHash))
         {

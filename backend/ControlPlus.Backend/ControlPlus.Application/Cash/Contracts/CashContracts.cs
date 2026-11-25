@@ -154,7 +154,11 @@ public sealed record IssuedOperatorCredentialDto(
     DateTimeOffset IssuedAtUtc,
     DateTimeOffset? ExpiresAtUtc);
 
-public sealed record StartOperatorSessionRequest(string CredentialToken);
+/// <summary>
+/// Carné escaneado, o (25/11/2026) usuario y contraseña de quien hace la operación. La sesión siempre queda unida al carné
+/// vigente de esa persona: la base exige un carné en cada sesión de operador.
+/// </summary>
+public sealed record StartOperatorSessionRequest(string? CredentialToken, string? UserName = null, string? Password = null);
 
 public sealed record OperatorSessionDto(
     Guid Id,

@@ -255,7 +255,7 @@ describe('Cajón de dinero en Caja', () => {
     screen.kind = 'cash-drops'; screen.amount = 20000; screen.concept = 'Retiro para el banco';
     await screen.move();
     expect(authorize).toHaveBeenCalledWith(expect.objectContaining({ title: 'Autorizar movimiento de caja',
-      description: expect.stringContaining('autorización del Administrador'), detail: 'Retiro de efectivo de 20.000 COP · Retiro para el banco',
+      description: expect.stringContaining('los autoriza el Administrador'), detail: 'Retiro de efectivo de 20.000 COP · Retiro para el banco',
       requireDifferentUser: true, allowCredential: true }));
     expect(api.movement).toHaveBeenCalledWith('cash-drops', 20000, 'Retiro para el banco', null, { userName: 'admin', password: 'clave' });
     expect(screen.notice()).toBe('Movimiento registrado.');
@@ -267,7 +267,7 @@ describe('Cajón de dinero en Caja', () => {
     screen.kind = 'incomes'; screen.amount = 1000; screen.concept = 'Base';
     await screen.move();
     expect(ensure).toHaveBeenCalledWith('Ingreso de 1.000 COP · Base');
-    expect(authorize).toHaveBeenCalledWith(expect.objectContaining({ requireDifferentUser: false, description: expect.stringContaining('Supervisor o del Administrador') }));
+    expect(authorize).toHaveBeenCalledWith(expect.objectContaining({ requireDifferentUser: false, description: expect.stringContaining('los autoriza el Administrador') }));
     expect(api.movement).toHaveBeenCalledWith('incomes', 1000, 'Base', 'session-1', { userName: 'admin', password: 'clave' });
     expect(screen.state()?.ownOperatorSession?.id).toBe('session-1');
   });

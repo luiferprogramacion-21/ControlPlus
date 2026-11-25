@@ -29,7 +29,7 @@ export class OrdersApi {
     } catch (error) { throw await readableError(error); }
   }
   send(order: Order): Promise<Order> { return firstValueFrom(this.http.post<Order>(`/api/purchase-orders/${order.id}/send`, { expectedVersion: order.version })); }
-  receive(order: Order, key: string, input: Omit<ReceiptInput, 'expectedOrderVersion'>): Promise<{ purchase: Purchase; orderId: string; orderStatus: string; orderVersion: number }> { return firstValueFrom(this.http.post<{ purchase: Purchase; orderId: string; orderStatus: string; orderVersion: number }>(`/api/purchase-orders/${order.id}/receipts`, { ...input, expectedOrderVersion: order.version }, { headers: { 'Idempotency-Key': key } })); }
+  receive(order: Order, key: string, input: Omit<ReceiptInput, 'expectedOrderVersion'>): Promise<{ purchase: Purchase; orderId: string; orderStatus: string; orderVersion: number }> { return firstValueFrom(this.http.post<{ purchase: Purchase; orderId: string; orderStatus: string; orderVersion: number }>(`/api/purchase-orders/${order.id}/receipts`, { ...input, expectedOrderVersion: order.version }, { headers: { 'Idempotency-Key': key }, ...(input.authorization ? { context: authorizationContext() } : {}) })); }
   closeReasons(): Promise<OrderReason[]> { return firstValueFrom(this.http.get<OrderReason[]>('/api/purchase-orders/reasons/close')); }
   cancelReasons(): Promise<OrderReason[]> { return firstValueFrom(this.http.get<OrderReason[]>('/api/purchase-orders/reasons/cancel')); }
   close(order: Order, input: OrderTransitionInput): Promise<Order> { return firstValueFrom(this.http.post<Order>(`/api/purchase-orders/${order.id}/close`, { expectedVersion: order.version, ...input }, { context: input.authorization ? authorizationContext() : undefined })); }

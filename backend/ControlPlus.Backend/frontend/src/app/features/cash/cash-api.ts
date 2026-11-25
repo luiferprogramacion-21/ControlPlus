@@ -65,5 +65,9 @@ export class CashApi {
   }
   /** Un carné inválido responde 401: se marca como intento de credencial para no cerrar la sesión del operador. */
   startSession(credentialToken: string): Promise<OperatorSession> { return firstValueFrom(this.http.post<OperatorSession>('/api/cash/operator-sessions', { credentialToken }, { context: authorizationContext() })); }
+  /** 25/11/2026: quien opera también se identifica con su usuario y contraseña; la sesión queda unida a su carné vigente. */
+  startSessionWithPassword(userName: string, password: string): Promise<OperatorSession> {
+    return firstValueFrom(this.http.post<OperatorSession>('/api/cash/operator-sessions', { credentialToken: null, userName, password }, { context: authorizationContext() }));
+  }
   endSession(id: string): Promise<OperatorSession> { return firstValueFrom(this.http.post<OperatorSession>(`/api/cash/operator-sessions/${id}/close`, {})); }
 }

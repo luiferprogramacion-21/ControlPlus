@@ -224,7 +224,7 @@ export class Cash implements OnInit {
   }
   /**
    * Pruebas del usuario del 24/11/2026 (punto 13): todo movimiento (ingreso, gasto o retiro) pide autorizador. El Administrador
-   * lo registra solo; el Supervisor, con el Administrador; el Cajero con permiso, con un Supervisor o el Administrador.
+   * lo registra solo; el Supervisor y (25/11/2026) también el Cajero con permiso, con el Administrador.
    * 25/11/2026: el botón ya no se bloquea en turno compartido. Si nadie ha pasado su carné, se pide antes de la autorización y
    * decide el rol de su dueño, porque el movimiento queda a su nombre.
    */
@@ -240,10 +240,9 @@ export class Cash implements OnInit {
       if (operator.shared) await this.refresh();
       const role = operator.shared ? operator.role : this.loggedRole;
       if (role === 'ADMINISTRADOR') { await this.submitMove(null, operator.sessionId); return; }
+      // 25/11/2026: los movimientos de caja solo los autoriza el Administrador, también los del Cajero.
       await this.authorization.open({ title: 'Autorizar movimiento de caja',
-        description: role === 'SUPERVISOR'
-          ? 'Un Supervisor registra movimientos de caja con la autorización del Administrador (carné o usuario y contraseña).'
-          : 'Un movimiento de caja necesita la autorización de un Supervisor o del Administrador (carné o usuario y contraseña).',
+        description: 'Los movimientos de caja los autoriza el Administrador (su carné, o su usuario y contraseña).',
         detail, operatorUserName: operator.shared ? '' : this.session.user()?.userName ?? '', requireDifferentUser: !operator.shared, allowCredential: true,
         onError: message => this.error.set(message),
         run: credentials => this.submitMove(credentials, operator.sessionId) });

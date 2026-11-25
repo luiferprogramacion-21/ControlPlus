@@ -259,12 +259,12 @@ public sealed partial class CashApiFlowTests
         var login = await LoginAsync(cashier, CashierUserName, CashierPassword);
         SetBearer(cashier, login.AccessToken);
         Assert.Equal(HttpStatusCode.Created, (await cashier.PostAsJsonAsync("/api/cash/movements/incomes",
-            new CreateCashMovementRequest(1m, "Sesión propia activa", sessions.OwnId, SupervisorMovementAuthorization))).StatusCode);
+            new CreateCashMovementRequest(1m, "Sesión propia activa", sessions.OwnId, AdministratorMovementAuthorization))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await cashier.PostAsJsonAsync("/api/cash/movements/incomes",
-            new CreateCashMovementRequest(1m, "Sesión ajena manipulada", sessions.OtherId, SupervisorMovementAuthorization))).StatusCode);
+            new CreateCashMovementRequest(1m, "Sesión ajena manipulada", sessions.OtherId, AdministratorMovementAuthorization))).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await cashier.PostAsync($"/api/cash/operator-sessions/{sessions.OwnId}/close", null)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await cashier.PostAsJsonAsync("/api/cash/movements/incomes",
-            new CreateCashMovementRequest(1m, "Mismo JWT y permiso; sesión cerrada", sessions.OwnId, SupervisorMovementAuthorization))).StatusCode);
+            new CreateCashMovementRequest(1m, "Mismo JWT y permiso; sesión cerrada", sessions.OwnId, AdministratorMovementAuthorization))).StatusCode);
         await using var scope = _factory!.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         Assert.Equal(1, await context.MovimientoCaja.CountAsync(x => x.SesionOperadorId == sessions.OwnId));

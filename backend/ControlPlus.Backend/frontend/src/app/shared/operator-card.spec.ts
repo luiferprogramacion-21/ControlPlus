@@ -53,7 +53,7 @@ describe('Carné de quien opera en turno compartido (pruebas del usuario del 25/
 describe('Ventana «Pasa tu carné»', () => {
   const close = vi.fn();
   const ref = { close, disableClose: false, keydownEvents: () => of() };
-  const api = { startSession: vi.fn() };
+  const api = { startSession: vi.fn(), startSessionWithPassword: vi.fn() };
   const create = () => {
     TestBed.configureTestingModule({ providers: [
       { provide: MAT_DIALOG_DATA, useValue: { detail: 'Ingreso de 5.000 COP' } },
@@ -86,10 +86,32 @@ describe('Ventana «Pasa tu carné»', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  it('sin carné, quien opera escribe su usuario y contraseña (25/11/2026)', async () => {
+    const fixture = create(); const component = fixture.componentInstance;
+    expect(fixture.nativeElement.textContent).toContain('o escribe tu usuario y tu contraseña');
+    api.startSessionWithPassword.mockResolvedValue({ id: 's1', state: 'ACTIVA' });
+    component.userName = ' cajera '; component.password = '1234';
+    await component.submit();
+    expect(api.startSessionWithPassword).toHaveBeenCalledWith('cajera', '1234');
+    expect(api.startSession).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledWith(true);
+    expect(component.password).toBe('');
+  });
+
+  it('una contraseña errada se explica y recuerda el bloqueo', async () => {
+    const component = create().componentInstance;
+    api.startSessionWithPassword.mockRejectedValue(new HttpErrorResponse({ status: 401, error: { title: 'Usuario o contraseña incorrectos.' } }));
+    component.userName = 'cajera'; component.password = '0000';
+    await component.submit();
+    expect(component.error()).toContain('Usuario o contraseña incorrectos.');
+    expect(component.error()).toContain('5 intentos fallidos');
+    expect(close).not.toHaveBeenCalled();
+  });
+
   it('sin carné pide pasarlo y cancelar cierra sin abrir sesión', async () => {
     const component = create().componentInstance;
     await component.submit();
-    expect(component.error()).toBe('Pasa tu carné por el lector.');
+    expect(component.error()).toBe('Pasa tu carné por el lector, o escribe tu usuario y tu contraseña.');
     component.cancel();
     expect(api.startSession).not.toHaveBeenCalled();
     expect(close).toHaveBeenCalledWith(false);

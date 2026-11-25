@@ -102,6 +102,12 @@
 
 /* Acciones de «Mercancía recibida» (pruebas del usuario del 25 de noviembre de 2026): una al lado de la otra y con espacio. */
 .receipt-row-actions { white-space:nowrap; }
+/* «Mismo precio» o precio nuevo al recibir (pruebas del usuario del 25 de noviembre de 2026). */
+.receipt-price { min-width:190px; }
+.same-price { display:inline-flex; align-items:center; gap:8px; font-weight:600; white-space:nowrap; cursor:pointer; }
+.same-price input { width:18px; height:18px; }
+.receipt-price__new { display:grid; gap:6px; margin-top:8px; }
+.receipt-price__new .field-label { margin:0; }
 .receipt-row-actions > .table-action + .table-action { margin-left:8px; }
 
 /* Producto nuevo desde el pedido (punto 17 de la auditoría, 24 de noviembre de 2026). */

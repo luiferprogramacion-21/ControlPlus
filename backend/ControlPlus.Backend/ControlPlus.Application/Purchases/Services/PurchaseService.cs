@@ -760,8 +760,18 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             return Result.Failure<PurchaseReceiptDto>(ApplicationError.NotFound("uno o más productos activos"));
         var prepared = Prepare(input.Lines!, input.VatMode!, products);
         if (prepared.Error is not null) return Result.Failure<PurchaseReceiptDto>(prepared.Error);
-        if (RequestsRetailPriceChange(prepared.Lines!) && !await CanChangeRetailPriceAsync(actor.UserId, ct))
-            return Denied<PurchaseReceiptDto>();
+        // D5 en la recepción de un pedido (pruebas del usuario del 25/11/2026): el Administrador cambia el precio de venta
+        // solo; el Supervisor, con la autorización del Administrador (carné o usuario y contraseña). Nadie más lo cambia.
+        var retailPriceRequested = RequestsRetailPriceChange(prepared.Lines!);
+        var priceByActor = retailPriceRequested && await CanChangeRetailPriceAsync(actor.UserId, ct);
+        if (retailPriceRequested && !priceByActor)
+        {
+            if ((await users.GetAuthorizationSnapshotAsync(actor.UserId, ct))?.HighestRoleLevel != RoleLevel.Supervisor)
+                return Denied<PurchaseReceiptDto>();
+            if (request.Authorization is null || !request.Authorization.IsComplete())
+                return Result.Failure<PurchaseReceiptDto>(ApplicationError.Forbidden(
+                    "Para cambiar el precio de venta al recibir, el Supervisor necesita la autorización del Administrador (carné o usuario y contraseña)."));
+        }
         var number = checked(sequence.UltimoNumero + 1);
         var document = input.Document ?? $"{InternalDocumentPrefix}{installation.Id:N}-{sequence.Prefijo}-{sequence.Serie}-{number}";
         if (document.Length > 100 || await repository.DocumentExistsAsync(supplier.Id, document, null, ct))
@@ -772,6 +782,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             (long)byLine[x.OrderLineId].CantidadRecibida + x.Quantity > byLine[x.OrderLineId].CantidadSolicitada);
         var correlation = Guid.CreateVersion7();
         AutorizacionOperacion? authorization = null;
+        AutorizacionOperacion? priceAuthorization = null;
+        Usuario? verifiedAuthorizer = null;
         var administratorSelfAuthorized = false;
         if (exceptional)
         {
@@ -809,6 +821,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             {
                 authorizer.RegisterSuccessfulLogin(clock.UtcNow);
                 await users.UpdateAsync(authorizer, ct);
+                verifiedAuthorizer = authorizer;
             }
             var authTime = clock.UtcNow.UtcDateTime;
             authorization = new AutorizacionOperacion { Id = Guid.CreateVersion7(),
@@ -822,6 +835,53 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                 Estado = "UTILIZADA", FechaSolicitud = authTime, FechaExpiracion = authTime.AddMinutes(5),
                 FechaUtilizacion = authTime };
             await repository.AddAuthorizationAsync(authorization, ct);
+        }
+        if (retailPriceRequested && !priceByActor)
+        {
+            // Las mismas credenciales ya verificadas para una recepción excepcional sirven si son de un Administrador.
+            var priceAuthorizer = verifiedAuthorizer;
+            if (priceAuthorizer is null)
+            {
+                var found = await users.GetByUserNameAsync(request.Authorization!.UserName!.Trim(), ct);
+                if (found is null)
+                {
+                    await RejectReceiptAuthorizationAsync(actor.UserId, orderId, correlation, terminal.Id, ct);
+                    return Result.Failure<PurchaseReceiptDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+                }
+                priceAuthorizer = await repository.GetUserForUpdateAsync(found.Id, ct) ?? found;
+                if (priceAuthorizer.IsActive && priceAuthorizer.Id != actor.UserId &&
+                    await CanChangeRetailPriceAsync(priceAuthorizer.Id, ct) &&
+                    !request.Authorization.UsesCredential() && !passwords.Verify(request.Authorization.Password!, priceAuthorizer.PasswordHash))
+                {
+                    var locked = priceAuthorizer.RegisterFailedLogin(clock.UtcNow);
+                    await users.UpdateAsync(priceAuthorizer, ct);
+                    if (locked) await AuditWriter.WriteAsync(audit, clock, priceAuthorizer.Id, AuditAction.UserLocked,
+                        nameof(Usuario), priceAuthorizer.Id, new { priceAuthorizer.Id, priceAuthorizer.FailedLoginAttempts }, ct);
+                    await RejectReceiptAuthorizationAsync(actor.UserId, orderId, correlation, terminal.Id, ct);
+                    return Result.Failure<PurchaseReceiptDto>(ApplicationError.Unauthorized("Credenciales de autorización inválidas."));
+                }
+            }
+            if (!priceAuthorizer.IsActive || priceAuthorizer.Id == actor.UserId || !await CanChangeRetailPriceAsync(priceAuthorizer.Id, ct))
+                return Result.Failure<PurchaseReceiptDto>(ApplicationError.Forbidden(
+                    "Solo un Administrador con permiso vigente puede autorizar el cambio del precio de venta."));
+            var pricePermission = await permissions.GetByCodeAsync(PermissionCodes.ProductsSensitiveUpdate, ct);
+            if (pricePermission is null)
+                return Result.Failure<PurchaseReceiptDto>(ApplicationError.Conflict("El permiso de cambio de precio no está disponible."));
+            if (verifiedAuthorizer is null)
+            {
+                priceAuthorizer.RegisterSuccessfulLogin(clock.UtcNow);
+                await users.UpdateAsync(priceAuthorizer, ct);
+            }
+            var priceTime = clock.UtcNow.UtcDateTime;
+            priceAuthorization = new AutorizacionOperacion { Id = Guid.CreateVersion7(),
+                UsuarioSolicitanteId = actor.UserId, UsuarioAutorizadorId = priceAuthorizer.Id, PermisoId = pricePermission.Id,
+                TipoOperacion = "PRECIO_RECEPCION_COMPRA", CorrelacionId = correlation,
+                DescripcionOperacion = "Autorización del Administrador para cambiar el precio de venta al recibir un pedido.",
+                Motivo = "CAMBIO_PRECIO_VENTA", MetodoAutenticacion = request.Authorization!.AuthenticationMethod(),
+                CredencialAutorizadorId = request.Authorization!.ResolvedCredentialId, Resultado = "EXITOSA",
+                Estado = "UTILIZADA", FechaSolicitud = priceTime, FechaExpiracion = priceTime.AddMinutes(5),
+                FechaUtilizacion = priceTime };
+            await repository.AddAuthorizationAsync(priceAuthorization, ct);
         }
         var now = clock.UtcNow.UtcDateTime;
         var purchase = new Compra { Id = Guid.CreateVersion7(), InstalacionId = installation.Id,
@@ -921,7 +981,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                     administratorSelfAuthorized ? "ADMINISTRATOR_SELF" : "OTHER_USER" }, correlation,
             authorization?.UsuarioAutorizadorId, null, terminal.Id, null, ct);
         await WriteRetailPriceAuditsAsync(actor.UserId, purchase.Id, order.Id, retailPriceChanges,
-            correlation, terminal.Id, ct);
+            correlation, terminal.Id, ct, priceAuthorization?.UsuarioAutorizadorId);
         await unitOfWork.SaveChangesAsync(ct);
         return Result.Success(response);
     }
@@ -960,7 +1020,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         lines.Any(x => x.NewRetailPrice is decimal price && price != x.Product.PrecioMinorista);
 
     private async Task WriteRetailPriceAuditsAsync(Guid actorId, Guid purchaseId, Guid? orderId,
-        IEnumerable<RetailPriceChange> changes, Guid correlationId, Guid terminalId, CancellationToken ct)
+        IEnumerable<RetailPriceChange> changes, Guid correlationId, Guid terminalId, CancellationToken ct,
+        Guid? authorizedBy = null)
     {
         foreach (var change in changes)
         {
@@ -969,7 +1030,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                 new { PurchaseId = purchaseId, OrderId = orderId, ProductId = change.ProductId,
                     PreviousRetailPrice = change.PreviousRetailPrice, NewRetailPrice = change.NewRetailPrice,
                     ChangeSource = "PURCHASE_RECEIPT", ModifiedFields = RetailPriceModifiedFields,
-                    CorrelationId = correlationId },
+                    AuthorizedBy = authorizedBy, CorrelationId = correlationId },
                 ct, correlationId, terminalId);
         }
     }

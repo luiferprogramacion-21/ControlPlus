@@ -63,7 +63,9 @@ Write-Result @("ESPERANDO", "commit $short", "inicio $(Get-Date -Format 'HH:mm:s
 # subido desde el último commit que ya tuvo CI, no solo el último commit (si no, un lote que termina en documentación
 # se tomaba como «sin CI» aunque trajera código).
 $base = "$Sha~1"
-foreach ($candidate in @(gh run list --limit 30 --json headSha --jq '.[].headSha' 2>$null)) {
+$candidates = @()
+try { $candidates = @(& $gh run list --limit 30 --json headSha --jq '.[].headSha' 2>$null) } catch { }
+foreach ($candidate in $candidates) {
     if (-not $candidate -or $candidate -eq $Sha) { continue }
     git merge-base --is-ancestor $candidate $Sha 2>$null
     if ($LASTEXITCODE -eq 0) { $base = $candidate; break }
@@ -78,7 +80,7 @@ if ($changed.Count -gt 0 -and -not ($changed | Where-Object { $_ -notlike '*.md'
 # Espera a que aparezca la ejecución del commit (hasta unos 10 minutos).
 $runId = $null
 for ($i = 0; $i -lt 40 -and -not $runId; $i++) {
-    $runId = (& $gh run list --commit $Sha --limit 1 --json databaseId -q '.[0].databaseId' 2>$null)
+    try { $runId = (& $gh run list --commit $Sha --limit 1 --json databaseId -q '.[0].databaseId' 2>$null) } catch { $runId = $null }
     if (-not $runId) { Start-Sleep -Seconds 15 }
 }
 if (-not $runId) {
@@ -87,11 +89,21 @@ if (-not $runId) {
     exit 0
 }
 
-# Espera hasta que termine, consultando cada $IntervalSeconds.
-& $gh run watch $runId --interval $IntervalSeconds *> $null
-
+# Espera hasta que termine, consultando cada $IntervalSeconds. Un error momentáneo de GitHub (por ejemplo HTTP 500)
+# ya no detiene la espera: se vuelve a consultar en la siguiente vuelta (25 de noviembre de 2026; antes `gh run watch`
+# terminaba el script y el resultado se quedaba en ESPERANDO).
 # Se lee el JSON completo: PowerShell 5.1 parte los filtros -q que llevan comillas internas.
-$run = (& $gh run view $runId --json conclusion,jobs) -join "`n" | ConvertFrom-Json
+$run = $null
+while ($true) {
+    try {
+        $json = (& $gh run view $runId --json status,conclusion,jobs 2>$null) -join "`n"
+        if ($LASTEXITCODE -eq 0 -and $json) {
+            $run = $json | ConvertFrom-Json
+            if ("$($run.status)".Trim() -eq 'completed') { break }
+        }
+    } catch { }
+    Start-Sleep -Seconds $IntervalSeconds
+}
 $conclusion = "$($run.conclusion)".Trim()
 $jobs = @($run.jobs | ForEach-Object { "$($_.name): $($_.conclusion)" })
 switch ($conclusion) {
@@ -101,9 +113,12 @@ switch ($conclusion) {
 }
 $lines = @($state, "commit $short", "ejecución $runId", "fin $(Get-Date -Format 'HH:mm:ss')", '') + $jobs
 if ($state -eq 'FALLO') {
-    $failed = @(& $gh run view $runId --log-failed 2>$null |
-        Select-String -Pattern '\[FAIL\]|Failed!|Error Message|error [A-Z]+[0-9]+|×' |
-        Select-Object -First 30 | ForEach-Object { $_.Line })
+    $failed = @()
+    try {
+        $failed = @(& $gh run view $runId --log-failed 2>$null |
+            Select-String -Pattern '\[FAIL\]|Failed!|Error Message|error [A-Z]+[0-9]+|×' |
+            Select-Object -First 30 | ForEach-Object { $_.Line })
+    } catch { $failed = @("No se pudo leer el registro: gh run view $runId --log-failed") }
     $lines += @('', 'Pruebas o errores:') + $failed
 }
 Write-Result $lines

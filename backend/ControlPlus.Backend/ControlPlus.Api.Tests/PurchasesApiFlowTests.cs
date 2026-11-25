@@ -627,7 +627,7 @@ public sealed partial class PurchasesApiFlowTests : IAsyncLifetime
         var order = await ReadJsonAsync(await client.PostAsJsonAsync("/api/purchase-orders", new
         {
             supplierId = supplier.Id,
-            lines = new[] { new { productId = product.Id, requestedQuantity = 1, estimatedUnitCost = 11m } }
+            lines = new[] { new { productId = product.Id, requestedQuantity = 2, estimatedUnitCost = 11m } }
         }), HttpStatusCode.Created);
         var sent = await ReadJsonAsync(await client.PostAsJsonAsync($"/api/purchase-orders/{order.GetProperty("id").GetGuid()}/send",
             new { expectedVersion = order.GetProperty("version").GetInt64() }), HttpStatusCode.OK);
@@ -644,12 +644,38 @@ public sealed partial class PurchasesApiFlowTests : IAsyncLifetime
         Bearer(client, supervisor.AccessToken);
         await ProblemAsync(await ReceiveOrderAsync(client, order.GetProperty("id").GetGuid(),
             "price-supervisor-receipt", receipt), HttpStatusCode.Forbidden);
+        // D5 en la recepción (pruebas del usuario del 25/11/2026): otro Supervisor no autoriza el precio nuevo...
+        await ProblemAsync(await ReceiveOrderAsync(client, order.GetProperty("id").GetGuid(), "price-supervisor-self",
+            new { receipt.expectedOrderVersion, receipt.invoiceDate, receipt.vatMode, receipt.lines,
+                authorization = new { userName = SupervisorName, password = _supervisorPassword } }), HttpStatusCode.Forbidden);
+        // ...el Administrador sí, con su usuario y contraseña.
+        var supervisorReceipt = new
+        {
+            receipt.expectedOrderVersion, receipt.invoiceDate, receipt.vatMode,
+            lines = new[] { new { orderLineId, productId = product.Id, quantity = 1, unitCost = 11m, newRetailPrice = 1300m } },
+            authorization = new { userName = AdminName, password = _adminPassword }
+        };
+        var bySupervisor = await ReadJsonAsync(await ReceiveOrderAsync(client, order.GetProperty("id").GetGuid(),
+            "price-supervisor-authorized", supervisorReceipt), HttpStatusCode.Created);
+        var supervisorLine = Assert.Single(bySupervisor.GetProperty("purchase").GetProperty("lines").EnumerateArray());
+        Assert.Equal(1200m, supervisorLine.GetProperty("previousRetailPrice").GetDecimal());
+        Assert.Equal(1300m, supervisorLine.GetProperty("newRetailPrice").GetDecimal());
+        await using (var authScope = _factory!.Services.CreateAsyncScope())
+        {
+            var authDb = authScope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            var priceAuthorization = Assert.Single(await authDb.AutorizacionOperacion.AsNoTracking()
+                .Where(x => x.TipoOperacion == "PRECIO_RECEPCION_COMPRA").ToArrayAsync());
+            Assert.Equal(users.Supervisor.User.Id, priceAuthorization.UsuarioSolicitanteId);
+            Assert.Equal(users.Admin.User.Id, priceAuthorization.UsuarioAutorizadorId);
+        }
 
         Bearer(client, users.Admin.Token.AccessToken);
+        var current = await ReadJsonAsync(await client.GetAsync($"/api/purchase-orders/{order.GetProperty("id").GetGuid()}"), HttpStatusCode.OK);
         var received = await ReadJsonAsync(await ReceiveOrderAsync(client, order.GetProperty("id").GetGuid(),
-            "price-admin-receipt", receipt), HttpStatusCode.Created);
+            "price-admin-receipt", new { expectedOrderVersion = current.GetProperty("version").GetInt64(), receipt.invoiceDate, receipt.vatMode, receipt.lines }),
+            HttpStatusCode.Created);
         var receiptLine = Assert.Single(received.GetProperty("purchase").GetProperty("lines").EnumerateArray());
-        Assert.Equal(1200m, receiptLine.GetProperty("previousRetailPrice").GetDecimal());
+        Assert.Equal(1300m, receiptLine.GetProperty("previousRetailPrice").GetDecimal());
         Assert.Equal(1400m, receiptLine.GetProperty("newRetailPrice").GetDecimal());
         Assert.Equal(1400m, (await ReadAsync<ProductDto>(await client.GetAsync($"/api/products/{product.Id}"),
             HttpStatusCode.OK)).RetailPrice);
@@ -661,9 +687,11 @@ public sealed partial class PurchasesApiFlowTests : IAsyncLifetime
                 .Where(x => x.EntidadId == product.Id && x.Accion == "PRODUCTUPDATED").ToArrayAsync())
             .Where(x => x.DatosNuevos != null && x.DatosNuevos.Contains("PURCHASE_RECEIPT", StringComparison.Ordinal))
             .ToArray();
-        Assert.Equal(2, audits.Length);
+        Assert.Equal(3, audits.Length);
         Assert.All(audits, audit =>
             Assert.Contains("retailPrice", audit.DatosNuevos!, StringComparison.Ordinal));
+        Assert.Contains(audits, audit => audit.DatosNuevos!.Contains(
+            users.Admin.User.Id.ToString(), StringComparison.OrdinalIgnoreCase));
         Assert.Contains(audits, audit => audit.DatosNuevos!.Contains(
             order.GetProperty("id").GetGuid().ToString(), StringComparison.OrdinalIgnoreCase));
     }
