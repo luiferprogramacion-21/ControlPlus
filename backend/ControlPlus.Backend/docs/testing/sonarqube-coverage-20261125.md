@@ -20,6 +20,14 @@ Validación local de esta preparación: `dotnet build ControlPlus.Backend.slnx -
 
 Ejecutar en Windows PowerShell 5.1 con SonarQube activo. El token de análisis se introduce de forma oculta y nunca se escribe en el repositorio ni en el chat. Esta copia usa el `HEAD` confirmado que se quiera medir; `npm.cmd ci` instala las dependencias declaradas en el lockfile.
 
+La forma recomendada es un solo comando. El script crea el worktree en la ruta correcta, ejecuta las pruebas y compilaciones, prepara ambos informes de cobertura y envía el análisis:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'C:\ControlPlus\backend\ControlPlus.Backend\scripts\dev\Invoke-SonarAnalysis.ps1'
+```
+
+La secuencia manual equivalente se conserva a continuación para diagnóstico.
+
 ```powershell
 Set-Location 'C:\ControlPlus\backend\ControlPlus.Backend'
 $revision = git rev-parse HEAD
