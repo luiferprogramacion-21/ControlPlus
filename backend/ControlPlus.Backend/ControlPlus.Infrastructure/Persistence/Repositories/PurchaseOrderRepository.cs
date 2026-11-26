@@ -129,7 +129,9 @@ public sealed class EfPurchaseOrderRepository(OfficialControlPlusDbContext db) :
         foreach (var added in retained.Values)
         {
             await db.DetallePedidoCompra.AddAsync(added, ct);
-            order.DetallePedidoCompra.Add(added);
+            // Al rastrear la línea, EF Core ya la agrega a la colección del pedido (por su PedidoCompraId); agregarla otra
+            // vez la repetía en la respuesta (prueba PurchaseOrder_UpdateDraft_ReplacesLinesAndRejectsStaleOrSentEdits).
+            if (!order.DetallePedidoCompra.Contains(added)) order.DetallePedidoCompra.Add(added);
         }
     }
 
