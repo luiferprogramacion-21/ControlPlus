@@ -11,6 +11,12 @@
 - Solo con CI verde entregar pasos de instalación en PowerShell como Administrador: detener el servicio, activar la migración pendiente si corresponde hasta `..._ACTIVATION_OK`, ejecutar `scripts/service/Install-ControlPlusService.ps1` hasta `CONTROLPLUS_SERVICE_OK` e indicar qué revisar en pantalla. El instalador compila la carpeta completa: no instalar con trabajo ajeno sin confirmar en `git status --short`.
 - Escribir en español y nunca exponer contraseñas ni secretos.
 
+## Continuación de pruebas del 26 de noviembre de 2026
+
+- Se añadieron tres escenarios de integración: corrección de un gasto o retiro que primero excede el efectivo y después se cancela sin reemplazo; corrección en turno compartido que exige sesión propia activa y autorización del Administrador; y rechazo de ediciones de pedido con productos duplicados o de otro proveedor, conservando pedido, numeración y existencias. Su ejecución PostgreSQL aún requiere el rol dedicado `controlplus_test_admin` en `127.0.0.1:5432` mediante `scripts/Run-LocalTests.ps1`; no se probó contra la base `controlplus`.
+- En el árbol con esos escenarios pasaron la compilación .NET con cero advertencias y errores, 399/399 pruebas .NET sin integración, 825/825 pruebas Angular y la compilación Angular. Los tres recorridos Playwright pasaron localmente contra un PostgreSQL 18 y una API aislados en `%TEMP%`, usando Chrome instalado; se verificó la eliminación del entorno temporal. Véanse `docs/testing/sonarqube-coverage-20261125.md` y `docs/e2e.md`.
+- La cobertura nueva 85,0 % y el Quality Gate `OK` siguen correspondiendo al análisis anterior de `b0a4962`. Estas pruebas no tienen aún una medición nueva de SonarQube. Verificar el CI del próximo commit antes de considerar la entrega lista para instalar.
+
 ## Estado de pruebas al 25 de noviembre de 2026
 
 - La última medición de SonarQube confirmada por el operador fue 85,0 % de cobertura en código nuevo y Quality Gate `OK`: 586 líneas nuevas, 55 sin cubrir; 586 condiciones nuevas, 121 sin cubrir. Esa medición precede a las pruebas añadidas en `cceb1f2`; no presentarla como resultado de este cambio. Véase `docs/testing/sonarqube-coverage-20261125.md`.

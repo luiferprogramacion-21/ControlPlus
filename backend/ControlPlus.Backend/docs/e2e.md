@@ -34,6 +34,8 @@ El trabajo «Pruebas de navegador (flujo principal)» de `.github/workflows/ci.y
 
 Si una prueba falla, el CI guarda el artefacto `e2e-evidencia` durante 7 días: informe HTML, traza, captura, video y el registro de la API.
 
+El 26 de noviembre de 2026 los tres recorridos pasaron también en Windows (**3/3**) con Chrome instalado, contra un PostgreSQL 18 y una API aislados en directorios y puertos temporales. Se comprobó el cierre de ambos procesos y la eliminación del entorno. En esta ejecución local se desactivó el video porque faltaba el FFmpeg de la versión instalada de Playwright; el CI conserva su configuración habitual.
+
 ## Correrlas en otra máquina
 
 Solo contra una base de pruebas, nunca contra `controlplus`. Con la API publicada sirviendo la pantalla y una base `controlplus_e2e_*` preparada con el programa anterior:
