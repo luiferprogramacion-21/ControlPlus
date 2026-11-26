@@ -1,20 +1,25 @@
 import { ConfirmationDialog } from '../../shared/confirmation-dialog';
 const confirmAction = vi.fn();
+const authorizeAction = vi.fn();
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Layaways } from './layaways';
-import { Layaway, LayawayDetail, LayawaysApi } from './layaways-api';
+import { Layaway, LayawayDetail, LayawayPayment, LayawaysApi } from './layaways-api';
 import { CustomersApi } from '../customers/customers-api';
 import { SessionService } from '../../core/session.service';
+import { AuthorizationDialog } from '../../shared/authorization-dialog';
 
 const layaway = (extra: Partial<Layaway> = {}): Layaway => ({ id: 'a1', number: 'APT-1', customerId: 'c1', customerName: 'Ana', createdAtUtc: '2026-11-01T10:00:00Z',
   dueOn: '2026-11-16', total: 100000, initialPayment: 20000, balance: 80000, state: 'ACTIVO', version: 3, isOverdue: false, ...extra });
 const detail = (extra: Partial<Layaway> = {}): LayawayDetail => ({ layaway: layaway(extra), initialMinimumPercentage: 20, lines: [], payments: [], delivery: null, cancellation: null });
+const payment = (extra: Partial<LayawayPayment> = {}): LayawayPayment => ({ id: 'p1', number: 'AB-1', methodCode: 'EFECTIVO', methodName: 'Efectivo', appliedAmount: 3000,
+  receivedAmount: 3000, change: 0, occurredAtUtc: '2026-11-01T12:00:00Z', state: 'APLICADO', correlationId: 'corr-1', ...extra });
 
 describe('Layaways: abonos y entrega', () => {
-  const api = { list: vi.fn(), get: vi.fn(), applyPayment: vi.fn(), deliver: vi.fn() };
+  const api = { list: vi.fn(), get: vi.fn(), applyPayment: vi.fn(), deliver: vi.fn(), paymentCancellationReasons: vi.fn(), cancelPayment: vi.fn() };
   const customers = { list: vi.fn() };
-  const session = { has: (code: string) => ['LAYAWAY.MANAGE', 'CUSTOMERS.BASIC_MANAGE'].includes(code) };
+  const session = { has: (code: string) => ['LAYAWAY.MANAGE', 'CUSTOMERS.BASIC_MANAGE'].includes(code),
+    hasRole: (...roles: string[]) => roles.includes('ADMINISTRADOR'), user: () => ({ userName: 'admin' }) };
   let component: Layaways;
 
   beforeEach(() => {
@@ -23,8 +28,12 @@ describe('Layaways: abonos y entrega', () => {
     api.get.mockResolvedValue(detail());
     api.applyPayment.mockResolvedValue({ layawayId: 'a1', balance: 30000, state: 'ACTIVO', version: 4, correlationId: 'c', change: 0, payments: [] });
     api.deliver.mockResolvedValue({ layawayId: 'a1', number: 'APT-1', state: 'ENTREGADO', version: 5 });
+    api.paymentCancellationReasons.mockResolvedValue([{ id: 'reason-1', code: 'OTRO', name: 'Otro', displayOrder: 1 }]);
+    api.cancelPayment.mockResolvedValue({ layawayId: 'a1', reversedAmount: 5000, balance: 85000, state: 'ACTIVO', version: 4 });
+    authorizeAction.mockImplementation((prompt: { run: (credentials: null) => Promise<void> }) => prompt.run(null));
     TestBed.configureTestingModule({ providers: [{ provide: ConfirmationDialog, useValue: { confirm: confirmAction } },
       { provide: LayawaysApi, useValue: api }, { provide: CustomersApi, useValue: customers }, { provide: SessionService, useValue: session },
+      { provide: AuthorizationDialog, useValue: { open: authorizeAction } },
     ] });
     confirmAction.mockResolvedValue(true);
     component = TestBed.runInInjectionContext(() => new Layaways());
@@ -167,5 +176,43 @@ describe('Layaways: abonos y entrega', () => {
     await component.deliver();
     expect(component.error()).toBe('Stock insuficiente.');
     expect(component.detail()).not.toBeNull();
+  });
+
+  it('corrige juntos los medios del abono, exige motivo y reutiliza la clave tras un fallo', async () => {
+    const target = payment();
+    api.get.mockResolvedValue({ ...detail(), payments: [
+      target,
+      payment({ id: 'p2', methodCode: 'NEQUI', methodName: 'Nequi', appliedAmount: 2000, receivedAmount: null }),
+      payment({ id: 'p3', correlationId: 'corr-2', appliedAmount: 700 }),
+    ] });
+    await component.open(layaway());
+    await component.startCorrectPayment(target);
+    expect(component.correctingPaymentTotal).toBe(5000);
+    expect(component.correctingPayment()?.id).toBe('p1');
+
+    component.paymentReasonId = 'reason-1';
+    await component.confirmPaymentCorrection();
+    expect(component.error()).toContain('observación');
+    expect(authorizeAction).not.toHaveBeenCalled();
+    expect(api.cancelPayment).not.toHaveBeenCalled();
+
+    component.paymentObservation = '  Medio registrado por error  ';
+    api.cancelPayment.mockRejectedValueOnce(new HttpErrorResponse({ status: 0 }));
+    await expect(component.confirmPaymentCorrection()).rejects.toBeDefined();
+    const firstKey = api.cancelPayment.mock.lastCall![3];
+    expect(firstKey).toEqual(expect.any(String));
+    expect(api.cancelPayment.mock.lastCall![0]).toMatchObject({ id: 'a1', version: 3 });
+    expect(api.cancelPayment.mock.lastCall![1]).toBe('p1');
+    expect(api.cancelPayment.mock.lastCall![2]).toEqual({ expectedVersion: 3, reasonId: 'reason-1', observation: 'Medio registrado por error' });
+    expect(component.correctingPayment()?.id).toBe('p1');
+    expect(component.saving()).toBe(false);
+
+    await component.confirmPaymentCorrection();
+    expect(api.cancelPayment.mock.lastCall![3]).toBe(firstKey);
+    expect(component.correctingPayment()).toBeNull();
+    expect(component.paymentDialog()).toBe(true);
+    expect(component.notice()).toContain('Los productos siguen reservados');
+    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(api.list).toHaveBeenCalledTimes(1);
   });
 });

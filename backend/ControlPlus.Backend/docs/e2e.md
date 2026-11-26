@@ -19,6 +19,8 @@ Decisión del 16 de noviembre de 2026: pruebas de extremo a extremo del flujo pr
 2. **Vender a crédito** registrando el cliente desde la venta: nombre, documento, teléfono y la dirección, que solo se pide en crédito o apartado.
 3. **Abonar** en Créditos: el valor llega con todo el saldo ($8.000) y se paga por Nequi **sin referencia**. El crédito queda pagado.
 
+`e2e/tests/zz-cash-correction.spec.ts` comprueba la corrección de un ingreso manual en Caja. Si el turno está cerrado, lo abre; registra $40, usa «Corregir un error de caja» para dejar $20 y verifica en la API que el efectivo esperado solo aumenta $20. También comprueba que el ingreso original, el reverso y el reemplazo permanecen vinculados en el historial. El nombre del archivo lo sitúa después de los dos recorridos anteriores cuando se ejecuta la suite completa.
+
 ## Cómo corren en el CI
 
 El trabajo «Pruebas de navegador (flujo principal)» de `.github/workflows/ci.yml`:

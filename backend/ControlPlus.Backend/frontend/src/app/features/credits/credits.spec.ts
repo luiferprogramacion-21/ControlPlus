@@ -2,12 +2,17 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { SessionService } from '../../core/session.service';
-import { Credit } from './credits-api';
+import { Credit, CreditPayment } from './credits-api';
 import { Credits } from './credits';
 import { AuthorizationDialog } from '../../shared/authorization-dialog';
 import { OperatorCard } from '../../shared/operator-card';
 
 const credit = { id: 'credit-id', saleNumber: 'VTA-1', customerName: 'Ana', adjustedAmount: 10000, balance: 5000, state: 'PENDIENTE', version: 4 } as Credit;
+const payment = { id: 'payment-id', number: 'AB-1', appliedAmount: 2000, state: 'APLICADO' } as CreditPayment;
+
+async function settle(): Promise<void> {
+  for (let tick = 0; tick < 10; tick++) await Promise.resolve();
+}
 
 describe('Credits', () => {
   let component: Credits; let fixture: ComponentFixture<Credits>; let http: HttpTestingController;
@@ -66,5 +71,107 @@ describe('Credits', () => {
     expect(postCount).toBe(1);
     expect(component.selected()?.balance).toBe(0);
     expect(component.result()?.items).toEqual([]);
+  });
+
+  it('reutiliza la clave del abono al reintentar un fallo de red y la cambia si cambia el importe', async () => {
+    component.selected.set(credit);
+    component.drafts = [{ methodCode: 'EFECTIVO', appliedAmount: 2000, receivedAmount: 2000, reference: '' }];
+
+    const first = component.save();
+    await settle();
+    const firstRequest = http.expectOne('/api/credits/credit-id/payments');
+    const firstKey = firstRequest.request.headers.get('Idempotency-Key');
+    expect(firstKey).toBeTruthy();
+    expect(firstRequest.request.body).toEqual({ expectedVersion: 4, payments: [{ methodCode: 'EFECTIVO', appliedAmount: 2000, receivedAmount: 2000, reference: null }] });
+    firstRequest.flush({ message: 'Sin conexión' }, { status: 503, statusText: 'Unavailable' });
+    await first;
+    expect(component.saving()).toBe(false);
+
+    const retry = component.save();
+    await settle();
+    const retryRequest = http.expectOne('/api/credits/credit-id/payments');
+    expect(retryRequest.request.headers.get('Idempotency-Key')).toBe(firstKey);
+    retryRequest.flush({ message: 'Sin conexión' }, { status: 503, statusText: 'Unavailable' });
+    await retry;
+
+    component.drafts[0].appliedAmount = 3000;
+    component.drafts[0].receivedAmount = 3000;
+    const changed = component.save();
+    await settle();
+    const changedRequest = http.expectOne('/api/credits/credit-id/payments');
+    expect(changedRequest.request.headers.get('Idempotency-Key')).not.toBe(firstKey);
+    expect(changedRequest.request.body.payments[0].appliedAmount).toBe(3000);
+    changedRequest.flush({ message: 'Sin conexión' }, { status: 503, statusText: 'Unavailable' });
+    await changed;
+  });
+
+  it('exige observación para Otro y conserva la clave al reintentar anular un abono', async () => {
+    component.selected.set(credit);
+    const opening = component.startCancelPayment(payment);
+    http.expectOne('/api/credits/payment-cancellation-reasons').flush([{ id: 'other-id', code: 'OTRO', name: 'Otro', displayOrder: 1 }]);
+    await opening;
+    expect(component.cancellingPayment()).toBe(true);
+    component.cancellationReasonId = 'other-id';
+    await component.confirmCancelPayment();
+    expect(component.error()).toContain('observación');
+    http.expectNone('/api/credits/credit-id/payments/payment-id/cancel');
+
+    component.cancellationObservation = '  Pago duplicado  ';
+    const first = component.confirmCancelPayment();
+    await settle();
+    const firstRequest = http.expectOne('/api/credits/credit-id/payments/payment-id/cancel');
+    const firstKey = firstRequest.request.headers.get('Idempotency-Key');
+    expect(firstKey).toBeTruthy();
+    expect(firstRequest.request.body).toEqual({ expectedVersion: 4, reasonId: 'other-id', observation: 'Pago duplicado' });
+    const rejection = expect(first).rejects.toBeDefined();
+    firstRequest.flush({ message: 'Sin conexión' }, { status: 503, statusText: 'Unavailable' });
+    await rejection;
+    expect(component.saving()).toBe(false);
+
+    const retry = component.confirmCancelPayment();
+    await settle();
+    const retryRequest = http.expectOne('/api/credits/credit-id/payments/payment-id/cancel');
+    expect(retryRequest.request.headers.get('Idempotency-Key')).toBe(firstKey);
+    retryRequest.flush({ reversedAmount: 2000 });
+    await settle();
+    http.expectOne('/api/credits/credit-id').flush({ ...credit, balance: 7000, version: 5 });
+    await settle();
+    http.expectOne(request => request.url === '/api/credits').flush({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    await retry;
+    expect(component.cancellingPayment()).toBe(false);
+    expect(component.selected()?.balance).toBe(7000);
+  });
+
+  it('valida la condonación, conserva la clave al reintentar y actualiza el detalle', async () => {
+    component.selected.set(credit);
+    component.startForgive();
+    expect(component.forgiving()).toBe(true);
+    await component.confirmForgive();
+    expect(component.error()).toContain('motivo');
+    http.expectNone('/api/credits/credit-id/forgive');
+
+    component.forgivenessReason = '  Acuerdo aprobado  ';
+    const first = component.confirmForgive();
+    await settle();
+    const firstRequest = http.expectOne('/api/credits/credit-id/forgive');
+    const firstKey = firstRequest.request.headers.get('Idempotency-Key');
+    expect(firstKey).toBeTruthy();
+    expect(firstRequest.request.body).toEqual({ expectedVersion: 4, reason: 'Acuerdo aprobado' });
+    firstRequest.flush({ message: 'Sin conexión' }, { status: 503, statusText: 'Unavailable' });
+    await first;
+    expect(component.forgiving()).toBe(true);
+
+    const retry = component.confirmForgive();
+    await settle();
+    const retryRequest = http.expectOne('/api/credits/credit-id/forgive');
+    expect(retryRequest.request.headers.get('Idempotency-Key')).toBe(firstKey);
+    retryRequest.flush({ creditId: 'credit-id', balance: 0, state: 'ANULADO', version: 5 });
+    await settle();
+    http.expectOne('/api/credits/credit-id').flush({ ...credit, balance: 0, state: 'ANULADO', version: 5 });
+    await settle();
+    http.expectOne(request => request.url === '/api/credits').flush({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    await retry;
+    expect(component.forgiving()).toBe(false);
+    expect(component.selected()?.state).toBe('ANULADO');
   });
 });
