@@ -15,7 +15,7 @@
 
 - Se añadieron tres escenarios de integración: corrección de un gasto o retiro que primero excede el efectivo y después se cancela sin reemplazo; corrección en turno compartido que exige sesión propia activa y autorización del Administrador; y rechazo de ediciones de pedido con productos duplicados o de otro proveedor, conservando pedido, numeración y existencias. Su ejecución PostgreSQL aún requiere el rol dedicado `controlplus_test_admin` en `127.0.0.1:5432` mediante `scripts/Run-LocalTests.ps1`; no se probó contra la base `controlplus`.
 - En el árbol con esos escenarios pasaron la compilación .NET con cero advertencias y errores, 399/399 pruebas .NET sin integración, 825/825 pruebas Angular y la compilación Angular. Los tres recorridos Playwright pasaron localmente contra un PostgreSQL 18 y una API aislados en `%TEMP%`, usando Chrome instalado; se verificó la eliminación del entorno temporal. Véanse `docs/testing/sonarqube-coverage-20261125.md` y `docs/e2e.md`.
-- La cobertura nueva 85,0 % y el Quality Gate `OK` siguen correspondiendo al análisis anterior de `b0a4962`. Estas pruebas no tienen aún una medición nueva de SonarQube. Verificar el CI del próximo commit antes de considerar la entrega lista para instalar.
+- El CI del commit `216d7e6` terminó verde en sus cuatro trabajos (run `45834150254`), incluido Backend con PostgreSQL 18 y Playwright. La cobertura nueva 85,0 % y el Quality Gate `OK` siguen correspondiendo al análisis anterior de `b0a4962`; no hay todavía una medición nueva de SonarQube para `216d7e6`.
 
 ## Estado de pruebas al 25 de noviembre de 2026
 
