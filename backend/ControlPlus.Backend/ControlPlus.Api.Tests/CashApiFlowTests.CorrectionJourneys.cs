@@ -88,7 +88,9 @@ public sealed partial class CashApiFlowTests
             client, path, "closed-shift-review", request), HttpStatusCode.OK));
 
         var history = await ReadSuccessAsync<CashClosureReviewDto[]>(await client.GetAsync(path), HttpStatusCode.OK);
-        Assert.Equal(review, Assert.Single(history));
+        var persisted = Assert.Single(history);
+        Assert.Equal(review.OccurredAtUtc.UtcTicks / 10, persisted.OccurredAtUtc.UtcTicks / 10);
+        Assert.Equal(review with { OccurredAtUtc = persisted.OccurredAtUtc }, persisted);
         var after = await ReadSuccessAsync<CashShiftDto[]>(await client.GetAsync("/api/cash/closed-shifts"),
             HttpStatusCode.OK);
         var unchanged = Assert.Single(after, x => x.Id == shift.Id);
@@ -98,6 +100,7 @@ public sealed partial class CashApiFlowTests
         await using var scope = _factory!.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
         Assert.Equal(1, await db.Set<RevisionCierreCaja>().CountAsync(x => x.TurnoCajaId == shift.Id));
+        Assert.Equal(1, await db.MovimientoCaja.CountAsync(x => x.TurnoCajaId == shift.Id));
         Assert.Equal(1, await db.EventoAuditoria.CountAsync(x =>
             x.Accion == "CASHCLOSUREREVIEWED" && x.EntidadId == shift.Id));
     }

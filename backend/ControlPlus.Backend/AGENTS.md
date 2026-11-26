@@ -11,6 +11,13 @@
 - Solo con CI verde entregar pasos de instalación en PowerShell como Administrador: detener el servicio, activar la migración pendiente si corresponde hasta `..._ACTIVATION_OK`, ejecutar `scripts/service/Install-ControlPlusService.ps1` hasta `CONTROLPLUS_SERVICE_OK` e indicar qué revisar en pantalla. El instalador compila la carpeta completa: no instalar con trabajo ajeno sin confirmar en `git status --short`.
 - Escribir en español y nunca exponer contraseñas ni secretos.
 
+## Estado de pruebas al 25 de noviembre de 2026
+
+- La última medición de SonarQube confirmada por el operador fue 85,0 % de cobertura en código nuevo y Quality Gate `OK`: 586 líneas nuevas, 55 sin cubrir; 586 condiciones nuevas, 121 sin cubrir. Esa medición precede a las pruebas añadidas en `cceb1f2`; no presentarla como resultado de este cambio. Véase `docs/testing/sonarqube-coverage-20261125.md`.
+- `cceb1f2` añadió pruebas de integración para corrección de movimientos y revisión de cierres de caja, y para editar un pedido borrador conservando el historial y rechazando versiones obsoletas o pedidos enviados. Añadió pruebas Angular de reintentos en créditos y correcciones de apartados, y un recorrido Playwright de corrección de ingresos de caja. Véase `docs/e2e.md`.
+- En la revisión local del conjunto `1ade0df` pasaron 399 pruebas .NET sin integración, 825 pruebas Angular, la compilación Angular y el listado de las tres pruebas E2E. Las pruebas nuevas con PostgreSQL y Playwright aún no tienen ejecución real acreditada. La integración requiere el rol exclusivo `controlplus_test_admin` y `scripts/Run-LocalTests.ps1`, que pide su contraseña de forma oculta y solo crea bases `controlplus_test_*`. No acceder a `controlplus` para resolver esta validación.
+- El CI de `1ade0df` no inició sus trabajos: GitHub Actions informó un problema de pagos recientes o límite de gasto de la cuenta (run `45733941672`), sin pasos ni registros de prueba. No declarar el cambio listo para instalar ni atribuir ese FALLO al código; repetir la verificación de CI cuando la cuenta vuelva a permitir trabajos.
+
 ## 1. Propósito de este archivo
 
 Este archivo es la fuente breve y operativa de contexto para trabajar en el proyecto **ControlPlus**. Todo agente que abra el repositorio debe leerlo antes de proponer cambios, crear código, modificar la base de datos o ajustar la interfaz.
