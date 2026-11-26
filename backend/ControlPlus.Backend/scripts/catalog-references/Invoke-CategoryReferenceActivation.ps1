@@ -17,9 +17,9 @@ $folder=Join-Path $Repository 'scripts\catalog-references'
 . (Join-Path $folder 'Maintenance.Helpers.ps1')
 $receiptPath=Join-Path $Repository 'docs\testing\category-reference-approved-clone-20261102.json'
 $receiptHash='D22AD75E6E90E3445F4745EF03E20B5021D5960EF6E85CCED931DA2A54A3626B'
-$rehearsal='C:\Users\luife\ControlPlus-Backups\CategoryReferenceRehearsal-15de3b08c6da431395852b8202f7c26a'
-$continuation='C:\Users\luife\ControlPlus-Reviews\CategoryCloneContinuation-cc84e19ca5e844c5b566a075cb57458d'
-$finish='C:\Users\luife\ControlPlus-Reviews\CategoryCloneFinish-777abceae3404c3f942163192afe6d11'
+$rehearsal="$env:USERPROFILE\ControlPlus-Backups\CategoryReferenceRehearsal-15de3b08c6da431395852b8202f7c26a"
+$continuation="$env:USERPROFILE\ControlPlus-Reviews\CategoryCloneContinuation-cc84e19ca5e844c5b566a075cb57458d"
+$finish="$env:USERPROFILE\ControlPlus-Reviews\CategoryCloneFinish-777abceae3404c3f942163192afe6d11"
 $directories=@{rehearsal=$rehearsal;continuation=$continuation;finish=$finish}
 $scriptHash=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash
 $inputNames=@('Maintenance.Helpers.ps1','Snapshot.sql','CategoryReference.Preflight.sql',

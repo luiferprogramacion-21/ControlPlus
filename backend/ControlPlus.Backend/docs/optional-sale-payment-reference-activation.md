@@ -13,7 +13,7 @@ función compartida `ventas.validar_datos_cobro()` y su referencia obligatoria.
 
 La activación quedó acreditada en:
 
-`C:\Users\luife\ControlPlus-Backups\OptionalSalePaymentReference-20261115T193156Z-e6269cfdb5a44b398af404f9751aee43`
+`%USERPROFILE%\ControlPlus-Backups\OptionalSalePaymentReference-20261115T193156Z-e6269cfdb5a44b398af404f9751aee43`
 
 - Estado: `OPTIONAL_SALE_PAYMENT_REFERENCE_ACTIVATION_OK`.
 - Respaldo verificado: 552435 bytes.

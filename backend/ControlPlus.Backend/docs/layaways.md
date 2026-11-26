@@ -28,10 +28,10 @@ Se conservan **dos ejecuciones independientes** de Windows, verificadas mediante
 Ambos TRX tienen `outcome=Completed`, todos sus resultados son `Passed` y los demás contadores de error o ejecución incompleta son cero. La salida 0 corresponde a la ejecución validada por el operador; los contadores se comprobaron leyendo los archivos, sin repetir las pruebas.
 
 - **Servicio 8/8:** `Overdue_UsesInstallationLocalDateAndStrictDueBoundary` (2 casos), `Overdue_OnlyAppliesToActivePastDue` (5 casos) y `List_PassesOverdueFilterWithPaginationAndOperatingDate` (1 caso), de `ControlPlus.Api.Tests.LayawayQueryServiceTests`.
-  TRX: `C:\Users\luife\AppData\Local\Temp\ControlPlus-IsOverdue-83ff885d955d4d43805723208dc1518a\IsOverdue.trx`.
+  TRX: `%USERPROFILE%\AppData\Local\Temp\ControlPlus-IsOverdue-83ff885d955d4d43805723208dc1518a\IsOverdue.trx`.
   SHA-256: `901e80d7b099d30a8c101c5c2a70738231f074a94fe2413daad11eab569946bb`.
 - **HTTP 1/1:** el nombre completo indicado arriba, ejecutado con `scripts/Run-LayawayOverdueHttpTest.ps1`. El runner mantiene el filtro exacto, exige salida 0 y un único resultado aprobado en el TRX; solicita la contraseña de forma oculta, valida el valor recibido por el proceso y restaura la variable de entorno al finalizar. La lectura de la propiedad real del constructor de conexión usa `.psbase.ConnectionString`, también al verificarla, para evitar que PowerShell la interprete como una clave del diccionario. Esa preparación se comprobó en PowerShell 5.1 con seis contraseñas ficticias, sin imprimir contraseñas ni cadenas de conexión y sin abrir PostgreSQL.
-  TRX: `C:\Users\luife\AppData\Local\Temp\ControlPlus-IsOverdue-HTTP-8d4816ea3f984b71bfae0346864de35b\IsOverdueHttp.trx`.
+  TRX: `%USERPROFILE%\AppData\Local\Temp\ControlPlus-IsOverdue-HTTP-8d4816ea3f984b71bfae0346864de35b\IsOverdueHttp.trx`.
   SHA-256: `65e8804924acd3c7e0e63d14ea73076a270fe550c02b5c8d36a50185045df665`.
 
 El build serial completo del fixture final terminó con salida 0, **0 errores y 0 advertencias**, con artefactos aislados en `/tmp/controlplus-overdue-http-artifacts`. En esta revisión solo se actualizó documentación; se conservaron las ejecuciones anteriores sin repetirlas. No se ejecutó la suite completa, no se accedió a `controlplus` y no hay migración en este corte. La cancelación o liberación automática y la devolución por vencimiento siguen pendientes de decisión de negocio, conforme a la propuesta siguiente.

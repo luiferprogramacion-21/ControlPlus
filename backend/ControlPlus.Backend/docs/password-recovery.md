@@ -6,7 +6,7 @@ Decisión del 18 de noviembre de 2026 (AGENTS.md, «Decisión del 18 de noviembr
 - El Administrador restablece las contraseñas de los demás.
 - Quien olvidó su contraseña la recupera con un código enviado a su correo.
 
-**En uso desde el 18 de noviembre de 2026:** cuenta `controlplus.pos@gmail.com` configurada en la tienda y una recuperación real comprobada por el operador.
+**En uso desde el 18 de noviembre de 2026:** la cuenta de Gmail de la tienda configurada en el equipo y una recuperación real comprobada por el operador.
 
 ## Cómo funciona
 
@@ -49,7 +49,7 @@ Hay que hacerlo una vez en el equipo de la tienda. Para Gmail:
 3. En PowerShell **como Administrador**, desde `C:\ControlPlus\backend\ControlPlus.Backend`, ejecute:
 
    ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\email\Set-EmailSettings.ps1 -FromAddress controlplus.pos@gmail.com -SendTestTo <su correo personal>
+   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\email\Set-EmailSettings.ps1 -FromAddress <cuenta de la tienda>@gmail.com -SendTestTo <su correo personal>
    powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\service\Install-ControlPlusService.ps1
    ```
 

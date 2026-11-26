@@ -17,7 +17,7 @@
     Termina con EMAIL_SETTINGS_OK. La contraseña nunca se muestra en la consola ni se escribe en archivos del repositorio.
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\email\Set-EmailSettings.ps1 -FromAddress controlplus.pos@gmail.com -SendTestTo dueno@example.com
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\email\Set-EmailSettings.ps1 -FromAddress tienda.ejemplo@gmail.com -SendTestTo dueno@example.com
 #>
 [CmdletBinding()]
 param(

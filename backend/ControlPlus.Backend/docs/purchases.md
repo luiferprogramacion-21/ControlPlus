@@ -108,7 +108,7 @@ BOM UTF-8 y devolución mediante una variable.
 
 El reintento del operador terminó el 12 de noviembre de 2026 con
 `PURCHASE_ORDER_SETUP_OK`. El recibo está en
-`C:\Users\luife\ControlPlus-Backups\PurchaseOrderSetup-20261112T200134Z-f5e80b503fa04e54800aa1128a1ab56d`.
+`%USERPROFILE%\ControlPlus-Backups\PurchaseOrderSetup-20261112T200134Z-f5e80b503fa04e54800aa1128a1ab56d`.
 El respaldo previo mide 547234 bytes, tiene TOC legible y su SHA-256
 `D8CA59C82C6350B2DA9A21542AFAFE716A8C962E1444F4D039C6633DE020F675`
 coincide con el archivo y el recibo; no se ensayó una restauración. El bloque

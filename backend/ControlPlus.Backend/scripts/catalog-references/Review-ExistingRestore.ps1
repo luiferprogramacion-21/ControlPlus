@@ -1,8 +1,8 @@
 ﻿#requires -Version 5.1
 param(
  [string]$Repository='C:\ControlPlus\backend\ControlPlus.Backend',
- [string]$Evidence='C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-507cd94ca1d84ff98e10286c3f6eab5f',
- [string]$Diagnostic='C:\Users\luife\ControlPlus-Reviews\CatalogRestoreDiagnostic-319acd15b71647b58e620c6344bb46f7',
+ [string]$Evidence="$env:USERPROFILE\ControlPlus-Backups\CatalogRehearsal-507cd94ca1d84ff98e10286c3f6eab5f",
+ [string]$Diagnostic="$env:USERPROFILE\ControlPlus-Reviews\CatalogRestoreDiagnostic-319acd15b71647b58e620c6344bb46f7",
  [string]$DatabaseRole='postgres',
  [string]$PgBin='C:\Program Files\PostgreSQL\18\bin',
  [switch]$ReadCurrent

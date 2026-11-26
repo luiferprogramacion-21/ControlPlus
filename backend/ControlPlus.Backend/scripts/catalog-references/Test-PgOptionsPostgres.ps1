@@ -1,7 +1,7 @@
 ﻿#requires -Version 5.1
 param(
  [string]$Repository='C:\ControlPlus\backend\ControlPlus.Backend',
- [string]$ReceiptWorkspace='C:\Users\luife\ControlPlus-Reviews\ReceiptSnapshot-25b7a887-1efbebcb39fe444191bf48c04d1b320a',
+ [string]$ReceiptWorkspace="$env:USERPROFILE\ControlPlus-Reviews\ReceiptSnapshot-25b7a887-1efbebcb39fe444191bf48c04d1b320a",
  [string]$PgBin='C:\Program Files\PostgreSQL\18\bin'
 )
 $ErrorActionPreference='Stop'

@@ -3,7 +3,7 @@
 param(
     [string]$Repository='C:\ControlPlus\backend\ControlPlus.Backend',
     [string]$PgBin='C:\Program Files\PostgreSQL\18\bin',
-    [string]$EvidenceDirectory='C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c',
+    [string]$EvidenceDirectory="$env:USERPROFILE\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c",
     [string]$ReadRole='postgres'
 )
 $ErrorActionPreference='Stop'

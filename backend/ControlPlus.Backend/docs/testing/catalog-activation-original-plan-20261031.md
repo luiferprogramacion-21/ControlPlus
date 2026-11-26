@@ -48,7 +48,7 @@ pasa en argumentos. No cambia contraseñas o permisos.
 & {
     $ErrorActionPreference = 'Stop'
     $repo = 'C:\ControlPlus\backend\ControlPlus.Backend'
-    $evidence = 'C:\Users\luife\AppData\Local\Temp\ControlPlus-CatalogPgOptions-6e54ad4641e84922b236de2bafcdd77a'
+    $evidence = "$env:USERPROFILE\AppData\Local\Temp\ControlPlus-CatalogPgOptions-6e54ad4641e84922b236de2bafcdd77a"
 
     & "$repo\scripts\catalog-references\Invoke-PermanentReferenceActivation.ps1" `
         -Repository $repo `

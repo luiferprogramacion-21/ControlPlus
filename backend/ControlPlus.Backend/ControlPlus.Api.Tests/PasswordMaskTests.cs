@@ -7,7 +7,7 @@ namespace ControlPlus.Api.Tests;
 public sealed class PasswordMaskTests
 {
     [Theory]
-    [InlineData("luiferprogramacion21@gmail.com", "lu•••21@gm•••.com")]
+    [InlineData("camilarojas21@gmail.com", "ca•••21@gm•••.com")]
     [InlineData("ana@hotmail.es", "a•••@ho•••.es")]
     [InlineData("pedro.p@x.co", "pe•••.p@x•••.co")]
     [InlineData("sin-arroba", "•••")]

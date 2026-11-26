@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$Repository='C:\ControlPlus\backend\ControlPlus.Backend',
-    [string]$ActivationEvidence='C:\Users\luife\ControlPlus-Backups\CategoryReferenceActivation-1c6e87f3a57f426c955ce765a8114387',
+    [string]$ActivationEvidence="$env:USERPROFILE\ControlPlus-Backups\CategoryReferenceActivation-1c6e87f3a57f426c955ce765a8114387",
     [switch]$InspectOnly
 )
 $ErrorActionPreference='Stop'; Set-StrictMode -Version 2.0

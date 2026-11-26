@@ -24,7 +24,7 @@ La fuente de verdad es `docs/ControlPlus_Fase4_Documento_y_Complementos.zip` des
 
 La instalación local V1 usa PostgreSQL 18. La base `controlplus` fue restaurada de PostgreSQL 17 a través de un respaldo lógico verificado; la comparación encontró 62 tablas, una vista y 230 filas en 18 tablas con datos. Los respaldos permanecen fuera del repositorio. La migración de Compras corte 2 se aplicó una vez de forma controlada el 16 de octubre de 2026; iniciar la API no aplica migraciones.
 
-Antes de aplicar `20261014010000_InventoryMovementRegistrationOrderV1` a la base persistente local se creó `controlplus-pg18-before-compras-20261016-142422-be1e2bfb.dump` en `C:\Users\luife\ControlPlus-Backups`, fuera del repositorio. `pg_dump` generó 476028 bytes, `pg_restore -l` leyó 800 entradas y SHA-256 fue `999698102666D3A6E6A9A39D3FB864D741918A6022F46201E79FF2D2F8D4F0D3`. Estas comprobaciones no equivalen a una restauración de prueba. El preflight de solo lectura terminó con `PREFLIGHT_COMPRAS_OK`; la ejecución dirigida terminó con `MigrationExitCode: 0`. El postflight en `REPEATABLE READ, READ ONLY` y rollback devolvió `POSTFLIGHT_COMPRAS_OK` y valor verdadero para historial exacto, columna, secuencia, restricción, índice, funciones y disparadores. La API local respondió HTTP `200` en `/api/health`, `/api/health/database` y `/openapi/v1.json` después del cambio. El catálogo de motivos `ANULACION_COMPRA` no se inicializó por esta migración y requiere una operación explícita aparte. Esta migración no debe volver a aplicarse ni revertirse en la base persistente local sin evaluación, respaldo y autorización específica.
+Antes de aplicar `20261014010000_InventoryMovementRegistrationOrderV1` a la base persistente local se creó `controlplus-pg18-before-compras-20261016-142422-be1e2bfb.dump` en `%USERPROFILE%\ControlPlus-Backups`, fuera del repositorio. `pg_dump` generó 476028 bytes, `pg_restore -l` leyó 800 entradas y SHA-256 fue `999698102666D3A6E6A9A39D3FB864D741918A6022F46201E79FF2D2F8D4F0D3`. Estas comprobaciones no equivalen a una restauración de prueba. El preflight de solo lectura terminó con `PREFLIGHT_COMPRAS_OK`; la ejecución dirigida terminó con `MigrationExitCode: 0`. El postflight en `REPEATABLE READ, READ ONLY` y rollback devolvió `POSTFLIGHT_COMPRAS_OK` y valor verdadero para historial exacto, columna, secuencia, restricción, índice, funciones y disparadores. La API local respondió HTTP `200` en `/api/health`, `/api/health/database` y `/openapi/v1.json` después del cambio. El catálogo de motivos `ANULACION_COMPRA` no se inicializó por esta migración y requiere una operación explícita aparte. Esta migración no debe volver a aplicarse ni revertirse en la base persistente local sin evaluación, respaldo y autorización específica.
 
 ## Migraciones y seed
 
@@ -150,7 +150,7 @@ terminaron correctamente antes de la aplicación dirigida en
 `5ec17b6e088138499edaf74afbdbaec4aa601f94` y la DLL Release cuya huella
 SHA-256 fue `8758826772CC64B7BC240460FD4AB96E37855F45207394D526D296C567859EDC`.
 El respaldo externo al repositorio es
-`C:\Users\luife\ControlPlus-Backups\InitialProductInventory-20261028-011142-5178d185f0a84f6088df56fd0827c82a\controlplus.dump`:
+`%USERPROFILE%\ControlPlus-Backups\InitialProductInventory-20261028-011142-5178d185f0a84f6088df56fd0827c82a\controlplus.dump`:
 485285 bytes y SHA-256
 `3AA48A6923931A3040FE381F7B63597D4CCBC4274B3A1902F91039AC295DAF22`.
 La comprobación registrada del respaldo incluyó tamaño positivo y catálogo

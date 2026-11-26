@@ -1,7 +1,7 @@
 ﻿#requires -Version 5.1
 param(
  [string]$Repository='C:\ControlPlus\backend\ControlPlus.Backend',
- [string]$Evidence='C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-507cd94ca1d84ff98e10286c3f6eab5f',
+ [string]$Evidence="$env:USERPROFILE\ControlPlus-Backups\CatalogRehearsal-507cd94ca1d84ff98e10286c3f6eab5f",
  [string]$DatabaseRole='postgres',
  [string]$PgBin='C:\Program Files\PostgreSQL\18\bin'
 )

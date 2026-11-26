@@ -37,7 +37,7 @@ Después, iniciar la API como siempre (`dotnet run` en `ControlPlus.Api`) y comp
 
 ## Activación del 15 de noviembre de 2026
 
-`WHOLESALE_MINIMUM_ACTIVATION_OK` en `C:\Users\luife\ControlPlus-Backups\WholesaleMinimum-20261115T224623Z-7ba8624f2f3a4a05b7734cb7d7db7e1f`.
+`WHOLESALE_MINIMUM_ACTIVATION_OK` en `%USERPROFILE%\ControlPlus-Backups\WholesaleMinimum-20261115T224623Z-7ba8624f2f3a4a05b7734cb7d7db7e1f`.
 
 - Historial 24→25: el preflight acreditó 24 con `20261115010000_OptionalSalePaymentReferenceV1` y sin otras conexiones; el postflight acreditó 25 con el objetivo.
 - Respaldo previo de `controlplus` verificado: 558685 bytes, SHA-256 `91871A096DCF010D7E13C0FA0D2266CA37E44ABDF1FB3DD00FE4A93B6A1282DC`.

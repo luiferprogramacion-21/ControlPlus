@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
  [string]$Repository='C:\ControlPlus\backend\ControlPlus.Backend',
- [string]$Evidence='C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c',
+ [string]$Evidence="$env:USERPROFILE\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c",
  [string]$PgBin='C:\Program Files\PostgreSQL\18\bin',
  [string]$ReadRole='postgres',
  [switch]$ContinueClone,

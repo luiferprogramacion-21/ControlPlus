@@ -3,7 +3,7 @@
 > **Estado vigente (21 de noviembre de 2026):** las tres migraciones de IVA ya están aplicadas en `controlplus` (historial 19→21 el 11 de noviembre y 21→22 el 12 de noviembre de 2026). Los bloques «pendiente de ejecución» de abajo son históricos: **no repetir ninguno**. El IVA se quitó de la operación el 18 de noviembre de 2026.
 
 
-**Activación ejecutada por el operador el 11 de noviembre de 2026.** La evidencia está en `C:\Users\luife\ControlPlus-Backups\BusinessVat-20261111T140623Z-d62b0903500246c79110ba1fa64eb681` y registra `BUSINESS_VAT_ACTIVATION_OK`. El agente no consultó `controlplus` ni ejecutó migraciones. Objetivos aplicados, en este orden:
+**Activación ejecutada por el operador el 11 de noviembre de 2026.** La evidencia está en `%USERPROFILE%\ControlPlus-Backups\BusinessVat-20261111T140623Z-d62b0903500246c79110ba1fa64eb681` y registra `BUSINESS_VAT_ACTIVATION_OK`. El agente no consultó `controlplus` ni ejecutó migraciones. Objetivos aplicados, en este orden:
 
 1. `20261110010000_BusinessVatSettingV1`: columnas y CHECK de `configuracion.establecimiento`, catálogo `TAXES.MANAGE` y una concesión de plantilla a Administrador.
 2. `20261110020000_BusinessVatWholePesoSalesV1`: reemplaza `ck_detalle_venta_iva_incluido` para admitir redondeo a peso entero además del histórico a cuatro decimales.
@@ -189,7 +189,7 @@ Antes del bloque real, ejecutar `BusinessVatWholePesoSalesMigrationTests.WholePe
 
 ## Reinicio y comprobaciones HTTP
 
-Tras `BUSINESS_VAT_ACTIVATION_OK`, el arranque desde el `api-bin` de la evidencia usa la configuración de Development/User Secrets habitual de la API y el rol `controlplus_app`. La gramática cerrada de la regla 9 de `AGENTS.md` rechaza `--urls`: el puerto se fija con `ASPNETCORE_URLS` y el entorno con `ASPNETCORE_ENVIRONMENT`. Ejemplo en otra consola de PowerShell: `$env:ASPNETCORE_ENVIRONMENT = 'Development'; $env:ASPNETCORE_URLS = 'http://localhost:5000'; dotnet C:\Users\luife\ControlPlus-Backups\BusinessVat-20261111T140623Z-d62b0903500246c79110ba1fa64eb681\api-bin\ControlPlus.Api.dll`. La ejecución habitual del operador desde el repositorio es `dotnet run --project ControlPlus.Api --launch-profile http`. La comprobación HTTP y la venta de validación realizadas se registran al inicio de este documento.
+Tras `BUSINESS_VAT_ACTIVATION_OK`, el arranque desde el `api-bin` de la evidencia usa la configuración de Development/User Secrets habitual de la API y el rol `controlplus_app`. La gramática cerrada de la regla 9 de `AGENTS.md` rechaza `--urls`: el puerto se fija con `ASPNETCORE_URLS` y el entorno con `ASPNETCORE_ENVIRONMENT`. Ejemplo en otra consola de PowerShell: `$env:ASPNETCORE_ENVIRONMENT = 'Development'; $env:ASPNETCORE_URLS = 'http://localhost:5000'; dotnet %USERPROFILE%\ControlPlus-Backups\BusinessVat-20261111T140623Z-d62b0903500246c79110ba1fa64eb681\api-bin\ControlPlus.Api.dll`. La ejecución habitual del operador desde el repositorio es `dotnet run --project ControlPlus.Api --launch-profile http`. La comprobación HTTP y la venta de validación realizadas se registran al inicio de este documento.
 
 Si cualquier etapa falla, conservar la API detenida y la carpeta de evidencia. Inspeccionar historial y objetos solo en lectura: una migración puede haber quedado aplicada. No repetir el bloque, no ejecutar `Down` ni restaurar el respaldo sobre la base real automáticamente. Ensayar cualquier recuperación en un clon nuevo antes de decidir sobre producción.
 
@@ -205,7 +205,7 @@ Antes de abrir la ventana real, el operador debe ejecutar `BusinessVatWholePesoL
 
 ## Bloque único de activación para el operador (segundo corte: ejecutado el 12 de noviembre de 2026; no volver a ejecutar)
 
-**Activación ejecutada por el operador el 12 de noviembre de 2026**: `BUSINESS_VAT_LAYAWAYS_CHANGES_ACTIVATION_OK`, historial 21→22. Evidencia en `C:\Users\luife\ControlPlus-Backups\BusinessVat-LayawaysChanges-20261112T140538Z-85af942f8ee645148f30f7084a8a2fc0`; respaldo SHA-256 `EBA10ACCB9E58A05BEAADF7F2E51482A4D5329E17A14E6A062371CA79ECC55E5`; API SHA-256 `D317110324379115741A9E7581CAB480D503B0794F97B564485D7D49628A3461`. El postflight y las huellas (cuatro tablas vacías, idénticas antes y después) quedaron conformes; la API respondió 200/200/200 y 401 en `/api/settings/vat` sin sesión. **No repetir ni ejecutar `Down`.** El bloque que sigue se conserva solo como registro.
+**Activación ejecutada por el operador el 12 de noviembre de 2026**: `BUSINESS_VAT_LAYAWAYS_CHANGES_ACTIVATION_OK`, historial 21→22. Evidencia en `%USERPROFILE%\ControlPlus-Backups\BusinessVat-LayawaysChanges-20261112T140538Z-85af942f8ee645148f30f7084a8a2fc0`; respaldo SHA-256 `EBA10ACCB9E58A05BEAADF7F2E51482A4D5329E17A14E6A062371CA79ECC55E5`; API SHA-256 `D317110324379115741A9E7581CAB480D503B0794F97B564485D7D49628A3461`. El postflight y las huellas (cuatro tablas vacías, idénticas antes y después) quedaron conformes; la API respondió 200/200/200 y 401 en `/api/settings/vat` sin sesión. **No repetir ni ejecutar `Down`.** El bloque que sigue se conserva solo como registro.
 
 Detener API, frontend y cualquier otro cliente antes de ejecutarlo. El bloque exige PostgreSQL 18, historial exacto **21**, última `20261110020000_BusinessVatWholePesoSalesV1`, ausencia del objetivo y ningún otro cliente conectado. Publica la API en serie con `/warnaserror`, crea un respaldo nuevo, conserva su SHA-256, valida el TOC y una lectura completa, repite historial y huellas, hace una sola confirmación `--migrate-to`, y ejecuta el postflight de solo lectura. Ejecutar desde una consola PowerShell abierta por el operador; la contraseña se mantiene solo en memoria.
 
@@ -578,7 +578,7 @@ La única escritura autorizada por este bloque es la migración objetivo exacta.
 
 ## Evidencia de la activación (12 de noviembre de 2026)
 
-Comunicada por el operador: `LAYAWAY_CREDIT_RULES_ACTIVATION_OK` en `C:\Users\luife\ControlPlus-Backups\LayawayCreditRules-20261112T162110Z-bd78f806dab4423e8c240678c13c5673`. El bloque terminó sin errores, por lo que el preflight (historial 22, última `20261111010000_BusinessVatWholePesoLayawaysChangesV1`, sin otros clientes), el respaldo verificado, el migrador, el postflight (columnas, CHECK 1–90, `ck_apartado_montos` y permisos de `controlplus_app`) y la igualdad de huellas de `establecimiento` (sin las dos columnas nuevas), `apartado` y `credito` resultaron conformes. Historial 22→23.
+Comunicada por el operador: `LAYAWAY_CREDIT_RULES_ACTIVATION_OK` en `%USERPROFILE%\ControlPlus-Backups\LayawayCreditRules-20261112T162110Z-bd78f806dab4423e8c240678c13c5673`. El bloque terminó sin errores, por lo que el preflight (historial 22, última `20261111010000_BusinessVatWholePesoLayawaysChangesV1`, sin otros clientes), el respaldo verificado, el migrador, el postflight (columnas, CHECK 1–90, `ck_apartado_montos` y permisos de `controlplus_app`) y la igualdad de huellas de `establecimiento` (sin las dos columnas nuevas), `apartado` y `credito` resultaron conformes. Historial 22→23.
 
 - Respaldo previo SHA-256: `9940859DBC82C50E025D84DBF6128DCB04DF31BCDE0087E8B402E02D6FA6B856`.
 - API congelada SHA-256: `BD9D6E497645A8682380A8235968B6FCB099A623C9B22BC4E10F8D1F54D1EBD6`.

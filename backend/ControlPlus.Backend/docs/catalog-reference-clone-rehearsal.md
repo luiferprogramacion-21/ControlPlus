@@ -3,7 +3,7 @@
 **Nuevo ensayo autorizado el 2 de noviembre:** el operador cerró el diagnóstico
 de deriva con `DATA_DRIFT_READONLY_OK` y confirmó una activación de producto y
 tres inicios de sesión posteriores al respaldo, con evidencia en
-`C:\Users\luife\ControlPlus-Reviews\CatalogDataDrift-8f6b9b32b30e4aad923a95a7cea4672f`.
+`%USERPROFILE%\ControlPlus-Reviews\CatalogDataDrift-8f6b9b32b30e4aad923a95a7cea4672f`.
 Autoriza ahora un respaldo y clon **nuevos**, usando el estado actual; el bloque
 de este documento vuelve a ser el recorrido aplicable. No reutiliza ni altera
 el respaldo, clon o evidencias del ensayo `6540f35e...`, la continuación

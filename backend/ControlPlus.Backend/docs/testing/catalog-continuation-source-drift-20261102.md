@@ -1,7 +1,7 @@
 # Continuación detenida: el origen cambió desde el respaldo
 
 Evidencia leída, sin conexión a PostgreSQL:
-`C:\Users\luife\ControlPlus-Reviews\CatalogCloneContinuation-238048ef5c7b4dd88da829d63bdd48d2`.
+`%USERPROFILE%\ControlPlus-Reviews\CatalogCloneContinuation-238048ef5c7b4dd88da829d63bdd48d2`.
 No se modificaron esos archivos, el respaldo ni el clon. El operador acreditó
 nativamente `INVENTORY_CHECK_EQUIVALENCE_OK checks=39` y
 `EXISTING_CLONE_PLAN_OK checks=23`; no se repitieron esas pruebas.
@@ -127,8 +127,8 @@ $repo = 'C:\ControlPlus\backend\ControlPlus.Backend'
 
 & (Join-Path $repo 'scripts\catalog-references\Read-ContinuationDataDrift.ps1') `
     -Repository $repo `
-    -Evidence 'C:\Users\luife\ControlPlus-Reviews\CatalogCloneContinuation-238048ef5c7b4dd88da829d63bdd48d2' `
-    -OriginalEvidence 'C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c' `
+    -Evidence "$env:USERPROFILE\ControlPlus-Reviews\CatalogCloneContinuation-238048ef5c7b4dd88da829d63bdd48d2" `
+    -OriginalEvidence "$env:USERPROFILE\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c" `
     -PgBin 'C:\Program Files\PostgreSQL\18\bin' `
     -ReadRole 'postgres' `
     -ReadCurrent

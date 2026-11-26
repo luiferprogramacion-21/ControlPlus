@@ -5,7 +5,7 @@ No repetir activación, ensayo, migración ni suites completas para este arranqu
 
 ## Evidencia de cierre comprobada
 
-`C:\Users\luife\ControlPlus-Reviews\CatalogActivation-54e8a95787bd408aa2e13e1ee8e47333`:
+`%USERPROFILE%\ControlPlus-Reviews\CatalogActivation-54e8a95787bd408aa2e13e1ee8e47333`:
 
 - result.json: CATALOG_ACTIVATION_OK, base controlplus, objetivo único
   `20261029010000_PermanentProductReferencesV1`, historial 12→13, UTC
@@ -34,7 +34,7 @@ la migración como evidencia de arranque o consultas HTTP posteriores.
 ```powershell
 $ErrorActionPreference = 'Stop'
 $repo = 'C:\ControlPlus\backend\ControlPlus.Backend'
-$activation = 'C:\Users\luife\ControlPlus-Reviews\CatalogActivation-54e8a95787bd408aa2e13e1ee8e47333'
+$activation = "$env:USERPROFILE\ControlPlus-Reviews\CatalogActivation-54e8a95787bd408aa2e13e1ee8e47333"
 
 & (Join-Path $repo 'scripts\catalog-references\Start-ActivatedCatalogApi.ps1') `
     -Repository $repo `

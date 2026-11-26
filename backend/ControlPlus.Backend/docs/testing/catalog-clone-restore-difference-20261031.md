@@ -7,7 +7,7 @@ formas y rechaza reglas desconocidas; el diagnóstico histórico siguiente se
 conserva. [Ajuste, pruebas y continuación sobre este clon](catalog-existing-clone-resume-20261102.md).
 
 Evidencias originales leídas sin modificar:
-`C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c`.
+`%USERPROFILE%\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c`.
 Clon: `controlplus_test_08c9dd5e50bd4980be0ca5252e298737`.
 
 ## Diagnóstico acreditado
@@ -93,7 +93,7 @@ $repo = 'C:\ControlPlus\backend\ControlPlus.Backend'
 & (Join-Path $repo 'scripts\catalog-references\Read-StoppedCloneDiagnostic.ps1') `
     -Repository $repo `
     -PgBin 'C:\Program Files\PostgreSQL\18\bin' `
-    -EvidenceDirectory 'C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c' `
+    -EvidenceDirectory "$env:USERPROFILE\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c" `
     -ReadRole 'postgres'
 ```
 

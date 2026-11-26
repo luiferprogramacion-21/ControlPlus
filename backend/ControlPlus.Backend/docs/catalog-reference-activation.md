@@ -13,7 +13,7 @@ y no se modifica su script.
 ## Evidencias comprobadas
 
 Carpeta:
-`C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-22eebc2bb624496eae905222f0fec269`.
+`%USERPROFILE%\ControlPlus-Backups\CatalogRehearsal-22eebc2bb624496eae905222f0fec269`.
 Clon conservado: `controlplus_test_7d06a60beb414b0ebd9de7d5aaf4f0a1`.
 
 - `result.json`: CLONE_REHEARSAL_OK, origen controlplus, sourceUnchanged=true,
@@ -52,7 +52,7 @@ y no guarda credenciales en archivos ni en argumentos del proceso.
 ```powershell
 $ErrorActionPreference = 'Stop'
 $repo = 'C:\ControlPlus\backend\ControlPlus.Backend'
-$evidence = 'C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-22eebc2bb624496eae905222f0fec269'
+$evidence = "$env:USERPROFILE\ControlPlus-Backups\CatalogRehearsal-22eebc2bb624496eae905222f0fec269"
 
 # Prueba nueva del orquestador: datos simulados; no conecta a PostgreSQL.
 & (Join-Path $repo 'scripts\catalog-references\Test-VerifiedCatalogActivationOffline.ps1') `

@@ -22,13 +22,13 @@ Para pruebas de escritura automatizadas, usar el arnés de bases temporales del 
 
 ## Referencia visual
 
-La referencia local comprobada es `C:\Users\luife\OneDrive\Documentos\controlplus-prototipo-bloque1`. Se reutilizaron su estructura del punto de venta y cobro, los paneles de apertura y cierre, el menú lateral y las reglas visuales pertinentes, adaptadas a los servicios reales. En Caja, la operación del turno y el arqueo tienen vistas separadas dentro de la ruta integrada. Las rutas del prototipo son `/operacion/ventas/nueva`, `/operacion/ventas/cobro`, `/operacion/caja/apertura` y `/operacion/caja/cierre`.
+La referencia local comprobada es `%USERPROFILE%\OneDrive\Documentos\controlplus-prototipo-bloque1`. Se reutilizaron su estructura del punto de venta y cobro, los paneles de apertura y cierre, el menú lateral y las reglas visuales pertinentes, adaptadas a los servicios reales. En Caja, la operación del turno y el arqueo tienen vistas separadas dentro de la ruta integrada. Las rutas del prototipo son `/operacion/ventas/nueva`, `/operacion/ventas/cobro`, `/operacion/caja/apertura` y `/operacion/caja/cierre`.
 
 La comparación visual lado a lado al mismo ancho y zoom queda pendiente: este entorno no tiene navegador disponible y la interoperabilidad WSL/Windows ya falló. En PowerShell, inicia ambos proyectos en ventanas separadas:
 
 ```powershell
 # Ventana 1: prototipo
-Set-Location 'C:\Users\luife\OneDrive\Documentos\controlplus-prototipo-bloque1'
+Set-Location "$env:USERPROFILE\OneDrive\Documentos\controlplus-prototipo-bloque1"
 npm start -- --port 4200
 ```
 

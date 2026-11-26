@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$Repository = 'C:\ControlPlus\backend\ControlPlus.Backend',
-    [string]$EvidenceDirectory = 'C:\Users\luife\ControlPlus-Backups\CategoryReferenceRehearsal-15de3b08c6da431395852b8202f7c26a',
+    [string]$EvidenceDirectory = "$env:USERPROFILE\ControlPlus-Backups\CategoryReferenceRehearsal-15de3b08c6da431395852b8202f7c26a",
     [string]$PgBin = 'C:\Program Files\PostgreSQL\18\bin',
     [string]$ReadRole = 'postgres'
 )

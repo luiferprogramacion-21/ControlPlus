@@ -2,8 +2,8 @@
 [CmdletBinding()]
 param(
  [string]$Repository='C:\ControlPlus\backend\ControlPlus.Backend',
- [string]$Evidence='C:\Users\luife\ControlPlus-Reviews\CatalogCloneContinuation-238048ef5c7b4dd88da829d63bdd48d2',
- [string]$OriginalEvidence='C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c',
+ [string]$Evidence="$env:USERPROFILE\ControlPlus-Reviews\CatalogCloneContinuation-238048ef5c7b4dd88da829d63bdd48d2",
+ [string]$OriginalEvidence="$env:USERPROFILE\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c",
  [string]$PgBin='C:\Program Files\PostgreSQL\18\bin',
  [string]$ReadRole='postgres',
  [switch]$ReadCurrent

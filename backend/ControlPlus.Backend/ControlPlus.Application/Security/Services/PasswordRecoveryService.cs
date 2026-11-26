@@ -85,7 +85,7 @@ public sealed partial class PasswordRecoveryService(
             $"Enviamos un código al correo {MaskEmail(user.Email)}. Revise ese correo: el código vale {minutes} minutos."));
     }
 
-    /// <summary>«luiferprogramacion21@gmail.com» → «lu•••21@gm•••.com»: lo justo para reconocerlo.</summary>
+    /// <summary>«camilarojas21@gmail.com» → «ca•••21@gm•••.com»: lo justo para reconocerlo.</summary>
     public static string MaskEmail(string email)
     {
         var at = email.LastIndexOf('@');

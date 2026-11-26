@@ -11,8 +11,8 @@ describe('purchase order document', () => {
   const supplier = { id: 'supplier', name: 'Proveedor & Cía.', documentType: 'NIT', documentNumber: '900123', phone: '555', address: 'Centro', email: 'ventas@example.com', observations: null, isActive: true, version: 1 } satisfies Supplier;
 
   it('genera un documento A4 con proveedor, pedido, productos y totales escapados', () => {
-    const html = buildPurchaseOrderHtml(order, supplier, 'Numael Álvarez', { commercialName: 'Tienda Central', identification: '900-1', phone: '555', address: 'Ocaña', receiptHeader: null, receiptFooter: null, version: 1 });
-    for (const value of ['Pedido de compra', 'PED-001-000027', 'Proveedor &amp; Cía.', 'Resma &lt;carta&gt;', 'Caja &quot;sellada&quot;', 'Total de unidades', '12', 'Numael Álvarez', 'Tienda Central', 'NIT 900-1', 'Ocaña']) expect(html).toContain(value);
+    const html = buildPurchaseOrderHtml(order, supplier, 'Ana Gómez', { commercialName: 'Tienda Central', identification: '900-1', phone: '555', address: 'Ocaña', receiptHeader: null, receiptFooter: null, version: 1 });
+    for (const value of ['Pedido de compra', 'PED-001-000027', 'Proveedor &amp; Cía.', 'Resma &lt;carta&gt;', 'Caja &quot;sellada&quot;', 'Total de unidades', '12', 'Ana Gómez', 'Tienda Central', 'NIT 900-1', 'Ocaña']) expect(html).toContain(value);
     expect(html).toContain('@page { size: A4 portrait;');
     expect(html).not.toContain('Resma <carta>');
   });

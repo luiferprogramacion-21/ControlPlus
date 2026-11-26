@@ -88,7 +88,7 @@ No ejecutó PostgreSQL, migraciones, restauraciones ni la suite completa.
 `RESTORE_RECORDED_EQUIVALENCE_OK`. Resultado final guardado en:
 
 ```text
-C:\Users\luife\ControlPlus-Reviews\CatalogRestoreReview-05c89986e4e14051973c7cbd83625b4b\result.json
+%USERPROFILE%\ControlPlus-Reviews\CatalogRestoreReview-05c89986e4e14051973c7cbd83625b4b\result.json
 ```
 
 Enriquece copias nuevas de las capturas antiguas con los componentes del

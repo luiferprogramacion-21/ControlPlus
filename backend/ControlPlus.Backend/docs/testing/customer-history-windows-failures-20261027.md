@@ -1,6 +1,6 @@
 # Historial comercial: fallos de la ejecución Windows del 27 de octubre de 2026
 
-Fuente: `C:\Users\luife\AppData\Local\Temp\ControlPlus-CustomerHistory-7c7297b5fcbd4ff3ac89fb3ae517c919\CustomerHistory.trx`.
+Fuente: `%USERPROFILE%\AppData\Local\Temp\ControlPlus-CustomerHistory-7c7297b5fcbd4ff3ac89fb3ae517c919\CustomerHistory.trx`.
 
 Resultado original: `Failed`, 9 casos, 9 ejecutados, 2 aprobados, 7 fallidos, 0 omitidos.
 

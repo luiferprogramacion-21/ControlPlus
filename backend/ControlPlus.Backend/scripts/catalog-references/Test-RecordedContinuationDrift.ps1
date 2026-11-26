@@ -1,8 +1,8 @@
 #requires -Version 5.1
 param(
  [string]$Repository='C:\ControlPlus\backend\ControlPlus.Backend',
- [string]$StoppedEvidence='C:\Users\luife\ControlPlus-Reviews\CatalogCloneContinuation-238048ef5c7b4dd88da829d63bdd48d2',
- [string]$OriginalEvidence='C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c'
+ [string]$StoppedEvidence="$env:USERPROFILE\ControlPlus-Reviews\CatalogCloneContinuation-238048ef5c7b4dd88da829d63bdd48d2",
+ [string]$OriginalEvidence="$env:USERPROFILE\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c"
 )
 $ErrorActionPreference='Stop'; Set-StrictMode -Version 2.0
 $folder=Join-Path $Repository 'scripts/catalog-references'

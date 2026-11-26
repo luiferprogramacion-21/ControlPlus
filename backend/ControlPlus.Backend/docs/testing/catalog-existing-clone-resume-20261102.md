@@ -9,7 +9,7 @@ Las focalizadas nativas 39/23 ya están acreditadas.
 
 Revisión del 2 de noviembre de 2026. Alcance exclusivo:
 
-- Evidencias: `C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c`.
+- Evidencias: `%USERPROFILE%\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c`.
 - Clon: `controlplus_test_08c9dd5e50bd4980be0ca5252e298737`.
 - Lecturas conservadas: subdirectorio `ReadOnlyDiagnosis-3970cddd892249e2b385d817a2cd5b11`.
 
@@ -144,7 +144,7 @@ $repo = 'C:\ControlPlus\backend\ControlPlus.Backend'
 
 & (Join-Path $repo 'scripts\catalog-references\Resume-ExistingCatalogClone.ps1') `
     -Repository $repo `
-    -Evidence 'C:\Users\luife\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c' `
+    -Evidence "$env:USERPROFILE\ControlPlus-Backups\CatalogRehearsal-6540f35e2fae4f009387c32fe72b241c" `
     -PgBin 'C:\Program Files\PostgreSQL\18\bin' `
     -ReadRole 'postgres' `
     -MaintenanceConfirmed `

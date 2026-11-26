@@ -1,7 +1,7 @@
 # Evidencia de Catálogo leída el 30 de octubre de 2026
 
 Origen (Windows):
-`C:\Users\luife\AppData\Local\Temp\ControlPlus-Catalog-d7ab5ed4f0f248589eaf4e65d1907716`.
+`%USERPROFILE%\AppData\Local\Temp\ControlPlus-Catalog-d7ab5ed4f0f248589eaf4e65d1907716`.
 Se leyeron los XML, no se ejecutaron pruebas, build ni conexiones de base de datos.
 No se copiaron stdout, cuerpos, credenciales ni datos de las pruebas al informe.
 

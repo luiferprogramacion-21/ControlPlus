@@ -49,7 +49,7 @@ Este bloque se ejecutó una vez por el operador. La ruta y el SHA-256 del recibo
 & {
 $ErrorActionPreference = 'Stop'
 Set-Location 'C:\ControlPlus\backend\ControlPlus.Backend'
-$rehearsal = 'C:\Users\luife\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T204319Z-a632e5f5996e40c296334d7fd5bc971f'
+$rehearsal = "$env:USERPROFILE\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T204319Z-a632e5f5996e40c296334d7fd5bc971f"
 $receiptSha256 = '438F946AEEDB6096B317FE4B92229CA6500937AE5455BB8D9B47C98CFDC09D08'
 if (-not (Test-Path -LiteralPath (Join-Path $rehearsal 'result.json'))) { throw 'Falta el ensayo aprobado.' }
 if ((Get-FileHash -LiteralPath (Join-Path $rehearsal 'result.json') -Algorithm SHA256).Hash -cne $receiptSha256) {
@@ -88,14 +88,14 @@ Set-Location 'C:\ControlPlus\backend\ControlPlus.Backend'
 .\scripts\admin-self-authorization\Invoke-AdminSelfActivation.ps1 -Mode OfflineValidateOnly
 .\scripts\admin-self-authorization\Test-AdminSelfActivationOffline.ps1
 .\scripts\admin-self-authorization\Test-AdminSelfRestoreOffline.ps1 `
-    -EvidenceDirectory 'C:\Users\luife\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T203114Z-0b87695bbca746b6a96977ac80b59f04'
+    -EvidenceDirectory "$env:USERPROFILE\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T203114Z-0b87695bbca746b6a96977ac80b59f04"
 ```
 
 La validación offline no acredita la disponibilidad de PostgreSQL, la parada real de la API, la restauración ni la aplicación. Esas comprobaciones pertenecen al ensayo y a la ejecución del operador.
 
 ## Primer ensayo detenido y comparador corregido (5 de noviembre de 2026)
 
-La carpeta `C:\Users\luife\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T203114Z-0b87695bbca746b6a96977ac80b59f04` contiene `failure.json` con `stage=RestoreClone` y `applyInvoked=false`. El preflight del origen y el respaldo terminaron; las capturas del origen antes y después del respaldo son iguales. El clon se restauró, pero `Assert-CatalogSnapshot -Mode Restore` rechazó sus metadatos antes de invocar el migrador. No hay registro `*-apply.txt` ni `result.json` de éxito de este intento. No se aplicó ninguna de las tres migraciones al clon ni a `controlplus`.
+La carpeta `%USERPROFILE%\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T203114Z-0b87695bbca746b6a96977ac80b59f04` contiene `failure.json` con `stage=RestoreClone` y `applyInvoked=false`. El preflight del origen y el respaldo terminaron; las capturas del origen antes y después del respaldo son iguales. El clon se restauró, pero `Assert-CatalogSnapshot -Mode Restore` rechazó sus metadatos antes de invocar el migrador. No hay registro `*-apply.txt` ni `result.json` de éxito de este intento. No se aplicó ninguna de las tres migraciones al clon ni a `controlplus`.
 
 La comparación offline de sus 234 claves por instantánea encontró solo `shape:catalogo.producto.relationsHash` y `shape:compras.movimiento_inventario.relationsHash` distintos. Las huellas actuales de origen y clon coinciden **por separado** con el par de instantáneas históricas del ensayo de referencias de categoría, cuyos tamaños y SHA-256 están fijados por `docs/testing/category-reference-approved-clone-20261102.json` (SHA-256 del recibo `D22AD75E6E90E3445F4745EF03E20B5021D5960EF6E85CCED931DA2A54A3626B`). La diferencia histórica se acreditó como los casts equivalentes de `ck_producto_formato_codigo` y `ck_movimiento_inventario_tipo`; véase `docs/testing/category-reference-clone-restore-difference-20261102.md`. El comparador nuevo exige **ese par exacto de hashes** para Producto, usa la equivalencia acotada existente para Inventario y mantiene igualdad estricta para todas las demás claves. También se usa al comparar el resultado real con el clon ensayado.
 
@@ -103,17 +103,17 @@ La comparación offline de sus 234 claves por instantánea encontró solo `shape
 
 ## Segundo ensayo completo y cierre del manifiesto binario
 
-El segundo ensayo, `C:\Users\luife\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T203753Z-80d88a93e8ef41f891fece171a0edef7`, terminó `ADMIN_SELF_REHEARSAL_OK`: historial del clon 15→18, tres `*-apply.txt` de éxito, los tres postflight conformes y `source-after.jsonl` idéntico a `source-before.jsonl`. El recibo archivado tiene SHA-256 `F222D8CE6A967D910B1A8287909BEDF6298C076910A2B8FC1D2FE5A5608F30B2`; su respaldo tiene SHA-256 `FF5ACBEAD5ED33D4937572784014532CCECBB2A8F5A5455506058458A4430D92`. No hubo aplicación a `controlplus`.
+El segundo ensayo, `%USERPROFILE%\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T203753Z-80d88a93e8ef41f891fece171a0edef7`, terminó `ADMIN_SELF_REHEARSAL_OK`: historial del clon 15→18, tres `*-apply.txt` de éxito, los tres postflight conformes y `source-after.jsonl` idéntico a `source-before.jsonl`. El recibo archivado tiene SHA-256 `F222D8CE6A967D910B1A8287909BEDF6298C076910A2B8FC1D2FE5A5608F30B2`; su respaldo tiene SHA-256 `FF5ACBEAD5ED33D4937572784014532CCECBB2A8F5A5455506058458A4430D92`. No hubo aplicación a `controlplus`.
 
 La revisión detectó una guarda incompleta **para la aplicación real**: ese recibo fijaba `ControlPlus.Api.dll`, pero no las demás DLL y archivos cargados desde `api-bin`. El activador ahora incluye un manifiesto de los **160 archivos** del directorio en `result.json` y comprueba nombres, tamaños y SHA-256 antes de cada migración real. La prueba offline `Test-AdminSelfBinaryManifestOffline.ps1` aprobó 4/4 sobre el binario ensayado: conjunto íntegro, lectura desde JSON y rechazo de un hash cambiado o un archivo omitido. Esta mejora cambió la huella del activador, de modo que **el segundo recibo no se debe usar para el bloque real**. Se exigió un tercer ensayo nuevo, acreditado a continuación. Los dos ensayos anteriores se conservan; no se repite ninguna migración sobre ellos ni sobre `controlplus`.
 
 ## Tercer ensayo acreditado para la aplicación real
 
-El tercer ensayo está en `C:\Users\luife\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T204319Z-a632e5f5996e40c296334d7fd5bc971f`. Su `result.json` tiene SHA-256 `438F946AEEDB6096B317FE4B92229CA6500937AE5455BB8D9B47C98CFDC09D08` y declara `ADMIN_SELF_REHEARSAL_OK`, origen 15, clon 18 y `sourcePreserved=true`. La revisión independiente de archivos confirmó SHA-256 del respaldo, seis instantáneas fijadas y el archivo `dump.sha256`, 13 fuentes/SQL actuales y los **160 archivos binarios** sin omisiones ni duplicados. Los tres `*-apply.txt` registran éxito para los tres objetivos exactos y los tres postflight tienen sus marcadores `*_OK`. `source-before.jsonl` y `source-after.jsonl` son byte a byte iguales. Este es el único recibo usado por el bloque real histórico de arriba; las tres migraciones se aplicaron después como se documenta a continuación.
+El tercer ensayo está en `%USERPROFILE%\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T204319Z-a632e5f5996e40c296334d7fd5bc971f`. Su `result.json` tiene SHA-256 `438F946AEEDB6096B317FE4B92229CA6500937AE5455BB8D9B47C98CFDC09D08` y declara `ADMIN_SELF_REHEARSAL_OK`, origen 15, clon 18 y `sourcePreserved=true`. La revisión independiente de archivos confirmó SHA-256 del respaldo, seis instantáneas fijadas y el archivo `dump.sha256`, 13 fuentes/SQL actuales y los **160 archivos binarios** sin omisiones ni duplicados. Los tres `*-apply.txt` registran éxito para los tres objetivos exactos y los tres postflight tienen sus marcadores `*_OK`. `source-before.jsonl` y `source-after.jsonl` son byte a byte iguales. Este es el único recibo usado por el bloque real histórico de arriba; las tres migraciones se aplicaron después como se documenta a continuación.
 
 ## Aplicación real: tres migraciones aplicadas y cierre de lectura acreditado
 
-La carpeta `C:\Users\luife\ControlPlus-Backups\AdminSelf-Apply-20261105T205249Z-add103bff6954dcca1c9fcf1ce7bf1bb` conserva el respaldo real, las capturas y `failure.json` (`stage=Postflight`, `applyInvoked=true`). Los tres archivos `controlplus-<MigrationId>-apply.txt` registran éxito de las tres migraciones en orden; los postflight `SALE_SELF_POSTFLIGHT_OK`, `CASH_SELF_POSTFLIGHT_OK` y `SUPERVISOR_REFUND_POSTFLIGHT_OK` también aprobaron. `stage-2-after.jsonl` muestra historial 18 y `seguridad.rol_permiso` 104→105 filas. **No volver a ejecutar `--migrate-to` ni `Down`.**
+La carpeta `%USERPROFILE%\ControlPlus-Backups\AdminSelf-Apply-20261105T205249Z-add103bff6954dcca1c9fcf1ce7bf1bb` conserva el respaldo real, las capturas y `failure.json` (`stage=Postflight`, `applyInvoked=true`). Los tres archivos `controlplus-<MigrationId>-apply.txt` registran éxito de las tres migraciones en orden; los postflight `SALE_SELF_POSTFLIGHT_OK`, `CASH_SELF_POSTFLIGHT_OK` y `SUPERVISOR_REFUND_POSTFLIGHT_OK` también aprobaron. `stage-2-after.jsonl` muestra historial 18 y `seguridad.rol_permiso` 104→105 filas. **No volver a ejecutar `--migrate-to` ni `Down`.**
 
 El marcador final inicial se detuvo al comparar el hash completo de `seguridad.rol_permiso` entre clon y real. La tercera migración inserta solo `(rol_id, permiso_id)`; el DDL del respaldo fija `fecha_asignacion DEFAULT CURRENT_TIMESTAMP`, generado en cada transacción. Los resultados archivados de las etapas 0 y 1 solo difieren en los dos CHECK de casts ya acreditados; en la etapa 2 aparece además **únicamente** el hash de esta tabla. El comparador usado en el bloque real omitió reconocer ese valor variable. La conciliación posterior de solo lectura terminó con `ADMIN_SELF_ACTIVATION_OK`, según la salida comunicada por el operador.
 
@@ -128,8 +128,8 @@ La validación `-OfflineValidateOnly` del cierre pasó en Windows PowerShell 5.1
     $ErrorActionPreference = 'Stop'
     Set-Location 'C:\ControlPlus\backend\ControlPlus.Backend'
     $completion = & .\scripts\admin-self-authorization\Complete-AdminSelfActivation.ps1 `
-        -FailedActivation 'C:\Users\luife\ControlPlus-Backups\AdminSelf-Apply-20261105T205249Z-add103bff6954dcca1c9fcf1ce7bf1bb' `
-        -ApprovedRehearsal 'C:\Users\luife\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T204319Z-a632e5f5996e40c296334d7fd5bc971f' `
+        -FailedActivation "$env:USERPROFILE\ControlPlus-Backups\AdminSelf-Apply-20261105T205249Z-add103bff6954dcca1c9fcf1ce7bf1bb" `
+        -ApprovedRehearsal "$env:USERPROFILE\ControlPlus-Backups\AdminSelf-Rehearsal-20261105T204319Z-a632e5f5996e40c296334d7fd5bc971f" `
         -ExpectedRehearsalSha256 '438F946AEEDB6096B317FE4B92229CA6500937AE5455BB8D9B47C98CFDC09D08' `
         -MaintenanceConfirmed
     if ([string]::IsNullOrWhiteSpace($completion)) { throw 'Cierre detenido; no hay recibo final.' }
@@ -143,7 +143,7 @@ La validación `-OfflineValidateOnly` del cierre pasó en Windows PowerShell 5.1
 }
 ```
 
-El script solicitó las credenciales de `postgres` y `controlplus_test_admin` con entrada oculta, solo para lectura. La ejecución del operador informó `ADMIN_SELF_ACTIVATION_OK` en `C:\Users\luife\ControlPlus-Reviews\AdminSelf-Completion-20261105T211139Z-aeb09173414d40c1b2c8bdbc000f56e0`; el SHA-256 comunicado de `result.json` es `1C7733FDF55995480BB41EA003D9B239711BD351718C3585B8A052CD05A06978`. No repetir el bloque de aplicación real ni este cierre histórico. El agente no abrió el recibo ni consultó la base real.
+El script solicitó las credenciales de `postgres` y `controlplus_test_admin` con entrada oculta, solo para lectura. La ejecución del operador informó `ADMIN_SELF_ACTIVATION_OK` en `%USERPROFILE%\ControlPlus-Reviews\AdminSelf-Completion-20261105T211139Z-aeb09173414d40c1b2c8bdbc000f56e0`; el SHA-256 comunicado de `result.json` es `1C7733FDF55995480BB41EA003D9B239711BD351718C3585B8A052CD05A06978`. No repetir el bloque de aplicación real ni este cierre histórico. El agente no abrió el recibo ni consultó la base real.
 
 ## Arranque posterior
 
