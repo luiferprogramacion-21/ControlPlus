@@ -40,7 +40,7 @@ public sealed class EfInventoryRepository(OfficialControlPlusDbContext dbContext
         {
             InventoryStockStatus.Inactive => source.Where(x => !x.Activo),
             InventoryStockStatus.LowStock => source.Where(LowStockSelection.Predicate),
-            InventoryStockStatus.OutOfStock => source.Where(x => x.Activo && x.StockActual - x.StockReservado <= 0),
+            InventoryStockStatus.OutOfStock => source.Where(LowStockSelection.OutOfStock),
             InventoryStockStatus.Available => source.Where(x => x.Activo && x.StockActual - x.StockReservado > x.StockMinimo),
             _ => query.IncludeInactive ? source : source.Where(x => x.Activo)
         };

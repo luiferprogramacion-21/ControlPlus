@@ -166,7 +166,7 @@ En cada producto de la venta, **−** y **+** cambian la cantidad y la **×** lo
 - **Para cualquiera de los dos necesitas la autorización de un Supervisor o del Administrador.** El sistema la pide al pulsar «Aplicar» o al elegir mayorista. Una vez autorizada, no se pide otra vez para esa venta.
 - El **motivo** del descuento es opcional.
 - **No se acumulan** mayorista y descuento manual en el mismo producto.
-- **Nunca se vende por debajo del costo.** Si el descuento lo deja por debajo, el sistema lo rechaza.
+- **Nunca se vende por debajo del costo.** Si el descuento lo deja por debajo, el sistema lo rechaza. Quien puede ver los costos (el Administrador) lo ve antes: la ventana del descuento dice cuánto es lo máximo y no deja aplicar más.
 
 ## 2.5 Cobrar y el cambio
 
@@ -257,9 +257,13 @@ Desde el punto de venta (**+ Nuevo cliente**) se piden esos mismos cuatro datos.
 
 Sin deuda no aparece nada. Al vender a crédito a un moroso sigue saliendo el aviso o el bloqueo que configuró el Administrador.
 
+La columna **Debe** de Clientes muestra cuánto debe cada cliente en total, sumando todos sus créditos pendientes.
+
+**Cupo de crédito:** lo pone el Supervisor o el Administrador al crear o editar el cliente (campo **Cupo de crédito**). El Cajero no ve ese campo.
+
 ## 2.11 Consultar productos y existencias
 
-- **Catálogo** muestra los productos, sus precios, sus códigos y su **estado**: **Disponible**, **Stock bajo** (quedan igual o menos que el mínimo) o **Agotado**. Con **Existencias** filtras: disponibles, stock bajo o agotados. Al buscar en el punto de venta también ves ese estado.
+- **Catálogo** muestra los productos, sus precios, sus códigos y su **estado**: **Disponible**, **Stock bajo** (quedan unidades, pero igual o menos que el mínimo) o **Agotado** (no queda ninguna). Con **Existencias** filtras: disponibles, stock bajo o agotados; el filtro **Stock bajo** no incluye los agotados. Al buscar en el punto de venta también ves ese estado.
 - **Inventario** muestra las existencias y las **alertas de reposición** (productos con poco stock o agotados). Solo consulta: los ajustes los hace el Administrador.
 
 ## 2.12 Lo que no puedes hacer, y a quién pedirlo
@@ -372,8 +376,11 @@ Menú **Historial de ventas**: lista las ventas con sus pagos y productos. **Ver
 2. Se permite hasta **15 días** después de la venta (el Administrador puede cambiar ese plazo).
 3. Elige lo que devuelve el cliente y lo que se lleva. La **diferencia** se paga o se suma al crédito, según corresponda.
    Lo devuelto se recibe por lo que el cliente pagó (**Mismo precio**, marcado). Si la tienda lo recibe por menos (por ejemplo, viene usado), desmarca **Mismo precio** y escribe en cuánto se recibe cada unidad. Nunca puede ser más de lo que pagó.
-   Si el cliente paga la diferencia en efectivo, escribe lo que entrega en **Efectivo recibido**: el **Cambio** que hay que devolverle aparece en grande.
+   El valor que paga el cliente, o el que se le devuelve, **ya viene escrito**. Si el cliente paga la diferencia en efectivo, escribe lo que entrega en **Efectivo recibido**: el **Cambio** que hay que devolverle aparece en grande.
+   Cuando se le devuelve dinero, arriba se ve en grande **con qué medio se pagó la venta** y ese medio viene elegido: devuélvelo por el mismo.
+   Lo devuelto vuelve al inventario. Si un producto llegó dañado, recíbelo igual y avísale al Administrador para que lo saque con un ajuste **Merma o daño**.
 4. Autoriza un **Administrador**.
+5. Al aprobarse, el **comprobante de la corrección se imprime solo**. Si necesitas otra copia, en la venta pulsa **Comprobante de corrección**.
 
 En **Corregir venta** cada opción dice qué pasa y quién la autoriza; elige la que corresponda a lo que ocurrió.
 
@@ -388,6 +395,7 @@ En **Créditos y abonos** puedes registrar abonos (como el Cajero) y además:
 
 - **Crear:** sin segunda autorización.
 - **Cancelar:** pides la autorización de un **Administrador** y decides cuánto se devuelve al cliente.
+- **Corregir productos** (antes de entregarlo): cambias cantidades, quitas o agregas productos y **eliges el motivo** de la lista; si ninguno sirve, elige **Otro** y escríbelo. En el detalle del apartado, **Correcciones de productos** muestra cada corrección con su fecha, motivo, cómo quedaron el total y el saldo y lo que se devolvió.
 - Abonar y entregar: igual que el Cajero.
 
 ## 3.9 Catálogo y etiquetas
@@ -406,6 +414,7 @@ Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor*
 - **Cuando llega mercancía:** pulsa **Recibir mercancía** (también en Inicio). Son tres pasos, que se ven arriba de cada ventana: **1. ¿De dónde viene?**, **2. Productos y cantidades** y **3. Confirmar**. El sistema pregunta si viene de un pedido:
   - **Sí, viene de un pedido:** eliges el pedido; las cantidades pendientes **vienen listas**. Si llegó menos (recepción **parcial**), corrígelas.
     En **Precio de venta**, cada producto trae marcada la casilla **Mismo precio**. Si el precio cambió, desmárcala y escribe el **precio nuevo** (o calcúlalo con el **% de ganancia**). Si eres Supervisor, al guardar se pide la **autorización del Administrador** (su carné, o su usuario y contraseña).
+    Un producto **Sin precio** (creado desde un pedido) dice **Escribe su precio**: hay que ponerle el precio de venta y su costo para recibirlo. Desde ese momento ya se puede vender.
   - **No, es una compra sin pedido:** anotas el proveedor, el número de factura, los productos y sus costos.
 
   Lo recibido entra al inventario y actualiza el costo.
@@ -512,7 +521,8 @@ Para dejar de usarlo, desmarca **Permitir apertura** y guarda. Un perfil de etiq
 
 - **Proveedores:** solo tú los creas, editas e inactivas. El documento (NIT o cédula) es opcional; si lo informas, debes escribir tipo y número, y no se puede repetir. Al editar puedes retirar ambos datos.
 - **Compras y pedidos:** además de lo del Supervisor (3.10), tú puedes **anular una compra** ya confirmada (completa, con motivo), **anular un pedido** y **Cerrar con pendientes** un pedido cuyo faltante ya no va a llegar.
-- **Anular una compra** resta lo que había entrado al inventario y devuelve el costo anterior. No se puede si el producto ya tuvo movimientos posteriores.
+- **Proveedor nuevo en una compra sin pedido:** si el proveedor no existe, pulsa **+ Proveedor nuevo** debajo de la lista de proveedores, escribe su nombre (NIT y teléfono son opcionales) y **Crear proveedor**: queda elegido para esa compra.
+- **Anular una compra** resta lo que había entrado al inventario y devuelve el costo anterior. Solo se anulan las **compras sin pedido** (botón **Anular compra** en la compra); lo que llegó de un pedido se corrige con **Corregir recepción**. No se puede si el producto ya tuvo movimientos posteriores (por ejemplo, ya se vendió).
 
 ## 4.9 Ventas, créditos y apartados: lo que solo tú haces
 
@@ -525,7 +535,7 @@ Para dejar de usarlo, desmarca **Permitir apertura** y guarda. Un perfil de etiq
 
 ## 4.10 Dashboard y Reportes
 
-- **Dashboard:** el resumen del día: ventas, comparación con el mismo lapso de ayer, caja actual (efectivo esperado del turno abierto), alertas (stock bajo, créditos vencidos, apartados próximos a vencer), ventas por hora, actividad reciente y estado del respaldo externo.
+- **Dashboard:** el resumen del día: ventas, comparación con el mismo lapso de ayer, caja actual (efectivo esperado del turno abierto), alertas (stock bajo, agotados, créditos vencidos, apartados próximos a vencer), ventas por hora, actividad reciente y estado del respaldo externo. **Productos con alerta** suma los de stock bajo y los agotados; cada alerta abre Inventario con su filtro.
 - **Reportes:** ventas por día, flujo de caja por día, medios de pago y, con costos, **margen comercial estimado**. Hay versión en pantalla y en PDF.
   - El margen usa el costo histórico de cada venta y el precio de venta. **No es utilidad contable**: no descuenta impuestos ni gastos.
   - Si falta el costo de algún producto, el sistema dice cuántas líneas faltan en vez de inventar el dato.

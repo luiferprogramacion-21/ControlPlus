@@ -1,6 +1,15 @@
-import { describeDiscount, discountAmount, maxDiscountAmount, maxDiscountPercent, validateDiscount } from './sale-discount';
+import { costFloorDiscount, describeDiscount, discountAmount, maxDiscountAmount, maxDiscountPercent, validateDiscount } from './sale-discount';
 
 describe('sale-discount', () => {
+  it('calcula lo más que se puede descontar sin vender por debajo del costo (pruebas del 26/11/2026)', () => {
+    expect(costFloorDiscount([{ gross: 20000, cost: 14000 }])).toBe(6000);
+    // Venta total: lo limita el producto de menor margen (20 % aquí) y nunca deja la venta en cero.
+    expect(costFloorDiscount([{ gross: 10000, cost: 8000 }, { gross: 10000, cost: 2000 }])).toBe(4000);
+    expect(costFloorDiscount([{ gross: 10000, cost: 0 }, { gross: 5000, cost: 0 }])).toBe(14999);
+    expect(costFloorDiscount([{ gross: 10000, cost: null }])).toBeNull();
+    expect(costFloorDiscount([])).toBeNull();
+  });
+
   it('el límite inicial por rol es 5 % Cajero y 20 % Supervisor; el Administrador no tiene tope (D7) y se usan los configurados', () => {
     expect(maxDiscountPercent(false, false)).toBe(5); expect(maxDiscountPercent(false, true)).toBe(20); expect(maxDiscountPercent(true, false)).toBe(100);
     expect(maxDiscountPercent(false, false, { cashier: 10, supervisor: 25, administrator: 100 })).toBe(10);

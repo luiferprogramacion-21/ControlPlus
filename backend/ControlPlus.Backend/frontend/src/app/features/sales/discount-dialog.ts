@@ -24,6 +24,8 @@ export class DiscountDialog implements OnInit {
   /** Value the discount applies to (the line, or the sale subtotal). */
   readonly gross = input.required<number>();
   readonly maxPercent = input.required<number>();
+  /** Lo más que se puede descontar sin quedar por debajo del costo; null si no se conoce el costo. */
+  readonly costFloor = input<number | null>(null);
   readonly current = input<Discount | null>(null);
   readonly currentReason = input('');
   /** What the other kind of discount will lose when this one is applied. */
@@ -46,7 +48,13 @@ export class DiscountDialog implements OnInit {
   get discount(): Discount | null { return this.value === null || this.value === undefined || `${this.value}` === '' ? null : { type: this.type, value: Number(this.value) }; }
   /** Live preview of what the discount takes off and what is left to pay. */
   get amount(): number { return discountAmount(this.gross(), this.discount); }
-  get limitText(): string { return `Máximo ${this.maxPercent()} % (${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(maxDiscountAmount(this.gross(), this.maxPercent()))}) según tu rol.`; }
+  get limitText(): string {
+    const format = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
+    const roleMax = maxDiscountAmount(this.gross(), this.maxPercent());
+    const floor = this.costFloor();
+    if (floor !== null && floor < roleMax) return `Máximo ${format(floor)}: con más se vendería por debajo del costo.`;
+    return `Máximo ${this.maxPercent()} % (${format(roleMax)}) según tu rol.`;
+  }
   get currentText(): string { const c = this.current(); return c ? describeDiscount(c) : ''; }
 
   setType(type: Discount['type']): void { if (this.type !== type) { this.type = type; this.value = null; this.error = ''; } }
@@ -54,6 +62,9 @@ export class DiscountDialog implements OnInit {
   apply(): void {
     const discount = this.discount;
     this.error = discount ? validateDiscount(discount, this.gross(), this.maxPercent()) : 'Escribe el valor del descuento.';
+    const floor = this.costFloor();
+    if (!this.error && discount && floor !== null && discountAmount(this.gross(), discount) > floor)
+      this.error = `Con ese descuento se vendería por debajo del costo. Lo máximo que puedes descontar es ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(floor)}.`;
     if (this.error || !discount) return;
     this.applied.emit({ discount: { type: discount.type, value: discount.value }, reason: this.reason.trim() });
   }

@@ -16,7 +16,7 @@ const payment = (extra: Partial<LayawayPayment> = {}): LayawayPayment => ({ id: 
   receivedAmount: 3000, change: 0, occurredAtUtc: '2026-11-01T12:00:00Z', state: 'APLICADO', correlationId: 'corr-1', ...extra });
 
 describe('Layaways: abonos y entrega', () => {
-  const api = { list: vi.fn(), get: vi.fn(), applyPayment: vi.fn(), deliver: vi.fn(), paymentCancellationReasons: vi.fn(), cancelPayment: vi.fn() };
+  const api = { list: vi.fn(), get: vi.fn(), applyPayment: vi.fn(), deliver: vi.fn(), paymentCancellationReasons: vi.fn(), cancelPayment: vi.fn(), productCorrections: vi.fn() };
   const customers = { list: vi.fn() };
   const session = { has: (code: string) => ['LAYAWAY.MANAGE', 'CUSTOMERS.BASIC_MANAGE'].includes(code),
     hasRole: (...roles: string[]) => roles.includes('ADMINISTRADOR'), user: () => ({ userName: 'admin' }) };
@@ -26,6 +26,7 @@ describe('Layaways: abonos y entrega', () => {
     vi.clearAllMocks();
     api.list.mockResolvedValue({ items: [layaway()], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 });
     api.get.mockResolvedValue(detail());
+    api.productCorrections.mockResolvedValue([]);
     api.applyPayment.mockResolvedValue({ layawayId: 'a1', balance: 30000, state: 'ACTIVO', version: 4, correlationId: 'c', change: 0, payments: [] });
     api.deliver.mockResolvedValue({ layawayId: 'a1', number: 'APT-1', state: 'ENTREGADO', version: 5 });
     api.paymentCancellationReasons.mockResolvedValue([{ id: 'reason-1', code: 'OTRO', name: 'Otro', displayOrder: 1 }]);
@@ -46,6 +47,18 @@ describe('Layaways: abonos y entrega', () => {
     component.overdue = ''; component.find();
     await vi.waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
     expect(api.list.mock.lastCall![0].overdue).toBeUndefined();
+  });
+
+  it('el detalle muestra las correcciones de productos del apartado (pruebas del 26/11/2026)', async () => {
+    const correction = { id: 'k1', layawayId: 'a1', version: 5, previousTotal: 30000, total: 20000, previousBalance: 20000, balance: 10000, refunded: 0,
+      reason: 'El cliente cambió de producto', occurredAtUtc: '2026-11-26T15:00:00Z', correlationId: 'c' };
+    api.productCorrections.mockResolvedValue([correction]);
+    await component.open(layaway());
+    expect(api.productCorrections).toHaveBeenCalledWith('a1');
+    expect(component.corrections()).toEqual([correction]);
+    api.productCorrections.mockRejectedValue(new Error('sin permiso'));
+    await component.refreshDetail();
+    expect(component.corrections()).toEqual([]);
   });
 
   it('rechaza un intervalo de fecha límite invertido', () => {

@@ -22,3 +22,10 @@ td small { display: block; color: var(--cp-text-muted); }
 /* Valor en que se recibe lo devuelto, o «Mismo precio» (auditoría del 23 de noviembre de 2026). */
 .change-received { display: grid; justify-items: end; gap: 6px; }
 .change-received .change-return__qty input { width: 110px; text-align: right; }
+
+/* Pruebas del usuario del 26/11/2026: en una devolución se ve en grande con qué medio se pagó la venta. */
+.change-paid-with { display: grid; gap: 6px; margin: 6px 0 12px; padding: 12px 16px; border-radius: 12px; background: var(--cp-primary-soft, #e8f0fb); }
+.change-paid-with > span { color: var(--cp-text-secondary); font-weight: 600; }
+.change-paid-with__methods { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.change-paid-with__methods strong { font-size: 1.6rem; line-height: 1.2; color: var(--cp-primary, #1f5fa8); }
+.change-paid-with small { color: var(--cp-text-muted); }

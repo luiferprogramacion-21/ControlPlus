@@ -22,6 +22,8 @@ export interface DashboardCash {
 
 export interface DashboardAlerts {
   lowStockProducts: number;
+  /** Pruebas del usuario del 26/11/2026: los agotados se cuentan aparte del stock bajo. */
+  outOfStockProducts?: number;
   overdueCreditCustomers: number;
   upcomingLayaways: number;
   upcomingLayawayDays: number;

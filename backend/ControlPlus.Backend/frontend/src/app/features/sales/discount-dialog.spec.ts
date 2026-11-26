@@ -3,8 +3,9 @@ import { DiscountApplied, DiscountDialog } from './discount-dialog';
 import { Discount } from './sale-discount';
 
 describe('DiscountDialog', () => {
-  async function open(inputs: { scope?: 'product' | 'sale'; gross?: number; maxPercent?: number; current?: Discount | null; reason?: string } = {}) {
+  async function open(inputs: { scope?: 'product' | 'sale'; gross?: number; maxPercent?: number; current?: Discount | null; reason?: string; costFloor?: number | null } = {}) {
     const fixture = TestBed.createComponent(DiscountDialog);
+    if (inputs.costFloor !== undefined) fixture.componentRef.setInput('costFloor', inputs.costFloor);
     fixture.componentRef.setInput('scope', inputs.scope ?? 'product'); fixture.componentRef.setInput('gross', inputs.gross ?? 20000);
     fixture.componentRef.setInput('maxPercent', inputs.maxPercent ?? 20);
     if (inputs.current !== undefined) fixture.componentRef.setInput('current', inputs.current);
@@ -14,6 +15,15 @@ describe('DiscountDialog', () => {
     fixture.detectChanges(); await fixture.whenStable();
     return { c: fixture.componentInstance, applied, removed: () => removed, closed: () => closed, fixture };
   }
+
+  it('no deja descontar por debajo del costo aunque el rol permita el 100 % (pruebas del 26/11/2026)', async () => {
+    const { c, applied } = await open({ maxPercent: 100, costFloor: 6000 });
+    expect(c.limitText).toContain('por debajo del costo');
+    c.value = 100; c.apply();
+    expect(applied).toEqual([]); expect(c.error).toContain('por debajo del costo');
+    c.value = 30; c.apply();
+    expect(applied[0].discount).toEqual({ type: 'PORCENTAJE', value: 30 });
+  });
 
   it('el título depende de si es del producto o de la venta total', async () => {
     expect((await open({ scope: 'product' })).c.title).toBe('Descuento del producto');

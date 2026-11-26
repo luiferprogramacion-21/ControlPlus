@@ -23,6 +23,9 @@ describe('Customers', () => {
     expect(api.creditStages).toHaveBeenCalledWith(['c1', 'c2']);
     expect(component.creditStageView(component.stages()['c1'])?.label).toBe('Moroso');
     expect(component.stages()['c2']).toBeUndefined();
+    // Pruebas del usuario del 26/11/2026: la lista muestra lo que debe cada cliente en total.
+    expect(component.debt('c1')).toBe('$ 9.000');
+    expect(component.debt('c2')).toBe('—');
     permissions = ['CUSTOMERS.MANAGE']; api.creditStages.mockClear();
     await component.reload();
     expect(api.creditStages).not.toHaveBeenCalled();

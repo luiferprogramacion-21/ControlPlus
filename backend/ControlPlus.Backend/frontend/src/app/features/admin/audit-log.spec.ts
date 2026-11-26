@@ -144,13 +144,27 @@ describe('Auditoría', () => {
     expect(rows['Total pagado']).toBe('12.345');
     expect(rows['Cantidad']).toBe('1.250');
     // Sin llaves, comillas ni identificadores internos.
-    expect(rows['Después']).toBe('Unitario costo: 1.234,5678 · Existencias: 10.000');
+    expect(rows['Después']).toBe('Costo unitario: 1.234,5678 · Existencias: 10.000');
     expect(rows['Productos']).toBe('Cantidad: 2.000 · Monto: -1.234,5');
     expect(rows['Product ids']).toBeUndefined();
     expect(rows['Version']).toBeUndefined();
-    expect(rows).toMatchObject({ 'Documento número': '1234567', 'Producto código': '00001234', 'Teléfono': '3101234567', 'Occurred fecha': '2026-11-19', 'Nota': 'Pedido 1234567' });
+    expect(rows).toMatchObject({ 'Número de documento': '1234567', 'Código del producto': '00001234', 'Teléfono': '3101234567', 'Fecha': '2026-11-19', 'Nota': 'Pedido 1234567' });
     expect(event.details).toBe(details);
     expect(fixture.componentInstance.detailRows(record({ details: '1234.5' }))).toEqual([{ field: 'Detalle', value: '1.234,5' }]);
+  });
+
+  it('muestra en español los campos modificados y los códigos en inglés (pruebas del 26/11/2026)', async () => {
+    const fixture = await create();
+    const details = JSON.stringify({ ModifiedFields: ['status', 'prefix', 'series', 'consecutive', 'supplierDocumentNumber', 'stock', 'averageCost'],
+      ChangeSource: 'PURCHASE_RECEIPT', AuthorizationMode: 'ADMINISTRATOR_SELF', PreviousRetailPrice: 0, NewRetailPrice: 1500 });
+    const rows = Object.fromEntries(fixture.componentInstance.detailRows(record({ details })).map(row => [row.field, row.value]));
+    expect(rows['Campos modificados']).toBe('Estado, Prefijo, Serie, Consecutivo, Número de factura, Existencias, Costo promedio');
+    expect(rows['Origen del cambio']).toBe('Recepción de compra');
+    expect(rows['Forma de autorización']).toBe('El Administrador, sin segundo autorizador');
+    expect(rows['Precio de venta anterior']).toBe('0');
+    expect(rows['Precio de venta nuevo']).toBe('1.500');
+    const text = JSON.stringify(rows);
+    for (const word of ['Modified', 'fields', 'supplierDocumentNumber', 'averageCost', 'PURCHASE']) expect(text).not.toContain(word);
   });
 
   it('sin USERS.READ no ofrece el filtro de usuario ni consulta la lista de usuarios', async () => {

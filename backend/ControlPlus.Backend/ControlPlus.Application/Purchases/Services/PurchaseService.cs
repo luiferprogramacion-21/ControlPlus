@@ -576,9 +576,13 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         var products = await repository.GetProductsForUpdateAsync(lineIds, ct);
         if (products.Count != lineIds.Length || products.Any(x => !x.Activo))
             return Result.Failure<PurchaseDto>(ApplicationError.NotFound("uno o más productos activos"));
+        var currentPrices = products.ToDictionary(x => x.Id, x => x.PrecioMinorista);
+        // Un producto que sigue sin precio conserva el precio que se le puso en el borrador (anterior = nuevo, ver
+        // RecordedPreviousRetailPrice); en los demás, igual anterior y nuevo significa «Mismo precio».
         var lines = purchase.DetalleCompra.Select(x => new PurchaseLineRequest(x.ProductoId, x.Cantidad,
             x.CostoUnitarioDocumento, x.PorcentajeIva,
-            x.PrecioVentaNuevo == x.PrecioVentaAnterior ? null : x.PrecioVentaNuevo)).ToArray();
+            x.PrecioVentaNuevo == x.PrecioVentaAnterior && currentPrices.GetValueOrDefault(x.ProductoId) > 0m
+                ? null : x.PrecioVentaNuevo)).ToArray();
         if (Validate(purchase.ProveedorId, purchase.NumeroDocumentoProveedor, purchase.FechaDocumento,
                 purchase.ModoIva, lines).Error is not null ||
             purchase.DetalleCompra.Any(x => x.ModoIva != purchase.ModoIva))
@@ -619,7 +623,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                 detail.CostoPromedioResultante = average;
                 var previousRetailPrice = product.PrecioMinorista;
                 var newRetailPrice = line.NewRetailPrice ?? previousRetailPrice;
-                detail.PrecioVentaAnterior = previousRetailPrice;
+                detail.PrecioVentaAnterior = RecordedPreviousRetailPrice(previousRetailPrice, line.NewRetailPrice);
                 detail.PrecioVentaNuevo = newRetailPrice;
                 product.StockActual = nextStock;
                 product.CostoPromedio = average;
@@ -1059,8 +1063,8 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
                  (rate is < 0m or > 100m || decimal.Round(rate, 2) != rate)))
                 return ValidatedInput.Fail("Cada línea requiere producto, cantidad entera positiva y costo/IVA dentro de la precisión oficial.");
             if (line.NewRetailPrice is decimal newRetailPrice &&
-                (newRetailPrice < 0m || decimal.Truncate(newRetailPrice) != newRetailPrice))
-                return ValidatedInput.Fail("El precio de venta nuevo debe ser un valor entero mayor o igual a cero.");
+                (newRetailPrice <= 0m || decimal.Truncate(newRetailPrice) != newRetailPrice))
+                return ValidatedInput.Fail("El precio de venta nuevo debe ser un valor entero mayor que cero.");
             if (vatMode == "NO_DISCRIMINADO" && line.VatPercentage is not null)
                 return ValidatedInput.Fail("NO_DISCRIMINADO no admite vatPercentage.");
         }
@@ -1077,9 +1081,13 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
             foreach (var request in requests.OrderBy(x => x.ProductId))
             {
                 var product = byId[request.ProductId];
-                if (!product.Activo || product.PrecioMinorista <= 0 || product.StockActual < 0 ||
+                if (!product.Activo || product.PrecioMinorista < 0 || product.StockActual < 0 ||
                     product.StockReservado < 0 || product.StockReservado > product.StockActual)
                     return PreparedPurchase.Fail("El producto no conserva un estado de inventario o precio válido.");
+                // Pruebas del usuario del 26/11/2026: un producto creado desde un pedido sin precio (punto 17) se recibe
+                // poniéndole su precio de venta; la base exige un precio mayor que cero en cada línea de compra.
+                if (product.PrecioMinorista == 0 && request.NewRetailPrice is not > 0m)
+                    return PreparedPurchase.Fail($"{product.Nombre} todavía no tiene precio de venta: escribe su precio nuevo para recibirlo.");
                 var rate = mode == "NO_DISCRIMINADO" ? null : product.PorcentajeIva;
                 if (mode != "NO_DISCRIMINADO" &&
                     (rate is null || rate is < 0m or > 100m || decimal.Round(rate.Value, 2) != rate.Value ||
@@ -1116,6 +1124,14 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         }
     }
 
+    /// <summary>
+    /// Precio anterior que se guarda en la línea de compra. La base exige que sea mayor que cero; un producto que aún no
+    /// tenía precio (creado desde un pedido, punto 17) registra el primero que se le pone, y la auditoría del producto
+    /// conserva el cambio desde 0.
+    /// </summary>
+    private static decimal RecordedPreviousRetailPrice(decimal current, decimal? requested) =>
+        current > 0m ? current : requested ?? current;
+
     private static DetalleCompra ToDetail(Guid purchaseId, PreparedLine line) => new()
     {
         Id = Guid.CreateVersion7(), CompraId = purchaseId, ProductoId = line.Product.Id,
@@ -1124,7 +1140,7 @@ public sealed class PurchaseService(IPurchaseRepository repository, IUserReposit
         ValorIva = line.Vat, TotalLinea = line.Total,
         CostoPromedioAnterior = line.Product.CostoPromedio,
         CostoPromedioResultante = line.Product.CostoPromedio ?? 0m,
-        PrecioVentaAnterior = line.Product.PrecioMinorista,
+        PrecioVentaAnterior = RecordedPreviousRetailPrice(line.Product.PrecioMinorista, line.NewRetailPrice),
         PrecioVentaNuevo = line.NewRetailPrice ?? line.Product.PrecioMinorista,
         EsSustituto = false
     };

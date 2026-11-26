@@ -85,6 +85,10 @@ export class LayawaysApi {
     return firstValueFrom(this.http.post<LayawayProductCorrection>(`/api/layaways/${layaway.id}/product-corrections`, input,
       { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));
   }
+  /** Correcciones de productos ya hechas a un apartado, para verlas en su detalle (pruebas del usuario del 26/11/2026). */
+  productCorrections(layawayId: string): Promise<LayawayProductCorrection[]> {
+    return firstValueFrom(this.http.get<LayawayProductCorrection[]>(`/api/layaways/${layawayId}/product-corrections`));
+  }
   cancelPayment(layaway: Layaway, paymentId: string, input: CancelLayawayPaymentInput, key: string): Promise<CancelLayawayPaymentResult> {
     return firstValueFrom(this.http.post<CancelLayawayPaymentResult>(`/api/layaways/${layaway.id}/payments/${paymentId}/cancel`, input,
       { headers: new HttpHeaders({ 'Idempotency-Key': key }) }));

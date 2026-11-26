@@ -281,10 +281,12 @@ public sealed partial class SalesApiFlowTests : IAsyncLifetime
         Assert.Equal(persistedSale.Total, activity.Total);
         Assert.Equal(("CONTADO", "CONFIRMADA"), (activity.SaleType, activity.State));
 
-        // Alertas: el stock bajo (disponible igual o menor al mínimo) se cuenta aparte, en memoria.
-        var expectedLowStock = (await context.Producto.AsNoTracking().ToArrayAsync())
-            .Count(p => p.Activo && p.StockActual - p.StockReservado <= p.StockMinimo);
-        Assert.Equal(new DashboardAlerts(expectedLowStock, 0, 0, DashboardRules.UpcomingLayawayDays), response.Alerts);
+        // Alertas: el stock bajo (disponible entre 1 y el mínimo) y los agotados se cuentan aparte, en memoria.
+        var allProducts = await context.Producto.AsNoTracking().ToArrayAsync();
+        var expectedLowStock = allProducts
+            .Count(p => p.Activo && p.StockActual - p.StockReservado > 0 && p.StockActual - p.StockReservado <= p.StockMinimo);
+        var expectedOutOfStock = allProducts.Count(p => p.Activo && p.StockActual - p.StockReservado <= 0);
+        Assert.Equal(new DashboardAlerts(expectedLowStock, 0, 0, DashboardRules.UpcomingLayawayDays, expectedOutOfStock), response.Alerts);
 
         var permissionId = await GetPermissionIdAsync(client, PermissionCodes.FinancialReportsRead);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(

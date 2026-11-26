@@ -39,6 +39,20 @@ export function validateDiscount(discount: Discount, gross: number, maxPercent: 
   return '';
 }
 
+/**
+ * Pruebas del usuario del 26/11/2026: lo más que se puede descontar sin vender por debajo del costo. Solo se calcula cuando
+ * se conocen los costos (quien tiene permiso de verlos); si no, devuelve null y el servidor sigue frenando al confirmar.
+ * `lines` son el valor bruto y el costo total (costo promedio por cantidad) de cada producto al que se aplica el descuento.
+ */
+export function costFloorDiscount(lines: { gross: number; cost: number | null }[]): number | null {
+  if (!lines.length || lines.some(line => line.cost === null || !(line.gross > 0))) return null;
+  const gross = lines.reduce((sum, line) => sum + line.gross, 0);
+  if (lines.length === 1) return Math.max(0, Math.floor(gross - (lines[0].cost ?? 0)));
+  // El descuento de la venta se reparte en proporción al valor de cada producto: lo limita el de menor margen.
+  const limit = Math.min(...lines.map(line => gross * (line.gross - (line.cost ?? 0)) / line.gross));
+  return Math.max(0, Math.min(Math.floor(limit + 1e-9), gross - 1));
+}
+
 /** Short text for the screen: «10 %» or «$ 5.000». */
 export function describeDiscount(discount: Discount): string {
   return discount.type === 'PORCENTAJE' ? `${discount.value.toLocaleString('es-CO')} %` : cop(discount.value);

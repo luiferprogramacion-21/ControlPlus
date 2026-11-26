@@ -178,7 +178,8 @@ public sealed partial class InventoryApiFlowTests : IAsyncLifetime
                 .Producto.AsNoTracking().ToArrayAsync();
             var expectedByStatus = new Dictionary<string, Guid[]>
             {
-                ["STOCK_BAJO"] = Ids(products.Where(p => p.Activo && p.StockActual - p.StockReservado <= p.StockMinimo).Select(p => p.Id)),
+                // Pruebas del usuario del 26/11/2026: «Stock bajo» ya no incluye los agotados.
+                ["STOCK_BAJO"] = Ids(products.Where(p => p.Activo && p.StockActual - p.StockReservado > 0 && p.StockActual - p.StockReservado <= p.StockMinimo).Select(p => p.Id)),
                 ["AGOTADO"] = Ids(products.Where(p => p.Activo && p.StockActual - p.StockReservado <= 0).Select(p => p.Id)),
                 ["DISPONIBLE"] = Ids(products.Where(p => p.Activo && p.StockActual - p.StockReservado > p.StockMinimo).Select(p => p.Id)),
                 ["INACTIVO"] = Ids(products.Where(p => !p.Activo).Select(p => p.Id))
@@ -191,9 +192,9 @@ public sealed partial class InventoryApiFlowTests : IAsyncLifetime
                 Assert.Equal(expected, Ids(filtered.Items.Select(x => x.ProductId)));
                 Assert.Equal(expected.Length, filtered.TotalCount);
             }
-            // Disponibles y stock bajo reparten a todos los activos sin solaparse.
+            // Disponibles, stock bajo y agotados reparten a todos los activos sin solaparse.
             Assert.Equal(Ids(products.Where(p => p.Activo).Select(p => p.Id)),
-                Ids(expectedByStatus["DISPONIBLE"].Concat(expectedByStatus["STOCK_BAJO"])));
+                Ids(expectedByStatus["DISPONIBLE"].Concat(expectedByStatus["STOCK_BAJO"]).Concat(expectedByStatus["AGOTADO"])));
         }
         Assert.Equal(HttpStatusCode.BadRequest, (await GetWithBearerAsync(
             client, "/api/inventory/stock?status=OTRO", scenario.Admin.AccessToken)).StatusCode);

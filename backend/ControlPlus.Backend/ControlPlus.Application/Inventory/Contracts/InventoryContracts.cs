@@ -14,8 +14,9 @@ public sealed record InventoryStockQuery(
 
 /// <summary>
 /// Estados del filtro de existencias (decisión del 15 de noviembre de 2026). STOCK_BAJO usa el mismo criterio del
-/// Dashboard (activo y disponible igual o menor al mínimo) e incluye los agotados; DISPONIBLE es su complemento entre
-/// los activos; AGOTADO es activo con disponible igual o menor a cero; INACTIVO exige PRODUCTS.SENSITIVE_UPDATE.
+/// Dashboard: activo con disponible mayor que cero e igual o menor al mínimo; desde las pruebas del usuario del 26 de
+/// noviembre ya no incluye los agotados. DISPONIBLE es disponible mayor que el mínimo; AGOTADO es activo con disponible
+/// igual o menor a cero; INACTIVO exige PRODUCTS.SENSITIVE_UPDATE.
 /// </summary>
 public static class InventoryStockStatus
 {

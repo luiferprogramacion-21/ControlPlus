@@ -54,6 +54,9 @@ public sealed class EfDashboardOverviewRepository(OfficialControlPlusDbContext d
     public Task<int> CountLowStockProductsAsync(CancellationToken cancellationToken) =>
         dbContext.Producto.AsNoTracking().CountAsync(LowStockSelection.Predicate, cancellationToken);
 
+    public Task<int> CountOutOfStockProductsAsync(CancellationToken cancellationToken) =>
+        dbContext.Producto.AsNoTracking().CountAsync(LowStockSelection.OutOfStock, cancellationToken);
+
     public Task<int> CountOverdueCreditCustomersAsync(Guid installationId, DateOnly operatingDate,
         CancellationToken cancellationToken) =>
         dbContext.Credito.AsNoTracking()

@@ -57,6 +57,12 @@
         @for (payment of d.payments; track payment.id) { <tr><td class="numeric">{{ payment.number }}</td><td>{{ payment.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }}</td><td>{{ payment.methodName }}</td><td class="align-right numeric">{{ money(payment.appliedAmount) }}</td><td class="align-right numeric">{{ money(payment.change) }}</td><td>{{ readableCode(payment.state) }}</td><td>@if (canCorrectPayment(payment)) { <button class="table-action" type="button" (click)="startCorrectPayment(payment)" [disabled]="saving()">Corregir abono</button> }</td></tr> }
         @empty { <tr class="empty-row"><td colspan="7">No hay abonos registrados.</td></tr> }
       </tbody></table></div>
+      @if (corrections().length) {
+        <h3>Correcciones de productos</h3>
+        <div class="table-wrap module-table-wrap"><table><thead><tr><th>Fecha</th><th>Motivo</th><th class="align-right">Total</th><th class="align-right">Saldo</th><th class="align-right">Devuelto</th></tr></thead><tbody>
+          @for (correction of corrections(); track correction.id) { <tr><td>{{ correction.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }}</td><td>{{ correction.reason }}</td><td class="align-right numeric">{{ money(correction.previousTotal) }} → {{ money(correction.total) }}</td><td class="align-right numeric">{{ money(correction.previousBalance) }} → {{ money(correction.balance) }}</td><td class="align-right numeric">{{ correction.refunded > 0 ? money(correction.refunded) : '—' }}</td></tr> }
+        </tbody></table></div>
+      }
       @if (d.delivery; as delivery) {
         <h3>Entrega</h3>
         <p class="muted">Entregado el {{ delivery.deliveredAtUtc | date:'dd/MM/yyyy HH:mm' }}. No generó una venta ni un movimiento de Caja.</p>

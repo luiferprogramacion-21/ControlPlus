@@ -102,9 +102,10 @@ public sealed class DashboardSummaryTests
     [Fact]
     public async Task Alerts_ReportCountersAndTheThreeDayLayawayWindow()
     {
-        var source = new Source(Guid.NewGuid()) { LowStock = 7, OverdueCustomers = 3, UpcomingLayaways = 5 };
+        var source = new Source(Guid.NewGuid()) { LowStock = 7, OverdueCustomers = 3, UpcomingLayaways = 5, OutOfStock = 2 };
         var result = await Create(source, new DateTimeOffset(2026, 10, 24, 17, 30, 0, TimeSpan.Zero)).GetAsync(Actor, default);
-        Assert.Equal(new DashboardAlerts(7, 3, 5, 3), result.Value!.Alerts);
+        // Pruebas del usuario del 26/11/2026: stock bajo y agotados se cuentan aparte.
+        Assert.Equal(new DashboardAlerts(7, 3, 5, 3, 2), result.Value!.Alerts);
         // Hoy y los próximos tres días, ambos incluidos; el vencimiento de créditos se mide contra hoy.
         Assert.Equal((new DateOnly(2026, 10, 24), new DateOnly(2026, 10, 27)), source.LastLayawayRange);
         Assert.Equal(new DateOnly(2026, 10, 24), source.LastOverdueDate);
@@ -169,6 +170,7 @@ public sealed class DashboardSummaryTests
         public IReadOnlyList<DashboardSaleRow> RecentSales { get; init; } = [];
         public DashboardCash? Cash { get; init; }
         public int LowStock { get; init; }
+        public int OutOfStock { get; init; }
         public int OverdueCustomers { get; init; }
         public int UpcomingLayaways { get; init; }
         public DateOnly? LastPreviousDate { get; private set; }
@@ -223,6 +225,8 @@ public sealed class DashboardSummaryTests
         }
 
         public Task<int> CountLowStockProductsAsync(CancellationToken cancellationToken) => Task.FromResult(LowStock);
+
+        public Task<int> CountOutOfStockProductsAsync(CancellationToken cancellationToken) => Task.FromResult(OutOfStock);
 
         public Task<int> CountOverdueCreditCustomersAsync(Guid installationId, DateOnly operatingDate, CancellationToken cancellationToken)
         {

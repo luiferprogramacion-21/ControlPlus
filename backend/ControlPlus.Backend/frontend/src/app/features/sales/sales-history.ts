@@ -115,7 +115,7 @@ export class SalesHistory implements OnInit {
     catch (error) { if (this.detail()?.id === saleId) this.changesError.set(errorText(error)); }
     finally { if (this.detail()?.id === saleId) this.changesLoading.set(false); }
   }
-  async printCorrection(change: ConfirmedChange): Promise<void> {
+  async printCorrection(change: ConfirmedChange, afterConfirm = false): Promise<void> {
     const sale = this.detail(); if (!sale || this.printingCorrection() || !this.session.has('SALES.REPRINT')) return;
     if (this.correctionPrintKey?.changeId !== change.id) this.correctionPrintKey = { changeId: change.id, key: crypto.randomUUID() };
     this.printingCorrection.set(change.id); this.error.set('');
@@ -123,7 +123,9 @@ export class SalesHistory implements OnInit {
       const receipt = await this.api.correctionReceipt(sale.id, change.id, this.correctionPrintKey.key);
       await this.ticketPrinter.print(buildCorrectionReceiptHtml(receipt));
       this.correctionPrintKey = null;
-      this.notice.set('Comprobante de corrección preparado. Se abrió la impresión del navegador; revisa la salida en papel.');
+      this.notice.set(afterConfirm
+        ? `Corrección ${change.visibleNumber} registrada. Se abrió la impresión de su comprobante; revisa la salida en papel.`
+        : 'Comprobante de corrección preparado. Se abrió la impresión del navegador; revisa la salida en papel.');
     } catch (error) { this.error.set(errorText(error)); }
     finally { this.printingCorrection.set(null); }
   }
@@ -142,6 +144,8 @@ export class SalesHistory implements OnInit {
     this.drawerNotice.set(cashDrawerNotice(change.drawerStatus));
     const id = this.detail()?.id;
     try { if (id) { this.detail.set(await this.api.detail(id)); await this.loadChanges(id); } } catch { this.detail.set(null); }
+    // Pruebas del usuario del 26/11/2026: el comprobante de la corrección se imprime solo al aprobarla.
+    if (this.detail()) await this.printCorrection(change, true);
     await this.reload();
   }
   canPrint(sale: SaleSummary): boolean { return sale.state === 'CONFIRMADA' && this.session.has('SALES.REPRINT'); }

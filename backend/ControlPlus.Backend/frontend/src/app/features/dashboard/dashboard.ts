@@ -37,6 +37,12 @@ export class Dashboard implements OnInit {
   readonly canOpenInventory = inject(SessionService).has('INVENTORY.READ');
   /** Inventario filtrado por el mismo criterio de stock bajo que cuenta el Dashboard. */
   readonly lowStockQuery = { filtro: 'stock-bajo' };
+  /** Inventario filtrado por los agotados, que desde el 26/11/2026 se cuentan aparte del stock bajo. */
+  readonly outOfStockQuery = { filtro: 'agotados' };
+  /** Productos que piden revisión: los de stock bajo más los agotados. */
+  alertProducts(alerts: { lowStockProducts: number; outOfStockProducts?: number }): number { return alerts.lowStockProducts + (alerts.outOfStockProducts ?? 0); }
+  /** El enlace del total abre primero el stock bajo y, si no hay, los agotados. */
+  alertQuery(alerts: { lowStockProducts: number }): { filtro: string } { return alerts.lowStockProducts > 0 ? this.lowStockQuery : this.outOfStockQuery; }
   readonly number = groupedNumber;
   readonly summary = signal<DashboardSummary | null>(null);
   readonly loading = signal(false);

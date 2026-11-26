@@ -1,5 +1,5 @@
 import { applyFormat, documentRule, InputFormat } from '../../shared/input-format';
-import { NumberInput } from '../../shared/number-input';
+import { groupedNumber, NumberInput } from '../../shared/number-input';
 import { A11yModule } from '@angular/cdk/a11y';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -31,6 +31,11 @@ export class Customers implements OnInit {
   /** Auditoría C.14: etapa del crédito de cada cliente de la página, con su color. */
   readonly stages = signal<Record<string, CreditStageData>>({});
   readonly creditStageView = creditStageView;
+  /** Pruebas del usuario del 26/11/2026: lo que debe cada cliente en total, con su saldo de créditos pendientes. */
+  debt(customerId: string): string {
+    const balance = this.stages()[customerId]?.outstandingBalance ?? 0;
+    return balance > 0 ? `$ ${groupedNumber(balance)}` : '—';
+  }
   get canSeeCredit(): boolean { return this.session.has('CREDIT.REQUEST'); }
   readonly error = toastSignal('error');
   readonly notice = toastSignal('success');

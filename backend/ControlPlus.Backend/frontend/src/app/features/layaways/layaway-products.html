@@ -32,8 +32,16 @@
       <cp-payment-methods [drafts]="drafts" mode="refund" idPrefix="products" [amountFromTotal]="true" />
       @if (drafts.length > 1) { <p class="form-hint">Repartido: {{ money(refundTotal) }} de {{ money(refund) }}.</p> }
     }
-    <label class="field-label field-label--spaced" for="layaway-products-reason">Motivo</label>
-    <input id="layaway-products-reason" class="text-field" name="reason" maxlength="500" [(ngModel)]="reason" placeholder="Ej.: el cliente cambió de talla" autocomplete="off">
+    <fieldset class="reason-choices"><legend class="field-label field-label--spaced">Motivo</legend>
+      @for (option of reasonOptions; track option) {
+        <label class="reason-choice" [class.reason-choice--on]="reasonChoice === option"><input type="radio" name="reasonChoice" [value]="option" [(ngModel)]="reasonChoice"> {{ option }}</label>
+      }
+      <label class="reason-choice" [class.reason-choice--on]="reasonChoice === otherReasonCode"><input type="radio" name="reasonChoice" [value]="otherReasonCode" [(ngModel)]="reasonChoice"> Otro</label>
+      @if (reasonChoice === otherReasonCode) {
+        <label class="sr-only" for="layaway-products-reason">Escribe el motivo</label>
+        <input id="layaway-products-reason" class="text-field" name="otherReason" maxlength="500" [(ngModel)]="otherReason" placeholder="Escribe el motivo" autocomplete="off">
+      }
+    </fieldset>
     @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
     <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="saving()">Continuar a la autorización</button><button class="button button--secondary" type="button" (click)="closed.emit()" [disabled]="saving()">Cancelar</button></div>
   </form>

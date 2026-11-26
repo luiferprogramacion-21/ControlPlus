@@ -43,6 +43,8 @@ export class Layaways implements OnInit {
   readonly number = groupedNumber;
   readonly result = signal<Page<Layaway> | null>(null);
   readonly detail = signal<LayawayDetail | null>(null);
+  /** Correcciones de productos del apartado abierto; vacía si no hay o no se pudieron leer. */
+  readonly corrections = signal<LayawayProductCorrection[]>([]);
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly error = toastSignal('error');
@@ -175,7 +177,10 @@ export class Layaways implements OnInit {
   }
   async loadDetail(id: string): Promise<void> {
     try { this.detail.set(await this.api.get(id)); }
-    catch (e) { this.error.set(errorText(e)); }
+    catch (e) { this.error.set(errorText(e)); return; }
+    // Pruebas del usuario del 26/11/2026: el detalle muestra cómo cambió el apartado con cada corrección.
+    try { const rows = await this.api.productCorrections(id); if (this.detail()?.layaway.id === id) this.corrections.set(rows); }
+    catch { if (this.detail()?.layaway.id === id) this.corrections.set([]); }
   }
   async refreshDetail(): Promise<void> { const id = this.detail()?.layaway.id; if (id) await this.loadDetail(id); }
   closeDetail(): void { if (this.saving()) return; this.detail.set(null); this.paymentDialog.set(false); this.paymentKey = null; this.deliveryKey = null; }

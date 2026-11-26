@@ -117,6 +117,76 @@ public sealed partial class PurchasesApiFlowTests : IAsyncLifetime
         Assert.Equal(2, (await db.ConsecutivoDocumento.SingleAsync(x => x.TipoDocumento == "COMPRA")).UltimoNumero);
     }
 
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task ProductWithoutPrice_IsReceivedOnlyWithItsNewRetailPrice_InPurchasesAndOrders()
+    {
+        // Pruebas del usuario del 26/11/2026: un producto creado sin precio desde un pedido (punto 17) no se podía recibir
+        // («El producto no conserva un estado de inventario o precio válido»). Ahora se recibe poniéndole su precio.
+        using var client = Client();
+        var users = await BootstrapAsync(client);
+        Bearer(client, users.Admin.Token.AccessToken);
+        var supplier = await SupplierAsync(client, "Proveedor de productos nuevos");
+        var direct = await ProductAsync(client, supplier.Id, "NO-PRICE-DIRECT", null);
+        var ordered = await ProductAsync(client, supplier.Id, "NO-PRICE-ORDER", null);
+        await SetRetailPriceAsync(direct.Id, 0m);
+        await SetRetailPriceAsync(ordered.Id, 0m);
+
+        using (var withoutPrice = await client.PostAsJsonAsync("/api/purchases", Body(supplier.Id, null, "NO_DISCRIMINADO",
+            new Line(direct.Id, 2, 800m))))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, withoutPrice.StatusCode);
+            Assert.Contains("todavía no tiene precio de venta", await withoutPrice.Content.ReadAsStringAsync());
+        }
+        var draft = await CreateDraftAsync(client, Body(supplier.Id, null, "NO_DISCRIMINADO",
+            new Line(direct.Id, 2, 800m, null, 1500m)));
+        var confirmed = await ReadJsonAsync(await ConfirmAsync(client, draft.GetProperty("id").GetGuid(),
+            "no-price-direct", draft.GetProperty("version").GetInt64()), HttpStatusCode.OK);
+        var directLine = Assert.Single(confirmed.GetProperty("lines").EnumerateArray());
+        Assert.Equal(1500m, directLine.GetProperty("newRetailPrice").GetDecimal());
+        var directProduct = await ReadAsync<ProductDto>(await client.GetAsync($"/api/products/{direct.Id}"), HttpStatusCode.OK);
+        Assert.Equal(1500m, directProduct.RetailPrice);
+        Assert.Equal(2, directProduct.CurrentStock);
+
+        var order = await ReadJsonAsync(await client.PostAsJsonAsync("/api/purchase-orders", new
+        {
+            supplierId = supplier.Id,
+            lines = new[] { new { productId = ordered.Id, requestedQuantity = 3, estimatedUnitCost = 900m } }
+        }), HttpStatusCode.Created);
+        var orderId = order.GetProperty("id").GetGuid();
+        var sent = await ReadJsonAsync(await client.PostAsJsonAsync($"/api/purchase-orders/{orderId}/send",
+            new { expectedVersion = order.GetProperty("version").GetInt64() }), HttpStatusCode.OK);
+        var orderLineId = Assert.Single(sent.GetProperty("lines").EnumerateArray()).GetProperty("id").GetGuid();
+        var version = sent.GetProperty("version").GetInt64();
+        using (var withoutPrice = await ReceiveOrderAsync(client, orderId, "no-price-order-missing", new
+        {
+            expectedOrderVersion = version, invoiceDate = "2026-11-26", vatMode = "NO_DISCRIMINADO",
+            lines = new[] { new { orderLineId, productId = ordered.Id, quantity = 3, unitCost = 900m } }
+        }))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, withoutPrice.StatusCode);
+            Assert.Contains("todavía no tiene precio de venta", await withoutPrice.Content.ReadAsStringAsync());
+        }
+        var received = await ReadJsonAsync(await ReceiveOrderAsync(client, orderId, "no-price-order", new
+        {
+            expectedOrderVersion = version, invoiceDate = "2026-11-26", vatMode = "NO_DISCRIMINADO",
+            lines = new[] { new { orderLineId, productId = ordered.Id, quantity = 3, unitCost = 900m, newRetailPrice = 1700m } }
+        }), HttpStatusCode.Created);
+        Assert.Equal("COMPLETADO", received.GetProperty("orderStatus").GetString());
+        var orderedProduct = await ReadAsync<ProductDto>(await client.GetAsync($"/api/products/{ordered.Id}"), HttpStatusCode.OK);
+        Assert.Equal(1700m, orderedProduct.RetailPrice);
+        Assert.Equal(3, orderedProduct.CurrentStock);
+    }
+
+    private async Task SetRetailPriceAsync(Guid productId, decimal price)
+    {
+        await using var scope = _factory!.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+        var product = await db.Producto.SingleAsync(x => x.Id == productId);
+        product.PrecioMinorista = price;
+        await db.SaveChangesAsync();
+    }
+
     private static async Task<HttpResponseMessage> ReceiveOrderAsync(HttpClient client, Guid orderId,
         string key, object request)
     {

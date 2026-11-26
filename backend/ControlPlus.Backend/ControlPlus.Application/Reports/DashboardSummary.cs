@@ -61,7 +61,8 @@ public sealed class DashboardSummaryService(IPermissionChecker permissions, IClo
             await overviewRepository.CountOverdueCreditCustomersAsync(installation.Id, date, cancellationToken),
             await overviewRepository.CountUpcomingLayawaysAsync(installation.Id, date,
                 date.AddDays(DashboardRules.UpcomingLayawayDays), cancellationToken),
-            DashboardRules.UpcomingLayawayDays);
+            DashboardRules.UpcomingLayawayDays,
+            await overviewRepository.CountOutOfStockProductsAsync(cancellationToken));
         var hourly = BuildHourlySales(
             await overviewRepository.GetSaleTimesAsync(installation.Id, date, cancellationToken), zone, localNow);
         var recent = (await overviewRepository.GetRecentSalesAsync(installation.Id, date,

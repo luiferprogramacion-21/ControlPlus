@@ -100,7 +100,7 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
         var hasSearch = !string.IsNullOrWhiteSpace(query.Search);
         products = query.StockStatus switch
         {
-            // Mismo criterio que Inventario y el Dashboard: «stock bajo» es disponible igual o menor al mínimo (incluye agotados).
+            // Mismo criterio que Inventario y el Dashboard: «stock bajo» es disponible entre 1 y el mínimo; los agotados van aparte.
             InventoryStockStatus.LowStock => products.Where(LowStockSelection.Predicate),
             InventoryStockStatus.OutOfStock => products.Where(x => x.StockActual - x.StockReservado <= 0),
             InventoryStockStatus.Available => products.Where(x => x.StockActual - x.StockReservado > x.StockMinimo),

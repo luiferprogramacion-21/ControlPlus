@@ -39,6 +39,25 @@ describe('SaleChange: cambio de productos', () => {
     TestBed.configureTestingModule({ providers: [{ provide: SalesApi, useValue: api }, { provide: CatalogApi, useValue: catalog }, { provide: AuthorizationDialog, useValue: dialog }, { provide: SessionService, useValue: session }] });
   });
 
+  it('escribe solo el valor a cobrar o devolver y propone el medio con que se pagó (pruebas del 26/11/2026)', async () => {
+    api.changePreparation.mockResolvedValue(prep());
+    const fixture = TestBed.createComponent(SaleChange);
+    fixture.componentRef.setInput('sale', { ...sale, payments: [{ id: 'pay1', methodCode: 'NEQUI', methodName: 'Nequi', appliedAmount: 30000, receivedAmount: null, change: 0, reference: null }] });
+    fixture.componentRef.setInput('mode', 'remove');
+    fixture.detectChanges(); await fixture.whenStable();
+    const c = fixture.componentInstance;
+    c.returning()[0].quantity = 1; c.syncDrafts();
+    expect(c.settlement.mode).toBe('refund');
+    expect(c.drafts[0]).toMatchObject({ appliedAmount: 10000, methodCode: 'NEQUI' });
+    c.returning()[0].quantity = 2; c.syncDrafts();
+    expect(c.drafts[0].appliedAmount).toBe(20000);
+    c.drafts[0].appliedAmount = 5000; c.returning()[0].quantity = 3; c.syncDrafts();
+    expect(c.drafts[0].appliedAmount).toBe(5000);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Esta venta se pagó con');
+    expect(fixture.nativeElement.textContent).not.toContain('buen estado');
+  });
+
   it('exige el mínimo mayorista configurado sobre las unidades entregadas', async () => {
     const c = await open(); expect(c.wholesaleMin()).toBe(2);
     c.returning()[0].quantity = 1; c.addDelivered({ ...pants, wholesalePrice: 20000 } as Product);
@@ -83,12 +102,12 @@ describe('SaleChange: cambio de productos', () => {
     expect(c.settlement).toMatchObject({ creditAdjustment: -20000, cashAmount: 10000, mode: 'refund' });
   });
 
-  it('explica crédito cerrado y mercancía no revendible; no confirma una corrección vacía o sin motivo', async () => {
+  it('explica crédito cerrado; no confirma una corrección vacía o sin motivo', async () => {
     const c = await open(prep(), 'remove');
     expect(c.validation()).toContain('devuelto');
-    c.returning()[0].quantity = 1; c.returning()[0].resellable = false;
-    expect(c.validation()).toContain('buen estado');
-    c.returning()[0].resellable = true; c.reason = '';
+    // Pruebas del usuario del 26/11/2026: ya no se pregunta si está en buen estado; lo devuelto vuelve al inventario.
+    c.returning()[0].quantity = 1; expect(c.returning()[0].resellable).toBe(true);
+    c.reason = '';
     expect(c.validation()).toContain('motivo');
     const closed = await open(prep({ canStartChange: false, blockedReason: 'El crédito ya está pagado; pide revisión.' }), 'remove');
     expect(closed.validation()).toContain('ya está pagado');

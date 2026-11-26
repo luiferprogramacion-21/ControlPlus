@@ -16,9 +16,12 @@ public sealed record DashboardComparison(DateOnly PreviousDate, decimal Previous
 /// <summary>Efectivo esperado del turno abierto, igual al que muestra el arqueo.</summary>
 public sealed record DashboardCash(DateTimeOffset OpenedAt, decimal ExpectedCash);
 
-/// <summary>Contadores de las alertas operativas.</summary>
+/// <summary>
+/// Contadores de las alertas operativas. Desde las pruebas del usuario del 26/11/2026 «Stock bajo» (disponible entre 1 y
+/// el mínimo) y «Agotados» se cuentan por separado, igual que los filtros de Catálogo e Inventario.
+/// </summary>
 public sealed record DashboardAlerts(int LowStockProducts, int OverdueCreditCustomers,
-    int UpcomingLayaways, int UpcomingLayawayDays);
+    int UpcomingLayaways, int UpcomingLayawayDays, int OutOfStockProducts = 0);
 
 /// <summary>Ventas confirmadas de una hora local del establecimiento.</summary>
 public sealed record DashboardHour(int Hour, int Transactions, decimal Total);
@@ -64,8 +67,11 @@ public interface IDashboardOverviewRepository
     Task<IReadOnlyList<DashboardSaleRow>> GetRecentSalesAsync(Guid installationId, DateOnly operatingDate, int limit,
         CancellationToken cancellationToken);
 
-    /// <summary>Productos activos agotados o por debajo del mínimo según el criterio de la vista oficial de reposición.</summary>
+    /// <summary>Productos activos con disponible entre 1 y el mínimo (stock bajo, sin los agotados).</summary>
     Task<int> CountLowStockProductsAsync(CancellationToken cancellationToken);
+
+    /// <summary>Productos activos agotados (disponible igual o menor a cero).</summary>
+    Task<int> CountOutOfStockProductsAsync(CancellationToken cancellationToken);
 
     /// <summary>Clientes con al menos un crédito con saldo cuyo vencimiento es anterior a la fecha operativa.</summary>
     Task<int> CountOverdueCreditCustomersAsync(Guid installationId, DateOnly operatingDate,

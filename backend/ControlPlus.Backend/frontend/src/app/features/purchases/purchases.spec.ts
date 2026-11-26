@@ -36,6 +36,18 @@ describe('Purchases', () => {
   it('rechaza cantidad mayor que la pendiente sin enviar HTTP', async () => { component.receipt.lines[0].quantity = 5; expect(component.receiptValidation()).toContain('pendiente'); await component.receive(); expect(receive).not.toHaveBeenCalled(); });
   it('rechaza cantidades fraccionarias y costo inválido', () => { component.receipt.lines[0].quantity = 1.5; expect(component.receiptValidation()).toContain('entera'); component.receipt.lines[0].quantity = 2; component.receipt.lines[0].unitCost = 0; expect(component.receiptValidation()).toContain('costo'); });
   it('muestra el precio anterior y restringe el precio nuevo al Administrador', () => { expect(component.productRetailPrice(productId)).toBe(1000); expect(component.receipt.lines[0].newRetailPrice).toBeNull(); expect(component.canChangeRetailPrice).toBe(false); component.receipt.lines[0].quantity = 2; component.receipt.lines[0].newRetailPrice = 1000.5; expect(component.receiptValidation()).toContain('precio nuevo'); });
+  it('un producto sin precio llega marcado para ponerle precio y no se recibe sin él (pruebas del 26/11/2026)', () => {
+    component.products.set([{ id: productId, retailPrice: 0 } as Product]);
+    component.startReceipt(); component.receipt.invoiceDate = '2026-10-24';
+    expect(component.hasNoPrice(productId)).toBe(true);
+    expect(component.newPrice[lineId]).toBe(true);
+    component.receipt.lines[0].quantity = 2;
+    expect(component.receiptValidation()).toContain('todavía no tiene precio de venta');
+    component.receipt.lines[0].newRetailPrice = 1500;
+    expect(component.receiptValidation()).toBe('');
+    component.receipt.lines[0].unitCost = 0;
+    expect(component.receiptValidation()).toContain('Escribe el costo de');
+  });
   it('el precio nuevo es opcional: la recepción arranca en blanco y se puede enviar sin precio', () => {
     expect(component.receipt.lines[0].newRetailPrice).toBeNull();
     component.receipt.lines[0].quantity = 2;
@@ -91,5 +103,43 @@ describe('purchase dates', () => {
   it('usa la fecha de Colombia aunque UTC ya haya cambiado de día', () => {
     expect(currentColombiaDate(new Date('2026-11-16T02:30:00Z'))).toBe('2026-11-15');
     expect(currentColombiaDate(new Date('2026-11-16T05:01:00Z'))).toBe('2026-11-16');
+  });
+});
+
+describe('Purchases: proveedor nuevo en la compra sin pedido (pruebas del 26/11/2026)', () => {
+  const createSupplier = vi.fn();
+  let roles: string[];
+  function build(): Purchases {
+    TestBed.configureTestingModule({ providers: [
+      { provide: PurchasesApi, useValue: {} }, { provide: OrdersApi, useValue: {} }, { provide: AuthorizationDialog, useValue: { open: vi.fn() } },
+      { provide: SuppliersApi, useValue: { create: createSupplier } }, { provide: CatalogApi, useValue: {} },
+      { provide: SessionService, useValue: { has: (p: string) => ['SUPPLIERS.MANAGE', 'PURCHASES.RECEIVE'].includes(p), hasRole: (...codes: string[]) => codes.some(c => roles.includes(c)), user: () => ({ roles }) } },
+    ] });
+    return TestBed.runInInjectionContext(() => new Purchases());
+  }
+  beforeEach(() => { vi.clearAllMocks(); roles = ['ADMINISTRADOR']; });
+
+  it('el Administrador lo crea ahí mismo y queda elegido para la compra', async () => {
+    const component = build();
+    createSupplier.mockResolvedValue({ id: 's-new', name: 'Distribuidora Nueva', isActive: true });
+    expect(component.canCreateSupplier).toBe(true);
+    component.startNewSupplier();
+    await component.createSupplier();
+    expect(createSupplier).not.toHaveBeenCalled();
+    expect(component.error()).toContain('nombre');
+    component.newSupplier = { name: ' Distribuidora Nueva ', documentNumber: '900123', phone: '' };
+    await component.createSupplier();
+    expect(createSupplier).toHaveBeenCalledWith({ name: 'Distribuidora Nueva', documentType: 'NIT', documentNumber: '900123', phone: null, address: null, email: null, observations: null });
+    expect(component.form.supplierId).toBe('s-new');
+    expect(component.suppliers().map(s => s.id)).toContain('s-new');
+    expect(component.addingSupplier()).toBe(false);
+  });
+
+  it('el Supervisor no ve la opción', () => {
+    roles = ['SUPERVISOR'];
+    const component = build();
+    expect(component.canCreateSupplier).toBe(false);
+    component.startNewSupplier();
+    expect(component.addingSupplier()).toBe(false);
   });
 });

@@ -74,6 +74,15 @@ describe('SalesHistory: historial y anulación', () => {
     expect(api.correctionReceipt.mock.calls[0][2]).toBe(api.correctionReceipt.mock.calls[1][2]);
     expect(printer.print).toHaveBeenCalledWith(expect.stringContaining('CAM-1'));
   });
+  it('al aprobar un cambio imprime solo su comprobante (pruebas del 26/11/2026)', async () => {
+    permissions.push('SALES.REPRINT', 'SALES.CREATE'); const c = await create();
+    const correction = { id: 'a', saleId: 's1', visibleNumber: 'CAM-7', difference: -2000, totalReturned: 2000, totalDelivered: 0, treatment: 'DEVOLUCION', paidOrRefunded: 2000, creditAdjustment: 0, state: 'CONFIRMADO' };
+    api.correctionReceipt.mockResolvedValue({ requestId: 'r', saleId: 's1', saleNumber: 'VTA-1', correction, establishmentName: 'Tienda' });
+    await c.changeDone(correction as never);
+    expect(api.correctionReceipt).toHaveBeenCalledWith('s1', 'a', expect.any(String));
+    expect(printer.print).toHaveBeenCalledWith(expect.stringContaining('CAM-7'));
+    expect(c.notice()).toContain('CAM-7');
+  });
   it('muestra el detalle en una ventana modal y permite cerrarla', async () => {
     const fixture = TestBed.createComponent(SalesHistory);
     fixture.detectChanges(); await fixture.whenStable();

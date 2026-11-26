@@ -21,6 +21,15 @@ export interface ProductRow {
  * (cantidad 0) o agregar productos. El servidor ajusta reservas y saldo y, si lo abonado supera el total nuevo, registra la
  * devolución por los medios elegidos. Un Supervisor necesita la autorización de un Administrador.
  */
+/** Motivos para corregir los productos de un apartado (pruebas del usuario del 26/11/2026). */
+export const LAYAWAY_CORRECTION_REASONS = [
+  'El cliente cambió de producto',
+  'El cliente ya no quiere un producto',
+  'El cliente quiere más unidades',
+  'Producto o cantidad registrados por error',
+];
+const OTHER_REASON = 'OTRO';
+
 @Component({
   selector: 'cp-layaway-products',
   imports: [WindowSheet, NumberInput, FormsModule, PaymentMethods],
@@ -42,7 +51,16 @@ export class LayawayProducts implements OnInit {
   readonly rows = signal<ProductRow[]>([]);
   readonly results = signal<Product[]>([]);
   search = '';
-  reason = '';
+  /** Pruebas del usuario del 26/11/2026: el motivo se elige de una lista; «Otro» deja escribirlo. */
+  readonly reasonOptions = LAYAWAY_CORRECTION_REASONS;
+  reasonChoice = '';
+  otherReason = '';
+  get reason(): string { return this.reasonChoice === OTHER_REASON ? this.otherReason : this.reasonChoice; }
+  set reason(value: string) {
+    if (this.reasonOptions.includes(value)) { this.reasonChoice = value; this.otherReason = ''; }
+    else { this.reasonChoice = value ? OTHER_REASON : ''; this.otherReason = value; }
+  }
+  readonly otherReasonCode = OTHER_REASON;
   drafts: PaymentDraft[] = [emptyDraft()];
   private pending: { key: string; fingerprint: string; authorizer: string | null } | null = null;
 
@@ -100,6 +118,7 @@ export class LayawayProducts implements OnInit {
       return 'Un producto nuevo supera las unidades disponibles.';
     if (!this.changed) return 'No cambiaste ningún producto ni cantidad.';
     if (this.newTotal <= 0) return 'El apartado debe conservar al menos un producto. Para quitarlo todo usa «Cancelar apartado».';
+    if (!this.reasonChoice) return 'Elige el motivo de la corrección.';
     if (!this.reason.trim()) return 'Escribe el motivo de la corrección.';
     if (this.reason.trim().length > 500) return 'El motivo admite hasta 500 caracteres.';
     if (this.refund > 0) {

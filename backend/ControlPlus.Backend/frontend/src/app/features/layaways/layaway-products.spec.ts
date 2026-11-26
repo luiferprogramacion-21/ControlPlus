@@ -48,7 +48,14 @@ describe('Corregir productos de un apartado', () => {
     expect(screen.rows().map(row => [row.productId, row.quantity])).toEqual([['p1', 2], ['p2', 1]]);
     expect(screen.validation()).toBe('No cambiaste ningún producto ni cantidad.');
     screen.step(screen.rows()[1], -1);
+    expect(screen.validation()).toBe('Elige el motivo de la corrección.');
+    // Pruebas del usuario del 26/11/2026: «Otro» exige escribirlo; una opción de la lista basta.
+    screen.reasonChoice = 'OTRO';
     expect(screen.validation()).toBe('Escribe el motivo de la corrección.');
+    screen.otherReason = 'Talla equivocada';
+    expect(screen.reason).toBe('Talla equivocada');
+    screen.reasonChoice = 'El cliente cambió de producto';
+    expect(screen.reason).toBe('El cliente cambió de producto');
   });
 
   it('quitar un producto baja el total y el saldo; se envían solo las líneas que quedan', async () => {

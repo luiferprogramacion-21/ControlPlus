@@ -67,6 +67,18 @@ describe('Inventory', () => {
     expect(fixture.componentInstance.status).toBe('STOCK_BAJO');
     expect(api.stock).toHaveBeenCalledWith(expect.objectContaining({ status: 'STOCK_BAJO' }));
   });
+  it('abre filtrado por agotados cuando llega desde el Dashboard (pruebas del 26/11/2026)', async () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: ConfirmationDialog, useValue: { confirm: confirmAction } },
+      { provide: InventoryApi, useValue: api }, { provide: SessionService, useValue: session }, { provide: AuthorizationDialog, useValue: dialog },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ filtro: 'agotados' }) } } },
+    ] });
+    api.stock.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    const fixture = TestBed.createComponent(Inventory); fixture.detectChanges(); await fixture.whenStable();
+    expect(fixture.componentInstance.status).toBe('AGOTADO');
+    expect(api.stock).toHaveBeenCalledWith(expect.objectContaining({ status: 'AGOTADO' }));
+  });
 
   it('cancelar un descarte conserva producto y clave del ajuste incierto', async () => {
     await component.openAdjustment(stock); component.quantityDelta = 1; component.reasonId = 'r';

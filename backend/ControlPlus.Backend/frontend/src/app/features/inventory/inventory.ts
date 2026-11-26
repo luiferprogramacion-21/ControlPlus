@@ -52,10 +52,12 @@ export class Inventory implements OnInit {
   private pending: { key: string; input: Omit<Adjustment, 'authorization'>; authorizerUserName: string | null } | null = null;
   get canAdjust(): boolean { return this.session.has('INVENTORY.ADJUST'); }
   get canSeeInactive(): boolean { return this.session.has('PRODUCTS.SENSITIVE_UPDATE'); }
-  /** El Dashboard enlaza con ?filtro=stock-bajo para abrir directamente los productos que cuenta como alerta. */
+  /** El Dashboard enlaza con ?filtro=stock-bajo o ?filtro=agotados para abrir directamente los productos que cuenta como alerta. */
   private readonly route = inject(ActivatedRoute, { optional: true });
   ngOnInit(): void {
-    if (this.route?.snapshot.queryParamMap.get('filtro') === 'stock-bajo') this.status = 'STOCK_BAJO';
+    const filter = this.route?.snapshot.queryParamMap.get('filtro');
+    if (filter === 'stock-bajo') this.status = 'STOCK_BAJO';
+    if (filter === 'agotados') this.status = 'AGOTADO';
     void this.reload(); if (this.canAdjust) void this.loadReasons();
   }
   /** Mismo orden que el filtro: inactivo, agotado, stock bajo (disponible igual o menor al mínimo) y disponible. */

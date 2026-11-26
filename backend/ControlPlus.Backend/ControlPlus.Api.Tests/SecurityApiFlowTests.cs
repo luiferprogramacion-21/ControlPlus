@@ -1085,7 +1085,8 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
             return json.RootElement.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).ToArray();
         }
         Assert.Contains(product.Id, await IdsAsync("AGOTADO"));
-        Assert.Contains(product.Id, await IdsAsync("STOCK_BAJO"));
+        // Pruebas del usuario del 26/11/2026: un agotado ya no aparece en «Stock bajo».
+        Assert.DoesNotContain(product.Id, await IdsAsync("STOCK_BAJO"));
         Assert.DoesNotContain(product.Id, await IdsAsync("DISPONIBLE"));
         Assert.DoesNotContain(inactiveProduct.Id, await IdsAsync("AGOTADO"));
         var directSearch = await client.GetAsync("/api/products?search=FILTER-001");

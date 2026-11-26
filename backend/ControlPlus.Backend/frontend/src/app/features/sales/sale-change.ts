@@ -1,13 +1,13 @@
 import { groupedNumber, NumberInput } from '../../shared/number-input';
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, input, OnInit, output, signal } from '@angular/core';
+import { Component, DoCheck, inject, input, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { errorText, reasonOr } from '../../core/api';
 import { SessionService } from '../../core/session.service';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { CatalogApi, Product } from '../catalog/catalog-api';
-import { appliedTotal, emptyDraft, money, PaymentDraft, PaymentMethods, validateDrafts } from '../layaways/payment-methods';
+import { appliedTotal, emptyDraft, money, PaymentDraft, PaymentMethod, PaymentMethods, validateDrafts } from '../layaways/payment-methods';
 import { ChangePaymentInput, ChangePreparation, ConfirmChangeInput, ConfirmedChange, SaleDetail, SalesApi } from './sales-api';
 import { ChangeTreatment, returnValue, settle } from './sale-change-math';
 import { WHOLESALE_MIN_QUANTITY } from './sale-discount';
@@ -25,7 +25,7 @@ interface Pending { key: string; fingerprint: string; authorizerUserName: string
   templateUrl: './sale-change.html',
   styleUrls: ['./sale-change.scss'],
 })
-export class SaleChange implements OnInit {
+export class SaleChange implements OnInit, DoCheck {
   private readonly api = inject(SalesApi);
   private readonly catalog = inject(CatalogApi);
   private readonly authorization = inject(AuthorizationDialog);
@@ -48,6 +48,35 @@ export class SaleChange implements OnInit {
   reason = 'Producto cobrado por error';
   drafts: PaymentDraft[] = [emptyDraft()];
   private pending: Pending | null = null;
+  /** Valor que la pantalla escribió sola en el medio de pago; si la persona lo cambia, ya no se toca. */
+  private autoAmount: number | null = null;
+  private refundMethodChosen = false;
+
+  /**
+   * Pruebas del usuario del 26/11/2026: el valor que paga el cliente o el que se le devuelve aparece escrito solo, y una
+   * devolución propone el medio con el que se pagó la venta. Con varios medios se deja que la persona los reparta.
+   */
+  ngDoCheck(): void { this.syncDrafts(); }
+  syncDrafts(): void {
+    const s = this.settlement;
+    if (s.mode === 'none') { this.autoAmount = null; this.refundMethodChosen = false; return; }
+    if (this.drafts.length !== 1) return;
+    const draft = this.drafts[0];
+    const current = Number(draft.appliedAmount) || 0;
+    if ((current === 0 || current === this.autoAmount) && current !== s.cashAmount) draft.appliedAmount = s.cashAmount;
+    if (current === 0 || current === this.autoAmount) this.autoAmount = s.cashAmount;
+    if (s.mode === 'refund' && !this.refundMethodChosen) {
+      const method = this.originalMethod;
+      if (method) draft.methodCode = method;
+      this.refundMethodChosen = true;
+    }
+    if (s.mode === 'payment') this.refundMethodChosen = false;
+  }
+  /** Medio con el que se pagó la venta, si fue uno solo. */
+  get originalMethod(): PaymentMethod | null {
+    const methods = [...new Set(this.sale().payments.map(payment => payment.methodCode))];
+    return methods.length === 1 && ['EFECTIVO', 'TRANSFERENCIA', 'NEQUI'].includes(methods[0]) ? methods[0] as PaymentMethod : null;
+  }
 
   /** Units of a delivered product required for the wholesale price; 12 is only the fallback. */
   readonly wholesaleMin = signal(WHOLESALE_MIN_QUANTITY);
@@ -75,7 +104,7 @@ export class SaleChange implements OnInit {
         const before = previous?.get(line.saleLineId);
         return { saleLineId: line.saleLineId, productId: line.productId, code: line.productCode, name: line.productName, sold: line.soldQuantity,
           remaining: line.remainingQuantity, net: original?.netAmount ?? 0,
-          quantity: before ? Math.min(Number(before.quantity) || 0, line.remainingQuantity) : 0, resellable: before?.resellable ?? true,
+          quantity: before ? Math.min(Number(before.quantity) || 0, line.remainingQuantity) : 0, resellable: true,
           receivedUnit: before?.receivedUnit ?? null };
       }));
       if (keep) this.error.set('La venta cambió mientras preparabas el cambio. Se actualizaron los datos; revisa los valores y confirma de nuevo.');
@@ -90,10 +119,6 @@ export class SaleChange implements OnInit {
   setReturnQuantity(line: Returning, value: unknown): void {
     const parsed = Math.trunc(Number(value));
     line.quantity = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), line.remaining) : 1;
-  }
-  /** Medios y valores con los que se pagó la venta original (una devolución solo sale por ellos). */
-  get originalPayments(): string {
-    return this.sale().payments.map(payment => `${payment.methodName} ${money(payment.appliedAmount)}`).join(' · ');
   }
 
   // --- amounts -------------------------------------------------------------------------------
@@ -151,7 +176,6 @@ export class SaleChange implements OnInit {
       if (!Number.isInteger(value) || value < 0) return `Escribe en cuánto se recibe cada unidad de ${line.name}, en pesos enteros, o marca «Mismo precio».`;
       if (value * Number(line.quantity) > this.paidValue(line)) return `${line.name}: no se puede recibir por más de lo que pagó el cliente ($${groupedNumber(this.paidValue(line))}).`;
     }
-    if (returned.some(line => !line.resellable)) return 'Solo se puede reponer mercancía en buen estado. Pide al Administrador revisar un producto dañado.';
     if (this.mode() === 'remove' && !this.reason.trim()) return 'Selecciona el motivo de la corrección.';
     if (this.mode() === 'exchange' && !this.delivering().length) return 'Agrega al menos un producto entregado o elige Quitar producto.';
     for (const line of this.delivering()) {

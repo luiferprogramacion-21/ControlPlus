@@ -161,7 +161,7 @@
       </aside>
       @if (discountScope(); as scope) {
         <cp-discount-dialog [scope]="scope" [target]="scope === 'product' ? (discountTarget?.product?.name ?? '') : (cart().length + ' productos')"
-          [gross]="scope === 'product' ? (discountTarget ? price(discountTarget) * discountTarget.quantity : 0) : subtotal" [maxPercent]="maxDiscount"
+          [gross]="scope === 'product' ? (discountTarget ? price(discountTarget) * discountTarget.quantity : 0) : subtotal" [maxPercent]="maxDiscount" [costFloor]="discountCostFloor(scope)"
           [current]="scope === 'product' ? (discountTarget?.discount ?? null) : generalDiscount" [currentReason]="discountReason" [replaces]="discountReplaces"
           (applied)="applyDiscount($event)" (removed)="removeDiscount(scope)" (closed)="closeDiscount()" />
       }

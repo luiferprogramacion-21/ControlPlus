@@ -36,14 +36,70 @@ const WORDS: Record<string, string> = {
   observation: 'observación', discount: 'descuento', initial: 'inicial', final: 'final', previous: 'anterior', new: 'nuevo',
   expected: 'esperado', counted: 'contado', difference: 'diferencia', mode: 'modalidad', role: 'rol', email: 'correo',
   display: 'visible', fragment: 'fragmento', format: 'formato', expires: 'vence', issued: 'emitido', pin: 'pin',
+  numero: 'número', direccion: 'dirección', telefono: 'teléfono', credito: 'crédito', operacion: 'operación',
+  ubicacion: 'ubicación', aplicacion: 'aplicación', authorization: 'autorización', authorized: 'autorizado',
+  authorizer: 'autorizador', cancellation: 'anulación', cash: 'efectivo', category: 'categoría', correction: 'corrección',
+  credit: 'crédito', days: 'días', inventory: 'inventario', layaway: 'apartado', movement: 'movimiento', order: 'pedido',
+  original: 'original', percentage: 'porcentaje', permission: 'permiso', purchase: 'compra', reversal: 'reverso',
+  shift: 'turno', supplier: 'proveedor', terminal: 'terminal', months: 'meses', count: 'cantidad', modified: 'modificado',
+  fields: 'campos', first: 'primer', retail: 'venta', wholesale: 'mayorista', average: 'promedio', invoice: 'factura',
+};
+
+/**
+ * Nombres completos que no se traducen bien palabra por palabra (pruebas del usuario del 26/11/2026: en Auditoría aparecía
+ * «Modified fields: status | prefix | …»). La clave va en minúsculas y sin guiones.
+ */
+const PHRASES: Record<string, string> = {
+  modifiedfields: 'Campos modificados', retailprice: 'Precio de venta', preciominorista: 'Precio de venta',
+  previousretailprice: 'Precio de venta anterior', newretailprice: 'Precio de venta nuevo', wholesaleprice: 'Precio mayorista',
+  previouswholesaleprice: 'Precio mayorista anterior', averagecost: 'Costo promedio', supplierdocumentnumber: 'Número de factura',
+  invoicedate: 'Fecha de factura', vatmode: 'Modo de IVA', prefix: 'Prefijo', series: 'Serie', consecutive: 'Consecutivo',
+  status: 'Estado', stock: 'Existencias', lines: 'Productos', supplier: 'Proveedor', authorizedby: 'Autorizado por',
+  authorizedwith: 'Autorizado con', authorizationmode: 'Forma de autorización', cashafter: 'Efectivo después',
+  cashbefore: 'Efectivo antes', cashdifference: 'Diferencia de efectivo', cashiermaxdiscountpercent: 'Descuento máximo del Cajero (%)',
+  supervisormaxdiscountpercent: 'Descuento máximo del Supervisor (%)', changesource: 'Origen del cambio',
+  changedbyself: 'Lo cambió el mismo usuario', commercialname: 'Nombre comercial', credentialrevoked: 'Carné revocado',
+  defaultmonths: 'Meses por defecto', defaultdays: 'Días por defecto', displayname: 'Nombre', discountorigin: 'Origen del descuento',
+  discountreasonpresent: 'Con motivo de descuento', discounttype: 'Tipo de descuento', documenttype: 'Tipo de documento',
+  documentnumber: 'Número de documento', emailchanged: 'Cambió el correo', exceedslimit: 'Supera el cupo',
+  expectedcash: 'Efectivo esperado', failedloginattempts: 'Intentos fallidos', firstnumber: 'Primer número',
+  forgivenamount: 'Valor perdonado', fromclosedshift: 'De una caja ya cerrada', hasemail: 'Tiene correo',
+  identification: 'Identificación', identifiedwith: 'Se identificó con', initialquantity: 'Cantidad inicial',
+  kepthistory: 'Conserva su historial', lockcleared: 'Desbloqueado', newdays: 'Días nuevos',
+  newenabled: 'Activado ahora', newpercentage: 'Porcentaje nuevo', orderstate: 'Estado del pedido', originalcount: 'Cantidad original',
+  originaloperatingdate: 'Día de caja original', passwordreset: 'Contraseña restablecida', pathchanged: 'Cambió la ubicación',
+  paymentmethods: 'Medios de pago', permissioncount: 'Permisos', previousdays: 'Días anteriores', previousenabled: 'Estaba activado',
+  previouspercentage: 'Porcentaje anterior', previousrolecode: 'Rol anterior', pricetype: 'Tipo de precio', productcount: 'Productos',
+  quantitydelta: 'Cambio de cantidad', receiptfooter: 'Pie del comprobante', receiptheader: 'Encabezado del comprobante',
+  recoverymethod: 'Forma de recuperación', removedoverrides: 'Permisos individuales quitados', resellableconfirmed: 'Revendible',
+  reversedamount: 'Valor revertido', reviewedcount: 'Revisados', blockriskycredit: 'Bloquear créditos riesgosos', blocked: 'Bloqueado',
+  risk: 'Riesgo', saletype: 'Tipo de venta', sessionsinvalidated: 'Sesiones cerradas', totalcounted: 'Total contado',
+  totaldifference: 'Diferencia total', totalexpected: 'Total esperado', username: 'Usuario', bootstrap: 'Instalación inicial',
+  automatic: 'Automático', trigger: 'Origen', effect: 'Efecto', level: 'Nivel', exception: 'Excepción', failure: 'Falla',
+  attempt: 'Intento', operation: 'Operación', from: 'Desde', to: 'Hasta', refunded: 'Devuelto', retained: 'Retenido',
+  active: 'Activo', isactive: 'Activo', address: 'Dirección', phone: 'Teléfono', fullname: 'Nombre completo', name: 'Nombre',
+  observations: 'Observaciones', creditlimit: 'Cupo de crédito', cupocredito: 'Cupo de crédito', email: 'Correo',
+  nombrecompleto: 'Nombre completo', numerodocumento: 'Número de documento', tipodocumento: 'Tipo de documento',
+  telefono: 'Teléfono', direccion: 'Dirección', observaciones: 'Observaciones', correo: 'Correo', category: 'Categoría',
+  roles: 'Roles', role: 'Rol', products: 'Productos', sale: 'Venta', unitcost: 'Costo unitario', productcode: 'Código del producto',
+  occurredon: 'Fecha', occurredat: 'Fecha y hora', productname: 'Producto', customername: 'Cliente', methodcode: 'Medio de pago',
 };
 
 /** «totalPaid» → «Total pagado», «FragmentoVisible» → «Fragmento visible». */
 function fieldLabel(field: string): string {
+  const phrase = PHRASES[field.replace(/[_-]+/g, '').toLowerCase()];
+  if (phrase) return phrase;
+  if (/^sessionconsumedby/i.test(field)) return 'Sesión de operador usada';
   const words = field.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').toLowerCase().split(' ').filter(Boolean)
     .map(word => WORDS[word] ?? word);
   const text = words.join(' ');
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Los campos modificados llegan como nombres internos («supplierDocumentNumber»); se muestran en palabras. */
+function fieldList(value: unknown): string | null {
+  if (!Array.isArray(value) || !value.every(item => typeof item === 'string')) return null;
+  return value.map(item => fieldLabel(item as string)).join(', ');
 }
 
 /** Objects and lists as plain text («Cantidad: 2 · Monto: 1.000»), without braces or quotes. */
@@ -237,7 +293,8 @@ export class AuditLog implements OnInit {
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         return Object.entries(parsed as Record<string, unknown>)
           .filter(([field, value]) => !HIDDEN_FIELD.test(field) && !(typeof value === 'string' && GUID.test(value)))
-          .map(([field, value]) => ({ field: fieldLabel(field), value: plainText(displayAuditValue(value, field)) }));
+          .map(([field, value]) => ({ field: fieldLabel(field),
+            value: (/fields$/i.test(field) ? fieldList(value) : null) ?? plainText(displayAuditValue(value, field)) }));
       }
       return [{ field: 'Detalle', value: typeof parsed === 'number' ? groupedNumber(parsed) : plainText(displayAuditValue(parsed)) }];
     } catch { return [{ field: 'Detalle', value: record.details }]; }

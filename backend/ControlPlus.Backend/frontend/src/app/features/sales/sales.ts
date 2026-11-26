@@ -15,7 +15,7 @@ import { CustomerCreditRisk, HeldSale, NO_SALE_DRAFT, Sale, SaleDraft, SaleDraft
 import { Customer } from '../customers/customers-api';
 import { CustomerPicker } from '../customers/customer-picker';
 import { buildTicketHtml, TicketPrinter } from './ticket';
-import { DEFAULT_DISCOUNT_LIMITS, describeDiscount, Discount, DiscountLimits, discountAmount, maxDiscountPercent, validateDiscount, WHOLESALE_MIN_QUANTITY } from './sale-discount';
+import { costFloorDiscount, DEFAULT_DISCOUNT_LIMITS, describeDiscount, Discount, DiscountLimits, discountAmount, maxDiscountPercent, validateDiscount, WHOLESALE_MIN_QUANTITY } from './sale-discount';
 import { DiscountApplied, DiscountDialog } from './discount-dialog';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody, authorizationIdentity } from '../../shared/authorization-dialog';
 import { statusKind, toastSignal } from '../../core/toast';
@@ -482,6 +482,12 @@ export class Sales implements OnInit, OnDestroy {
     return !!state?.hasOpenShift && !state.requiresPreviousShiftClosure && (state.requiresOperatorSession ? !!state.ownOperatorSession : state.currentShift?.responsibleUserId === this.session.user()?.id);
   }
   price(line: CartLine): number { return line.priceType === 'MAYORISTA' ? line.product.wholesalePrice ?? 0 : line.product.retailPrice; }
+  /** Pruebas del usuario del 26/11/2026: el descuento no deja bajar del costo cuando se conoce (el servidor siempre lo revisa). */
+  discountCostFloor(scope: 'product' | 'sale'): number | null {
+    const lines = scope === 'product' ? (this.discountTarget ? [this.discountTarget] : []) : this.cart();
+    return costFloorDiscount(lines.map(line => ({ gross: this.price(line) * line.quantity,
+      cost: line.product.averageCost === null || line.product.averageCost === undefined ? null : line.product.averageCost * line.quantity })));
+  }
   paymentName(code: PaymentCode): string { return code === 'EFECTIVO' ? 'Efectivo' : code === 'TRANSFERENCIA' ? 'Transferencia' : 'Nequi'; }
   paymentAmount(code: PaymentCode): number { return code === 'EFECTIVO' ? Number(this.cashApplied) : code === 'TRANSFERENCIA' ? Number(this.transferApplied) : Number(this.nequiApplied); }
   paymentUsed(code: PaymentCode): boolean { return this.activePayments().includes(code); }
