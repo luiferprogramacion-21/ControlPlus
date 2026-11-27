@@ -8,7 +8,7 @@ es separar tres estados: cumplimiento acreditado, cumplimiento parcial y falta d
 de una medición no se presenta como un defecto del sistema, pero permanece abierta hasta obtener una
 evidencia reproducible.
 
-El alcance de esta primera revisión es el árbol local de `main` sobre `9fc5e54`. Al iniciar existían
+El alcance de esta primera revisión quedó confirmado en el commit de código `1bfad86`. Al iniciar existían
 modificaciones concurrentes en reportes, documentos PDF, datos del establecimiento y el instalador;
 se conservaron y luego quedaron confirmadas por su responsable en ese commit. Esta auditoría no las
 preparó como propias. No se accedió a la base persistente `controlplus`, no se aplicaron migraciones y
@@ -39,9 +39,9 @@ y añade medidas propias para cubrir el modelo de nueve características de 2501
 | `dotnet list ... package --vulnerable --include-transitive` | 0 paquetes vulnerables en los 7 proyectos | Consulta contra NuGet; refleja los avisos publicados en ese momento |
 | `npm audit --omit=dev` | 0 vulnerabilidades en 15 dependencias de producción | La aplicación instalada no incluía el hallazgo de la herramienta de desarrollo |
 | `npm audit` completo | 0 vulnerabilidades después de actualizar Angular a 22.2.5 y Vite a 8.3.5 | Antes de la corrección detectó 1 aviso alto y 1 bajo en dependencias de desarrollo |
-| CI de `2eccf5b` | Aprobado, ejecución `45945427738` | Acredita el commit; no incluye modificaciones locales sin confirmar |
+| CI de `1bfad86` | Aprobado, ejecución `46020622376` | Frontend, backend sin base, backend con PostgreSQL 18 y navegador aprobados |
 | SonarQube de `b0a4962` | Quality Gate OK, cobertura nueva 85,0 %, duplicación nueva 0,90667 %, 0 infracciones nuevas | Es la última medición publicada, pero precede a los cambios posteriores y no representa el árbol local actual |
-| Playwright del commit `84d688b` | 11/11 recorridos en CI | No acredita las modificaciones locales posteriores |
+| Playwright del commit `1bfad86` | Trabajo de navegador aprobado en el CI final | Acredita los recorridos vigentes del repositorio contra una API y PostgreSQL descartables |
 
 ## Matriz ISO IEC 25010 de calidad del producto
 
