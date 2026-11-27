@@ -218,6 +218,9 @@ builder.Services.AddSingleton<BootstrapAccessValidator>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
 
+// Ingresos por minuto desde un mismo equipo: 10 en la tienda. Las pruebas de navegador del CI inician sesión muchas veces
+// seguidas desde la misma dirección y lo suben con RateLimiting:LoginPerMinute (26/11/2026); solo se aceptan 1 a 1000.
+var loginPerMinute = Math.Clamp(builder.Configuration.GetValue<int?>("RateLimiting:LoginPerMinute") ?? 10, 1, 1000);
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -228,7 +231,7 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("login", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => FixedWindow(10)));
+            _ => FixedWindow(loginPerMinute)));
     // Pedir y usar códigos de recuperación de contraseña: pocos por minuto, para no enviar correos en masa.
     options.AddPolicy("password-recovery", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(

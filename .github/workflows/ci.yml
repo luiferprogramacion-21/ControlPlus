@@ -239,6 +239,8 @@ jobs:
         working-directory: ${{ runner.temp }}/api
         env:
           ASPNETCORE_URLS: http://127.0.0.1:5000
+          # Las pruebas de navegador inician sesión muchas veces seguidas desde la misma dirección; en la tienda siguen siendo 10.
+          RateLimiting__LoginPerMinute: '200'
         run: |
           nohup dotnet ControlPlus.Api.dll > "$RUNNER_TEMP/api.log" 2>&1 &
           for i in $(seq 1 60); do
