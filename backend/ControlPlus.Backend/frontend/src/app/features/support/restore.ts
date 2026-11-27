@@ -3,12 +3,14 @@ import { RouterLink } from '@angular/router';
 import { errorText } from '../../core/api';
 import { RestorableCopy, RestoreOverview, RestoreTest, SupportApi } from './support-api';
 import { toastSignal } from '../../core/toast';
-import { groupedNumber } from '../../shared/number-input';
+import { groupedNumber, NumberInput } from '../../shared/number-input';
+import { FormsModule } from '@angular/forms';
+import { WindowSheet } from '../../shared/window-sheet';
 
 /** Restauración y continuidad (maqueta 22c). Only the restore test is available; the real restore is a separate procedure. */
 @Component({
   selector: 'cp-restore',
-  imports: [RouterLink],
+  imports: [RouterLink, FormsModule, NumberInput, WindowSheet],
   templateUrl: './restore.html',
   styleUrl: './support.scss',
 })
@@ -24,6 +26,31 @@ export class Restore implements OnInit {
   readonly selected = computed(() => this.overview()?.copies.find(x => x.copyId === this.selectedId()) ?? null);
 
   ngOnInit(): void { void this.load(); }
+
+  /** Cambiar metas (decisión del usuario del 27/11/2026: 30 minutos de pérdida, 30 de recuperación y prueba cada mes). */
+  readonly editingGoals = signal(false);
+  readonly savingGoals = signal(false);
+  goals = { rpoMinutes: 30, rtoMinutes: 30, restoreTestDays: 30 };
+  startGoals(): void {
+    const data = this.overview(); if (!data) return;
+    this.goals = { rpoMinutes: data.rpoMinutes, rtoMinutes: data.rtoMinutes, restoreTestDays: data.restoreTestDays };
+    this.error.set(''); this.editingGoals.set(true);
+  }
+  async saveGoals(): Promise<void> {
+    const data = this.overview(); if (!data || this.savingGoals()) return;
+    const rpo = Number(this.goals.rpoMinutes), rto = Number(this.goals.rtoMinutes), days = Number(this.goals.restoreTestDays);
+    if (!Number.isInteger(rpo) || rpo < 5 || rpo > 1440) { this.error.set('La pérdida máxima va de 5 a 1.440 minutos (un día).'); return; }
+    if (!Number.isInteger(rto) || rto < 5 || rto > 1440) { this.error.set('El tiempo para recuperar va de 5 a 1.440 minutos (un día).'); return; }
+    if (!Number.isInteger(days) || days < 1 || days > 365) { this.error.set('La prueba se hace cada 1 a 365 días.'); return; }
+    this.savingGoals.set(true); this.error.set('');
+    try {
+      this.overview.set(await this.api.updateRestoreGoals({ rpoMinutes: rpo, rtoMinutes: rto, restoreTestDays: days, expectedVersion: data.goalsVersion ?? 0 }));
+      this.editingGoals.set(false);
+      this.notice.set('Metas guardadas.');
+    } catch (e) { this.error.set(errorText(e)); }
+    finally { this.savingGoals.set(false); }
+  }
+  readonly notice = toastSignal('success');
 
   async load(): Promise<void> {
     this.loading.set(true); this.error.set('');

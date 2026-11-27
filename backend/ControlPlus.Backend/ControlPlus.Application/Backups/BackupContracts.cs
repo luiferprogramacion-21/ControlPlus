@@ -63,7 +63,19 @@ public sealed record RestoreTestDto(Guid Id, Guid CopyId, DateTimeOffset Started
 
 /// <summary>Metas de Fase 4 del establecimiento (RPO, RTO y frecuencia de prueba), última prueba y copias disponibles.</summary>
 public sealed record RestoreOverviewDto(int RpoMinutes, int RtoMinutes, int RestoreTestDays, RestoreTestDto? LastTest,
-    DateOnly? NextTestDue, IReadOnlyList<RestorableCopyDto> Copies);
+    DateOnly? NextTestDue, IReadOnlyList<RestorableCopyDto> Copies,
+    // Versión del establecimiento, para cambiar las metas sin pisar otro cambio (27/11/2026).
+    long GoalsVersion = 0);
+
+/// <summary>
+/// Metas de respaldo y recuperación (decisión del usuario del 27/11/2026): pérdida máxima y tiempo para recuperar en
+/// minutos, y cada cuántos días se prueba una restauración. Las cambia el Administrador desde la pantalla de Restauración.
+/// </summary>
+public sealed record UpdateRestoreGoalsRequest(
+    [property: JsonRequired] int RpoMinutes,
+    [property: JsonRequired] int RtoMinutes,
+    [property: JsonRequired] int RestoreTestDays,
+    [property: JsonRequired] long ExpectedVersion);
 
 /// <summary>Configuración técnica del servicio, leída de la configuración local (no de la base).</summary>
 public sealed record BackupRuntimeSettings(bool Enabled, int IntervalMinutes, bool PassphraseConfigured, string? DatabaseDriveRoot);
@@ -84,6 +96,8 @@ public interface IBackupService
     Task<Result<BackupDestinationDto>> UpdateDestinationAsync(ActorContext actor, string type,
         UpdateBackupDestinationRequest request, CancellationToken cancellationToken = default);
     Task<Result<RestoreOverviewDto>> GetRestoreOverviewAsync(ActorContext actor, CancellationToken cancellationToken = default);
+    Task<Result<RestoreOverviewDto>> UpdateRestoreGoalsAsync(ActorContext actor, UpdateRestoreGoalsRequest request,
+        CancellationToken cancellationToken = default);
     /// <summary>Restaura la copia en una base temporal que se borra al terminar; nunca toca la base real.</summary>
     Task<Result<RestoreTestDto>> TestRestoreAsync(ActorContext actor, Guid copyId, CancellationToken cancellationToken = default);
 }

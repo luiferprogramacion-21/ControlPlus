@@ -5,7 +5,7 @@ import { Restore } from './restore';
 import { RestoreOverview, SupportApi } from './support-api';
 
 const overview: RestoreOverview = {
-  rpoMinutes: 30, rtoMinutes: 120, restoreTestDays: 90, lastTest: null, nextTestDue: '2026-11-15',
+  rpoMinutes: 30, rtoMinutes: 120, restoreTestDays: 90, lastTest: null, nextTestDue: '2026-11-15', goalsVersion: 4,
   copies: [
     { copyId: 'c3', backupAt: '2026-11-15T19:00:00Z', destinationType: 'EXTERNO_CIFRADO', sizeBytes: 195_000_000, verified: true, available: true },
     { copyId: 'c2', backupAt: '2026-11-15T18:30:00Z', destinationType: 'LOCAL_FISICO_SEPARADO', sizeBytes: 194_000_000, verified: true, available: false },
@@ -13,7 +13,7 @@ const overview: RestoreOverview = {
 };
 
 describe('Restauración', () => {
-  const api = { restoreOverview: vi.fn(), restoreTest: vi.fn() };
+  const api = { restoreOverview: vi.fn(), restoreTest: vi.fn(), updateRestoreGoals: vi.fn() };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -86,5 +86,21 @@ describe('Restauración', () => {
     api.restoreTest.mockRejectedValue(new HttpErrorResponse({ status: 409 }));
     await fixture.componentInstance.test();
     expect(fixture.componentInstance.error()).not.toBe('');
+  });
+
+  it('el Administrador cambia las metas con su versión y valida los valores (27/11/2026)', async () => {
+    const fixture = await create(); const component = fixture.componentInstance;
+    api.updateRestoreGoals.mockResolvedValue({ ...overview, rtoMinutes: 30, restoreTestDays: 30, goalsVersion: 5 });
+    component.startGoals();
+    expect(component.goals).toEqual({ rpoMinutes: 30, rtoMinutes: 120, restoreTestDays: 90 });
+    component.goals.rtoMinutes = 0;
+    await component.saveGoals();
+    expect(api.updateRestoreGoals).not.toHaveBeenCalled();
+    expect(component.error()).toContain('tiempo para recuperar');
+    component.goals = { rpoMinutes: 30, rtoMinutes: 30, restoreTestDays: 30 };
+    await component.saveGoals();
+    expect(api.updateRestoreGoals).toHaveBeenCalledWith({ rpoMinutes: 30, rtoMinutes: 30, restoreTestDays: 30, expectedVersion: 4 });
+    expect(component.overview()?.rtoMinutes).toBe(30);
+    expect(component.editingGoals()).toBe(false);
   });
 });

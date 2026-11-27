@@ -32,8 +32,9 @@ public sealed class InstallationBootstrapper(OfficialControlPlusDbContext dbCont
             DiasLimiteCambio = 15,
             ModoTurnoPredeterminado = "INDIVIDUAL",
             RpoMinutos = 30,
-            RtoMinutos = 120,
-            DiasPruebaRestauracion = 90,
+            // Metas acordadas con el usuario el 27/11/2026: recuperar en 30 minutos y probar cada mes (Fase 4: 120 y 90).
+            RtoMinutos = 30,
+            DiasPruebaRestauracion = 30,
             Activo = true,
             FechaCreacion = now,
             Version = 1

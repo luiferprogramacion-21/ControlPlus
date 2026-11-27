@@ -59,6 +59,9 @@ public sealed class EfBackupRepository(OfficialControlPlusDbContext dbContext) :
         dbContext.Instalacion.AsNoTracking().Where(x => x.Id == installationId)
             .Select(x => x.Establecimiento).FirstOrDefaultAsync(cancellationToken);
 
+    public Task<Establecimiento?> GetEstablishmentForUpdateAsync(Guid installationId, CancellationToken cancellationToken) =>
+        dbContext.Establecimiento.Where(x => x.Instalacion.Any(i => i.Id == installationId)).FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<(CopiaRespaldo Copy, EjecucionRespaldo Execution, string DestinationType)>> GetCompletedCopiesAsync(
         Guid installationId, int limit, CancellationToken cancellationToken)
     {

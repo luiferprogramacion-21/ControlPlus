@@ -64,6 +64,8 @@ public interface IBackupRepository
     Task SaveChangesAsync(CancellationToken cancellationToken);
 
     Task<Establecimiento?> GetEstablishmentAsync(Guid installationId, CancellationToken cancellationToken);
+    /// <summary>El establecimiento de la instalación, seguido para guardar cambios (metas de recuperación).</summary>
+    Task<Establecimiento?> GetEstablishmentForUpdateAsync(Guid installationId, CancellationToken cancellationToken);
     /// <summary>Copias completadas, de la más reciente a la más antigua, con su ejecución y el tipo de destino.</summary>
     Task<IReadOnlyList<(CopiaRespaldo Copy, EjecucionRespaldo Execution, string DestinationType)>> GetCompletedCopiesAsync(
         Guid installationId, int limit, CancellationToken cancellationToken);

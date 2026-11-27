@@ -184,7 +184,8 @@ public sealed class BackupApiTests : IAsyncLifetime
         _ = await RunAsync(BackupCodes.Manual);
 
         var overview = await ReadAsync<RestoreOverviewDto>(await client.GetAsync("/api/backups/restore"), HttpStatusCode.OK);
-        Assert.Equal((30, 120, 90), (overview.RpoMinutes, overview.RtoMinutes, overview.RestoreTestDays));
+        // Metas acordadas con el usuario el 27/11/2026 para instalaciones nuevas: 30 minutos, 30 minutos y prueba cada 30 días.
+        Assert.Equal((30, 30, 30), (overview.RpoMinutes, overview.RtoMinutes, overview.RestoreTestDays));
         Assert.Null(overview.LastTest);
         Assert.Equal(2, overview.Copies.Count);
         Assert.All(overview.Copies, x => Assert.True(x.Available && x.Verified && x.DestinationType == "EXTERNO_CIFRADO"));
@@ -209,7 +210,23 @@ public sealed class BackupApiTests : IAsyncLifetime
         }
         var after = await ReadAsync<RestoreOverviewDto>(await client.GetAsync("/api/backups/restore"), HttpStatusCode.OK);
         Assert.Equal(test.Id, after.LastTest!.Id);
-        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90), after.NextTestDue);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30), after.NextTestDue);
+
+        // El Administrador cambia las metas desde la pantalla: se validan, usan la versión y quedan en la auditoría.
+        await AssertProblemAsync(await client.PutAsJsonAsync("/api/backups/restore/goals",
+            new UpdateRestoreGoalsRequest(0, 30, 30, after.GoalsVersion)), HttpStatusCode.BadRequest, "validation.failed");
+        var changed = await ReadAsync<RestoreOverviewDto>(await client.PutAsJsonAsync("/api/backups/restore/goals",
+            new UpdateRestoreGoalsRequest(15, 45, 7, after.GoalsVersion)), HttpStatusCode.OK);
+        Assert.Equal((15, 45, 7), (changed.RpoMinutes, changed.RtoMinutes, changed.RestoreTestDays));
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7), changed.NextTestDue);
+        Assert.True(changed.GoalsVersion > after.GoalsVersion);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync("/api/backups/restore/goals",
+            new UpdateRestoreGoalsRequest(30, 30, 30, after.GoalsVersion))).StatusCode);
+        await using (var scope = _factory!.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<OfficialControlPlusDbContext>();
+            Assert.True(await db.EventoAuditoria.AnyAsync(x => x.Accion == "BACKUPGOALSUPDATED"));
+        }
 
         // Una prueba fallida queda registrada con su mensaje y no adelanta la próxima fecha.
         _engine.RestoreResult = new RestoreTestResult(false, false, TimeSpan.FromSeconds(5), null, "La copia no coincide con la huella del respaldo original.");
@@ -228,6 +245,8 @@ public sealed class BackupApiTests : IAsyncLifetime
             (await client.PostAsync($"/api/backups/copies/{Guid.NewGuid()}/restore-test", null)).StatusCode);
         SetBearer(client, supervisor);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/backups/restore")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync("/api/backups/restore/goals",
+            new UpdateRestoreGoalsRequest(30, 30, 30, changed.GoalsVersion))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden,
             (await client.PostAsync($"/api/backups/copies/{newest.CopyId}/restore-test", null)).StatusCode);
     }

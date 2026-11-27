@@ -4,6 +4,7 @@
       <h2 id="restore-title">Comprobar que los respaldos sirven</h2>
       <p>Solo administrador · La prueba no toca tus datos reales. <a routerLink="/operacion/soporte">Volver a Soporte</a></p>
     </div>
+    @if (overview()) { <button class="button button--secondary" type="button" (click)="startGoals()">Cambiar metas</button> }
   </div>
 
   <!-- Auditoría A.20: pasos claros para probar una restauración sin conocer términos técnicos. -->
@@ -73,6 +74,24 @@
       <p>Recuperar los datos reales reemplaza lo que hay en el equipo, por eso no se hace con un botón: hay que detener ControlPlus y seguir el procedimiento de emergencia con ayuda de soporte. Antes de empezar, el sistema guarda una copia de lo que había.</p>
       <button class="button button--secondary restore-choice" type="button" disabled title="Se hace con el procedimiento de emergencia, con ayuda de soporte.">Restaurar operación</button>
       <p class="restore-note" role="note">Restaurar la operación exige confirmación, verificación y registro de auditoría.</p>
+      <p class="restore-note" role="note">Para comprobar que las copias sirven si el computador se pierde, haz el <strong>simulacro de recuperación</strong> con la copia de la nube y la contraseña anotada (manual de uso, 4.11).</p>
     </section>
+  }
+
+  @if (editingGoals()) {
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="restore-goals-title"><div class="module-form-sheet__backdrop" (click)="savingGoals() || editingGoals.set(false)"></div>
+      <form class="panel panel--padded module-form" (submit)="$event.preventDefault(); saveGoals()">
+        <div class="panel-heading"><h2 id="restore-goals-title">Metas de respaldo y recuperación</h2><p>Lo que la tienda se compromete a cumplir si el equipo se daña.</p></div>
+        <label class="field-label" for="goal-rpo">Pérdida máxima de trabajo (minutos)</label>
+        <input id="goal-rpo" class="text-field" type="text" cpNumberInput min="5" step="1" name="rpo" [(ngModel)]="goals.rpoMinutes">
+        <small class="form-hint">Lo que se haya hecho después de la última copia se recupera con los tickets impresos.</small>
+        <label class="field-label field-label--spaced" for="goal-rto">Tiempo máximo para volver a trabajar (minutos)</label>
+        <input id="goal-rto" class="text-field" type="text" cpNumberInput min="5" step="1" name="rto" [(ngModel)]="goals.rtoMinutes">
+        <label class="field-label field-label--spaced" for="goal-days">Probar una restauración cada (días)</label>
+        <input id="goal-days" class="text-field" type="text" cpNumberInput min="1" step="1" name="days" [(ngModel)]="goals.restoreTestDays">
+        @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
+        <div class="form-actions"><button class="button button--primary" type="submit" [disabled]="savingGoals()">{{ savingGoals() ? 'Guardando…' : 'Guardar metas' }}</button><button class="button button--secondary" type="button" (click)="editingGoals.set(false)" [disabled]="savingGoals()">Cancelar</button></div>
+      </form>
+    </div>
   }
 </section>

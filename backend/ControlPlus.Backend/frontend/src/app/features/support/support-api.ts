@@ -38,6 +38,8 @@ export interface RestoreTest {
 /** Phase 4 goals of the establishment, last restore test and the copies that can be tested. */
 export interface RestoreOverview {
   rpoMinutes: number; rtoMinutes: number; restoreTestDays: number; lastTest: RestoreTest | null; nextTestDue: string | null; copies: RestorableCopy[];
+  /** Versión del establecimiento, para cambiar las metas (27/11/2026). */
+  goalsVersion?: number;
 }
 
 /** Perfil de impresora activo de la terminal (GET /api/printing/status). */
@@ -77,6 +79,10 @@ export class SupportApi {
   run(): Promise<unknown> { return firstValueFrom(this.http.post('/api/backups/run', null)); }
   restoreOverview(): Promise<RestoreOverview> { return firstValueFrom(this.http.get<RestoreOverview>('/api/backups/restore')); }
   /** Restores the copy into a temporary database that is dropped afterwards; the real database is never touched. */
+  /** Metas de respaldo y recuperación (decisión del usuario del 27/11/2026); devuelve la vista actualizada. */
+  updateRestoreGoals(goals: { rpoMinutes: number; rtoMinutes: number; restoreTestDays: number; expectedVersion: number }): Promise<RestoreOverview> {
+    return firstValueFrom(this.http.put<RestoreOverview>('/api/backups/restore/goals', goals));
+  }
   restoreTest(copyId: string): Promise<RestoreTest> { return firstValueFrom(this.http.post<RestoreTest>(`/api/backups/copies/${copyId}/restore-test`, null)); }
   updateDestination(type: BackupDestinationType, path: string, active: boolean, expectedVersion: number | null): Promise<BackupDestination> {
     return firstValueFrom(this.http.put<BackupDestination>(`/api/backups/destinations/${type}`, { path, active, expectedVersion }));

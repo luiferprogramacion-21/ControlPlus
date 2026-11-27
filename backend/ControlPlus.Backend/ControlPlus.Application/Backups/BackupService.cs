@@ -226,7 +226,41 @@ public sealed class BackupService(
             ? DateOnly.FromDateTime(last.FechaInicio).AddDays(establishment.DiasPruebaRestauracion)
             : today;
         return Result.Success(new RestoreOverviewDto(establishment.RpoMinutos, establishment.RtoMinutos,
-            establishment.DiasPruebaRestauracion, last is null ? null : MapTest(last), nextDue, copies));
+            establishment.DiasPruebaRestauracion, last is null ? null : MapTest(last), nextDue, copies, establishment.Version));
+    }
+
+    /// <summary>
+    /// Cambia las metas de respaldo y recuperación (decisión del usuario del 27/11/2026: 30 minutos de pérdida, 30 de
+    /// recuperación y prueba cada mes). Solo el Administrador con BACKUPS.MANAGE; se audita con los valores anteriores.
+    /// </summary>
+    public async Task<Result<RestoreOverviewDto>> UpdateRestoreGoalsAsync(ActorContext actor, UpdateRestoreGoalsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var error = await RequireAdministratorAsync(actor, cancellationToken);
+        if (error is not null) return Result.Failure<RestoreOverviewDto>(error);
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.RpoMinutes is < 5 or > 1440)
+            return Result.Failure<RestoreOverviewDto>(ApplicationError.Validation("La pérdida máxima va de 5 a 1.440 minutos (un día)."));
+        if (request.RtoMinutes is < 5 or > 1440)
+            return Result.Failure<RestoreOverviewDto>(ApplicationError.Validation("El tiempo para recuperar va de 5 a 1.440 minutos (un día)."));
+        if (request.RestoreTestDays is < 1 or > 365)
+            return Result.Failure<RestoreOverviewDto>(ApplicationError.Validation("La prueba de restauración se hace cada 1 a 365 días."));
+        var installationId = await repository.GetActiveInstallationIdAsync(cancellationToken);
+        if (installationId is null) return Result.Failure<RestoreOverviewDto>(ApplicationError.NotFound("la instalación activa"));
+        var establishment = await repository.GetEstablishmentForUpdateAsync(installationId.Value, cancellationToken);
+        if (establishment is null) return Result.Failure<RestoreOverviewDto>(ApplicationError.NotFound("el establecimiento activo"));
+        if (request.ExpectedVersion != establishment.Version)
+            return Result.Failure<RestoreOverviewDto>(ApplicationError.ConcurrencyConflict("Las metas fueron cambiadas por otra persona."));
+        var previous = new { establishment.RpoMinutos, establishment.RtoMinutos, establishment.DiasPruebaRestauracion };
+        establishment.RpoMinutos = request.RpoMinutes;
+        establishment.RtoMinutos = request.RtoMinutes;
+        establishment.DiasPruebaRestauracion = request.RestoreTestDays;
+        await AuditWriter.WriteCashAsync(audits, clock, actor.UserId, AuditAction.BackupGoalsUpdated,
+            nameof(Establecimiento), establishment.Id,
+            new { Before = previous, After = new { RpoMinutos = request.RpoMinutes, RtoMinutos = request.RtoMinutes, DiasPruebaRestauracion = request.RestoreTestDays } },
+            Guid.CreateVersion7(), null, null, null, null, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return await GetRestoreOverviewAsync(actor, cancellationToken);
     }
 
     public async Task<Result<RestoreTestDto>> TestRestoreAsync(ActorContext actor, Guid copyId, CancellationToken cancellationToken = default)

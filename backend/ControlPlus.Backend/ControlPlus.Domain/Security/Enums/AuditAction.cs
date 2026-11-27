@@ -146,5 +146,7 @@ public enum AuditAction
     SalePaymentsCorrected = 139,
     SalePaymentCorrectionAuthorizationRejected = 140,
     // Pruebas del usuario del 24/11/2026 (punto 13): los movimientos de caja piden autorizador.
-    CashMovementAuthorizationRejected = 141
+    CashMovementAuthorizationRejected = 141,
+    // Metas de respaldo y recuperación cambiadas por el Administrador (27/11/2026).
+    BackupGoalsUpdated = 142
 }

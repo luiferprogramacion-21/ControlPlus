@@ -78,6 +78,7 @@ export const AUDIT_ACTION_GROUPS: AuditActionGroup[] = [
   { module: 'Respaldos', actions: {
     BackupRequested: 'Respaldo manual solicitado', BackupDestinationUpdated: 'Destino de respaldo modificado',
     BackupRestoreTested: 'Prueba de restauración',
+    BackupGoalsUpdated: 'Metas de respaldo cambiadas',
   } },
   { module: 'Configuración', actions: {
     EstablishmentUpdated: 'Datos del establecimiento modificados',

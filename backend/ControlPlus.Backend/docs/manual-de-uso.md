@@ -587,7 +587,7 @@ Menú **Soporte y continuidad**.
 
 > Un respaldo en el mismo disco que la base no protege contra la falla de ese disco. Conecta un **USB o segundo disco** y configúralo como destino local.
 
-**Metas acordadas (27 de noviembre de 2026):** si el equipo se daña, se pierden **como máximo 30 minutos** de trabajo (lo que se haya hecho después de la última copia se recupera con los tickets impresos), y ControlPlus vuelve a funcionar en **máximo 30 minutos**.
+**Metas acordadas (27 de noviembre de 2026):** si el equipo se daña, se pierden **como máximo 30 minutos** de trabajo (lo que se haya hecho después de la última copia se recupera con los tickets impresos), y ControlPlus vuelve a funcionar en **máximo 30 minutos**. Se prueba una restauración **cada mes**. Estas metas se ven y se cambian en **Soporte y continuidad → Restauración → Cambiar metas**.
 
 ### Kit de recuperación (guárdalo fuera del computador)
 

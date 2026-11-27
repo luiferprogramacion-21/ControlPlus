@@ -66,6 +66,22 @@ public sealed class BackupsController(CurrentActorContextResolver actorContextRe
         return actor is null ? MissingActor() : FromResult(await backups.TestRestoreAsync(actor, copyId, cancellationToken), Ok);
     }
 
+    /// <summary>Cambia las metas de respaldo y recuperación (pérdida máxima, tiempo para recuperar y días entre pruebas).</summary>
+    [HttpPut("restore/goals")]
+    [PermissionAuthorize(PermissionCodes.BackupsManage)]
+    [Consumes("application/json")]
+    [ProducesResponseType<RestoreOverviewDto>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json")]
+    public async Task<IActionResult> UpdateRestoreGoals([FromBody] UpdateRestoreGoalsRequest request, CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor()
+            : FromResult(await backups.UpdateRestoreGoalsAsync(actor, request, cancellationToken), Ok);
+    }
+
     /// <summary>Configura la carpeta de un destino (LOCAL_FISICO_SEPARADO o EXTERNO_CIFRADO) y si está activo.</summary>
     [HttpPut("destinations/{type}")]
     [PermissionAuthorize(PermissionCodes.BackupsManage)]
