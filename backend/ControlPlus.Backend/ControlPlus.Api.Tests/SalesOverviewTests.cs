@@ -124,8 +124,21 @@ public sealed class SalesOverviewTests
         Assert.Null(repo.RequestedInstallationId);
     }
 
-    private static string RenderPdf(SalesOverviewReport report) =>
-        Encoding.Latin1.GetString(SalesOverviewPdf.Render(report));
+    private static string RenderPdf(SalesOverviewReport report, string? businessName = null) =>
+        Encoding.Latin1.GetString(SalesOverviewPdf.Render(report, businessName));
+
+    [Fact]
+    public void Pdf_ShowsTheConfiguredBusinessName()
+    {
+        // Pedido del usuario del 27/11/2026: el reporte lleva el nombre de Configuración → Establecimiento, no uno fijo.
+        var report = new SalesOverviewReport(From, To, "COP", new(1, 100m, 0, 100m),
+            new(0, 0m), 100m, 0m, null, 100m, 40m, 60m, 60m,
+            "COMPLETE", 0, 0, [new(From, 100m, 0, 100m)], 100m, [new("EFECTIVO", "Efectivo", 100m, 100m)]);
+        var named = RenderPdf(report, " Variedades La Esquina ");
+        Assert.Contains("Variedades La Esquina · Reporte de ventas", named);
+        Assert.DoesNotContain("Baratísimo", named);
+        Assert.Contains("ControlPlus · Reporte de ventas", RenderPdf(report));
+    }
 
     private static void AssertValidStructure(string pdf)
     {

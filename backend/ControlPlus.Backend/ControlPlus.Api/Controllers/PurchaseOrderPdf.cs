@@ -21,7 +21,7 @@ public static class PurchaseOrderPdf
 
     public static byte[] Render(PurchaseOrderDto order, SupplierDto supplier, EstablishmentDto? business, DateTimeOffset generatedAtUtc)
     {
-        var businessName = string.IsNullOrWhiteSpace(business?.CommercialName) ? "Baratísimo" : business.CommercialName.Trim();
+        var businessName = string.IsNullOrWhiteSpace(business?.CommercialName) ? "ControlPlus" : business.CommercialName.Trim();
         var doc = new Document($"{businessName} · Pedido {order.VisibleNumber}");
         var generated = TimeZoneInfo.ConvertTime(generatedAtUtc, LocalZone);
         var sentAt = TimeZoneInfo.ConvertTime(new DateTimeOffset(DateTime.SpecifyKind(order.SentAt ?? order.CreatedAt, DateTimeKind.Utc)), LocalZone);

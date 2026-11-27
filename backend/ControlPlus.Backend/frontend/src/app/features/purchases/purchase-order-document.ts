@@ -22,7 +22,7 @@ export function buildPurchaseOrderHtml(order: Order, supplier: Supplier, operato
   </tr>`).join('');
   const contact = [supplier.phone, supplier.email, supplier.address].filter(Boolean).map(value => escapeHtml(value!)).join(' · ');
   const totalUnits = order.lines.reduce((sum, line) => sum + line.requestedQuantity, 0);
-  const businessName = establishment?.commercialName || 'Baratísimo';
+  const businessName = establishment?.commercialName || 'ControlPlus';
   const businessContact = [establishment?.identification ? `NIT ${establishment.identification}` : null,
     establishment?.phone, establishment?.address].filter(Boolean).map(value => escapeHtml(value!)).join(' · ');
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pedido ${escapeHtml(order.visibleNumber)}</title><style>

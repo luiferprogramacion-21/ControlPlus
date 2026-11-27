@@ -147,7 +147,7 @@ try {
     $exe = Join-Path $installDir 'ControlPlus.Api.exe'
     if (-not $existing) {
         New-Service -Name $serviceName -DisplayName 'ControlPlus' -BinaryPathName ('"' + $exe + '"') `
-            -Description 'ControlPlus POS de Baratísimo: API, pantalla y respaldos automáticos.' `
+            -Description 'ControlPlus POS: API, pantalla y respaldos automáticos.' `
             -StartupType Automatic -DependsOn $postgres.Name | Out-Null
     }
     # Sin retraso: la dependencia de PostgreSQL ya garantiza el orden (decisión del 16 de noviembre de 2026).

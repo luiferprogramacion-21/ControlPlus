@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using ControlPlus.Api.Authorization;
 using ControlPlus.Api.Security;
+using ControlPlus.Application.Establishments.Contracts;
 using ControlPlus.Application.Reports;
 using ControlPlus.Application.Security.Contracts;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +10,7 @@ namespace ControlPlus.Api.Controllers;
 
 [Route("api/reports")]
 public sealed class ReportsController(CurrentActorContextResolver actorContextResolver, IFinancialSalesReportService service,
-    IDailyCashFlowService cashFlowService, ISalesOverviewService overviewService)
+    IDailyCashFlowService cashFlowService, ISalesOverviewService overviewService, IEstablishmentService establishments)
     : ApiControllerBase(actorContextResolver)
 {
     /// <summary>Ventas confirmadas por fecha operativa de la instalación activa; rango inclusivo de hasta 31 días.</summary>
@@ -75,8 +76,11 @@ public sealed class ReportsController(CurrentActorContextResolver actorContextRe
     {
         var actor = await GetActorAsync(cancellationToken);
         if (actor is null) return MissingActor();
-        return FromResult(await overviewService.GetAsync(actor, from, to, cancellationToken), report =>
-            File(SalesOverviewPdf.Render(report), "application/pdf",
+        var overview = await overviewService.GetAsync(actor, from, to, cancellationToken);
+        var business = overview.IsSuccess ? await establishments.GetAsync(actor, cancellationToken) : null;
+        var businessName = business is { IsSuccess: true } ? business.Value!.CommercialName : null;
+        return FromResult(overview, report =>
+            File(SalesOverviewPdf.Render(report, businessName), "application/pdf",
                 $"reporte-ventas-{report.From:yyyy-MM-dd}_{report.To:yyyy-MM-dd}.pdf"));
     }
 }

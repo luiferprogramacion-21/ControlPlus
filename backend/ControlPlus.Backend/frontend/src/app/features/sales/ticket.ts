@@ -59,7 +59,7 @@ export function buildTicketHtml(receipt: SaleReceipt, extras: TicketExtras = {},
   const cashSettlement =
     `<tr><td>Recibido</td><td class="r">${cop(received)}</td></tr>` +
     `<tr><td>Devuelta</td><td class="r">${cop(receipt.change)}</td></tr>`;
-  const businessName = receipt.establishmentName?.trim() || 'Baratísimo';
+  const businessName = receipt.establishmentName?.trim() || 'ControlPlus';
   const businessData = [receipt.establishmentIdentification ? `NIT: ${receipt.establishmentIdentification}` : '',
     receipt.establishmentAddress ?? '', receipt.establishmentPhone ? `Tel: ${receipt.establishmentPhone}` : '']
     .filter(Boolean).map(value => escapeHtml(value)).join('<br>');

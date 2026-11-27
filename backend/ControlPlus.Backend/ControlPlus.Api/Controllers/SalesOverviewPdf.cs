@@ -39,14 +39,19 @@ public static class SalesOverviewPdf
     public static string FormatPercent(decimal value) => value.ToString("#,##0.##", Culture) + " %";
     public static string FormatDate(DateOnly value) => value.ToString("dd/MM/yyyy", Culture);
 
-    public static byte[] Render(SalesOverviewReport report)
+    /// <summary>
+    /// <paramref name="businessName"/> es el nombre configurado en Configuración → Establecimiento (pedido del usuario del
+    /// 27/11/2026); sin él, el encabezado dice ControlPlus.
+    /// </summary>
+    public static byte[] Render(SalesOverviewReport report, string? businessName = null)
     {
-        var doc = new Document();
+        var name = string.IsNullOrWhiteSpace(businessName) ? "ControlPlus" : businessName.Trim();
+        var doc = new Document($"{name} · Reporte de ventas");
         var generated = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, LocalZone);
         var dayCount = report.To.DayNumber - report.From.DayNumber + 1;
 
         // Heading
-        doc.Text(Margin, doc.Y - 10, "Baratísimo", 10, bold: true, color: Gray);
+        doc.Text(Margin, doc.Y - 10, Fit(name, 10, Right - Margin), 10, bold: true, color: Gray);
         doc.Y -= 16;
         doc.Text(Margin, doc.Y - 18, "Reporte de ventas", 20, bold: true, color: Blue);
         doc.Y -= 30;
@@ -290,7 +295,7 @@ public static class SalesOverviewPdf
         private readonly string _footer;
         public double Y { get; set; }
 
-        public Document(string footer = "Baratísimo · Reporte de ventas")
+        public Document(string footer = "Reporte de ventas")
         {
             _footer = footer;
             NewPage();

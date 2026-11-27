@@ -106,6 +106,7 @@ public sealed partial class SalesApiFlowTests
             Assert.Equal("application/pdf", pdfResponse.Content.Headers.ContentType?.MediaType);
             var pdf = Encoding.Latin1.GetString(await pdfResponse.Content.ReadAsByteArrayAsync());
             Assert.Contains("Ventas del período", pdf);
+            Assert.Contains("Comercio ficticio de Ventas · Reporte de ventas", pdf);
             Assert.Contains(SalesOverviewPdf.FormatMoney(persisted.Total), pdf);
             Assert.Contains("Costo de los productos", pdf);
             Assert.Contains(SalesOverviewPdf.FormatMoney(cost), pdf);

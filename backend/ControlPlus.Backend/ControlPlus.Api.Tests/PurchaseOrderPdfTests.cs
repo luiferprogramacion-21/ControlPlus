@@ -42,7 +42,8 @@ public sealed class PurchaseOrderPdfTests
         Assert.Contains("Página 1 de 3", pdf);
         Assert.Contains("Producto número 60", pdf);
         Assert.True(pdf.Split("(Cantidad) Tj").Length - 1 >= 3);
-        Assert.Contains("Baratísimo · Pedido PED-CP-2026-01-6", pdf);
+        // Sin datos del establecimiento el PDF dice ControlPlus; con datos usa el nombre configurado (27/11/2026).
+        Assert.Contains("ControlPlus · Pedido PED-CP-2026-01-6", pdf);
     }
 
     [Fact]

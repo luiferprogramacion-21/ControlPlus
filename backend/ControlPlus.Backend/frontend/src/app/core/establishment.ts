@@ -30,7 +30,8 @@ export class EstablishmentService {
   private pending: Promise<Establishment> | null = null;
 
   readonly value = this.state.asReadonly();
-  readonly name = computed(() => this.state()?.commercialName || 'Baratísimo');
+  /** Nombre de Configuración → Establecimiento; si aún no se ha cargado, ControlPlus. */
+  readonly name = computed(() => this.state()?.commercialName || 'ControlPlus');
 
   load(force = false): Promise<Establishment> {
     if (!force && this.state()) return Promise.resolve(this.state()!);
