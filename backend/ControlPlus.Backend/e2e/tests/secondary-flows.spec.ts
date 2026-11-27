@@ -12,6 +12,9 @@ const baseURL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:5000";
 const adminUser = "admin.e2e";
 const adminPassword = process.env.CONTROLPLUS_E2E_ADMIN_PASSWORD ?? "";
 const suffix = Date.now().toString();
+const categoryAbbreviation = `SF${Array.from({ length: 6 }, () =>
+  String.fromCharCode(65 + Math.floor(Math.random() * 26)),
+).join("")}`;
 const mixedProductName = `Producto secundario E2E ${suffix}`;
 const lowProductName = `Stock bajo E2E ${suffix}`;
 const emptyProductName = `Agotado E2E ${suffix}`;
@@ -58,7 +61,7 @@ test.beforeAll(async () => {
       data: {
         name: `Secundarios E2E ${suffix}`,
         description: null,
-        abbreviation: "SFE",
+        abbreviation: categoryAbbreviation,
       },
     }),
     201,
@@ -128,7 +131,9 @@ test("una clave incorrecta se rechaza y luego permite iniciar sesión con la cla
   await page.getByLabel("Usuario").fill(adminUser);
   await page.getByLabel("Contraseña").fill(`${adminPassword}-incorrecta`);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
-  await expect(page.getByRole("alert")).toContainText(/incorrect|credencial/i);
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    /incorrect|credencial/i,
+  );
   await page.getByLabel("Contraseña").fill(adminPassword);
   await page.getByRole("button", { name: "Iniciar sesión" }).click();
   await expect(page).toHaveURL(/\/operacion\//);
