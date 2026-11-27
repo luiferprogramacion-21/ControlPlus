@@ -1022,6 +1022,7 @@ export class Sales implements OnInit, OnDestroy {
       this.pending = { key: crypto.randomUUID(), authorizerUserName: authorizationIdentity(credentials), input: { customerId: this.customerId.trim() || null, lines: this.cart().map(line => ({ productId: line.product.id, quantity: Number(line.quantity), priceType: line.priceType, discount: !this.generalDiscount && line.discount ? { type: line.discount.type, value: Number(line.discount.value) } : null })), generalDiscount: this.generalDiscount ? { type: this.generalDiscount.type, value: Number(this.generalDiscount.value) } : null, discountReason: this.discountReason.trim() || null, payments, saleType: this.saleType(), dueDate: this.saleType() === 'CREDITO' ? this.dueDate : null, authorization: null } };
     }
     this.busy.set(true); this.error.set('');
+    let confirmed = false;
     try {
       // Ya marcada «en proceso» (sin dobles envíos): el último guardado del borrador termina antes de confirmar,
       // porque la venta lo cierra en el servidor.
@@ -1036,8 +1037,7 @@ export class Sales implements OnInit, OnDestroy {
       this.receipt.set(meta); this.showDetail.set(false); this.reprintMessage.set(''); this.printed.set(false); this.lastJobStatus.set(null); this.sale.set(result);
       this.pending = null; this.drawerCheckoutKey = null; this.cart.set([]); this.results.set([]); this.selectedProductId.set(null); this.cashApplied = this.cashReceived = this.transferApplied = this.nequiApplied = 0; this.generalDiscount = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); this.activePayments.set(['EFECTIVO']); this.checkoutMode.set(false);
       this.focusField('new-sale');
-      // La venta ya está confirmada: un fallo de impresión no la afecta y se puede reintentar con el botón.
-      setTimeout(() => void this.printSaleTicket(true));
+      confirmed = true;
       await this.refreshCash();
     } catch (error) { if (error instanceof HttpErrorResponse && error.status === 403 && this.pending?.input.saleType === 'CREDITO') { this.pending = null; throw new Error(this.creditRisk()?.blocked ? `${this.creditRiskText} Con el bloqueo activo, solo un Administrador puede autorizar esta venta.` : reasonOr(error, 'No se autorizó el crédito. Verifica el rol, permiso y credenciales del autorizador.')); } if (error instanceof HttpErrorResponse && error.status === 403 && credentials) { this.pending = null; this.concessionAuthorization = null; this.concessionAuthorizedBy.set(''); throw new Error(reasonOr(error, 'No se autorizó el descuento o el precio mayorista. Aplica la autorización de nuevo con un Supervisor o Administrador.')); } if (credentials) throw error;
       // Auditoría del 23 de noviembre de 2026: un rechazo claro del servidor (400, 404, 409, 422) significa que la venta NO se
@@ -1046,6 +1046,10 @@ export class Sales implements OnInit, OnDestroy {
       if (error instanceof HttpErrorResponse && [400, 404, 409, 422].includes(error.status)) { this.pending = null; this.error.set(`No se guardó la venta: ${errorText(error)}`); }
       else this.error.set('No se supo si la venta quedó guardada (se perdió la respuesta). Pulsa «Reintentar confirmación»: si ya se guardó, no se repite.'); }
     finally { this.busy.set(false); }
+    // La venta ya está confirmada: se consulta el ticket cuando la pantalla quedó libre. Antes se lanzaba mientras se
+    // actualizaba la caja y, como la pantalla seguía ocupada, la consulta no se hacía: el ticket salía en papel pero la
+    // pantalla decía «Ticket sin imprimir» (pruebas del usuario del 27/11/2026). Un fallo de impresión no afecta la venta.
+    if (confirmed) void this.printSaleTicket(true);
   }
 
   // --- after the sale -------------------------------------------------------------------------

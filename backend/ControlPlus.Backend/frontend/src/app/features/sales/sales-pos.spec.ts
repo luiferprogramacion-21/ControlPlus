@@ -223,8 +223,8 @@ describe('Sales: punto de venta de contado', () => {
     it('la primera impresión no registra reimpresión; las siguientes sí', async () => {
       receipt.mockResolvedValue({ saleId: 's1', visibleNumber: 'VTA-1', occurredAtUtc: '2026-11-06T15:00:00Z', lines: [], payments: [], total: 50000, change: 0, grossSubtotal: 50000, discountTotal: 0 });
       requestReprint.mockResolvedValue({ status: 'PENDIENTE' });
-      await component.confirm();
-      await component.printSaleTicket();
+      // La primera impresión es la automática al confirmar; la del botón después ya es una reimpresión.
+      await component.confirm(); await vi.advanceTimersByTimeAsync(10);
       expect(requestReprint).not.toHaveBeenCalled(); expect(print).toHaveBeenCalledTimes(1);
       expect(component.printed()).toBe(true); expect(component.reprintMessage()).toContain('enviado');
       await component.printSaleTicket();
@@ -263,6 +263,16 @@ describe('Sales: punto de venta de contado', () => {
       const calls = printJobs.mock.calls.length;
       await vi.advanceTimersByTimeAsync(6000);
       expect(printJobs.mock.calls.length).toBe(calls);
+    });
+    it('consulta el ticket aunque actualizar la caja tarde, y no se queda en «sin imprimir» (27/11/2026)', async () => {
+      printingStatus.mockResolvedValue({ hasActiveProfile: true, profileName: 'Caja', columns: 32 });
+      printJobs.mockResolvedValue({ items: [{ id: 'j1', copyType: 'ORIGINAL', status: 'IMPRESO' }] });
+      state.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(cash), 300)));
+      const confirming = component.confirm();
+      await vi.advanceTimersByTimeAsync(400); await confirming; await vi.advanceTimersByTimeAsync(10);
+      expect(printingStatus).toHaveBeenCalled();
+      expect(component.printed()).toBe(true);
+      expect(component.lastJobStatus()).toBe('IMPRESO');
     });
     it('si no puede consultar el perfil no abre el navegador ni duplica el ticket', async () => {
       printingStatus.mockRejectedValue(new Error('Sin conexión'));
