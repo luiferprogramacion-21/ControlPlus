@@ -27,6 +27,7 @@ public interface ICatalogRepository
 
     Task<PagedResult<Producto>> ListProductsAsync(ProductListQuery query, CancellationToken cancellationToken = default);
     Task<Producto?> GetProductAsync(Guid productId, CancellationToken cancellationToken = default);
+    Task<ProductCatalogSummaryDto> GetProductSummaryAsync(CancellationToken cancellationToken = default);
     Task<Producto?> GetProductForUpdateAsync(Guid productId, CancellationToken cancellationToken = default);
     Task<bool> HasProductHistoryAsync(Guid productId, CancellationToken cancellationToken = default);
     Task DeleteProductOwnedDataAsync(Guid productId, CancellationToken cancellationToken = default);

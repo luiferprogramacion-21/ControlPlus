@@ -239,6 +239,15 @@ describe('Purchases: buscar el producto escribiendo o con el lector (pruebas del
     expect(component.productCode('p2')).toBe('PAP-000007');
   });
 
+  it('«Pedir» desde Catálogo abre el pedido con el proveedor y el producto incluido (maqueta 11)', async () => {
+    const component = build();
+    vi.spyOn(component, 'newOrder').mockResolvedValue();
+    await component.orderProductFromCatalog('s1', 'p2');
+    expect(component.orderSupplierId).toBe('s1');
+    expect(component.orderLines.find(line => line.productId === 'p2')).toMatchObject({ selected: true, quantity: 1 });
+    expect(component.orderSearchNote()).toContain('Cuaderno cuadriculado');
+  });
+
   it('en el pedido la búsqueda filtra la lista y Enter incluye el producto o suma uno', () => {
     const component = build();
     component.setOrderSupplier('s1');

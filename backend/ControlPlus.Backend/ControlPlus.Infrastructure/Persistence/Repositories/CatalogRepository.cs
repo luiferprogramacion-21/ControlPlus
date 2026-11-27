@@ -97,6 +97,8 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
             .Include(x => x.Categoria).Include(x => x.UnidadMedida).AsQueryable();
         if (!query.IncludeInactive) products = products.Where(x => x.Activo);
         if (query.CategoryId is Guid categoryId) products = products.Where(x => x.CategoriaId == categoryId);
+        if (query.WithoutPrice) products = products.Where(x => x.PrecioMinorista <= 0);
+        if (query.OnlyInactive) products = products.Where(x => !x.Activo);
         var hasSearch = !string.IsNullOrWhiteSpace(query.Search);
         products = query.StockStatus switch
         {
@@ -104,7 +106,7 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
             InventoryStockStatus.LowStock => products.Where(LowStockSelection.Predicate),
             InventoryStockStatus.OutOfStock => products.Where(x => x.StockActual - x.StockReservado <= 0),
             InventoryStockStatus.Available => products.Where(x => x.StockActual - x.StockReservado > x.StockMinimo),
-            _ when !query.IncludeOutOfStock && !hasSearch => products.Where(x => x.StockActual - x.StockReservado > 0),
+            _ when !query.IncludeOutOfStock && !hasSearch && !query.WithoutPrice && !query.OnlyInactive => products.Where(x => x.StockActual - x.StockReservado > 0),
             _ => products
         };
         if (hasSearch)
@@ -123,6 +125,16 @@ public sealed class EfCatalogRepository(OfficialControlPlusDbContext dbContext) 
         var items = await products.OrderBy(x => x.Nombre).ThenBy(x => x.CodigoInterno)
             .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArrayAsync(cancellationToken);
         return new PagedResult<Producto>(items, query.Page, query.PageSize, count);
+    }
+
+    public async Task<ProductCatalogSummaryDto> GetProductSummaryAsync(CancellationToken cancellationToken = default)
+    {
+        var products = dbContext.Producto.AsNoTracking();
+        var active = await products.CountAsync(x => x.Activo, cancellationToken);
+        var lowStock = await products.CountAsync(LowStockSelection.Predicate, cancellationToken);
+        var outOfStock = await products.CountAsync(LowStockSelection.OutOfStock, cancellationToken);
+        var withoutPrice = await products.CountAsync(x => x.Activo && x.PrecioMinorista <= 0, cancellationToken);
+        return new ProductCatalogSummaryDto(active, lowStock, outOfStock, withoutPrice);
     }
 
     public Task<Producto?> GetProductAsync(Guid productId, CancellationToken cancellationToken = default) =>

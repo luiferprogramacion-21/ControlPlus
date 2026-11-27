@@ -147,7 +147,7 @@ public sealed class CatalogService(
                 or Inventory.Contracts.InventoryStockStatus.LowStock or Inventory.Contracts.InventoryStockStatus.OutOfStock))
             return Result.Failure<PagedResult<ProductDto>>(ApplicationError.Validation(
                 "El estado de existencias debe ser DISPONIBLE, STOCK_BAJO o AGOTADO."));
-        query = query with { StockStatus = stockStatus };
+        query = query with { StockStatus = stockStatus, IncludeInactive = query.IncludeInactive || query.OnlyInactive };
 
         if (query.IncludeOutOfStock && stockStatus is null &&
             !await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.InventoryRead, cancellationToken))
@@ -166,6 +166,18 @@ public sealed class CatalogService(
         var canViewCost = await permissionChecker.HasPermissionAsync(actor.UserId, PermissionCodes.ProductCostsRead, cancellationToken);
         var result = await repository.ListProductsAsync(query, cancellationToken);
         return Result.Success(new PagedResult<ProductDto>(result.Items.Select(x => Map(x, canViewCost)).ToArray(), result.Page, result.PageSize, result.TotalCount));
+    }
+
+    /// <summary>
+    /// Resumen del Catálogo (maqueta 11, 26/11/2026). Solo cuenta productos activos, con el mismo criterio de stock bajo
+    /// y agotados que Inventario y el Dashboard; lo consulta quien ve el catálogo.
+    /// </summary>
+    public async Task<Result<ProductCatalogSummaryDto>> GetProductSummaryAsync(
+        ActorContext actor, CancellationToken cancellationToken = default)
+    {
+        var error = await RequireAsync(actor, PermissionCodes.ProductsRead, cancellationToken);
+        if (error is not null) return Result.Failure<ProductCatalogSummaryDto>(error);
+        return Result.Success(await repository.GetProductSummaryAsync(cancellationToken));
     }
 
     public async Task<Result<ProductDto>> GetProductAsync(

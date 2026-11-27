@@ -272,7 +272,12 @@ La columna **Debe** de Clientes muestra cuánto debe cada cliente en total, suma
 
 ## 2.11 Consultar productos y existencias
 
-- **Catálogo** muestra los productos, sus precios, sus códigos y su **estado**: **Disponible**, **Stock bajo** (quedan unidades, pero igual o menos que el mínimo) o **Agotado** (no queda ninguna). Con **Existencias** filtras: disponibles, stock bajo o agotados; el filtro **Stock bajo** no incluye los agotados. Al buscar en el punto de venta también ves ese estado.
+- **Catálogo** muestra arriba un **resumen**: productos activos, con **stock bajo**, **agotados** y **sin precio** (esos no se pueden vender). Al tocar uno, la lista muestra solo esos; al tocarlo otra vez, vuelven todos.
+  - Busca escribiendo el nombre o la referencia, o pasando el lector; la lista se actualiza mientras escribes. Al lado eliges la categoría.
+  - Los botones **Todos, Disponibles, Stock bajo, Agotados** y **Sin precio** filtran la lista. **Stock bajo** son los que tienen unidades, pero igual o menos que el mínimo; no incluye los agotados.
+  - Cada producto se ve en una fila: un cuadro con la abreviatura de su categoría (verde si hay, naranja si queda poco, rojo si se agotó, gris si todavía no ha llegado), el nombre, la referencia, el código de barras, la categoría y el proveedor, las existencias frente al mínimo y el precio.
+  - Al tocar el **nombre** se abre su **ficha** con los datos del producto.
+  Al buscar en el punto de venta también ves si está disponible, en stock bajo o agotado.
 - **Inventario** muestra las existencias y las **alertas de reposición** (productos con poco stock o agotados). Solo consulta: los ajustes los hace el Administrador.
 
 ## 2.12 Lo que no puedes hacer, y a quién pedirlo
@@ -409,10 +414,14 @@ En **Créditos y abonos** puedes registrar abonos (como el Cajero) y además:
 
 ## 3.9 Catálogo y etiquetas
 
+- **Catálogo** tiene arriba **+ Nuevo producto**, **Etiquetas** y **Categorías**. Cada fila muestra dos botones a la vista y el resto en **Más ▾** (o con clic derecho):
+  - **Poner precio** aparece en los productos **Sin precio**: abre el producto con el precio listo para escribir.
+  - **Pedir** aparece cuando queda poco o se agotó: abre **Nuevo pedido al proveedor** con su proveedor y el producto ya incluido; solo falta escribir la cantidad.
+  - La **ficha** (al tocar el nombre) tiene las pestañas **Datos** y **Existencias e historial** (cada entrada y salida con su fecha).
 - **Crear productos** (con cantidad y costo inicial si ya tienes mercancía). A la vista quedan nombre, categoría, precio, existencia, costo, proveedor y stock mínimo; unidad, código de barras, descripción, precio mayorista y la calculadora de ganancia están en **Más datos** (la unidad es «Unidad» y el código de barras se genera solo) y **consultar** las categorías; crear o cambiar categorías es del Administrador. Cada producto recibe una **referencia automática** (abreviatura de la categoría + número, por ejemplo `PAP-000004`).
 - **No ves los costos.** Para **cambiar el precio, el nombre u otros datos** de un producto ya creado, pulsa **Editar**, haz el cambio y **Guardar**: el sistema pide la **autorización del Administrador** (su carné, o su usuario y contraseña). Queda en la auditoría quién autorizó y el precio anterior.
 - **Modo del turno:** en Configuración → **Caja y turnos** puedes cambiar entre turno individual y compartido, también con la autorización del Administrador (solo sin turno abierto).
-- **Etiquetas:** Catálogo → **Etiquetas de productos**. Elige los productos, revisa la **vista previa** y pulsa **Imprimir etiquetas**. Necesita una impresora de etiquetas configurada por el Administrador.
+- **Etiquetas:** Catálogo → **Etiquetas**. Elige los productos, revisa la **vista previa** y pulsa **Imprimir etiquetas**. Desde un producto, **Más ▾ → Imprimir etiqueta** abre Etiquetas con ese producto ya agregado. Necesita una impresora de etiquetas configurada por el Administrador.
 
 ## 3.10 Compras: pedidos y mercancía recibida
 
@@ -492,11 +501,12 @@ Menú **Catálogo**.
 - **Categorías:** toda categoría lleva una **abreviatura** única de 2 a 10 letras (por ejemplo PAP, JUG). Con ella se arman las referencias de sus productos (`PAP-000004`). Las referencias ya asignadas no cambian aunque cambies la abreviatura.
 - **Productos:** nombre, categoría, unidad (**unidad, paquete o metro**), precio minorista y mayorista, stock mínimo, proveedor preferido. Puedes dejar activado **Generar código** (el sistema crea un código de barras propio) o registrar uno existente, que no puede repetirse.
 - **Existencias iniciales:** al crear un producto puedes indicar cantidad y costo de entrada.
-- **Costos:** pestaña **Costos**, con el historial de precios de compra.
+- **Resumen y filtros:** igual que lo ve el Supervisor (ver 3.9), y además el botón **Inactivos**, que muestra solo los productos inactivos.
+- **Costos:** en la fila, **Costos**, o la pestaña **Costos** de la ficha, con el promedio actual, el último costo y el historial de compras.
 - **Editar:** cambios de nombre, código o precio quedan **auditados**.
 - **Inactivar** un producto lo saca de la venta sin perder su historial.
 - **Borrar:** solo si **no tiene ningún historial** (ventas, compras, apartados…). Pide confirmación. Si tiene historial, solo se inactiva.
-- **Agotados:** se ocultan de los listados normales. Con **Existencias** (Disponibles, Stock bajo, Agotados) los filtras aquí o en **Inventario**; cada producto muestra su estado.
+- **Agotados:** en **Todos** del Catálogo ves también los agotados; en la venta no aparecen. Con **Agotados** (o la tarjeta del resumen) ves solo esos; también en **Inventario**.
 - Un **Supervisor** también puede editar un producto, pero al guardar necesita **tu autorización** (carné o usuario y contraseña).
 
 ## 4.5 Inventario

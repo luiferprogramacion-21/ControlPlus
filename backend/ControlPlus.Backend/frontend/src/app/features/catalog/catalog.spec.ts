@@ -4,10 +4,14 @@ import { CatalogApi, Product } from './catalog-api';
 import { SessionService } from '../../core/session.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthorizationDialog, AuthorizationPrompt } from '../../shared/authorization-dialog';
+import { InventoryApi } from '../inventory/inventory-api';
+import { Router } from '@angular/router';
 
 describe('Catalog: existencias iniciales', () => {
   let component: Catalog;
-  const api = { createProduct: vi.fn(), products: vi.fn(), updateProduct: vi.fn(), units: vi.fn(), categories: vi.fn(), createCategory: vi.fn(), updateCategory: vi.fn() };
+  const api = { createProduct: vi.fn(), products: vi.fn(), updateProduct: vi.fn(), units: vi.fn(), categories: vi.fn(), createCategory: vi.fn(), updateCategory: vi.fn(), summary: vi.fn(), costHistory: vi.fn(), activeSuppliers: vi.fn() };
+  const inventory = { movements: vi.fn() };
+  const router = { navigate: vi.fn(async () => true) };
   const user = { id: 'actor-1', roles: ['SUPERVISOR'], permissions: ['PRODUCTS.CREATE', 'PRODUCTS.READ'] };
   const session = { has: (permission: string) => user.permissions.includes(permission), hasRole: (...codes: string[]) => codes.some(code => user.roles.includes(code)), user: () => ({ ...user, userName: 'super' }), refreshUser: vi.fn(async () => {}) };
   // Decisión D5: el Supervisor edita con la autorización del Administrador (el diálogo se simula).
@@ -21,9 +25,12 @@ describe('Catalog: existencias iniciales', () => {
     api.updateProduct.mockResolvedValue({ internalCode: 'P-000001' });
     api.units.mockResolvedValue([{ id: 'unit', code: 'UNIDAD', name: 'Unidad', symbol: 'u', isActive: true }]);
     api.categories.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
+    api.summary.mockResolvedValue({ active: 12, lowStock: 3, outOfStock: 2, withoutPrice: 1 });
+    api.activeSuppliers.mockResolvedValue([]);
     TestBed.configureTestingModule({ providers: [
       { provide: CatalogApi, useValue: api }, { provide: SessionService, useValue: session },
-      { provide: AuthorizationDialog, useValue: authorization },
+      { provide: AuthorizationDialog, useValue: authorization }, { provide: InventoryApi, useValue: inventory },
+      { provide: Router, useValue: router },
     ] });
     component = TestBed.runInInjectionContext(() => new Catalog());
     component.newProduct();
@@ -250,12 +257,71 @@ describe('Catalog: existencias iniciales', () => {
     expect(component.stockState({ ...base, availableStock: 5 }).label).toBe('Stock bajo');
     expect(component.stockState({ ...base, availableStock: 6 }).label).toBe('Disponible');
     expect(component.stockState({ ...base, isActive: false, availableStock: 9 }).label).toBe('Inactivo');
-    component.filters.patchValue({ stockStatus: 'AGOTADO' });
+    component.setProductFilter('AGOTADO');
     await component.reload();
     expect(api.products).toHaveBeenLastCalledWith(expect.objectContaining({ stockStatus: 'AGOTADO' }));
-    component.filters.patchValue({ stockStatus: '' });
+    component.setProductFilter('');
     await component.reload();
     expect(api.products).toHaveBeenLastCalledWith(expect.objectContaining({ stockStatus: undefined }));
+  });
+
+  describe('maqueta 11 (aprobada el 26/11/2026)', () => {
+    const product = (extra: Partial<Product>): Product => ({ id: 'p1', internalCode: 'PAP-000004', barcode: 'CP000016', name: 'Cuaderno', categoryName: 'Papelería',
+      categoryId: 'c', measurementUnitId: 'unit', measurementUnitCode: 'UNIDAD', supplierId: 's1', retailPrice: 3000, wholesalePrice: null, averageCost: null,
+      canViewCost: false, currentStock: 24, reservedStock: 0, availableStock: 24, minimumStock: 5, isActive: true, version: 1, ...extra } as Product);
+
+    it('los grupos piden al servidor sin precio, solo inactivos o todos con agotados', async () => {
+      user.permissions.push('INVENTORY.READ', 'PRODUCTS.SENSITIVE_UPDATE');
+      component.setProductFilter('SIN_PRECIO'); await component.reload();
+      expect(api.products).toHaveBeenLastCalledWith(expect.objectContaining({ withoutPrice: true, stockStatus: undefined }));
+      component.setProductFilter('INACTIVOS'); await component.reload();
+      expect(api.products).toHaveBeenLastCalledWith(expect.objectContaining({ onlyInactive: true }));
+      component.setProductFilter(''); await component.reload();
+      expect(api.products).toHaveBeenLastCalledWith(expect.objectContaining({ includeOutOfStock: true, withoutPrice: undefined, onlyInactive: undefined }));
+      expect(component.summary()).toEqual({ active: 12, lowStock: 3, outOfStock: 2, withoutPrice: 1 });
+      component.toggleSummaryFilter('STOCK_BAJO'); expect(component.productFilter()).toBe('STOCK_BAJO');
+      component.toggleSummaryFilter('STOCK_BAJO'); expect(component.productFilter()).toBe('');
+      expect(component.productChips.map(chip => chip.label)).toContain('Inactivos');
+    });
+
+    it('la fila dice la categoría, el estado y qué falta', () => {
+      expect(component.prefix(product({}))).toBe('PAP');
+      expect(component.prefix(product({ internalCode: 'P-000001' }))).toBe('P');
+      expect(component.stockText(product({}))).toBe('24 disponibles · mín. 5');
+      expect(component.stockText(product({ availableStock: 3 }))).toBe('Stock bajo · 3 de mín. 5');
+      expect(component.stockText(product({ availableStock: 0 }))).toBe('Agotado');
+      expect(component.stockText(product({ retailPrice: 0, currentStock: 0, availableStock: 0 }))).toBe('Sin existencias todavía');
+      expect(component.rowTone(product({ retailPrice: 0, currentStock: 0, availableStock: 0 }))).toBe('neutral');
+      expect(component.stockText(product({ isActive: false }))).toBe('Inactivo');
+      expect(component.detailLine(product({}))).toBe('PAP-000004 · barras CP000016 · Papelería');
+    });
+
+    it('«Pedir» abre el pedido con el proveedor y el producto; solo Supervisor o Administrador que hacen pedidos', () => {
+      const low = product({ availableStock: 2 });
+      expect(component.needsOrder(low)).toBe(true);
+      expect(component.canOrder(low)).toBe(false);
+      user.permissions.push('PURCHASE_ORDERS.MANAGE', 'SUPPLIERS.READ', 'INVENTORY.READ');
+      expect(component.canOrder(low)).toBe(true);
+      expect(component.canOrder(product({ supplierId: null }))).toBe(false);
+      component.orderProduct(low);
+      expect(router.navigate).toHaveBeenCalledWith(['/operacion/compras'], { queryParams: { accion: 'pedir', proveedor: 's1', producto: 'p1' } });
+      expect(component.needsOrder(product({ availableStock: 0, retailPrice: 0 }))).toBe(false);
+    });
+
+    it('la ficha carga el historial y los costos al abrir su pestaña', async () => {
+      user.permissions.push('INVENTORY.READ', 'PRODUCTS.COSTS_READ');
+      inventory.movements.mockResolvedValue({ items: [{ id: 'm1', type: 'COMPRA', stockQuantity: 10, newStock: 24 }], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 });
+      api.costHistory.mockResolvedValue({ currentAverageCost: 1500, lastConfirmedPurchaseCost: 1500, history: { items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 } });
+      component.openFicha(product({}));
+      expect(component.fichaTab()).toBe('datos');
+      await component.setFichaTab('existencias');
+      expect(inventory.movements).toHaveBeenCalledWith({ productId: 'p1', page: 1, pageSize: 20 });
+      expect(component.movements()?.items.length).toBe(1);
+      await component.setFichaTab('costos');
+      expect(api.costHistory).toHaveBeenCalledWith('p1', 1);
+      component.closeFicha();
+      expect(component.ficha()).toBeNull(); expect(component.movements()).toBeNull(); expect(component.costHistory()).toBeNull();
+    });
   });
 
   it('renderiza las columnas aprobadas, el alta predeterminada y la sección activa aunque cambie el foco', async () => {
@@ -265,8 +331,12 @@ describe('Catalog: existencias iniciales', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
-    expect(Array.from(root.querySelectorAll('table thead th')).slice(0, 3).map(x => x.textContent?.trim()))
-      .toEqual(['N.º de producto', 'Código de barras', 'Producto']);
+    // Maqueta 11: una fila por producto con su estado, precio y acciones, y el resumen arriba.
+    expect(Array.from(root.querySelectorAll('table thead th')).map(x => x.textContent?.trim()))
+      .toEqual(['Producto', 'Existencias', 'Precio', 'Acciones']);
+    expect(root.querySelector('.catalog-summary')?.textContent).toContain('Sin precio (no se venden)');
+    expect(Array.from(root.querySelectorAll('.catalog-chip')).map(x => x.textContent?.trim()))
+      .toEqual(['Todos', 'Disponibles', 'Stock bajo', 'Agotados', 'Sin precio']);
     fixture.componentInstance.newProduct();
     fixture.detectChanges();
     // Propuesta 2 (21 de noviembre de 2026): unidad, barras, descripción y mayorista quedan en «Más datos».
@@ -278,14 +348,16 @@ describe('Catalog: existencias iniciales', () => {
     expect(root.querySelector('mat-select[formControlName="barcodeFormat"]')).toBeNull();
     expect(root.textContent).toContain('Costo de compra por unidad');
     expect(fixture.componentInstance.productForm.controls.measurementUnitId.value).toBe('unit');
-    const categoryTab = Array.from(root.querySelectorAll<HTMLButtonElement>('.tabs button'))
+    fixture.componentInstance.cancel();
+    fixture.detectChanges();
+    const categoriesButton = Array.from(root.querySelectorAll<HTMLButtonElement>('.catalog__actions button'))
       .find(button => button.textContent?.trim() === 'Categorías')!;
-    categoryTab.click();
+    categoriesButton.click();
     await fixture.whenStable();
     fixture.detectChanges();
-    categoryTab.focus(); categoryTab.blur();
-    expect(categoryTab.classList.contains('active')).toBe(true);
-    expect(getComputedStyle(categoryTab).color).toBe('rgb(255, 255, 255)');
+    expect(fixture.componentInstance.tab()).toBe('categories');
+    expect(root.querySelector('.catalog__header h2')?.textContent).toBe('Categorías');
+    expect(Array.from(root.querySelectorAll<HTMLButtonElement>('.catalog__actions button')).map(x => x.textContent?.trim())).toEqual(['← Productos']);
   });
 
   describe('abreviatura de categoría', () => {

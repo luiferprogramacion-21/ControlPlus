@@ -133,6 +133,19 @@ export class Purchases implements OnInit {
     void this.initialize();
     // Desde Inicio, «Recibir mercancía» abre la pregunta de «Registrar compra».
     if (this.route?.snapshot.queryParamMap?.get('accion') === 'registrar') this.startRegisterPurchase();
+    // Catálogo (maqueta 11): «Pedir» abre el pedido nuevo con el proveedor del producto y el producto ya incluido.
+    if (this.route?.snapshot.queryParamMap?.get('accion') === 'pedir') {
+      const params = this.route.snapshot.queryParamMap;
+      void this.orderProductFromCatalog(params.get('proveedor') ?? '', params.get('producto') ?? '');
+    }
+  }
+  async orderProductFromCatalog(supplierId: string, productId: string): Promise<void> {
+    if (!this.canWriteOrders) return;
+    await this.newOrder();
+    if (!supplierId) return;
+    this.setOrderSupplier(supplierId);
+    const line = this.orderLines.find(item => item.productId === productId);
+    if (line) { line.selected = true; this.orderSearchNote.set(`Incluido: ${line.productName}. Escribe la cantidad a pedir.`); }
   }
   private empty(): PurchaseInput { return { supplierId: '', supplierDocumentNumber: null, invoiceDate: currentColombiaDate(), vatMode: 'NO_DISCRIMINADO', lines: [] }; }
   private async initialize(): Promise<void> {

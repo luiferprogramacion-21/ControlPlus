@@ -1,5 +1,5 @@
 import { groupedNumber, NumberInput } from '../../shared/number-input';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -12,15 +12,21 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { SessionService } from '../../core/session.service';
 import { errorText, Page } from '../../core/api';
 import { profitPercentOf, suggestedPrice } from '../../shared/price-calculator';
-import { CatalogApi, Category, CostHistory, CreateProductInput, Product, ProductInput, productStockState, StockStatus, Supplier, Unit } from './catalog-api';
+import { CatalogApi, Category, CostHistory, CreateProductInput, Product, ProductInput, ProductSummary, productStockState, StockStatus, Supplier, Unit } from './catalog-api';
+import { InventoryApi, Movement } from '../inventory/inventory-api';
+import { readableCode } from '../../core/readable-code';
+import { Icon } from '../../layout/icon';
 import { toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
 import { HelpTip } from '../../shared/help-tip';
 import { AuthorizationDialog, authorizationBody } from '../../shared/authorization-dialog';
+
+/** Maqueta 11 (aprobada el 26/11/2026): grupos que filtran la lista. Vacío = todos los activos. */
+export type ProductFilter = '' | StockStatus | 'SIN_PRECIO' | 'INACTIVOS';
 
 interface ProductCreateAttempt {
   actorId: string;
@@ -31,15 +37,17 @@ interface ProductCreateAttempt {
 
 @Component({
   selector: 'cp-catalog',
-  imports: [WindowSheet, HelpTip, NumberInput, DecimalPipe, FormsModule, ReactiveFormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule, MatOptionModule, MatSelectModule, MatSlideToggleModule, MatProgressSpinnerModule, MatPaginatorModule],
+  imports: [WindowSheet, HelpTip, NumberInput, Icon, DatePipe, DecimalPipe, FormsModule, ReactiveFormsModule, RouterLink, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule, MatOptionModule, MatSelectModule, MatSlideToggleModule, MatProgressSpinnerModule, MatPaginatorModule],
   templateUrl: './catalog.html',
-  styleUrl: './catalog.scss',
+  styleUrls: ['./catalog.scss', './catalog-list.scss'],
 })
 export class Catalog implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly api = inject(CatalogApi);
   readonly session = inject(SessionService);
   private readonly authorization = inject(AuthorizationDialog);
+  private readonly inventory = inject(InventoryApi);
+  private readonly router = inject(Router);
   readonly tab = signal<'products' | 'categories'>('products');
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -74,8 +82,7 @@ export class Catalog implements OnInit {
   private readonly createAttemptStorageKey = 'controlplus.catalog.create-attempt';
 
   readonly filters = this.fb.nonNullable.group({
-    productSearch: [''], categorySearch: [''], categoryId: [''], stockStatus: ['' as '' | StockStatus],
-    includeInactiveProducts: [false], includeInactiveCategories: [false],
+    productSearch: [''], categorySearch: [''], categoryId: [''], includeInactiveCategories: [false],
   });
   readonly categoryForm = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(100)]],
@@ -165,10 +172,15 @@ export class Catalog implements OnInit {
     try {
       if (this.tab() === 'products' && this.session.has('PRODUCTS.READ')) {
         const f = this.filters.getRawValue();
+        const filter = this.productFilter();
+        void this.loadSummary();
         const result = await this.api.products({
           search: f.productSearch.trim(), categoryId: f.categoryId || undefined,
-          includeInactive: this.session.has('PRODUCTS.SENSITIVE_UPDATE') && f.includeInactiveProducts,
-          stockStatus: f.stockStatus || undefined,
+          stockStatus: filter === 'DISPONIBLE' || filter === 'STOCK_BAJO' || filter === 'AGOTADO' ? filter : undefined,
+          withoutPrice: filter === 'SIN_PRECIO' || undefined,
+          onlyInactive: (filter === 'INACTIVOS' && this.session.has('PRODUCTS.SENSITIVE_UPDATE')) || undefined,
+          // «Todos» muestra también los agotados a quien puede ver el inventario, igual que el resumen los cuenta.
+          includeOutOfStock: (!filter && this.session.has('INVENTORY.READ')) || undefined,
           page: this.productPage(), pageSize: this.productPageSize(),
         });
         if (id === this.requestId) this.products.set(result);
@@ -183,6 +195,89 @@ export class Catalog implements OnInit {
     } catch (e) { if (id === this.requestId) this.error.set(errorText(e)); }
     finally { if (id === this.requestId) this.loading.set(false); }
   }
+
+  // --- Maqueta 11 (aprobada el 26/11/2026): resumen, grupos, una fila por producto y ficha con pestañas ----------
+  readonly productFilter = signal<ProductFilter>('');
+  readonly summary = signal<ProductSummary | null>(null);
+  get productChips(): { value: ProductFilter; label: string }[] {
+    const chips: { value: ProductFilter; label: string }[] = [{ value: '', label: 'Todos' }, { value: 'DISPONIBLE', label: 'Disponibles' },
+      { value: 'STOCK_BAJO', label: 'Stock bajo' }, { value: 'AGOTADO', label: 'Agotados' }, { value: 'SIN_PRECIO', label: 'Sin precio' }];
+    if (this.session.has('PRODUCTS.SENSITIVE_UPDATE')) chips.push({ value: 'INACTIVOS', label: 'Inactivos' });
+    return chips;
+  }
+  setProductFilter(filter: ProductFilter): void { this.productFilter.set(filter); this.productPage.set(1); void this.reload(); }
+  /** Una tarjeta del resumen filtra la lista; tocarla otra vez vuelve a «Todos». */
+  toggleSummaryFilter(filter: ProductFilter): void { this.setProductFilter(this.productFilter() === filter ? '' : filter); }
+  private async loadSummary(): Promise<void> {
+    try { this.summary.set((await this.api.summary()) ?? null); } catch { this.summary.set(null); }
+  }
+  /** La lista se busca mientras se escribe; Enter (o el lector) busca de una vez. */
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  searchSoon(): void {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => { this.searchTimer = null; this.search(); }, 350);
+  }
+  searchNow(): void { if (this.searchTimer) { clearTimeout(this.searchTimer); this.searchTimer = null; } this.search(); }
+  number(value: number): string { return groupedNumber(value); }
+  /** El cuadro de la fila muestra la abreviatura de la categoría (inicio de la referencia, por ejemplo PAP). */
+  prefix(product: Product): string { const head = (product.internalCode ?? '').split('-')[0].toUpperCase(); return head.length <= 4 ? head : head.slice(0, 3); }
+  /** Producto sin precio que nunca tuvo existencias (creado desde un pedido): se ve en gris, no como agotado. */
+  private waitingFirstStock(product: Product): boolean { return product.isActive && product.retailPrice <= 0 && product.currentStock <= 0; }
+  rowTone(product: Product): 'success' | 'warning' | 'error' | 'neutral' { return this.waitingFirstStock(product) ? 'neutral' : productStockState(product).tone; }
+  stockText(product: Product): string {
+    if (!product.isActive) return 'Inactivo';
+    if (this.waitingFirstStock(product)) return 'Sin existencias todavía';
+    const state = productStockState(product);
+    if (state.tone === 'error') return 'Agotado';
+    if (state.tone === 'warning') return `Stock bajo · ${groupedNumber(product.availableStock)} de mín. ${groupedNumber(product.minimumStock)}`;
+    return `${groupedNumber(product.availableStock)} disponibles · mín. ${groupedNumber(product.minimumStock)}`;
+  }
+  supplierName(id: string | null): string { return id ? this.suppliers().find(supplier => supplier.id === id)?.name ?? '' : ''; }
+  unitName(id: string): string { return this.units().find(unit => unit.id === id)?.name ?? ''; }
+  detailLine(product: Product): string {
+    return [product.internalCode, product.barcode ? `barras ${product.barcode}` : '', product.categoryName, this.supplierName(product.supplierId)]
+      .filter(Boolean).join(' · ');
+  }
+  /** «Pedir» abre «Nuevo pedido al proveedor» con el producto; lo ve quien hace pedidos y si el producto tiene proveedor. */
+  canOrder(product: Product): boolean {
+    return product.isActive && !!product.supplierId && this.session.has('PURCHASE_ORDERS.MANAGE') && this.session.has('SUPPLIERS.READ')
+      && this.session.has('INVENTORY.READ') && this.session.hasRole('SUPERVISOR', 'ADMINISTRADOR');
+  }
+  needsOrder(product: Product): boolean { const tone = productStockState(product).tone; return product.retailPrice > 0 && (tone === 'warning' || tone === 'error'); }
+  orderProduct(product: Product): void {
+    void this.router.navigate(['/operacion/compras'], { queryParams: { accion: 'pedir', proveedor: product.supplierId, producto: product.id } });
+  }
+  canPrintLabel(product: Product): boolean { return this.session.has('PRODUCTS.LABELS_MANAGE') && product.isActive && !!product.barcode; }
+  /** «Poner precio» abre el producto con el precio listo para escribir. */
+  putPrice(product: Product): void {
+    this.editProduct(product);
+    setTimeout(() => (document.getElementById('product-retail-price') as HTMLInputElement | null)?.select());
+  }
+  readonly ficha = signal<Product | null>(null);
+  readonly fichaTab = signal<'datos' | 'existencias' | 'costos'>('datos');
+  readonly movements = signal<Page<Movement> | null>(null);
+  readonly fichaLoading = signal(false);
+  openFicha(product: Product, tab: 'datos' | 'existencias' | 'costos' = 'datos'): void {
+    this.ficha.set(product); this.movements.set(null); this.costHistory.set(null); void this.setFichaTab(tab);
+  }
+  closeFicha(): void { this.ficha.set(null); this.movements.set(null); this.costHistory.set(null); }
+  async setFichaTab(tab: 'datos' | 'existencias' | 'costos'): Promise<void> {
+    const product = this.ficha(); if (!product) return;
+    this.fichaTab.set(tab);
+    if (tab === 'existencias' && !this.movements()) await this.loadMovements(1);
+    if (tab === 'costos' && !this.costHistory()) await this.showCosts(product);
+  }
+  async loadMovements(page: number): Promise<void> {
+    const product = this.ficha(); if (!product || !this.session.has('INVENTORY.READ')) return;
+    this.fichaLoading.set(true);
+    try { const result = await this.inventory.movements({ productId: product.id, page, pageSize: 20 }); if (this.ficha()?.id === product.id) this.movements.set(result); }
+    catch (e) { this.error.set(errorText(e)); }
+    finally { this.fichaLoading.set(false); }
+  }
+  movementsPageChanged(event: PageEvent): void { void this.loadMovements(event.pageIndex + 1); }
+  movementLabel(type: string): string { return readableCode(type); }
+  /** Desde la ficha: cierra la ficha y abre la edición. */
+  editFromFicha(product: Product): void { this.closeFicha(); this.editProduct(product); }
 
   switchTab(tab: 'products' | 'categories'): void {
     this.tab.set(tab); this.cancel(); void this.reload();
@@ -405,7 +500,8 @@ export class Catalog implements OnInit {
       this.cancel();
       if (!selected.id) {
         this.tab.set('products'); this.productPage.set(1);
-        this.filters.patchValue({ productSearch: saved.internalCode, categoryId: '', stockStatus: '' });
+        this.filters.patchValue({ productSearch: saved.internalCode, categoryId: '' });
+        this.productFilter.set('');
       }
       this.notice.set(`Producto guardado. N.º de producto: ${saved.internalCode}.`); await this.reload();
     } catch (e) {

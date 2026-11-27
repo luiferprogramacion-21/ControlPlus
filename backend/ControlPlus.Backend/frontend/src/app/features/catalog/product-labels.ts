@@ -75,6 +75,9 @@ export class ProductLabels implements OnInit {
       if (purchaseId) this.prepareReceipt(await this.api.receipt(purchaseId));
     } catch (error) { this.error.set(errorText(error)); }
     finally { this.loading.set(false); }
+    // Catálogo (maqueta 11): «Imprimir etiqueta» llega con la referencia del producto y lo agrega.
+    const productCode = this.route?.snapshot.queryParamMap.get('producto');
+    if (productCode && !this.sourceReceipt()) { this.search = productCode; await this.find(); }
   }
 
   async find(): Promise<void> {

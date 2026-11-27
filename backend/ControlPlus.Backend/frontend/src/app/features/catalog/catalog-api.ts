@@ -15,6 +15,7 @@ export interface Product {
   reservedStock: number; availableStock: number; minimumStock: number; isOutOfStock: boolean; isActive: boolean; version: number;
 }
 export type StockStatus = 'DISPONIBLE' | 'STOCK_BAJO' | 'AGOTADO';
+export interface ProductSummary { active: number; lowStock: number; outOfStock: number; withoutPrice: number; }
 /** Estado de existencias de un producto, en el mismo orden que el filtro: inactivo, agotado, stock bajo y disponible. */
 export function productStockState(product: Pick<Product, 'isActive' | 'availableStock' | 'minimumStock'>): { label: string; tone: 'success' | 'warning' | 'error' | 'neutral' } {
   if (!product.isActive) return { label: 'Inactivo', tone: 'neutral' };
@@ -39,10 +40,15 @@ export class CatalogApi {
   categories(query: { search?: string; includeInactive?: boolean; page: number; pageSize: number }): Promise<Page<Category>> {
     return firstValueFrom(this.http.get<Page<Category>>('/api/categories', { params: this.params(query) }));
   }
-  /** `stockStatus`: DISPONIBLE, STOCK_BAJO (incluye agotados) o AGOTADO, con el mismo criterio de Inventario (auditoría C.19). */
-  products(query: { search?: string; categoryId?: string; includeInactive?: boolean; includeOutOfStock?: boolean; stockStatus?: StockStatus; page: number; pageSize: number }): Promise<Page<Product>> {
+  /**
+   * `stockStatus`: DISPONIBLE, STOCK_BAJO o AGOTADO, con el mismo criterio de Inventario (auditoría C.19). `withoutPrice`:
+   * solo los que no tienen precio de venta; `onlyInactive`: solo los inactivos (maqueta 11, 26/11/2026).
+   */
+  products(query: { search?: string; categoryId?: string; includeInactive?: boolean; includeOutOfStock?: boolean; stockStatus?: StockStatus; withoutPrice?: boolean; onlyInactive?: boolean; page: number; pageSize: number }): Promise<Page<Product>> {
     return firstValueFrom(this.http.get<Page<Product>>('/api/products', { params: this.params(query) }));
   }
+  /** Resumen del Catálogo: productos activos, con stock bajo, agotados y sin precio. */
+  summary(): Promise<ProductSummary> { return firstValueFrom(this.http.get<ProductSummary>('/api/products/summary')); }
   units(): Promise<Unit[]> { return firstValueFrom(this.http.get<Unit[]>('/api/measurement-units')); }
   costHistory(productId: string, page: number): Promise<CostHistory> {
     return firstValueFrom(this.http.get<CostHistory>(`/api/products/${productId}/purchase-cost-history`, {

@@ -131,6 +131,17 @@ public sealed partial class PurchasesApiFlowTests : IAsyncLifetime
         var ordered = await ProductAsync(client, supplier.Id, "NO-PRICE-ORDER", null);
         await SetRetailPriceAsync(direct.Id, 0m);
         await SetRetailPriceAsync(ordered.Id, 0m);
+        // Catálogo rediseñado (maqueta 11, 26/11/2026): «Sin precio» muestra los productos sin precio, también sin existencias,
+        // y el resumen los cuenta.
+        using (var withoutPriceList = JsonDocument.Parse(await client.GetStringAsync("/api/products?withoutPrice=true&pageSize=100")))
+        {
+            var ids = withoutPriceList.RootElement.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).ToArray();
+            Assert.Contains(direct.Id, ids);
+            Assert.Contains(ordered.Id, ids);
+            Assert.All(withoutPriceList.RootElement.GetProperty("items").EnumerateArray(), x => Assert.Equal(0m, x.GetProperty("retailPrice").GetDecimal()));
+        }
+        using (var summary = JsonDocument.Parse(await client.GetStringAsync("/api/products/summary")))
+            Assert.True(summary.RootElement.GetProperty("withoutPrice").GetInt32() >= 2);
 
         using (var withoutPrice = await client.PostAsJsonAsync("/api/purchases", Body(supplier.Id, null, "NO_DISCRIMINADO",
             new Line(direct.Id, 2, 800m))))

@@ -22,6 +22,16 @@ public sealed class ProductsController(
         return actor is null ? MissingActor() : FromResult(await catalogService.ListProductsAsync(actor, query, cancellationToken), Ok);
     }
 
+    /// <summary>Resumen del Catálogo (maqueta 11): activos, stock bajo, agotados y sin precio.</summary>
+    [HttpGet("summary")]
+    [PermissionAuthorize(PermissionCodes.ProductsRead)]
+    [ProducesResponseType<ProductCatalogSummaryDto>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> Summary(CancellationToken cancellationToken)
+    {
+        var actor = await GetActorAsync(cancellationToken);
+        return actor is null ? MissingActor() : FromResult(await catalogService.GetProductSummaryAsync(actor, cancellationToken), Ok);
+    }
+
     [HttpGet("{productId:guid}")]
     [PermissionAuthorize(PermissionCodes.ProductsRead)]
     [ProducesResponseType<ProductDto>(StatusCodes.Status200OK)]

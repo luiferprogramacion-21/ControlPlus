@@ -1,49 +1,61 @@
 <section class="catalog">
+  <!-- Maqueta 11 (aprobada el 26/11/2026): resumen que filtra, grupos, una fila clara por producto y ficha con pestañas. -->
   <header class="catalog__header">
-    <div><h2>Catálogo</h2></div>
-    <div class="tabs">
-      @if (session.has('PRODUCTS.LABELS_MANAGE')) { <a mat-stroked-button routerLink="/operacion/catalogo/etiquetas">Imprimir etiquetas</a> }
-      @if (session.has('PRODUCTS.READ')) { <button mat-button type="button" [class.active]="tab() === 'products'" (click)="switchTab('products')">Productos</button> }
-      @if (session.has('CATEGORIES.READ')) { <button mat-button type="button" [class.active]="tab() === 'categories'" (click)="switchTab('categories')">Categorías</button> }
+    <div class="catalog__title"><span class="module-heading__icon"><cp-icon name="catalog" /></span><div><h2>{{ tab() === 'categories' ? 'Categorías' : 'Catálogo' }}</h2><p>{{ tab() === 'categories' ? 'Grupos de productos y el prefijo de sus referencias' : 'Qué hay, qué falta y qué no tiene precio' }}</p></div></div>
+    <div class="catalog__actions">
+      @if (tab() === 'products') {
+        @if (session.has('PRODUCTS.CREATE')) { <button class="button button--primary" type="button" [disabled]="saving() || checkingCreate()" (click)="newProduct()">{{ createOutcomeUncertain() ? 'Retomar producto sin confirmar' : '+ Nuevo producto' }}</button> }
+        @if (session.has('PRODUCTS.LABELS_MANAGE')) { <a class="button button--secondary" routerLink="/operacion/etiquetas">Etiquetas</a> }
+        @if (session.has('CATEGORIES.READ')) { <button class="button button--secondary" type="button" (click)="switchTab('categories')">Categorías</button> }
+      } @else if (session.has('PRODUCTS.READ')) {
+        <button class="button button--secondary" type="button" (click)="switchTab('products')">← Productos</button>
+      }
     </div>
   </header>
-  @if (error() && !selectedProduct()) { <p class="alert alert--error" role="alert">{{ error() }}</p> }
+  @if (error() && !selectedProduct() && !ficha()) { <p class="alert alert--error" role="alert">{{ error() }}</p> }
 
   @if (tab() === 'products' && session.has('PRODUCTS.READ')) {
+    @if (summary(); as s) {
+      <div class="catalog-summary" role="group" aria-label="Resumen del catálogo">
+        <button class="catalog-summary__card" type="button" [class.is-on]="productFilter() === ''" [attr.aria-pressed]="productFilter() === ''" (click)="setProductFilter('')"><span>Productos activos</span><strong>{{ number(s.active) }}</strong></button>
+        <button class="catalog-summary__card catalog-summary__card--warning" type="button" [class.is-on]="productFilter() === 'STOCK_BAJO'" [attr.aria-pressed]="productFilter() === 'STOCK_BAJO'" (click)="toggleSummaryFilter('STOCK_BAJO')"><span>Stock bajo</span><strong>{{ number(s.lowStock) }}</strong></button>
+        <button class="catalog-summary__card catalog-summary__card--error" type="button" [class.is-on]="productFilter() === 'AGOTADO'" [attr.aria-pressed]="productFilter() === 'AGOTADO'" (click)="toggleSummaryFilter('AGOTADO')"><span>Agotados</span><strong>{{ number(s.outOfStock) }}</strong></button>
+        <button class="catalog-summary__card catalog-summary__card--price" type="button" [class.is-on]="productFilter() === 'SIN_PRECIO'" [attr.aria-pressed]="productFilter() === 'SIN_PRECIO'" (click)="toggleSummaryFilter('SIN_PRECIO')"><span>Sin precio (no se venden)</span><strong>{{ number(s.withoutPrice) }}</strong></button>
+      </div>
+    }
     <div class="panel">
-      <form class="filters" [formGroup]="filters" (ngSubmit)="search()">
-        <mat-form-field appearance="outline"><mat-label>Buscar código, barras o nombre</mat-label><input matInput formControlName="productSearch"></mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Categoría</mat-label><mat-select formControlName="categoryId">
-          <mat-option value="">Todas</mat-option>
-          @for (category of categoryOptions(); track category.id) { <mat-option [value]="category.id">{{ category.name }}</mat-option> }
-        </mat-select></mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Existencias</mat-label><mat-select formControlName="stockStatus" (selectionChange)="search()">
-          <mat-option value="">Todas</mat-option><mat-option value="DISPONIBLE">Disponibles</mat-option>
-          <mat-option value="STOCK_BAJO">Stock bajo</mat-option><mat-option value="AGOTADO">Agotados</mat-option>
-        </mat-select></mat-form-field>
-        <button mat-flat-button type="submit">Buscar</button>
-        @if (session.has('PRODUCTS.CREATE')) { <button mat-stroked-button type="button" [disabled]="saving() || checkingCreate()" (click)="newProduct()">{{ createOutcomeUncertain() ? 'Retomar producto sin confirmar' : 'Nuevo producto' }}</button> }
-        @if (session.has('PRODUCTS.SENSITIVE_UPDATE')) { <mat-checkbox formControlName="includeInactiveProducts" (change)="search()">Inactivos</mat-checkbox> }
+      <form class="catalog-toolbar" [formGroup]="filters" (ngSubmit)="searchNow()">
+        <label class="sr-only" for="catalog-search">Buscar producto</label>
+        <input id="catalog-search" class="text-field catalog-toolbar__search" type="search" formControlName="productSearch" (input)="searchSoon()" placeholder="Buscar por nombre, referencia o código (sirve el lector)" autocomplete="off">
+        <label class="sr-only" for="catalog-category">Categoría</label>
+        <select id="catalog-category" class="text-field catalog-toolbar__category" formControlName="categoryId" (change)="search()">
+          <option value="">Todas las categorías</option>
+          @for (category of categoryOptions(); track category.id) { <option [value]="category.id">{{ category.name }}</option> }
+        </select>
       </form>
+      <div class="catalog-chips" role="radiogroup" aria-label="Mostrar productos">
+        @for (chip of productChips; track chip.value) { <button class="catalog-chip" type="button" role="radio" [class.is-on]="productFilter() === chip.value" [attr.aria-checked]="productFilter() === chip.value" (click)="setProductFilter(chip.value)">{{ chip.label }}</button> }
+      </div>
       @if (loading()) { <div class="loading"><mat-spinner diameter="36"></mat-spinner><span>Cargando productos…</span></div> }
       @else {
         <div class="table-scroll">
-          <table><thead><tr><th>N.º de producto</th><th>Código de barras</th><th>Producto</th><th>Categoría</th><th>Precio minorista</th><th>Disponible</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <table class="product-list"><thead><tr><th>Producto</th><th>Existencias</th><th class="align-right">Precio</th><th class="align-right">Acciones</th></tr></thead>
             <tbody>
               @for (product of products()?.items ?? []; track product.id) {
-                <tr>
-                  <td>{{ product.internalCode }}</td><td>{{ product.barcode || '—' }}</td><td><strong>{{ product.name }}</strong></td>
-                  <td>{{ product.categoryName }}</td><td>@if (product.retailPrice > 0) { {{ product.retailPrice | number:'1.0-0' }} } @else { <span class="no-price" title="Ponle precio con Editar para poder venderlo">Sin precio</span> }</td><td>{{ product.availableStock | number:'1.0-0' }}</td>
-                  <td>@let state = stockState(product);<span class="status-pill stock-state stock-state--{{ state.tone }}">{{ state.label }}</span></td>
-                  <td>@if (canEditProduct()) { <button mat-button type="button" (click)="editProduct(product)">Editar</button> }
-                  @if (session.has('PRODUCTS.SENSITIVE_UPDATE')) {
-                    <button mat-button type="button" [disabled]="saving()" (click)="toggleProduct(product)">{{ product.isActive ? 'Inactivar' : 'Activar' }}</button>
-                    @if (canDeleteProduct()) { <button mat-button type="button" class="danger-action" [disabled]="saving()" (click)="askDelete(product)">Borrar</button> }
-                  } @if (session.has('PRODUCTS.COSTS_READ')) {
-                    <button mat-button type="button" (click)="showCosts(product)">Costos</button>
-                  }</td>
+                <tr class="product-row product-row--{{ rowTone(product) }}" [class.product-row--inactive]="!product.isActive">
+                  <td><div class="product-cell"><span class="product-badge product-badge--{{ rowTone(product) }}" aria-hidden="true">{{ prefix(product) }}</span><div class="product-cell__text"><button class="product-name" type="button" (click)="openFicha(product)" [attr.aria-label]="'Ver ficha de ' + product.name">{{ product.name }}</button><small>{{ detailLine(product) }}</small></div></div></td>
+                  <td><span class="status-pill stock-state--{{ rowTone(product) }}">{{ stockText(product) }}</span></td>
+                  <td class="align-right">@if (product.retailPrice > 0) { <strong class="product-price">$ {{ product.retailPrice | number:'1.0-0' }}</strong> } @else { <strong class="product-price product-price--none" title="No se puede vender hasta ponerle precio">Sin precio</strong> }</td>
+                  <td class="align-right">@if (product.retailPrice <= 0 && product.isActive && canEditProduct()) { <button class="table-action table-action--primary" type="button" (click)="putPrice(product)">Poner precio</button> } @else if (needsOrder(product) && canOrder(product)) { <button class="table-action table-action--primary" type="button" (click)="orderProduct(product)">Pedir</button> }
+                    @if (canEditProduct()) { <button class="table-action" type="button" (click)="editProduct(product)">Editar</button> } @else { <button class="table-action" type="button" (click)="openFicha(product)">Ver ficha</button> }
+                    @if (session.has('PRODUCTS.COSTS_READ')) { <button class="table-action" type="button" (click)="openFicha(product, 'costos')">Costos</button> }
+                    @if (canPrintLabel(product)) { <a class="table-action" routerLink="/operacion/etiquetas" [queryParams]="{ producto: product.internalCode }">Imprimir etiqueta</a> }
+                    @if (session.has('PRODUCTS.SENSITIVE_UPDATE')) {
+                      <button class="table-action" type="button" [disabled]="saving()" (click)="toggleProduct(product)">{{ product.isActive ? 'Inactivar' : 'Activar' }}</button>
+                      @if (canDeleteProduct()) { <button class="table-action table-action--danger" type="button" [disabled]="saving()" (click)="askDelete(product)">Borrar</button> }
+                    }</td>
                 </tr>
-              } @empty { <tr><td colspan="8">No hay productos para estos filtros.</td></tr> }
+              } @empty { <tr class="empty-row"><td colspan="4"><span aria-hidden="true">◇</span><strong>Sin productos</strong><small>{{ productFilter() ? 'Ningún producto está en este grupo.' : 'No hay productos para esta búsqueda.' }}</small></td></tr> }
             </tbody>
           </table>
         </div>
@@ -52,18 +64,65 @@
     </div>
   }
 
-  @if (costHistory(); as costs) {
-    <section class="panel" aria-label="Historial de costos">
-      <h3>Historial de compra: {{ costProductName() }}</h3>
-      <p>Promedio actual: {{ (costs.currentAverageCost | number:'1.0-4') ?? 'Sin dato' }} · Último costo: {{ (costs.lastConfirmedPurchaseCost | number:'1.0-4') ?? 'Sin dato' }}</p>
-      <div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Cantidad</th><th>Costo unitario</th><th>Promedio resultante</th></tr></thead>
-        <tbody>@for (item of costs.history.items; track item.purchaseId) {
-          <tr><td>{{ item.documentDate }}</td><td>{{ item.quantity | number:'1.0-0' }}</td><td>{{ item.documentUnitCost | number:'1.0-4' }}</td><td>{{ item.resultingAverageCost | number:'1.0-4' }}</td></tr>
-        } @empty { <tr><td colspan="4">No hay compras confirmadas.</td></tr> }</tbody>
-      </table></div>
-      <mat-paginator [length]="costs.history.totalCount" [pageIndex]="costs.history.page-1" [pageSize]="20" (page)="showCostsByPage($event)" aria-label="Páginas de costos"></mat-paginator>
-      <button mat-button type="button" (click)="costHistory.set(null)">Cerrar historial</button>
+  @if (ficha(); as p) {
+    <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="product-ficha-title"><div class="module-form-sheet__backdrop" (click)="closeFicha()"></div>
+    <section class="panel editor module-form module-form--wide product-ficha">
+      <div class="panel-heading product-ficha__heading"><span class="product-badge product-badge--{{ rowTone(p) }}" aria-hidden="true">{{ prefix(p) }}</span><div><h3 id="product-ficha-title">{{ p.name }}</h3><p>{{ detailLine(p) }}</p></div><div class="product-ficha__price"><span>Precio</span>@if (p.retailPrice > 0) { <strong>$ {{ p.retailPrice | number:'1.0-0' }}</strong> } @else { <strong class="product-price--none">Sin precio</strong> }</div></div>
+      <div class="product-tabs" role="tablist" aria-label="Ficha del producto">
+        <button class="product-tab" type="button" role="tab" [class.is-on]="fichaTab() === 'datos'" [attr.aria-selected]="fichaTab() === 'datos'" (click)="setFichaTab('datos')">Datos</button>
+        @if (session.has('INVENTORY.READ')) { <button class="product-tab" type="button" role="tab" [class.is-on]="fichaTab() === 'existencias'" [attr.aria-selected]="fichaTab() === 'existencias'" (click)="setFichaTab('existencias')">Existencias e historial</button> }
+        @if (session.has('PRODUCTS.COSTS_READ')) { <button class="product-tab" type="button" role="tab" [class.is-on]="fichaTab() === 'costos'" [attr.aria-selected]="fichaTab() === 'costos'" (click)="setFichaTab('costos')">Costos</button> }
+      </div>
+      @switch (fichaTab()) {
+        @case ('datos') {
+          <dl class="product-facts">
+            <div><dt>Estado</dt><dd><span class="status-pill stock-state--{{ rowTone(p) }}">{{ stockText(p) }}</span></dd></div>
+            <div><dt>Categoría</dt><dd>{{ p.categoryName }}</dd></div>
+            <div><dt>Proveedor preferido</dt><dd>{{ supplierName(p.supplierId) || 'Ninguno' }}</dd></div>
+            <div><dt>Unidad</dt><dd>{{ unitName(p.measurementUnitId) || p.measurementUnitCode }}</dd></div>
+            <div><dt>Referencia</dt><dd>{{ p.internalCode }}</dd></div>
+            <div><dt>Código de barras</dt><dd>{{ p.barcode || 'Sin código' }}</dd></div>
+            <div><dt>Precio mayorista</dt><dd>{{ p.wholesalePrice ? '$ ' + number(p.wholesalePrice) : 'No tiene' }}</dd></div>
+            @if (p.canViewCost) { <div><dt>Costo promedio</dt><dd>{{ p.averageCost != null ? '$ ' + (p.averageCost | number:'1.0-4') : 'Sin dato' }}</dd></div> }
+            <div><dt>Existencias</dt><dd>{{ number(p.currentStock) }}</dd></div>
+            <div><dt>Apartadas</dt><dd>{{ number(p.reservedStock) }}</dd></div>
+            <div><dt>Disponibles</dt><dd>{{ number(p.availableStock) }}</dd></div>
+            <div><dt>Stock mínimo</dt><dd>{{ number(p.minimumStock) }}</dd></div>
+            @if (p.description) { <div class="product-facts__wide"><dt>Descripción</dt><dd>{{ p.description }}</dd></div> }
+          </dl>
+        }
+        @case ('existencias') {
+          @if (fichaLoading() && !movements()) { <p class="muted" role="status">Cargando historial…</p> }
+          @else if (movements(); as page) {
+            <div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Movimiento</th><th class="align-right">Cantidad</th><th class="align-right">Quedaron</th><th>Motivo</th></tr></thead>
+              <tbody>@for (movement of page.items; track movement.id) {
+                <tr><td>{{ movement.occurredAtUtc | date:'dd/MM/yyyy HH:mm' }}</td><td>{{ movementLabel(movement.type) }}</td><td class="align-right numeric">{{ movement.stockQuantity > 0 ? '+' : '' }}{{ number(movement.stockQuantity) }}</td><td class="align-right numeric">{{ number(movement.newStock) }}</td><td>{{ movement.reasonName || movement.observation || '—' }}</td></tr>
+              } @empty { <tr class="empty-row"><td colspan="5"><strong>Sin movimientos</strong></td></tr> }</tbody>
+            </table></div>
+            <mat-paginator [length]="page.totalCount" [pageIndex]="page.page - 1" [pageSize]="20" (page)="movementsPageChanged($event)" aria-label="Páginas del historial"></mat-paginator>
+          }
+        }
+        @case ('costos') {
+          @if (costHistory(); as costs) {
+            <p class="product-costs">Promedio actual: <strong>{{ (costs.currentAverageCost | number:'1.0-4') ?? 'Sin dato' }}</strong> · Último costo: <strong>{{ (costs.lastConfirmedPurchaseCost | number:'1.0-4') ?? 'Sin dato' }}</strong></p>
+            <div class="table-scroll"><table><thead><tr><th>Fecha</th><th class="align-right">Cantidad</th><th class="align-right">Costo unitario</th><th class="align-right">Promedio resultante</th></tr></thead>
+              <tbody>@for (item of costs.history.items; track item.purchaseId) {
+                <tr><td>{{ item.documentDate }}</td><td class="align-right numeric">{{ item.quantity | number:'1.0-0' }}</td><td class="align-right numeric">{{ item.documentUnitCost | number:'1.0-4' }}</td><td class="align-right numeric">{{ item.resultingAverageCost | number:'1.0-4' }}</td></tr>
+              } @empty { <tr class="empty-row"><td colspan="4"><strong>No hay compras confirmadas.</strong></td></tr> }</tbody>
+            </table></div>
+            <mat-paginator [length]="costs.history.totalCount" [pageIndex]="costs.history.page-1" [pageSize]="20" (page)="showCostsByPage($event)" aria-label="Páginas de costos"></mat-paginator>
+          } @else { <p class="muted" role="status">Cargando costos…</p> }
+        }
+      }
+      <div class="actions form-actions">
+        @if (p.retailPrice <= 0 && p.isActive && canEditProduct()) { <button class="button button--primary" type="button" (click)="closeFicha(); putPrice(p)">Poner precio</button> }
+        @else if (canEditProduct()) { <button class="button button--primary" type="button" (click)="editFromFicha(p)">Editar</button> }
+        @if (canOrder(p)) { <button class="button button--secondary" type="button" (click)="orderProduct(p)">Pedir</button> }
+        @if (canPrintLabel(p)) { <a class="button button--secondary" routerLink="/operacion/etiquetas" [queryParams]="{ producto: p.internalCode }">Imprimir etiqueta</a> }
+        <button class="button button--secondary" type="button" (click)="closeFicha()">Cerrar</button>
+      </div>
     </section>
+    </div>
   }
 
   @if (tab() === 'categories' && session.has('CATEGORIES.READ')) {
@@ -121,7 +180,7 @@
         </mat-select>
           @if (!product.id && hasCategoriesWithoutAbbreviation()) { <mat-hint>Las categorías sin prefijo se configuran en la pestaña Categorías antes de crear productos.</mat-hint> }
           <mat-error>Selecciona una categoría.</mat-error></mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Precio minorista</mat-label><input matInput type="text" cpNumberInput step="1" min="0" formControlName="retailPrice"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Precio minorista</mat-label><input id="product-retail-price" matInput type="text" cpNumberInput step="1" min="0" formControlName="retailPrice"><mat-error>Usa un entero no negativo.</mat-error></mat-form-field>
         @if (!product.id) {
           <mat-form-field appearance="outline"><mat-label>Existencia inicial</mat-label><cp-help matSuffix text="Cuántas unidades hay hoy en la tienda al crear el producto." /><input matInput type="text" cpNumberInput step="1" min="0" max="2147483647" formControlName="initialQuantity"><mat-error>Usa un entero entre 0 y 2.147.483.647.</mat-error></mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>Costo de compra por unidad</mat-label><cp-help matSuffix text="Lo que te cuesta cada unidad. Sirve para calcular la ganancia y evitar vender por debajo del costo." /><input matInput type="text" cpNumberInput [cpNumberString]="true" min="0" step="0.0001" formControlName="initialUnitCost"><mat-hint>Cuánto pagaste al proveedor por cada unidad que estás ingresando. Decimales con coma.</mat-hint><mat-error>Usa un valor de 0 a 14 dígitos enteros y hasta 4 decimales.</mat-error></mat-form-field>

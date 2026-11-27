@@ -81,6 +81,13 @@ describe('Etiquetas de productos', () => {
     expect(component.totalLabels()).toBe(6);
   });
 
+  it('desde Catálogo llega con la referencia del producto y lo agrega (maqueta 11)', async () => {
+    TestBed.overrideProvider(ActivatedRoute, { useValue: { snapshot: { queryParamMap: convertToParamMap({ producto: product.internalCode }) } } });
+    const fixture = await create(); const component = fixture.componentInstance;
+    await vi.waitFor(() => expect(component.selected()).toEqual([{ product, quantity: 1 }]));
+    expect(api.products).toHaveBeenCalledWith(product.internalCode, 1, 20);
+  });
+
   it('reintenta solo el mismo lote fallido y no permite repetir uno de resultado incierto', async () => {
     const fixture = await create(); const component = fixture.componentInstance;
     await component.showJobs(); fixture.detectChanges();

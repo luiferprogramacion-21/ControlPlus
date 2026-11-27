@@ -1044,6 +1044,13 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         }
 
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/products?includeOutOfStock=true")).StatusCode);
+        // Maqueta 11: «Inactivos» muestra solo los inactivos.
+        using (var onlyInactiveJson = JsonDocument.Parse(await client.GetStringAsync("/api/products?onlyInactive=true&pageSize=100")))
+        {
+            var items = onlyInactiveJson.RootElement.GetProperty("items").EnumerateArray().ToArray();
+            Assert.Contains(items, item => item.GetProperty("id").GetGuid() == inactiveProduct.Id);
+            Assert.All(items, item => Assert.False(item.GetProperty("isActive").GetBoolean()));
+        }
         var administratorInactiveList = await client.GetAsync("/api/products?includeInactive=true&includeOutOfStock=true");
         Assert.Equal(HttpStatusCode.OK, administratorInactiveList.StatusCode);
         using (var administratorInactiveJson = JsonDocument.Parse(await administratorInactiveList.Content.ReadAsStringAsync()))
@@ -1075,6 +1082,7 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cashierSession.AccessToken);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/products?includeOutOfStock=true")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/products?includeInactive=true")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/products?onlyInactive=true")).StatusCode);
         // Auditoría C.19: el Cajero consulta las existencias por estado (Disponible, Stock bajo, Agotado).
         foreach (var status in new[] { "DISPONIBLE", "STOCK_BAJO", "AGOTADO", "agotado" })
             Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/products?stockStatus={status}")).StatusCode);
@@ -1085,6 +1093,13 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
             return json.RootElement.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).ToArray();
         }
         Assert.Contains(product.Id, await IdsAsync("AGOTADO"));
+        // Catálogo rediseñado (maqueta 11, 26/11/2026): el resumen lo consulta también el Cajero.
+        using (var summaryJson = JsonDocument.Parse(await client.GetStringAsync("/api/products/summary")))
+        {
+            Assert.True(summaryJson.RootElement.GetProperty("active").GetInt32() >= 1);
+            Assert.True(summaryJson.RootElement.GetProperty("outOfStock").GetInt32() >= 1);
+            Assert.True(summaryJson.RootElement.GetProperty("withoutPrice").GetInt32() >= 0);
+        }
         // Pruebas del usuario del 26/11/2026: un agotado ya no aparece en «Stock bajo».
         Assert.DoesNotContain(product.Id, await IdsAsync("STOCK_BAJO"));
         Assert.DoesNotContain(product.Id, await IdsAsync("DISPONIBLE"));

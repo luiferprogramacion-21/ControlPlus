@@ -54,7 +54,15 @@ public sealed record ProductListQuery(
     int PageSize = 20,
     // Auditoría del 23/11/2026 (C.19): DISPONIBLE, STOCK_BAJO o AGOTADO con el mismo criterio de Inventario y del Dashboard
     // (InventoryStockStatus). Lo usa también el Cajero; con estado no se aplica IncludeOutOfStock.
-    string? StockStatus = null);
+    string? StockStatus = null,
+    // Catálogo rediseñado (maqueta 11, 26/11/2026): solo productos sin precio de venta (precio 0), que no se pueden
+    // vender. Incluye los que aún no tienen existencias (creados desde un pedido).
+    bool WithoutPrice = false,
+    // Solo los inactivos (maqueta 11): exige el mismo permiso que IncludeInactive.
+    bool OnlyInactive = false);
+
+/// <summary>Resumen del Catálogo (maqueta 11): productos activos, con stock bajo, agotados y sin precio.</summary>
+public sealed record ProductCatalogSummaryDto(int Active, int LowStock, int OutOfStock, int WithoutPrice);
 
 public sealed record ProductPurchaseCostHistoryQuery(int Page = 1, int PageSize = 20);
 
@@ -136,6 +144,7 @@ public interface ICatalogService
     Task<Result<IReadOnlyCollection<MeasurementUnitDto>>> ListMeasurementUnitsAsync(ActorContext actor, CancellationToken cancellationToken = default);
     Task<Result<PagedResult<ProductDto>>> ListProductsAsync(ActorContext actor, ProductListQuery query, CancellationToken cancellationToken = default);
     Task<Result<ProductDto>> GetProductAsync(ActorContext actor, Guid productId, CancellationToken cancellationToken = default);
+    Task<Result<ProductCatalogSummaryDto>> GetProductSummaryAsync(ActorContext actor, CancellationToken cancellationToken = default);
     Task<Result<ProductPurchaseCostHistoryDto>> GetProductPurchaseCostHistoryAsync(ActorContext actor, Guid productId, ProductPurchaseCostHistoryQuery query, CancellationToken cancellationToken = default);
     Task<Result<ProductDto>> CreateProductAsync(ActorContext actor, CreateProductRequest request, string? idempotencyKey = null, CancellationToken cancellationToken = default);
     Task<Result<ProductDto>> UpdateProductAsync(ActorContext actor, Guid productId, UpdateProductRequest request, CancellationToken cancellationToken = default);
