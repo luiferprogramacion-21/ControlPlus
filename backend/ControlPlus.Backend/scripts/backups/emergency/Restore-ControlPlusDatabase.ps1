@@ -17,6 +17,11 @@
        la base actual pasa a controlplus_anterior_<fecha> (NO se borra) y la restaurada pasa a ser controlplus.
     6. Inicia el servicio y comprueba la salud de la API y de la base.
     No aplica migraciones. Termina con EMERGENCY_RESTORE_OK. Ver docs/backups.md, «Restauración de emergencia».
+
+    Con -Drill (simulacro de recuperación, 27 de noviembre de 2026) hace los pasos 1 a 4 y se detiene: siempre pide
+    la contraseña de cifrado (para probar la que está anotada fuera del computador, no la guardada en el equipo), mide
+    cuánto tardó, informa la antigüedad de la copia frente a las metas (30 minutos de pérdida y 30 de recuperación) y
+    borra la base restaurada. Nunca detiene el servicio ni reemplaza la base real. Termina con RECOVERY_DRILL_OK.
 #>
 [CmdletBinding()]
 param(
@@ -24,7 +29,9 @@ param(
     [Parameter(Mandatory = $true)][string]$BackupFile,
     # Permite restaurar una copia con menos migraciones que la base actual. La API NO se inicia: primero hay que
     # aplicar las migraciones que falten con el migrador controlado.
-    [switch]$AllowMissingMigrations
+    [switch]$AllowMissingMigrations,
+    # Simulacro: restaura y compara sin reemplazar la base real; al final borra la base restaurada.
+    [switch]$Drill
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,7 +50,10 @@ $url = 'http://localhost:5000'
 $stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmss')
 $restoringDb = 'controlplus_restaurando_' + $stamp
 $previousDb = 'controlplus_anterior_' + $stamp
-$evidence = Join-Path $env:USERPROFILE ('ControlPlus-Backups\EmergencyRestore-' + $stamp + '-' + [guid]::NewGuid().ToString('N'))
+$evidenceKind = 'EmergencyRestore-'
+if ($Drill) { $evidenceKind = 'RecoveryDrill-' }
+$evidence = Join-Path $env:USERPROFILE ('ControlPlus-Backups\' + $evidenceKind + $stamp + '-' + [guid]::NewGuid().ToString('N'))
+$drillWatch = $null
 $savedPassword = $env:PGPASSWORD
 $plainDump = $null
 $decrypted = $false
@@ -132,16 +142,23 @@ try {
     if ($owner -notmatch '^[a-z_][a-z0-9_]*$') { throw 'El dueño de la base actual tiene un nombre inesperado.' }
 
     # 2. Copia en claro y verificación
+    # El simulacro mide desde aquí: abrir la copia, restaurarla y comprobarla (sin contar las preguntas previas).
+    if ($Drill) { $drillWatch = [Diagnostics.Stopwatch]::StartNew() }
     $plainDump = Join-Path $evidence ($name -replace '\.cpbk$', '')
     if ($encrypted) {
         if (-not (Test-Path -LiteralPath $dotnet -PathType Leaf) -or -not (Test-Path -LiteralPath $decryptTool -PathType Leaf)) {
             throw 'Para descifrar se necesitan el SDK de .NET 10 y scripts\backups\decrypt\Decrypt-ControlPlusBackup.cs.'
         }
         $passphrase = $null
-        if (Test-Path -LiteralPath $serviceSecrets) {
+        # En el simulacro se escribe la contraseña anotada: así se prueba que esa sirve si el equipo se pierde.
+        if (-not $Drill -and (Test-Path -LiteralPath $serviceSecrets)) {
             try { $passphrase = (Get-Content -LiteralPath $serviceSecrets -Raw -Encoding UTF8 | ConvertFrom-Json).Backup.EncryptionPassphrase } catch { $passphrase = $null }
         }
-        if ([string]::IsNullOrEmpty($passphrase)) { $passphrase = Read-Secret 'Contraseña de cifrado de la copia externa (oculta)' }
+        if ([string]::IsNullOrEmpty($passphrase)) {
+            $prompt = 'Contraseña de cifrado de la copia externa (oculta)'
+            if ($Drill) { $prompt = 'Contraseña de cifrado que tienes anotada fuera del computador (oculta)' }
+            $passphrase = Read-Secret $prompt
+        }
         else { Write-Step 'Se usa la contraseña de cifrado guardada en la configuración del servicio.' }
         $previousEncoding = $OutputEncoding
         $OutputEncoding = New-Object Text.UTF8Encoding($false)
@@ -192,6 +209,32 @@ try {
     if ($olderSchema -and -not $AllowMissingMigrations) {
         throw ('La copia tiene menos migraciones que la base actual: la API instalada no funcionaría con ella. ' +
             'Use una copia más reciente o repita con -AllowMissingMigrations y aplique después las migraciones faltantes.')
+    }
+    if ($Drill) {
+        # Simulacro: hasta aquí todo es igual a una restauración real; la base real nunca se reemplaza.
+        $drillWatch.Stop()
+        $minutes = [math]::Ceiling($drillWatch.Elapsed.TotalMinutes)
+        $copyAge = $null
+        if ($name -match '^controlplus-(\d{8}T\d{6}Z)-') {
+            $copyAt = [DateTime]::ParseExact($Matches[1], "yyyyMMdd'T'HHmmss'Z'", [Globalization.CultureInfo]::InvariantCulture,
+                [Globalization.DateTimeStyles]'AssumeUniversal,AdjustToUniversal')
+            $copyAge = [math]::Floor(((Get-Date).ToUniversalTime() - $copyAt).TotalMinutes)
+        }
+        $salesAfter = $null
+        if ($current) { $salesAfter = [int]$current.Ventas - [int]$restored.Ventas }
+        $lines = @(
+            'RECOVERY_DRILL_OK',
+            "Copia: $name",
+            ('Antigüedad de la copia: ' + $(if ($null -ne $copyAge) { "$copyAge minutos" } else { 'no se pudo leer del nombre' })),
+            "Recuperación (abrir, restaurar y comprobar): $minutes minuto(s). Meta: 30 minutos.",
+            ('Ventas en la copia: ' + $restored.Ventas + $(if ($null -ne $salesAfter) { "; en la base actual: $($current.Ventas) ($salesAfter posteriores a la copia)" } else { '' })),
+            "Productos en la copia: $($restored.Productos). Migraciones: $($restored.Migraciones).",
+            'La base real no se tocó; la base restaurada se borra al terminar.')
+        [IO.File]::WriteAllLines((Join-Path $evidence 'resultado-simulacro.txt'), [string[]]$lines, (New-Object Text.UTF8Encoding($false)))
+        if ($minutes -gt 30) { Write-Step "AVISO: la recuperación tardó $minutes minutos, más que la meta de 30." }
+        foreach ($line in ($lines | Select-Object -Skip 1)) { Write-Step $line }
+        Write-Step 'RECOVERY_DRILL_OK'
+        return
     }
     Write-Host 'Se reemplazarán los datos actuales por los de la copia. La base actual se conservará como' $previousDb
     if ((Read-Host 'Escriba RESTAURAR para continuar') -cne 'RESTAURAR') { throw 'Cancelado por el operador; la base real no se modificó.' }

@@ -96,6 +96,12 @@ No aplica migraciones ni toca las copias de respaldo. Si falla antes del cambio 
 - Cree un respaldo manual en «Soporte y continuidad».
 - Cuando todo esté confirmado, borre la base anterior con `scripts/maintenance/Remove-PreviousDatabase.ps1 -DatabaseName controlplus_anterior_<fecha>` (desde el 27 de noviembre de 2026). El script solo acepta ese tipo de nombre, comprueba que nadie esté conectado, guarda un respaldo `pg_dump` verificado con `pg_restore --list` y su SHA-256 en `%USERPROFILE%\ControlPlus-Backups\PreviousDatabase-<fecha>-<id>`, pide escribir `BORRAR` y termina con `PREVIOUS_DATABASE_DROP_OK`. No toca `controlplus` ni detiene el servicio. Para volver atrás antes de borrarla: detenga el servicio y cambie los nombres al revés con `ALTER DATABASE ... RENAME TO ...`.
 
+### Simulacro de recuperación (27 de noviembre de 2026)
+
+Metas acordadas con el usuario: pérdida máxima 30 minutos y recuperación en máximo 30 minutos. «Probar restauración» comprueba la copia con la contraseña guardada en el equipo; el simulacro comprueba lo que de verdad hace falta si el equipo se pierde: la copia **descargada de la nube** y la contraseña **anotada fuera del computador**.
+
+`Restore-ControlPlusDatabase.ps1 -Drill -BackupFile <copia descargada>` (PowerShell como Administrador) hace los pasos 1 a 4 de la restauración de emergencia y se detiene: siempre pide la contraseña de cifrado (no usa la de `api-secrets.json`), restaura en `controlplus_restaurando_<fecha>`, comprueba historial, establecimiento y permisos, compara con la base real, mide el tiempo desde abrir la copia hasta comprobarla y lo contrasta con la meta de 30 minutos, informa la antigüedad de la copia por su nombre y borra la base restaurada. Nunca detiene el servicio ni reemplaza `controlplus`. Termina con `RECOVERY_DRILL_OK` y deja `resultado-simulacro.txt` en `%USERPROFILE%\ControlPlus-Backups\RecoveryDrill-<fecha>-<id>`. El simulacro no prueba la instalación en un equipo nuevo (no hay un segundo computador); esos pasos están en «Equipo nuevo». El kit de recuperación y los pasos para el Administrador están en el manual de uso (4.11).
+
 ### Equipo nuevo
 
 En un PostgreSQL recién instalado faltan los roles, que no viajan en las copias. Antes de restaurar, cree `controlplus_app` como `postgres` con la contraseña que tiene la conexión de la API (`CREATE ROLE controlplus_app LOGIN PASSWORD '...';`). Después de restaurar, repita la preparación de respaldos (`Initialize-Backups.ps1 -KeepPassphrase` si conserva la contraseña de cifrado) y la instalación del servicio.

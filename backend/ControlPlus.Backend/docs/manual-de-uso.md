@@ -582,10 +582,44 @@ Menú **Soporte y continuidad**.
 - El sistema hace una **copia de la base de datos** cada 30 minutos, después de cada cierre de caja y cuando la pides con el botón **Crear respaldo**.
 - Cada copia va a **dos destinos**: una copia **local** en un disco distinto al de la base y una copia **externa cifrada** en la carpeta de OneDrive o Google Drive.
 - Se conservan 7 copias diarias, 4 semanales y 12 mensuales.
-- **Probar restauración** (botón en Soporte) comprueba que una copia sirve, en tres pasos: **1.** elige la copia (la más reciente ya viene elegida); **2.** pulsa **Probar restauración**; **3.** si dice **Prueba correcta**, esa copia sirve. El sistema la recupera en una base de prueba aparte y la borra al terminar: **no toca** tus datos reales. Hazlo cada 90 días; la pantalla avisa cuándo toca.
+- **Probar restauración** (botón en Soporte) comprueba que una copia sirve, en tres pasos: **1.** elige la copia (la más reciente ya viene elegida); **2.** pulsa **Probar restauración**; **3.** si dice **Prueba correcta**, esa copia sirve. El sistema la recupera en una base de prueba aparte y la borra al terminar: **no toca** tus datos reales. Esta prueba usa la contraseña guardada en el equipo; para comprobar que la copia sirve si el computador se pierde, haz el **simulacro** de más abajo.
 - **Restaurar la operación real** no está en pantalla, a propósito: se hace con un script de emergencia (`scripts/backups/emergency/Restore-ControlPlusDatabase.ps1`), que conserva la base anterior. Detalle en `docs/backups.md`.
 
 > Un respaldo en el mismo disco que la base no protege contra la falla de ese disco. Conecta un **USB o segundo disco** y configúralo como destino local.
+
+**Metas acordadas (27 de noviembre de 2026):** si el equipo se daña, se pierden **como máximo 30 minutos** de trabajo (lo que se haya hecho después de la última copia se recupera con los tickets impresos), y ControlPlus vuelve a funcionar en **máximo 30 minutos**.
+
+### Kit de recuperación (guárdalo fuera del computador)
+
+Si el computador se daña o se lo roban, las copias de OneDrive **solo se abren con la contraseña de cifrado**, y esa contraseña hoy solo está guardada en ese computador. Ten en un sobre cerrado o en un gestor de contraseñas, **fuera del computador**:
+
+1. La **contraseña de cifrado** de las copias (la que se escribió al preparar los respaldos).
+2. La **contraseña de `postgres`** (la de PostgreSQL).
+3. El **usuario y la contraseña de OneDrive** donde llegan las copias.
+4. Esta página impresa.
+
+Nunca las escribas en el chat, en un archivo del computador ni en el repositorio.
+
+### Simulacro de recuperación (prueba real)
+
+Comprueba de verdad que las copias **sirven** si el computador se pierde: usa la copia de la nube y la contraseña anotada, no las que guarda el equipo. No toca tus datos reales ni detiene ControlPlus. Hazlo después de cambios grandes y al menos una vez al mes.
+
+1. Entra a **onedrive.live.com** desde el navegador, abre la carpeta **ControlPlus** y descarga la copia más reciente (termina en `.dump.cpbk`) a **Descargas**. No le cambies el nombre.
+2. Abre **PowerShell como Administrador** y ejecuta (cambia el nombre por el del archivo que bajaste):
+
+   ```powershell
+   cd C:\ControlPlus\backend\ControlPlus.Backend
+   .\scripts\backups\emergency\Restore-ControlPlusDatabase.ps1 -Drill -BackupFile "$env:USERPROFILE\Downloads\controlplus-....dump.cpbk"
+   ```
+
+3. Escribe la contraseña de `postgres` y la **contraseña de cifrado que tienes anotada**.
+4. Al final debe decir **`RECOVERY_DRILL_OK`**. Arriba muestra:
+   - cuánto tardó la recuperación (meta: 30 minutos);
+   - qué tan vieja es la copia;
+   - cuántas ventas tiene la copia frente a las de hoy.
+
+   El resultado queda en `ControlPlus-Backups\RecoveryDrill-…` dentro de tu carpeta de usuario.
+5. Si falla con «No se pudo descifrar», la contraseña anotada **no es la correcta**: búscala antes de que haga falta de verdad.
 
 ## 4.12 Auditoría
 
