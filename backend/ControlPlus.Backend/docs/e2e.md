@@ -32,7 +32,7 @@ Decisión del 16 de noviembre de 2026: pruebas de extremo a extremo del flujo pr
 7. crear un proveedor dentro de una compra sin pedido y guardar el borrador;
 8. crear un apartado, registrar su pago inicial y comprobar la reserva de inventario.
 
-La suite queda formada por **11 recorridos**. Continúa usando un solo trabajador porque varios escenarios ejercitan la misma instalación y caja descartables en un orden conocido; cada comprobación conserva aserciones propias para que un fallo indique la operación concreta.
+La suite queda formada por **11 recorridos**. Continúa usando un solo trabajador porque varios escenarios ejercitan la misma instalación y caja descartables en un orden conocido; cada comprobación conserva aserciones propias para que un fallo indique la operación concreta. Los recorridos secundarios preparan una sola sesión válida por API y la reutilizan en el navegador; solo el escenario de credenciales usa el formulario de ingreso. Esto evita que la preparación repetitiva agote el límite de intentos de autenticación sin dejar de probar el acceso real.
 
 ## Cómo corren en el CI
 

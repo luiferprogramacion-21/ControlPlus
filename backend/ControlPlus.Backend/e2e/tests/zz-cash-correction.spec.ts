@@ -5,21 +5,27 @@ import { expect, request, test } from '@playwright/test';
 const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5000';
 const adminUser = 'admin.e2e';
 const adminPassword = process.env.CONTROLPLUS_E2E_ADMIN_PASSWORD ?? '';
+interface BrowserSession {
+  accessToken: string;
+  expiresAtUtc: string;
+  user: unknown;
+  passwordChangeRequired?: boolean;
+}
 
 test('corregir un ingreso manual conserva el original y ajusta el efectivo esperado', async ({ page }) => {
   expect(adminPassword, 'Falta CONTROLPLUS_E2E_ADMIN_PASSWORD').not.toBe('');
   const anonymous = await request.newContext({ baseURL });
   const login = await anonymous.post('/api/auth/login', { data: { userName: adminUser, password: adminPassword } });
   expect(login.status(), await login.text()).toBe(200);
-  const { accessToken } = await login.json() as { accessToken: string };
+  const session = (await login.json()) as BrowserSession;
   await anonymous.dispose();
-  const api = await request.newContext({ baseURL, extraHTTPHeaders: { Authorization: `Bearer ${accessToken}` } });
+  const api = await request.newContext({ baseURL, extraHTTPHeaders: { Authorization: `Bearer ${session.accessToken}` } });
 
   try {
-    await page.goto('/ingresar');
-    await page.getByLabel('Usuario').fill(adminUser);
-    await page.getByLabel('Contraseña').fill(adminPassword);
-    await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+    await page.addInitScript((savedSession) => {
+      window.sessionStorage.setItem('controlplus.session', JSON.stringify(savedSession));
+    }, session);
+    await page.goto('/operacion');
     await expect(page).toHaveURL(/\/operacion\//);
     await page.goto('/operacion/caja');
     await expect(page.locator('.opening-form, .movement-form')).toBeVisible();

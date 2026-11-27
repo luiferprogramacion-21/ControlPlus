@@ -20,7 +20,15 @@ const lowProductName = `Stock bajo E2E ${suffix}`;
 const emptyProductName = `Agotado E2E ${suffix}`;
 const customerName = `Cliente apartado E2E ${suffix}`;
 
+interface BrowserSession {
+  accessToken: string;
+  expiresAtUtc: string;
+  user: unknown;
+  passwordChangeRequired?: boolean;
+}
+
 let api: APIRequestContext;
+let browserSession: BrowserSession;
 let mixedProductId = "";
 let lowProductId = "";
 let emptyProductId = "";
@@ -34,17 +42,20 @@ async function json<T>(
 }
 
 async function login(page: Page): Promise<void> {
-  await page.goto("/ingresar");
-  await page.getByLabel("Usuario").fill(adminUser);
-  await page.getByLabel("Contraseña").fill(adminPassword);
-  await page.getByRole("button", { name: "Iniciar sesión" }).click();
+  await page.addInitScript((session) => {
+    window.sessionStorage.setItem(
+      "controlplus.session",
+      JSON.stringify(session),
+    );
+  }, browserSession);
+  await page.goto("/operacion");
   await expect(page).toHaveURL(/\/operacion\//);
 }
 
 test.beforeAll(async () => {
   expect(adminPassword, "Falta CONTROLPLUS_E2E_ADMIN_PASSWORD").not.toBe("");
   const anonymous = await request.newContext({ baseURL });
-  const session = await json<{ accessToken: string }>(
+  browserSession = await json<BrowserSession>(
     await anonymous.post("/api/auth/login", {
       data: { userName: adminUser, password: adminPassword },
     }),
@@ -53,7 +64,7 @@ test.beforeAll(async () => {
   await anonymous.dispose();
   api = await request.newContext({
     baseURL,
-    extraHTTPHeaders: { Authorization: `Bearer ${session.accessToken}` },
+    extraHTTPHeaders: { Authorization: `Bearer ${browserSession.accessToken}` },
   });
 
   const category = await json<{ id: string }>(
