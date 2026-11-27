@@ -64,11 +64,14 @@ Write-Result @("ESPERANDO", "commit $short", "inicio $(Get-Date -Format 'HH:mm:s
 # se tomaba como «sin CI» aunque trajera código).
 $base = "$Sha~1"
 $candidates = @()
-try { $candidates = @(& $gh run list --limit 30 --json headSha --jq '.[].headSha' 2>$null) } catch { }
+# Solo corridas del CI en main: las de Dependabot (desde el 27/11/2026) traen commits de ramas que no están en la copia
+# local, y git falla al compararlos; un error de git aquí nunca debe detener la espera.
+try { $candidates = @(& $gh run list --workflow ci.yml --branch main --event push --limit 30 --json headSha --jq '.[].headSha' 2>$null) } catch { }
 foreach ($candidate in $candidates) {
     if (-not $candidate -or $candidate -eq $Sha) { continue }
-    git merge-base --is-ancestor $candidate $Sha 2>$null
-    if ($LASTEXITCODE -eq 0) { $base = $candidate; break }
+    $isAncestor = $false
+    try { git merge-base --is-ancestor $candidate $Sha 2>$null; $isAncestor = ($LASTEXITCODE -eq 0) } catch { $isAncestor = $false }
+    if ($isAncestor) { $base = $candidate; break }
 }
 $changed = @(git diff --name-only $base $Sha 2>$null)
 if ($changed.Count -gt 0 -and -not ($changed | Where-Object { $_ -notlike '*.md' })) {
@@ -80,7 +83,8 @@ if ($changed.Count -gt 0 -and -not ($changed | Where-Object { $_ -notlike '*.md'
 # Espera a que aparezca la ejecución del commit (hasta unos 10 minutos).
 $runId = $null
 for ($i = 0; $i -lt 40 -and -not $runId; $i++) {
-    try { $runId = (& $gh run list --commit $Sha --limit 1 --json databaseId -q '.[0].databaseId' 2>$null) } catch { $runId = $null }
+    # Solo el flujo CI: desde que se activó Dependabot (27/11/2026) un mismo commit también tiene corridas «Dependabot Updates».
+    try { $runId = (& $gh run list --workflow ci.yml --commit $Sha --limit 1 --json databaseId -q '.[0].databaseId' 2>$null) } catch { $runId = $null }
     if (-not $runId) { Start-Sleep -Seconds 15 }
 }
 if (-not $runId) {
