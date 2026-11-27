@@ -92,7 +92,7 @@ test.beforeAll(async () => {
           taxPercentage: null,
           minimumStock,
           initialQuantity: quantity,
-          initialUnitCost: 2000,
+          initialUnitCost: quantity > 0 ? 2000 : null,
         },
       }),
       201,
