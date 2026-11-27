@@ -90,7 +90,7 @@ test.beforeAll(async () => {
   ) =>
     json<{ id: string }>(
       await api.post("/api/products", {
-        headers: { "Idempotency-Key": `e2e-secondary-${key}` },
+        headers: { "Idempotency-Key": `e2e-secondary-${key}-${suffix}` },
         data: {
           categoryId: category.id,
           measurementUnitId: unitId,
@@ -272,6 +272,7 @@ test("una compra sin pedido crea el proveedor en la misma ventana y guarda el bo
   await page
     .locator("#purchase-date")
     .fill(new Date().toISOString().slice(0, 10));
+  await page.getByRole("button", { name: "Agregar producto" }).click();
   await page.getByLabel("Producto de la línea 1").selectOption(mixedProductId);
   await page.getByLabel("Cantidad de la línea 1").fill("3");
   await page.getByLabel("Costo unitario de la línea 1").fill("2100");
