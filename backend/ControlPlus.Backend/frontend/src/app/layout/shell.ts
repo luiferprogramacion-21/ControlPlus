@@ -66,7 +66,7 @@ function readCollapsed(): boolean { try { return localStorage.getItem(COLLAPSED_
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
     <div class="app-shell app-shell--fixed" [class.app-shell--collapsed]="collapsed()">
       <aside id="main-navigation" class="sidebar" aria-label="Navegación principal">
-        <div class="brand brand--sidebar"><img class="brand__mark brand__mark--logo" src="controlplus-icon.png" alt="" width="36" height="36"><span class="sidebar__text"><strong>ControlPlus</strong><small>{{ establishment.name() }}</small></span></div>
+        <div class="brand brand--sidebar"><img class="brand__mark brand__mark--logo" src="controlplus-icon.png" alt="" width="36" height="36"><span class="sidebar__text"><strong>ControlPlus</strong></span></div>
         <nav class="sidebar__nav">
           @for (group of groups(); track group.label) {
             <p class="sidebar__label">{{ group.label }}</p>
@@ -102,7 +102,7 @@ function readCollapsed(): boolean { try { return localStorage.getItem(COLLAPSED_
       <section class="shell-content">
         <header class="topbar">
           <div class="topbar__leading"><button class="icon-button menu-toggle" type="button" [attr.aria-label]="collapsed() ? 'Mostrar el menú completo' : 'Plegar el menú'" [title]="collapsed() ? 'Mostrar el menú completo' : 'Plegar el menú'" [attr.aria-expanded]="!collapsed()" aria-controls="main-navigation" (click)="toggleCollapsed()"><cp-icon name="menu" /></button><div><h1>{{ pageTitle() }}</h1><p>{{ pageSubtitle() }}</p></div></div>
-          <div class="topbar__status"><strong class="store-name">{{ establishment.name() }}</strong>@if (operator.active(); as active) { <span class="operator-chip" role="status">Operador: {{ active.name }}@if (operator.roleLabel()) { · {{ operator.roleLabel() }} }</span> }<span>{{ session.user()?.displayName }}</span><button class="icon-button" type="button" (click)="logout()" aria-label="Cerrar sesión" title="Cerrar sesión"><cp-icon name="logout" /></button></div>
+          <div class="topbar__status">@if (operator.active(); as active) { <span class="operator-chip" role="status">Operador: {{ active.name }}@if (operator.roleLabel()) { · {{ operator.roleLabel() }} }</span> }<span>{{ session.user()?.displayName }}</span><button class="icon-button" type="button" (click)="logout()" aria-label="Cerrar sesión" title="Cerrar sesión"><cp-icon name="logout" /></button></div>
         </header>
         <main id="main-content" class="workspace" [class.workspace--bounded]="boundedWorkspace()" tabindex="-1"><router-outlet /></main>
       </section>

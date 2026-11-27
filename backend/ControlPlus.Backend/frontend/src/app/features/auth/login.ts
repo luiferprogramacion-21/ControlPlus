@@ -24,7 +24,7 @@ import { toastSignal } from '../../core/toast';
         @if (view() === 'login') {
         <form class="cp-login__form" [formGroup]="form" (ngSubmit)="submit()">
           <img class="cp-login__mark" src="controlplus-icon.png" alt="" width="64" height="64">
-          <h1 class="cp-login__title">Punto de venta<br>Baratísimo</h1>
+          <h1 class="cp-login__title">Punto de venta</h1>
           <span class="cp-login__accent" aria-hidden="true"></span>
           <p class="cp-login__hint">Ingresa con tu usuario de ControlPlus.</p>
           <mat-form-field appearance="outline"><mat-label>Usuario</mat-label>
@@ -38,7 +38,7 @@ import { toastSignal } from '../../core/toast';
           <button mat-flat-button type="submit" [disabled]="busy()">{{ busy() ? 'Ingresando…' : 'Iniciar sesión' }}</button>
           @if (error()) { <p class="field-error" role="alert">{{ error() }}</p> }
           <button class="cp-login__link" type="button" (click)="startRecovery()">¿Olvidaste tu contraseña?</button>
-          <p class="cp-login__footer">ControlPlus · sistema local de Baratísimo</p>
+          <p class="cp-login__footer">ControlPlus · sistema local</p>
         </form>
         } @else {
         <form class="cp-login__form" [formGroup]="recovery" (ngSubmit)="view() === 'request' ? sendCode() : confirmCode()">
