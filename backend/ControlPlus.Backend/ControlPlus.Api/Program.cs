@@ -249,6 +249,18 @@ static FixedWindowRateLimiterOptions FixedWindow(int permitLimit) => new()
 
 var app = builder.Build();
 
+// Defensa base para la API y la pantalla instalada: evita inferencia de tipos, incrustación en marcos y acceso
+// accidental a capacidades del equipo que ControlPlus no utiliza. No se aplica CSP aquí porque debe validarse
+// por separado con la pantalla Angular y los recorridos de impresión antes de restringir sus recursos.
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.TryAdd("X-Frame-Options", "DENY");
+    context.Response.Headers.TryAdd("Referrer-Policy", "no-referrer");
+    context.Response.Headers.TryAdd("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    await next();
+});
+
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
