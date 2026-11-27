@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { CashApi } from '../features/cash/cash-api';
 import { OperatorCard, OperatorCardDialogComponent } from './operator-card';
 
@@ -44,6 +44,35 @@ describe('Carné de quien opera en turno compartido (pruebas del usuario del 25/
     expect(await card().ensure('Ingreso')).toBeNull();
   });
 
+  it('si ya está pidiendo el carné no abre una segunda ventana', async () => {
+    const closed = new Subject<boolean>();
+    api.state.mockResolvedValue(sharedState);
+    open.mockReturnValue({ afterClosed: () => closed.asObservable() });
+    const service = card();
+
+    const first = service.ensure('Primer movimiento');
+    await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+    await expect(service.ensure('Segundo movimiento')).resolves.toBeNull();
+    expect(open).toHaveBeenCalledTimes(1);
+
+    closed.next(false); closed.complete();
+    await expect(first).resolves.toBeNull();
+  });
+
+  it('si la sesión se abrió pero no se puede refrescar conserva el contexto compartido', async () => {
+    api.state.mockResolvedValueOnce(sharedState).mockRejectedValueOnce(new Error('sin conexión'));
+    open.mockReturnValue({ afterClosed: () => of(true) });
+    await expect(card().ensure('Ingreso')).resolves.toEqual({ shared: true, role: null, sessionId: null });
+  });
+
+  it('si la respuesta refrescada omite rol y sesión devuelve valores nulos', async () => {
+    api.state.mockResolvedValueOnce(sharedState).mockResolvedValueOnce({
+      ...sharedState, ownOperatorSession: undefined, activeOperatorRole: undefined,
+    });
+    open.mockReturnValue({ afterClosed: () => of(true) });
+    await expect(card().ensure('Ingreso')).resolves.toEqual({ shared: true, role: null, sessionId: null });
+  });
+
   it('si no se puede consultar la caja deja decidir al servidor', async () => {
     api.state.mockRejectedValue(new Error('sin conexión'));
     expect(await card().ensure()).toEqual({ shared: false, role: null, sessionId: null });
@@ -52,18 +81,23 @@ describe('Carné de quien opera en turno compartido (pruebas del usuario del 25/
 
 describe('Ventana «Pasa tu carné»', () => {
   const close = vi.fn();
-  const ref = { close, disableClose: false, keydownEvents: () => of() };
+  const keydownEvents = vi.fn(() => of<KeyboardEvent>());
+  const ref = { close, disableClose: false, keydownEvents };
   const api = { startSession: vi.fn(), startSessionWithPassword: vi.fn() };
-  const create = () => {
+  const create = (detail = 'Ingreso de 5.000 COP') => {
     TestBed.configureTestingModule({ providers: [
-      { provide: MAT_DIALOG_DATA, useValue: { detail: 'Ingreso de 5.000 COP' } },
+      { provide: MAT_DIALOG_DATA, useValue: { detail } },
       { provide: MatDialogRef, useValue: ref }, { provide: CashApi, useValue: api },
     ] });
     const fixture = TestBed.createComponent(OperatorCardDialogComponent);
     fixture.detectChanges();
     return fixture;
   };
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    keydownEvents.mockReturnValue(of<KeyboardEvent>());
+    ref.disableClose = false;
+  });
 
   it('explica para qué es y abre la sesión con el carné', async () => {
     const fixture = create(); const component = fixture.componentInstance;
@@ -131,5 +165,46 @@ describe('Ventana «Pasa tu carné»', () => {
     component.cancel();
     expect(api.startSession).not.toHaveBeenCalled();
     expect(close).toHaveBeenCalledWith(false);
+  });
+
+  it('Escape cancela la ventana y cualquier otra tecla no vuelve a cerrarla', () => {
+    keydownEvents.mockReturnValue(of(
+      { key: 'Escape' } as KeyboardEvent,
+      { key: 'Enter' } as KeyboardEvent,
+    ));
+    create();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledWith(false);
+  });
+
+  it('mientras revisa las credenciales no permite cancelar ni enviar otra vez', async () => {
+    const fixture = create(''); const component = fixture.componentInstance;
+    component.token = 'carné-en-proceso'; component.password = 'clave-en-proceso';
+    component.busy.set(true);
+    fixture.detectChanges();
+
+    component.cancel();
+    await component.submit();
+
+    expect(fixture.nativeElement.textContent).toContain('Revisando…');
+    expect(component.token).toBe('carné-en-proceso');
+    expect(component.password).toBe('clave-en-proceso');
+    expect(api.startSession).not.toHaveBeenCalled();
+    expect(api.startSessionWithPassword).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it('muestra el error técnico seguro cuando el fallo no es de credenciales', async () => {
+    const component = create().componentInstance;
+    api.startSession.mockRejectedValue(new HttpErrorResponse({ status: 503, statusText: 'Servicio no disponible' }));
+    component.token = '12345678901234';
+
+    await component.submit();
+
+    expect(component.error()).toBeTruthy();
+    expect(component.token).toBe('');
+    expect(component.password).toBe('');
+    expect(ref.disableClose).toBe(false);
+    expect(close).not.toHaveBeenCalled();
   });
 });
