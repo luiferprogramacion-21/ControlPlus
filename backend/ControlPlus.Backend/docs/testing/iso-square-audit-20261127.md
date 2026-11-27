@@ -8,7 +8,7 @@ es separar tres estados: cumplimiento acreditado, cumplimiento parcial y falta d
 de una medición no se presenta como un defecto del sistema, pero permanece abierta hasta obtener una
 evidencia reproducible.
 
-El alcance de esta primera revisión es el árbol local de `main` sobre `1a99a7b`. Al iniciar existían
+El alcance de esta primera revisión es el árbol local de `main` sobre `9fc5e54`. Al iniciar existían
 modificaciones concurrentes en reportes, documentos PDF, datos del establecimiento y el instalador;
 se conservaron y luego quedaron confirmadas por su responsable en ese commit. Esta auditoría no las
 preparó como propias. No se accedió a la base persistente `controlplus`, no se aplicaron migraciones y
@@ -36,6 +36,9 @@ y añade medidas propias para cubrir el modelo de nueve características de 2501
 | Pruebas .NET con `Category!=Integration` | 402/402 aprobadas: Domain 100, Infrastructure 49, API 253 | No incluye PostgreSQL ni migraciones |
 | `npx ng test --watch=false` | 858/858 aprobadas en 92 archivos | Pruebas de componentes y servicios Angular; no sustituye la observación de usuarios reales |
 | `npx ng build` | Aprobado | Conserva advertencias de presupuesto en `cash.scss` (+356 bytes) y `sales.scss` (+856 bytes) |
+| `dotnet list ... package --vulnerable --include-transitive` | 0 paquetes vulnerables en los 7 proyectos | Consulta contra NuGet; refleja los avisos publicados en ese momento |
+| `npm audit --omit=dev` | 0 vulnerabilidades en 15 dependencias de producción | La aplicación instalada no incluía el hallazgo de la herramienta de desarrollo |
+| `npm audit` completo | 0 vulnerabilidades después de actualizar Angular a 22.2.5 y Vite a 8.3.5 | Antes de la corrección detectó 1 aviso alto y 1 bajo en dependencias de desarrollo |
 | CI de `2eccf5b` | Aprobado, ejecución `45945427738` | Acredita el commit; no incluye modificaciones locales sin confirmar |
 | SonarQube de `b0a4962` | Quality Gate OK, cobertura nueva 85,0 %, duplicación nueva 0,90667 %, 0 infracciones nuevas | Es la última medición publicada, pero precede a los cambios posteriores y no representa el árbol local actual |
 | Playwright del commit `84d688b` | 11/11 recorridos en CI | No acredita las modificaciones locales posteriores |
@@ -49,7 +52,7 @@ y añade medidas propias para cubrir el modelo de nueve características de 2501
 | Compatibilidad | Build local Windows, CI Linux y navegador Chromium | Parcialmente acreditada | Registrar matriz Windows, Chrome y Edge; comprobar impresión y lector en el equipo de la tienda |
 | Capacidad de interacción | 858 pruebas Angular y 11 recorridos Playwright | Parcialmente acreditada | Ejecutar tareas observadas con Cajero, Supervisor y Administrador reales |
 | Fiabilidad | Pruebas de transacciones, concurrencia, idempotencia y conservación de originales documentadas | Parcialmente acreditada | Añadir ensayo de recuperación ante interrupción y restauración verificable de respaldo |
-| Seguridad | JWT, permisos efectivos, bloqueo de cuentas, auditoría y Quality Gate sin infracciones nuevas | Parcialmente acreditada | Actualizar SonarQube y ejecutar revisión de dependencias y pruebas negativas de cabeceras y sesiones |
+| Seguridad | JWT, permisos efectivos, bloqueo de cuentas, auditoría, encabezados HTTP y auditoría de dependencias sin vulnerabilidades conocidas | Parcialmente acreditada | Actualizar SonarQube y ampliar pruebas negativas de sesiones |
 | Mantenibilidad | Arquitectura por capas, build con advertencias como error, 402 pruebas .NET y Quality Gate previo | Acreditada con observaciones | Actualizar SonarQube y resolver los dos presupuestos de estilos sin cambiar el prototipo |
 | Flexibilidad | Configuraciones de negocio, migraciones controladas y operación local | Parcialmente acreditada | Probar cambio de configuración, reinstalación y operación sin Internet con criterios medibles |
 | Seguridad frente a daños | Invariantes financieros, auditoría, idempotencia y correcciones que conservan originales | Parcialmente acreditada | Crear una matriz de riesgos monetarios e inventario con severidad, prevención y recuperación |
@@ -86,6 +89,7 @@ Requisitos iniciales pendientes de medición:
 | QR-PERF-001 | El 95 % de las búsquedas de producto responde en hasta 1 segundo bajo un volumen y equipo definidos | Falta fijar volumen, equipo y prueba |
 | QR-REL-001 | Ninguna operación financiera confirmada queda parcialmente persistida ante un fallo controlado | Cubierto por varios casos de integración; falta inventario consolidado |
 | QR-SEC-001 | Toda respuesta HTTP incluye protecciones básicas contra inferencia de tipo, marcos y capacidades no usadas | Corregido y probado en una respuesta correcta y una solicitud no autorizada |
+| QR-SEC-002 | Las dependencias de producción y construcción no tienen vulnerabilidades conocidas por NuGet o npm | Cumple en la consulta del 27 de noviembre de 2026 |
 | QR-USE-001 | Cada rol completa sus tareas críticas sin ayuda y dentro del tiempo acordado | No evaluado con usuarios reales |
 | QR-REC-001 | Un respaldo se restaura en un tiempo máximo acordado sin pérdida de la muestra verificada | Falta definir RTO, RPO y ensayo |
 
@@ -133,6 +137,17 @@ Requisitos iniciales pendientes de medición:
 - Evidencia: `cash.scss` supera el presupuesto por 356 bytes y `sales.scss` por 856 bytes.
 - Estado: abierto. No se aumenta el presupuesto ni se cambia la apariencia para ocultar la advertencia;
   la corrección debe conservar el prototipo y verificarse visualmente.
+
+### ISO-AUD-007 Vite vulnerable en la cadena de desarrollo
+
+- Clasificación: seguridad y mantenibilidad, ISO/IEC 25010:2023.
+- Evidencia inicial: `npm audit` detectó 1 aviso alto y 1 bajo en dependencias de desarrollo;
+  Vite 8.3.0 era transitivo de `@angular/build` 22.2.4. Las 15 dependencias de producción
+  conservaron 0 vulnerabilidades.
+- Corrección: se fijó la familia Angular en 22.2.5, que resuelve Vite 8.3.5, y se regeneró
+  `package-lock.json` sin opciones `--force` ni `--legacy-peer-deps`.
+- Validación: `npm audit` completo con 0 vulnerabilidades, Angular 858/858 y build de producción aprobado.
+- Estado: corregido y validado localmente.
 
 ## Criterio de cierre de la auditoría
 
