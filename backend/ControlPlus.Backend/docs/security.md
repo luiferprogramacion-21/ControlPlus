@@ -18,6 +18,12 @@ Variables requeridas en desarrollo/local:
 - `Installation__MasterKey` — Master Key local de al menos 32 bytes UTF-8 para habilitar `POST /api/auth/setup` mediante el encabezado `X-ControlPlus-Master-Key`.
 
 En Development local, `Jwt:SigningKey`, `Installation:MasterKey` y `ConnectionStrings:ControlPlusDb` se guardan en User Secrets de `ControlPlus.Api`. Los parámetros no sensibles del token se leen de `appsettings.json`.
+
+La API normal valida además la conexión antes de iniciar: fuera del entorno `Testing` solo acepta
+`127.0.0.1:5432/controlplus` con el rol limitado `controlplus_app`, contraseña presente y
+`Include Error Detail` desactivado. Las credenciales de `postgres`, `controlplus_backup` y
+`controlplus_test_admin` quedan rechazadas en el arranque normal; las migraciones autorizadas usan
+sus modos controlados, que terminan antes de construir el servidor HTTP.
 Fuera de `Testing`, la API falla al iniciar si `CONTROLPLUS_MASTER_KEY` falta o no alcanza 32 bytes UTF-8, o si falta `JWT_SIGNING_KEY`. Después de crear el primer administrador, `CONTROLPLUS_MASTER_KEY` debe conservarse en almacenamiento local seguro o rotarse. El endpoint vuelve a comprobar la existencia de usuarios dentro de una transacción serializable con bloqueo asesor y rechaza cualquier reutilización.
 
 La Master Key se compara en tiempo constante. Nunca se registra, se incluye en respuestas ni se reemplaza por un valor predeterminado en archivos versionados.

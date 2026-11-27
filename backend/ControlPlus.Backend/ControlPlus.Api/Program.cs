@@ -119,6 +119,9 @@ if (runningAsService)
 StartupSecurityConfiguration.EnsureRequiredSecrets(
     builder.Configuration,
     builder.Environment.EnvironmentName);
+StartupDatabaseSecurityConfiguration.EnsureLeastPrivilegeConnection(
+    builder.Configuration,
+    builder.Environment.EnvironmentName);
 
 builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
 {

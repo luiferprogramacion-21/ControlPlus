@@ -74,7 +74,7 @@ public sealed class HttpsRedirectionTests
         {
             builder.UseEnvironment(environment);
             builder.UseSetting("ConnectionStrings:ControlPlusDb",
-                "Host=127.0.0.1;Port=1;Database=controlplus_test_https;Username=test;Password=test");
+                "Host=127.0.0.1;Port=5432;Database=controlplus;Username=controlplus_app;Password=https-test-only");
             builder.UseSetting("Installation:MasterKey", new string('m', 32));
             builder.UseSetting("Jwt:Issuer", "controlplus-https-tests");
             builder.UseSetting("Jwt:Audience", "controlplus-https-client");
