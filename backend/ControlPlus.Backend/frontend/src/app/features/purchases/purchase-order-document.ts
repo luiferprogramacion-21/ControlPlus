@@ -23,6 +23,8 @@ export function buildPurchaseOrderHtml(order: Order, supplier: Supplier, operato
   const contact = [supplier.phone, supplier.email, supplier.address].filter(Boolean).map(value => escapeHtml(value!)).join(' · ');
   const totalUnits = order.lines.reduce((sum, line) => sum + line.requestedQuantity, 0);
   const businessName = establishment?.commercialName || 'ControlPlus';
+  // Pedido del usuario del 27/11/2026: «Elaboró» lleva el nombre de quien hizo el pedido.
+  const author = order.createdByName?.trim() || operatorName;
   const businessContact = [establishment?.identification ? `NIT ${establishment.identification}` : null,
     establishment?.phone, establishment?.address].filter(Boolean).map(value => escapeHtml(value!)).join(' · ');
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pedido ${escapeHtml(order.visibleNumber)}</title><style>
@@ -44,7 +46,7 @@ footer { position: fixed; right: 0; bottom: 0; left: 0; color: #718096; font-siz
 <section class="meta"><div class="card"><span class="label">Proveedor</span><b>${escapeHtml(supplier.name)}</b><p>${escapeHtml(supplierDocument(supplier))}${contact ? `<br>${contact}` : ''}</p></div><div class="card"><span class="label">Información del pedido</span><b>${order.lines.length.toLocaleString('es-CO')} producto(s) · ${totalUnits.toLocaleString('es-CO')} unidades</b><p>Estado: Enviado${operatorName ? `<br>Generado por ${escapeHtml(operatorName)}` : ''}</p></div></section>
 <table><thead><tr><th>#</th><th>Producto</th><th class="quantity">Cantidad</th><th>Observación</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="summary"><span>Total de productos <strong>${order.lines.length.toLocaleString('es-CO')}</strong></span><span>Total de unidades <strong>${totalUnits.toLocaleString('es-CO')}</strong></span></div>
-<section class="signatures"><div class="signature">Elaboró</div><div class="signature">Recibido por el proveedor</div></section>
+<section class="signatures"><div class="signature">Elaboró${author ? `: ${escapeHtml(author)}` : ''}</div><div class="signature">Recibido por el proveedor</div></section>
 <footer>Documento generado por ControlPlus · ${escapeHtml(order.visibleNumber)}</footer>
 </body></html>`;
 }

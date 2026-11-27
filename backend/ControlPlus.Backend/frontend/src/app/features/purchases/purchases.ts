@@ -49,7 +49,7 @@ export class Purchases implements OnInit {
   })).filter(group => group.products.length > 0));
   orderReasonId = ''; orderObservation = '';
   orderSupplierId = '';
-  orderLines: { productId: string; productName: string; productCode: string; available: number; selected: boolean; quantity: number }[] = [];
+  orderLines: { productId: string; productName: string; productCode: string; available: number; selected: boolean; quantity: number; minimum?: number }[] = [];
   orderDraft: Order | null = null;
   view: 'orders' | 'receipts' | 'purchases' = 'orders';
   orderSearch = ''; receiptOrderId = '';
@@ -352,7 +352,20 @@ export class Purchases implements OnInit {
     this.purchaseProductSearch = '';
   }
   productCode(id: string): string { return this.products().find(product => product.id === id)?.internalCode ?? ''; }
-  setOrderSupplier(id: string): void { this.orderSupplierId = id; this.orderProductSearch = ''; this.orderSearchNote.set(''); this.orderLines = this.products().filter(p => p.isActive && p.supplierId === id).map(p => ({ productId: p.id, productName: p.name, productCode: p.internalCode, available: p.availableStock, selected: false, quantity: 1 })); }
+  setOrderSupplier(id: string): void {
+    this.orderSupplierId = id; this.orderProductSearch = ''; this.orderSearchNote.set('');
+    const lines = this.products().filter(p => p.isActive && p.supplierId === id).map(p => ({ productId: p.id, productName: p.name, productCode: p.internalCode, available: p.availableStock, selected: false, quantity: 1, minimum: p.minimumStock }));
+    // Pedido del usuario del 27/11/2026: arriba, en naranja, lo que conviene pedir (agotados primero, luego stock bajo).
+    const rank = (line: Purchases['orderLines'][number]) => this.orderNeed(line) === 'Agotado' ? 0 : this.orderNeed(line) ? 1 : 2;
+    this.orderLines = lines.map((line, index) => ({ line, index })).sort((a, b) => rank(a.line) - rank(b.line) || a.index - b.index).map(item => item.line);
+  }
+  /** «Agotado» (no queda disponible) o «Stock bajo» (igual o menos que el mínimo); vacío si no hace falta pedirlo. */
+  orderNeed(line: Purchases['orderLines'][number]): '' | 'Agotado' | 'Stock bajo' {
+    if (line.minimum === undefined) return '';
+    if (line.available <= 0) return 'Agotado';
+    return line.available <= line.minimum ? 'Stock bajo' : '';
+  }
+  orderNeededCount(): number { return this.orderLines.filter(line => this.orderNeed(line)).length; }
   orderValidation(): string { if (!this.orderSupplierId || !this.suppliers().some(s => s.id === this.orderSupplierId && s.isActive)) return 'Selecciona un proveedor activo.'; const lines = this.orderLines.filter(l => l.selected); if (!lines.length || lines.length > 200) return 'Incluye entre 1 y 200 productos.'; if (lines.some(l => !Number.isInteger(l.quantity) || l.quantity <= 0)) return 'Indica cantidades enteras positivas.'; return ''; }
   async saveOrder(): Promise<void> { if (!this.canWriteOrders || this.saving()) return; const issue = this.orderValidation(); if (issue) { this.error.set(issue); return; } this.saving.set(true); this.error.set(''); try { const lines = this.orderLines.filter(l => l.selected).map(l => ({ productId: l.productId, requestedQuantity: l.quantity })); const result = this.orderDraft ? await this.ordersApi.update(this.orderDraft, lines) : await this.ordersApi.create({ supplierId: this.orderSupplierId, lines }); this.selectedOrder.set(result); this.editingOrder.set(false); this.notice.set('Pedido guardado.'); await this.reload(); } catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); } }
   async sendOrder(): Promise<void> { const order = this.selectedOrder(); if (!order || order.status !== 'BORRADOR' || !this.canWriteOrders || this.saving()) return; this.saving.set(true); this.error.set(''); try { const sent = await this.ordersApi.send(order); this.selectedOrder.set(sent); this.notice.set('Pedido enviado. Descargando el PDF…'); await this.reload(); await this.downloadOrderPdf(sent, true); } catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); } }

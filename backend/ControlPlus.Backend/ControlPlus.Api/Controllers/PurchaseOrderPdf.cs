@@ -105,7 +105,8 @@ public static class PurchaseOrderPdf
         const double signatureWidth = 200;
         doc.Line(Margin, doc.Y, Margin + signatureWidth, Gray);
         doc.Line(Right - signatureWidth, doc.Y, Right, Gray);
-        doc.Text(Margin, doc.Y - 12, "Elaboró", 9, color: Gray);
+        var author = string.IsNullOrWhiteSpace(order.CreatedByName) ? "Elaboró" : $"Elaboró: {order.CreatedByName.Trim()}";
+        doc.Text(Margin, doc.Y - 12, Fit(author, 9, signatureWidth), 9, color: Gray);
         doc.Text(Right - signatureWidth, doc.Y - 12, "Recibido por el proveedor", 9, color: Gray);
         return doc.ToPdf();
     }

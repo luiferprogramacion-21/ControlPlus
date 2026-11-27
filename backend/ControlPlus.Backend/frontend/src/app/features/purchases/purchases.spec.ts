@@ -239,6 +239,21 @@ describe('Purchases: buscar el producto escribiendo o con el lector (pruebas del
     expect(component.productCode('p2')).toBe('PAP-000007');
   });
 
+  it('al armar el pedido pone arriba, en naranja, los agotados y los de stock bajo (27/11/2026)', () => {
+    const component = build();
+    component.products.set([
+      { id: 'ok', name: 'Abanico', internalCode: 'HOG-1', barcode: null, supplierId: 's1', isActive: true, availableStock: 30, minimumStock: 5 },
+      { id: 'low', name: 'Balde', internalCode: 'HOG-2', barcode: null, supplierId: 's1', isActive: true, availableStock: 3, minimumStock: 5 },
+      { id: 'out', name: 'Cepillo', internalCode: 'HOG-3', barcode: null, supplierId: 's1', isActive: true, availableStock: 0, minimumStock: 2 },
+      { id: 'edge', name: 'Dulcera', internalCode: 'HOG-4', barcode: null, supplierId: 's1', isActive: true, availableStock: 5, minimumStock: 5 },
+    ] as never);
+    component.setOrderSupplier('s1');
+    expect(component.orderLines.map(line => line.productId)).toEqual(['out', 'low', 'edge', 'ok']);
+    expect(component.orderLines.map(line => component.orderNeed(line))).toEqual(['Agotado', 'Stock bajo', 'Stock bajo', '']);
+    expect(component.orderNeededCount()).toBe(3);
+    expect(component.orderLines.every(line => !line.selected)).toBe(true);
+  });
+
   it('«Pedir» desde Catálogo abre el pedido con el proveedor y el producto incluido (maqueta 11)', async () => {
     const component = build();
     vi.spyOn(component, 'newOrder').mockResolvedValue();

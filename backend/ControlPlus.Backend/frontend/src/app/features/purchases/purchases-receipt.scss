@@ -34,3 +34,8 @@
 /* Pruebas del usuario del 26/11/2026: buscar el producto escribiendo o con el lector, en la compra y en el pedido. */
 .product-search { display: grid; gap: 4px; margin: 12px 0; }
 .product-search__field { display: block; width: 100%; }
+
+/* Pedido del usuario del 27/11/2026: al armar el pedido, arriba y en naranja lo que conviene pedir. */
+.order-line--needed > td { background: var(--cp-warning-soft); }
+.status-pill.order-need { margin-left: 8px; border: 1px solid var(--cp-warning); background: var(--cp-surface); color: var(--cp-warning); }
+.order-needed-note { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--cp-warning-soft); color: var(--cp-warning); font-weight: 600; }

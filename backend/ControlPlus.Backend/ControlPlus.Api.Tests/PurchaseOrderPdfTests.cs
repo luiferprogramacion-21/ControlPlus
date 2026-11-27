@@ -15,7 +15,7 @@ public sealed class PurchaseOrderPdfTests
         new DateTime(2026, 11, 23, 16, 30, 0, DateTimeKind.Utc), null,
         Enumerable.Range(1, lines).Select(i => new PurchaseOrderLineDto(Guid.CreateVersion7(), Guid.CreateVersion7(),
             $"BIS-{i:000000}", $"Producto número {i}", 1_000 + i, 0, 1_000 + i, 0, 0, null,
-            i == 1 ? "Empacar por docena" : null, 0, 0, 0, "MANUAL")).ToArray(), null, null, null, null, null);
+            i == 1 ? "Empacar por docena" : null, 0, 0, 0, "MANUAL")).ToArray(), null, null, null, null, null, "Ana Gómez");
 
     private static readonly SupplierDto Supplier = new(Guid.CreateVersion7(), "NIT", "900123456-7", "Distribuidora La Ejemplar",
         "3001234567", "Calle 10 # 5-20", "ventas@distribuidora.example", null, true, 1);
@@ -44,6 +44,8 @@ public sealed class PurchaseOrderPdfTests
         Assert.True(pdf.Split("(Cantidad) Tj").Length - 1 >= 3);
         // Sin datos del establecimiento el PDF dice ControlPlus; con datos usa el nombre configurado (27/11/2026).
         Assert.Contains("ControlPlus · Pedido PED-CP-2026-01-6", pdf);
+        // Pedido del usuario del 27/11/2026: «Elaboró» lleva el nombre de quien hizo el pedido.
+        Assert.Contains("Elaboró: Ana Gómez", pdf);
     }
 
     [Fact]

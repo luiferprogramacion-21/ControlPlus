@@ -484,7 +484,7 @@ public sealed class PurchaseOrderService(IPurchaseOrderRepository repository, IU
                 x.StockDisponibleOrigen, x.StockMinimoOrigen, x.PendienteOtrosPedidos,
                 x.OrigenNecesidad, x.Producto?.CostoPromedio)).ToArray(), order.FechaCancelacion,
         order.MotivoCierreId, order.MotivoCancelacionId,
-        order.AutorizacionCierreId, order.AutorizacionCancelacionId);
+        order.AutorizacionCierreId, order.AutorizacionCancelacionId, order.UsuarioCreacion?.NombreCompleto);
 
     private static Result<T> Denied<T>() => Result.Failure<T>(ApplicationError.Forbidden());
     private static Result<T> Invalid<T>(string message) => Result.Failure<T>(ApplicationError.Validation(message));

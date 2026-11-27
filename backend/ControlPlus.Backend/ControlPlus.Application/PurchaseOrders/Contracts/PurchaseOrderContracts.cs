@@ -59,7 +59,9 @@ public sealed record PurchaseOrderDto(Guid Id, Guid SupplierId, string Status, s
     DateTime CreatedAt, DateTime? SentAt, DateTime? ClosedAt,
     IReadOnlyCollection<PurchaseOrderLineDto> Lines, DateTime? CanceledAt,
     Guid? CloseReasonId, Guid? CancelReasonId, Guid? CloseAuthorizationId,
-    Guid? CancelAuthorizationId);
+    Guid? CancelAuthorizationId,
+    // Nombre de quien hizo el pedido (pedido del usuario del 27/11/2026); va en «Elaboró» del documento.
+    string? CreatedByName = null);
 
 public sealed record PurchaseOrderLineSummaryDto(string ProductCode, string ProductName,
     int RequestedQuantity, int ReceivedQuantity);

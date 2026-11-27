@@ -67,6 +67,7 @@ public sealed class EfPurchaseOrderRepository(OfficialControlPlusDbContext db) :
     // Auditoría del 23/11/2026: el detalle trae el producto de cada línea para proponer su costo actual al recibir.
     public Task<PedidoCompra?> GetAsync(Guid id, CancellationToken ct = default) =>
         db.PedidoCompra.AsNoTracking().Include(x => x.DetallePedidoCompra).ThenInclude(x => x.Producto)
+            .Include(x => x.UsuarioCreacion)
             .SingleOrDefaultAsync(x => x.Id == id, ct);
 
     public async Task<PagedResult<PedidoCompra>> ListAsync(Guid installationId,

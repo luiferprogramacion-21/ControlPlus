@@ -16,4 +16,10 @@ describe('purchase order document', () => {
     expect(html).toContain('@page { size: A4 portrait;');
     expect(html).not.toContain('Resma <carta>');
   });
+
+  it('«Elaboró» lleva el nombre de quien hizo el pedido (27/11/2026)', () => {
+    const html = buildPurchaseOrderHtml({ ...order, createdByName: 'Carlos <Ruiz>' }, supplier, 'Ana Gómez');
+    expect(html).toContain('Elaboró: Carlos &lt;Ruiz&gt;');
+    expect(buildPurchaseOrderHtml(order, supplier, 'Ana Gómez')).toContain('Elaboró: Ana Gómez');
+  });
 });

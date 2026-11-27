@@ -434,6 +434,7 @@ Arriba hay un botón para cada cosa:
 - **Nuevo pedido al proveedor**: vas a pedirle mercancía a un proveedor.
 
 - **Pedir mercancía:** **Nuevo pedido al proveedor** → elige el proveedor, marca **Incluir** en los productos y escribe su cantidad → **Guardar**.
+  Al elegir el proveedor, **arriba y en naranja** salen sus productos **agotados** o con **stock bajo** (con su mínimo): son los que conviene pedir. Márcalos con **Incluir** y escribe la cantidad.
   En **Buscar producto** escribe el nombre o la referencia, o pasa el lector: la lista muestra solo lo que coincide. Con **Enter** el producto queda incluido; si ya lo estaba, suma uno a la cantidad. Si el producto es de otro proveedor, el aviso lo dice.
 - **Pedir algo que aún no está en el sistema:** en el mismo pedido pulsa **+ Producto nuevo**, escribe el nombre, elige la categoría y la cantidad y pulsa **Agregar al pedido**. Queda creado en Catálogo con ese proveedor. El **precio de venta es opcional**: si aún no lo sabes, déjalo vacío. Mientras no tenga precio se ve como **Sin precio** y **no se puede vender**; el Administrador se lo pone al recibir la mercancía o en Catálogo.
 - **Cuando llega mercancía:** pulsa **Recibir un pedido** o **Compra sin pedido**. Desde Inicio, **Recibir mercancía** te pregunta si viene de un pedido. Los pasos se ven arriba de cada ventana: **1. ¿De dónde viene?**, **2. Productos y cantidades** y **3. Confirmar**.
@@ -450,7 +451,7 @@ Arriba hay un botón para cada cosa:
     Si llegó un producto que **aún no está en el sistema**, pulsa **+ Producto nuevo (no está en el sistema)** (aparece después de elegir el proveedor): escribe el nombre, la categoría, cuántas llegaron, el costo por unidad y el **precio de venta** (aquí es obligatorio, porque la mercancía ya llegó) y pulsa **Agregar a la compra**. Queda creado en Catálogo con ese proveedor y su propio código de barras, y sus existencias se suman al confirmar la compra.
 
   Lo recibido entra al inventario y actualiza el costo.
-- **Al enviar un pedido** se descarga solo su **PDF** para mandarlo al proveedor. En el pedido puedes volver a pulsar **Descargar PDF** o **Imprimir documento**.
+- **Al enviar un pedido** se descarga solo su **PDF** para mandarlo al proveedor. Lleva el nombre del establecimiento y, en **Elaboró**, el nombre de quien hizo el pedido. En el pedido puedes volver a pulsar **Descargar PDF** o **Imprimir documento**.
 - En **Mercancía recibida**, cada pedido muestra **Recibir mercancía** (en azul) solo si todavía falta algo por recibir, y **Ver recepciones** si ya llegó algo.
 - **Si algo se recibió mal:** en **Mercancía recibida**, en el pedido, pulsa **Ver recepciones**; abre la entrega con **Ver detalle** y pulsa **Corregir recepción**. Te muestra cómo queda el pedido, eliges el motivo y pides la **autorización del Administrador**. Las unidades salen del inventario y vuelven a quedar pendientes en el pedido. Si esos productos ya se vendieron o se ajustaron después, la pantalla explica por qué no se puede deshacer.
 - **Proveedor nuevo en una compra sin pedido:** pulsa **+ Proveedor nuevo**, escribe el nombre (NIT y teléfono son opcionales) y **Crear proveedor**; se pide la **autorización del Administrador** (su carné, o su usuario y contraseña) y el proveedor queda elegido para la compra.

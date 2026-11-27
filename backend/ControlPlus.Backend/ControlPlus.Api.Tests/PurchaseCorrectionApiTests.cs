@@ -61,7 +61,10 @@ public sealed partial class PurchasesApiFlowTests
         {
             Assert.Equal(HttpStatusCode.OK, pdf.StatusCode);
             Assert.Equal("application/pdf", pdf.Content.Headers.ContentType?.MediaType);
-            Assert.StartsWith("%PDF-1.4", System.Text.Encoding.Latin1.GetString(await pdf.Content.ReadAsByteArrayAsync()));
+            var pdfText = System.Text.Encoding.Latin1.GetString(await pdf.Content.ReadAsByteArrayAsync());
+            Assert.StartsWith("%PDF-1.4", pdfText);
+            // Pedido del usuario del 27/11/2026: «Elaboró» lleva el nombre de quien hizo el pedido.
+            Assert.Contains("Elaboró: ", pdfText);
             Assert.StartsWith("pedido-", pdf.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
         }
         var preparation = await ReadAsync<PurchaseCorrectionPreparationDto>(await client.GetAsync(
