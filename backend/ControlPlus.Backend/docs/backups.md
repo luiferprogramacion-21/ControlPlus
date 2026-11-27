@@ -94,7 +94,7 @@ No aplica migraciones ni toca las copias de respaldo. Si falla antes del cambio 
 
 - Revise en ControlPlus las últimas ventas, la caja y el inventario. Lo registrado después de la copia hay que volver a cargarlo a mano (por ejemplo, con los tiquetes impresos).
 - Cree un respaldo manual en «Soporte y continuidad».
-- Cuando todo esté confirmado, borre la base anterior desde psql como `postgres`: `DROP DATABASE controlplus_anterior_<fecha>;`. Para volver atrás antes de borrarla: detenga el servicio y cambie los nombres al revés con `ALTER DATABASE ... RENAME TO ...`.
+- Cuando todo esté confirmado, borre la base anterior con `scripts/maintenance/Remove-PreviousDatabase.ps1 -DatabaseName controlplus_anterior_<fecha>` (desde el 27 de noviembre de 2026). El script solo acepta ese tipo de nombre, comprueba que nadie esté conectado, guarda un respaldo `pg_dump` verificado con `pg_restore --list` y su SHA-256 en `%USERPROFILE%\ControlPlus-Backups\PreviousDatabase-<fecha>-<id>`, pide escribir `BORRAR` y termina con `PREVIOUS_DATABASE_DROP_OK`. No toca `controlplus` ni detiene el servicio. Para volver atrás antes de borrarla: detenga el servicio y cambie los nombres al revés con `ALTER DATABASE ... RENAME TO ...`.
 
 ### Equipo nuevo
 

@@ -1,0 +1,85 @@
+# Dependabot (decisión del 16/11/2026: después de la entrega; activado a pedido del usuario el 27/11/2026).
+# Revisa cada lunes las dependencias y abre solicitudes de cambio (PR) agrupadas. Nunca se fusionan solas:
+# se revisan, deben pasar el CI y se instalan solo desde main, como cualquier cambio (ver AGENTS.md).
+# Los saltos de versión mayor (.NET 11, Angular 23, etc.) se ignoran: se hacen a mano, con pruebas completas.
+version: 2
+updates:
+  # Backend .NET: un directorio por proyecto (la solución usa .slnx y no hay paquetes centralizados).
+  - package-ecosystem: "nuget"
+    directories:
+      - "/backend/ControlPlus.Backend/ControlPlus.Api"
+      - "/backend/ControlPlus.Backend/ControlPlus.Application"
+      - "/backend/ControlPlus.Backend/ControlPlus.Domain"
+      - "/backend/ControlPlus.Backend/ControlPlus.Infrastructure"
+      - "/backend/ControlPlus.Backend/ControlPlus.Api.Tests"
+      - "/backend/ControlPlus.Backend/ControlPlus.Domain.Tests"
+      - "/backend/ControlPlus.Backend/ControlPlus.Infrastructure.Tests"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Bogota"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(backend)"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      backend:
+        update-types: ["minor", "patch"]
+
+  # Pantalla Angular: la familia Angular se actualiza junta (sus versiones deben coincidir).
+  - package-ecosystem: "npm"
+    directory: "/backend/ControlPlus.Backend/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Bogota"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(frontend)"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      angular:
+        patterns: ["@angular/*", "@angular-devkit/*", "@schematics/angular"]
+        update-types: ["minor", "patch"]
+      frontend:
+        exclude-patterns: ["@angular/*", "@angular-devkit/*", "@schematics/angular"]
+        update-types: ["minor", "patch"]
+
+  # Pruebas de navegador (Playwright).
+  - package-ecosystem: "npm"
+    directory: "/backend/ControlPlus.Backend/e2e"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Bogota"
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "deps(e2e)"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      e2e:
+        update-types: ["minor", "patch"]
+
+  # Acciones del CI (.github/workflows).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Bogota"
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "deps(ci)"
+    groups:
+      actions:
+        patterns: ["*"]
