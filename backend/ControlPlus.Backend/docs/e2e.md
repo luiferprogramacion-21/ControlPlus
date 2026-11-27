@@ -49,6 +49,8 @@ Si una prueba falla, el CI guarda el artefacto `e2e-evidencia` durante 7 días: 
 
 El 26 de noviembre de 2026 los tres recorridos pasaron también en Windows (**3/3**) con Chrome instalado, contra un PostgreSQL 18 y una API aislados en directorios y puertos temporales. Se comprobó el cierre de ambos procesos y la eliminación del entorno. En esta ejecución local se desactivó el video porque faltaba el FFmpeg de la versión instalada de Playwright; el CI conserva su configuración habitual.
 
+La ampliación a **11/11 recorridos** quedó confirmada el 26 de noviembre de 2026 en el commit `84d688b`, ejecución de GitHub Actions `45927450502`. Los cuatro trabajos terminaron correctamente: backend sin base, frontend, backend con PostgreSQL 18 y navegador con Chromium. Durante la estabilización, las ejecuciones `45920675221`, `45922455412`, `45924246005` y `45925651860` permitieron corregir exclusivamente la preparación de pruebas: costo inicial nulo para el producto sin existencias, selectores no ambiguos, reinicios sin colisiones, reutilización de sesión frente al límite de accesos, claves de idempotencia únicas y creación explícita de la línea de compra. No se accedió a la base `controlplus`.
+
 ## Correrlas en otra máquina
 
 Solo contra una base de pruebas, nunca contra `controlplus`. Con la API publicada sirviendo la pantalla y una base `controlplus_e2e_*` preparada con el programa anterior:
