@@ -21,6 +21,19 @@ Decisión del 16 de noviembre de 2026: pruebas de extremo a extremo del flujo pr
 
 `e2e/tests/zz-cash-correction.spec.ts` comprueba la corrección de un ingreso manual en Caja. Si el turno está cerrado, lo abre; registra $40, usa «Corregir un error de caja» para dejar $20 y verifica en la API que el efectivo esperado solo aumenta $20. También comprueba que el ingreso original, el reverso y el reemplazo permanecen vinculados en el historial. El nombre del archivo lo sitúa después de los dos recorridos anteriores cuando se ejecuta la suite completa.
 
+`e2e/tests/secondary-flows.spec.ts` (26 de noviembre de 2026) añade ocho recorridos secundarios y de rechazo. Los datos repetitivos se preparan por API en la base descartable; la operación que se acredita se realiza siempre en el navegador:
+
+1. rechazar una contraseña incorrecta y permitir después el ingreso con la vigente;
+2. separar correctamente los filtros **Stock bajo** y **Agotados**;
+3. impedir que un producto agotado entre al carrito;
+4. poner una venta en espera, retomarla y conservar su producto;
+5. cobrar una venta con efectivo y transferencia, sin exigir referencia electrónica;
+6. rechazar un gasto superior al efectivo sin cambiar el arqueo;
+7. crear un proveedor dentro de una compra sin pedido y guardar el borrador;
+8. crear un apartado, registrar su pago inicial y comprobar la reserva de inventario.
+
+La suite queda formada por **11 recorridos**. Continúa usando un solo trabajador porque varios escenarios ejercitan la misma instalación y caja descartables en un orden conocido; cada comprobación conserva aserciones propias para que un fallo indique la operación concreta.
+
 ## Cómo corren en el CI
 
 El trabajo «Pruebas de navegador (flujo principal)» de `.github/workflows/ci.yml`:
