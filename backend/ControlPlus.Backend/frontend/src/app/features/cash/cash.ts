@@ -19,7 +19,7 @@ import { CashCorrections } from './cash-corrections';
   selector: 'cp-cash',
   imports: [CashCorrections, NumberInput, FormsModule, CurrencyPipe, DatePipe, MatButtonModule],
   templateUrl: './cash.html',
-  styleUrl: './cash.scss',
+  styleUrls: ['./cash.scss', './cash-panels.scss'],
 })
 export class Cash implements OnInit {
   readonly readableCode = readableCode;

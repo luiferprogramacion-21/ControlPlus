@@ -32,7 +32,7 @@ const DRAFT_DELAY_MS = 1200;
 const PRINT_WATCH_INTERVAL_MS = 1500;
 const PRINT_WATCH_ATTEMPTS = 20;
 
-@Component({ selector: 'cp-sales', imports: [WindowSheet, NumberInput, DecimalPipe, A11yModule, FormsModule, CurrencyPipe, DatePipe, MatButtonModule, RouterLink, CustomerPicker, DiscountDialog], templateUrl: './sales.html', styleUrl: './sales.scss' })
+@Component({ selector: 'cp-sales', imports: [WindowSheet, NumberInput, DecimalPipe, A11yModule, FormsModule, CurrencyPipe, DatePipe, MatButtonModule, RouterLink, CustomerPicker, DiscountDialog], templateUrl: './sales.html', styleUrls: ['./sales.scss', './sales-checkout.scss'] })
 export class Sales implements OnInit, OnDestroy {
   private readonly catalog = inject(CatalogApi);
   private readonly cash = inject(CashApi);

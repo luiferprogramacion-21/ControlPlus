@@ -135,8 +135,12 @@ Requisitos iniciales pendientes de medición:
 
 - Clasificación: eficiencia y mantenibilidad, ISO/IEC 25010:2023.
 - Evidencia: `cash.scss` supera el presupuesto por 356 bytes y `sales.scss` por 856 bytes.
-- Estado: abierto. No se aumenta el presupuesto ni se cambia la apariencia para ocultar la advertencia;
-  la corrección debe conservar el prototipo y verificarse visualmente.
+- Corrección (27 de noviembre de 2026): cada hoja se dividió en dos archivos que el componente carga en el mismo
+  orden (`cash.scss` + `cash-panels.scss`, `sales.scss` + `sales-checkout.scss`), cortando entre reglas completas.
+  Se comprobó que las dos partes juntas son idénticas al archivo anterior, así que la apariencia no cambia; no se
+  aumentó el presupuesto.
+- Validación: build de producción sin advertencias de presupuesto y Angular 860/860.
+- Estado: corregido y validado localmente.
 
 ### ISO-AUD-007 Vite vulnerable en la cadena de desarrollo
 
