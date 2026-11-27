@@ -238,6 +238,8 @@ jobs:
       - name: Iniciar la API
         working-directory: ${{ runner.temp }}/api
         env:
+          # La base y el usuario de este trabajo son descartables; activa únicamente las excepciones de pruebas.
+          ASPNETCORE_ENVIRONMENT: Testing
           ASPNETCORE_URLS: http://127.0.0.1:5000
           # Las pruebas de navegador inician sesión muchas veces seguidas desde la misma dirección; en la tienda siguen siendo 10.
           RateLimiting__LoginPerMinute: '200'
