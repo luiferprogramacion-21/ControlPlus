@@ -424,7 +424,8 @@ Arriba hay un botón para cada cosa:
 - **Compra sin pedido**: llegó mercancía que no estaba pedida (compraste en el momento).
 - **Nuevo pedido al proveedor**: vas a pedirle mercancía a un proveedor.
 
-- **Pedir mercancía:** **Nuevo pedido al proveedor** → elige el proveedor, agrega productos con su cantidad → **Crear pedido**.
+- **Pedir mercancía:** **Nuevo pedido al proveedor** → elige el proveedor, marca **Incluir** en los productos y escribe su cantidad → **Guardar**.
+  En **Buscar producto** escribe el nombre o la referencia, o pasa el lector: la lista muestra solo lo que coincide. Con **Enter** el producto queda incluido; si ya lo estaba, suma uno a la cantidad. Si el producto es de otro proveedor, el aviso lo dice.
 - **Pedir algo que aún no está en el sistema:** en el mismo pedido pulsa **+ Producto nuevo**, escribe el nombre, elige la categoría y la cantidad y pulsa **Agregar al pedido**. Queda creado en Catálogo con ese proveedor. El **precio de venta es opcional**: si aún no lo sabes, déjalo vacío. Mientras no tenga precio se ve como **Sin precio** y **no se puede vender**; el Administrador se lo pone al recibir la mercancía o en Catálogo.
 - **Cuando llega mercancía:** pulsa **Recibir un pedido** o **Compra sin pedido**. Desde Inicio, **Recibir mercancía** te pregunta si viene de un pedido. Los pasos se ven arriba de cada ventana: **1. ¿De dónde viene?**, **2. Productos y cantidades** y **3. Confirmar**.
   - **Recibir un pedido:** eliges el pedido; las cantidades pendientes **vienen listas**. Si llegó menos (recepción **parcial**), corrígelas.
@@ -436,6 +437,7 @@ Arriba hay un botón para cada cosa:
     Abajo se ve cuántos productos y unidades recibes, el total y cuántos precios cambian.
     Un producto **Sin precio** (creado desde un pedido) dice **Escribe su precio**: hay que ponerle el precio de venta y su costo para recibirlo. Desde ese momento ya se puede vender.
   - **Compra sin pedido:** anotas el proveedor, el número de factura, los productos y sus costos.
+    Los productos se agregan en **Agregar producto**: escribe el nombre o la referencia, o pasa el lector, y elige el producto (con **Enter** se agrega el primero de la lista). Si pasas otra vez el mismo producto, suma uno a su cantidad. El costo viene con el actual: corrígelo si cambió.
     Si llegó un producto que **aún no está en el sistema**, pulsa **+ Producto nuevo (no está en el sistema)** (aparece después de elegir el proveedor): escribe el nombre, la categoría, cuántas llegaron, el costo por unidad y el **precio de venta** (aquí es obligatorio, porque la mercancía ya llegó) y pulsa **Agregar a la compra**. Queda creado en Catálogo con ese proveedor y su propio código de barras, y sus existencias se suman al confirmar la compra.
 
   Lo recibido entra al inventario y actualiza el costo.

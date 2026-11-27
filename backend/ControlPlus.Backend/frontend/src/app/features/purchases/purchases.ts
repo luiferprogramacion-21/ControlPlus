@@ -10,7 +10,7 @@ import { Icon } from '../../layout/icon';
 import { CatalogApi, Category, Product } from '../catalog/catalog-api';
 import { Supplier, SuppliersApi } from '../suppliers/suppliers-api';
 import { Order, OrderReason, OrderSummary, OrdersApi, ReceiptLine } from './orders-api';
-import { CancellationReason, Purchase, PurchaseCorrectionPreparation, PurchaseInput, PurchaseLineInput, PurchaseSummary, PurchasesApi } from './purchases-api';
+import { CancellationReason, Purchase, PurchaseCorrectionPreparation, PurchaseInput, PurchaseSummary, PurchasesApi } from './purchases-api';
 import { AuthorizationCredentials, AuthorizationDialog, authorizationBody } from '../../shared/authorization-dialog';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PurchaseOrderDocumentPrinter } from './purchase-order-document';
@@ -18,6 +18,7 @@ import { profitPercentOf, suggestedPrice } from '../../shared/price-calculator';
 import { toastSignal } from '../../core/toast';
 import { WindowSheet } from '../../shared/window-sheet';
 import { InputFormat } from '../../shared/input-format';
+import { foldText, SuggestField, SuggestOption } from '../../shared/suggest-field';
 
 export function currentColombiaDate(now = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -26,7 +27,7 @@ export function currentColombiaDate(now = new Date()): string {
   const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
   return `${value['year']}-${value['month']}-${value['day']}`;
 }
-@Component({ selector: 'cp-purchases', imports: [WindowSheet, NumberInput, InputFormat, CommonModule, FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './purchases.html', styleUrls: ['../directory.scss', './purchases.scss', './purchases-receipt.scss'] })
+@Component({ selector: 'cp-purchases', imports: [WindowSheet, NumberInput, InputFormat, SuggestField, CommonModule, FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './purchases.html', styleUrls: ['../directory.scss', './purchases.scss', './purchases-receipt.scss'] })
 export class Purchases implements OnInit {
   private readonly api = inject(PurchasesApi); private readonly ordersApi = inject(OrdersApi); private readonly suppliersApi = inject(SuppliersApi); private readonly catalog = inject(CatalogApi);
   private readonly authorization = inject(AuthorizationDialog);
@@ -287,7 +288,58 @@ export class Purchases implements OnInit {
     } catch (e) { this.error.set(reasonOr(e, 'No se pudo crear el producto nuevo. Revisa los datos e inténtalo de nuevo.')); }
     finally { this.saving.set(false); }
   }
-  setOrderSupplier(id: string): void { this.orderSupplierId = id; this.orderLines = this.products().filter(p => p.isActive && p.supplierId === id).map(p => ({ productId: p.id, productName: p.name, productCode: p.internalCode, available: p.availableStock, selected: false, quantity: 1 })); }
+  /**
+   * Pruebas del usuario del 26/11/2026: en el pedido se busca el producto escribiendo o con el lector. La lista se filtra
+   * mientras se escribe; con Enter se incluye el producto (si ya estaba incluido, suma uno a la cantidad).
+   */
+  orderProductSearch = '';
+  readonly orderSearchNote = signal('');
+  visibleOrderLines(): Purchases['orderLines'] {
+    const words = foldText(this.orderProductSearch).split(/\s+/).filter(Boolean);
+    if (!words.length) return this.orderLines;
+    return this.orderLines.filter(line => { const text = this.productSearchText(line.productId, line.productName, line.productCode); return words.every(word => text.includes(word)); });
+  }
+  pickOrderProduct(): void {
+    const term = foldText(this.orderProductSearch);
+    if (!term) return;
+    const visible = this.visibleOrderLines();
+    const line = visible.find(item => this.productKeys(item.productId, item.productCode).includes(term)) ?? (visible.length === 1 ? visible[0] : undefined);
+    if (!line) {
+      const other = this.products().find(product => this.productKeys(product.id, product.internalCode).includes(term));
+      this.orderSearchNote.set(other
+        ? `${other.name} no está asignado a este proveedor. Cámbiale el proveedor en Catálogo o pídelo a su proveedor.`
+        : visible.length ? 'Hay varios productos con eso: elige el tuyo en la lista y marca «Incluir».' : `No hay productos de este proveedor con «${this.orderProductSearch.trim()}».`);
+      return;
+    }
+    if (line.selected) line.quantity = (Number(line.quantity) || 0) + 1; else line.selected = true;
+    this.orderSearchNote.set(`Incluido: ${line.productName} · cantidad ${groupedNumber(line.quantity)}.`);
+    this.orderProductSearch = '';
+  }
+  /** Nombre, referencia y código de barras sin tildes, para buscar. */
+  private productSearchText(productId: string, name: string, code: string): string {
+    return foldText(`${name} ${code} ${this.products().find(product => product.id === productId)?.barcode ?? ''}`);
+  }
+  /** Referencia y código de barras exactos (lo que manda el lector). */
+  private productKeys(productId: string, code: string): string[] {
+    const barcode = this.products().find(product => product.id === productId)?.barcode;
+    return [code, barcode].filter((key): key is string => !!key).map(foldText);
+  }
+  /** Pruebas del usuario del 26/11/2026: en la compra sin pedido el producto se busca escribiendo o con el lector. */
+  purchaseProductSearch = '';
+  readonly purchaseProductOptions = computed<SuggestOption[]>(() => this.products().filter(product => product.isActive)
+    .map(product => ({ value: product.id, text: `${product.name} · ${product.internalCode}`, hint: product.barcode ?? undefined,
+      keys: [product.internalCode, product.barcode].filter((key): key is string => !!key) })));
+  /** Agrega el producto como línea; si ya está en la compra, suma uno a la cantidad. El costo viene con el actual. */
+  pickPurchaseProduct(productId: string): void {
+    if (!productId) return;
+    const product = this.products().find(item => item.id === productId);
+    const existing = this.form.lines.find(line => line.productId === productId);
+    if (existing) existing.quantity = (Number(existing.quantity) || 0) + 1;
+    else this.form.lines = [...this.form.lines, { productId, quantity: 1, unitCost: product?.averageCost ?? 0, vatPercentage: null, newRetailPrice: null }];
+    this.purchaseProductSearch = '';
+  }
+  productCode(id: string): string { return this.products().find(product => product.id === id)?.internalCode ?? ''; }
+  setOrderSupplier(id: string): void { this.orderSupplierId = id; this.orderProductSearch = ''; this.orderSearchNote.set(''); this.orderLines = this.products().filter(p => p.isActive && p.supplierId === id).map(p => ({ productId: p.id, productName: p.name, productCode: p.internalCode, available: p.availableStock, selected: false, quantity: 1 })); }
   orderValidation(): string { if (!this.orderSupplierId || !this.suppliers().some(s => s.id === this.orderSupplierId && s.isActive)) return 'Selecciona un proveedor activo.'; const lines = this.orderLines.filter(l => l.selected); if (!lines.length || lines.length > 200) return 'Incluye entre 1 y 200 productos.'; if (lines.some(l => !Number.isInteger(l.quantity) || l.quantity <= 0)) return 'Indica cantidades enteras positivas.'; return ''; }
   async saveOrder(): Promise<void> { if (!this.canWriteOrders || this.saving()) return; const issue = this.orderValidation(); if (issue) { this.error.set(issue); return; } this.saving.set(true); this.error.set(''); try { const lines = this.orderLines.filter(l => l.selected).map(l => ({ productId: l.productId, requestedQuantity: l.quantity })); const result = this.orderDraft ? await this.ordersApi.update(this.orderDraft, lines) : await this.ordersApi.create({ supplierId: this.orderSupplierId, lines }); this.selectedOrder.set(result); this.editingOrder.set(false); this.notice.set('Pedido guardado.'); await this.reload(); } catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); } }
   async sendOrder(): Promise<void> { const order = this.selectedOrder(); if (!order || order.status !== 'BORRADOR' || !this.canWriteOrders || this.saving()) return; this.saving.set(true); this.error.set(''); try { const sent = await this.ordersApi.send(order); this.selectedOrder.set(sent); this.notice.set('Pedido enviado. Descargando el PDF…'); await this.reload(); await this.downloadOrderPdf(sent, true); } catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); } }
@@ -307,9 +359,6 @@ export class Purchases implements OnInit {
   async newPurchase(): Promise<void> { if (!this.canReceive) return; this.selectedPurchase.set(null); this.form = this.empty(); this.editing.set(true); await this.loadProducts(); }
   async editPurchase(p: Purchase): Promise<void> { if (!this.canReceive || p.status !== 'BORRADOR') return; this.form = { supplierId: p.supplierId, supplierDocumentNumber: p.supplierDocumentNumber, invoiceDate: p.invoiceDate, vatMode: 'NO_DISCRIMINADO', lines: p.lines.map(l => ({ productId: l.productId, quantity: l.quantity, unitCost: l.unitCost, vatPercentage: null, newRetailPrice: l.newRetailPrice })) }; this.editing.set(true); await this.loadProducts(); }
   private async loadProducts(): Promise<void> { try { const all: Product[] = []; let page = 1, total = 1; do { const result = await this.catalog.products({ includeOutOfStock: true, page, pageSize: 100 }); all.push(...result.items); total = result.totalPages; page++; } while (page <= total); this.products.set(all); } catch (e) { this.error.set(errorText(e)); } }
-  addLine(): void { this.form.lines.push({ productId: '', quantity: 1, unitCost: 0, vatPercentage: null, newRetailPrice: null }); }
-  /** El precio nuevo es opcional: en blanco, el precio de venta del producto no cambia. */
-  selectPurchaseProduct(line: PurchaseLineInput, productId: string): void { line.productId = productId; line.newRetailPrice = null; }
   /** Porcentaje de ganancia escrito en la calculadora, por producto (no viaja al servidor). */
   profit: Record<string, number | null> = {};
   /** Costo con el que se comparó cada línea al empezar la recepción, para avisar si subió o bajó. */

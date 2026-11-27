@@ -30,3 +30,7 @@
 .receipt-summary strong { color: var(--cp-text); }
 @container cp (max-width: 900px) { .receipt-card { grid-template-columns: 1fr 1fr; } }
 @container cp (max-width: 560px) { .receipt-card { grid-template-columns: 1fr; } }
+
+/* Pruebas del usuario del 26/11/2026: buscar el producto escribiendo o con el lector, en la compra y en el pedido. */
+.product-search { display: grid; gap: 4px; margin: 12px 0; }
+.product-search__field { display: block; width: 100%; }

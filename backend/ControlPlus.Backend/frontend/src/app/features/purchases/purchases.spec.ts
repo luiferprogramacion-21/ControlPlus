@@ -1,3 +1,4 @@
+import { suggestMatches } from '../../shared/suggest-field';
 import { TestBed } from '@angular/core/testing';
 import { currentColombiaDate, Purchases } from './purchases';
 import { PurchasesApi } from './purchases-api';
@@ -202,5 +203,63 @@ describe('Purchases: producto nuevo en la compra sin pedido (pruebas del 26/11/2
     expect(component.canCreatePurchaseProduct).toBe(false);
     await component.startPurchaseProduct();
     expect(component.newPurchaseProduct()).toBeNull();
+  });
+});
+
+describe('Purchases: buscar el producto escribiendo o con el lector (pruebas del 26/11/2026)', () => {
+  function build(): Purchases {
+    TestBed.configureTestingModule({ providers: [
+      { provide: PurchasesApi, useValue: {} }, { provide: OrdersApi, useValue: {} }, { provide: AuthorizationDialog, useValue: {} },
+      { provide: SuppliersApi, useValue: {} }, { provide: CatalogApi, useValue: {} },
+      { provide: SessionService, useValue: { has: () => true, hasRole: () => true, user: () => ({ roles: ['ADMINISTRADOR'] }) } },
+    ] });
+    const component = TestBed.runInInjectionContext(() => new Purchases());
+    component.products.set([
+      { id: 'p1', name: 'Cuaderno rayado', internalCode: 'PAP-000004', barcode: 'CP000016', supplierId: 's1', isActive: true, availableStock: 5, averageCost: 1500 },
+      { id: 'p2', name: 'Cuaderno cuadriculado', internalCode: 'PAP-000007', barcode: 'CP0000161', supplierId: 's1', isActive: true, availableStock: 2, averageCost: null },
+      { id: 'p3', name: 'Martillo', internalCode: 'FER-000003', barcode: '7701234', supplierId: 's2', isActive: true, availableStock: 1, averageCost: 9000 },
+      { id: 'p4', name: 'Cuaderno viejo', internalCode: 'PAP-000001', barcode: null, supplierId: 's1', isActive: false, availableStock: 0, averageCost: null },
+    ] as never);
+    return component;
+  }
+
+  it('en la compra el lector pone primero el código exacto y repetir el producto suma uno', () => {
+    const component = build();
+    const options = component.purchaseProductOptions();
+    expect(options.map(option => option.value)).toEqual(['p1', 'p2', 'p3']);
+    expect(suggestMatches(options, 'CP000016')[0].value).toBe('p1');
+    expect(suggestMatches(options, 'cuaderno').map(option => option.value)).toEqual(['p1', 'p2']);
+    component.pickPurchaseProduct('p1');
+    component.pickPurchaseProduct('p1');
+    component.pickPurchaseProduct('p2');
+    expect(component.form.lines).toEqual([
+      { productId: 'p1', quantity: 2, unitCost: 1500, vatPercentage: null, newRetailPrice: null },
+      { productId: 'p2', quantity: 1, unitCost: 0, vatPercentage: null, newRetailPrice: null },
+    ]);
+    expect(component.productCode('p2')).toBe('PAP-000007');
+  });
+
+  it('en el pedido la búsqueda filtra la lista y Enter incluye el producto o suma uno', () => {
+    const component = build();
+    component.setOrderSupplier('s1');
+    component.orderProductSearch = 'cuaderno';
+    expect(component.visibleOrderLines().map(line => line.productId)).toEqual(['p1', 'p2']);
+    component.pickOrderProduct();
+    expect(component.orderSearchNote()).toContain('varios');
+    component.orderProductSearch = 'cp000016';
+    component.pickOrderProduct();
+    expect(component.orderLines.find(line => line.productId === 'p1')).toMatchObject({ selected: true, quantity: 1 });
+    expect(component.orderProductSearch).toBe('');
+    component.orderProductSearch = 'CP000016';
+    component.pickOrderProduct();
+    expect(component.orderLines.find(line => line.productId === 'p1')?.quantity).toBe(2);
+    expect(component.orderSearchNote()).toContain('cantidad 2');
+    component.orderProductSearch = '7701234';
+    component.pickOrderProduct();
+    expect(component.orderSearchNote()).toContain('Martillo no está asignado a este proveedor');
+    component.orderProductSearch = 'tornillo';
+    component.pickOrderProduct();
+    expect(component.orderSearchNote()).toContain('No hay productos');
+    expect(component.visibleOrderLines()).toEqual([]);
   });
 });

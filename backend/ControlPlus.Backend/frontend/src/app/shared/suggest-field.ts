@@ -1,7 +1,10 @@
 import { Component, computed, input, model, output, signal } from '@angular/core';
 
-/** Una opción que se puede elegir: `value` es lo que usa la pantalla y `text` lo que se lee. */
-export interface SuggestOption { value: string; text: string; hint?: string; }
+/**
+ * Una opción que se puede elegir: `value` es lo que usa la pantalla y `text` lo que se lee. `keys` son códigos exactos
+ * (referencia, código de barras): lo que manda el lector coincide entero y esa opción va primero.
+ */
+export interface SuggestOption { value: string; text: string; hint?: string; keys?: string[]; }
 
 /** «Crédito» y «credito» se buscan igual: sin tildes ni mayúsculas. */
 export const foldText = (text: string): string =>
@@ -9,11 +12,13 @@ export const foldText = (text: string): string =>
 
 /** Opciones que contienen todas las palabras escritas, en cualquier orden y sin importar tildes. */
 export function suggestMatches(options: SuggestOption[], text: string, limit = 50): SuggestOption[] {
-  const words = foldText(text).split(/\s+/).filter(Boolean);
+  const folded = foldText(text);
+  const words = folded.split(/\s+/).filter(Boolean);
   const found = words.length
-    ? options.filter(option => { const haystack = foldText(`${option.text} ${option.hint ?? ''}`); return words.every(word => haystack.includes(word)); })
+    ? options.filter(option => { const haystack = foldText(`${option.text} ${option.hint ?? ''} ${(option.keys ?? []).join(' ')}`); return words.every(word => haystack.includes(word)); })
     : options;
-  return found.slice(0, limit);
+  const exact = found.filter(option => option.keys?.some(key => foldText(key) === folded));
+  return (exact.length ? [...exact, ...found.filter(option => !exact.includes(option))] : found).slice(0, limit);
 }
 
 let sequence = 0;

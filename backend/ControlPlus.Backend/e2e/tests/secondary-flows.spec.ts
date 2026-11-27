@@ -272,8 +272,15 @@ test("una compra sin pedido crea el proveedor y un producto en la misma ventana 
   await page
     .locator("#purchase-date")
     .fill(new Date().toISOString().slice(0, 10));
-  await page.getByRole("button", { name: "Agregar producto" }).click();
-  await page.getByLabel("Producto de la línea 1").selectOption(mixedProductId);
+  // Pruebas del usuario del 26/11/2026: el producto se busca escribiendo (o con el lector) y Enter lo agrega.
+  const productSearch = page.getByRole("combobox", {
+    name: "Buscar o escanear producto",
+  });
+  await productSearch.fill(mixedProductName);
+  await productSearch.press("Enter");
+  await expect(page.getByLabel("Producto de la línea 1")).toContainText(
+    mixedProductName,
+  );
   await page.getByLabel("Cantidad de la línea 1").fill("3");
   await page.getByLabel("Costo unitario de la línea 1").fill("2100");
   await page
@@ -289,9 +296,9 @@ test("una compra sin pedido crea el proveedor y un producto en la misma ventana 
   await page.locator("#pp-price").fill("3000");
   await page.getByRole("button", { name: "Agregar a la compra" }).click();
   await expect(page.getByText(`${newProductName} quedó en Catálogo y en la compra.`)).toBeVisible();
-  await expect(
-    page.getByLabel("Producto de la línea 2").locator("option:checked"),
-  ).toContainText(newProductName);
+  await expect(page.getByLabel("Producto de la línea 2")).toContainText(
+    newProductName,
+  );
   await page.getByRole("button", { name: "Guardar borrador" }).click();
   await expect(page.getByText("Borrador guardado.")).toBeVisible();
 });
