@@ -251,14 +251,14 @@ test("un gasto superior al efectivo se rechaza sin cambiar el arqueo", async ({
   ).toBe(cashBefore);
 });
 
-test("una compra sin pedido crea el proveedor en la misma ventana y guarda el borrador", async ({
+test("una compra sin pedido crea el proveedor y un producto en la misma ventana y guarda el borrador", async ({
   page,
 }) => {
   await login(page);
   await page.goto("/operacion/compras");
-  await page.getByRole("button", { name: "Recibir mercancía" }).click();
+  // Pruebas del usuario del 26/11/2026: Compras tiene un botón por acción.
   await page
-    .getByRole("button", { name: /No, es una compra sin pedido/ })
+    .getByRole("button", { name: "Compra sin pedido", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Compra sin pedido" }),
@@ -276,6 +276,22 @@ test("una compra sin pedido crea el proveedor en la misma ventana y guarda el bo
   await page.getByLabel("Producto de la línea 1").selectOption(mixedProductId);
   await page.getByLabel("Cantidad de la línea 1").fill("3");
   await page.getByLabel("Costo unitario de la línea 1").fill("2100");
+  await page
+    .getByRole("button", { name: "+ Producto nuevo (no está en el sistema)" })
+    .click();
+  const newProductName = `Producto de compra E2E ${suffix}`;
+  await page.locator("#pp-name").fill(newProductName);
+  await page
+    .locator("#pp-category")
+    .selectOption({ label: `Secundarios E2E ${suffix}` });
+  await page.locator("#pp-quantity").fill("2");
+  await page.locator("#pp-cost").fill("1500");
+  await page.locator("#pp-price").fill("3000");
+  await page.getByRole("button", { name: "Agregar a la compra" }).click();
+  await expect(page.getByText(`${newProductName} quedó en Catálogo y en la compra.`)).toBeVisible();
+  await expect(
+    page.getByLabel("Producto de la línea 2").locator("option:checked"),
+  ).toContainText(newProductName);
   await page.getByRole("button", { name: "Guardar borrador" }).click();
   await expect(page.getByText("Borrador guardado.")).toBeVisible();
 });

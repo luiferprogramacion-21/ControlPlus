@@ -1,3 +1,4 @@
+using ControlPlus.Application.Sales.Contracts;
 using System.Security.Cryptography;
 using System.Text.Json;
 using ControlPlus.Application.Common;
@@ -520,6 +521,54 @@ public sealed class ReceiptPrintingService(
         return terminal is null ? null : (await db.Terminal.FromSqlInterpolated(
             $"SELECT * FROM configuracion.terminal WHERE id = {terminal.Id} FOR UPDATE")
             .AsTracking().ToArrayAsync(ct)).Single();
+    }
+
+    public async Task<CorrectionPrintResultDto> PrintCorrectionAsync(Guid actorId, SaleCorrectionReceiptDto receipt,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        var terminal = await GetActiveTerminalAsync(ct);
+        var profile = terminal is null ? null : await db.PerfilImpresora.AsNoTracking().Where(x => x.TerminalId == terminal.Id &&
+            x.Activo && x.EsPredeterminada && (x.TipoImpresora == "RECIBOS" || x.TipoImpresora == "HIBRIDA"))
+            .OrderBy(x => x.Id).FirstOrDefaultAsync(ct);
+        if (profile is null) return new CorrectionPrintResultDto("SIN_PERFIL", null);
+        var template = await db.PlantillaImpresion.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.Codigo == ReceiptTemplateCode(profile.Id) && x.Activa, ct);
+        var columns = template is null ? 0 : ReadColumns(template.Configuracion);
+        if (template is null || columns is < 24 or > 80) return new CorrectionPrintResultDto("SIN_PERFIL", null);
+        var establishment = await db.Establecimiento.AsNoTracking()
+            .Where(x => x.Id == template.EstablecimientoId)
+            .Select(x => new ReceiptEstablishmentInfo(x.NombreComercial, x.Identificacion, x.Telefono,
+                x.Direccion, x.EncabezadoComprobante, x.PieComprobante))
+            .SingleAsync(ct);
+        var content = ReceiptTextRenderer.RenderCorrection(receipt, establishment, columns);
+        string status;
+        try
+        {
+            await spooler.SubmitAsync(profile.NombreSistema, content,
+                $"ControlPlus CORRECCION {receipt.Correction.Id:N}", CancellationToken.None);
+            status = "IMPRESO";
+        }
+        catch (PrintSubmissionException exception) { status = exception.MayHaveBeenAccepted ? "INCIERTO" : "FALLIDO"; }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            status = exception is PlatformNotSupportedException ? "FALLIDO" : "INCIERTO";
+        }
+        await WriteAuditAsync(actorId, status switch
+            {
+                "IMPRESO" => AuditAction.PrintJobAccepted,
+                "INCIERTO" => AuditAction.PrintJobUncertain,
+                _ => AuditAction.PrintJobFailed
+            }, "CambioVenta", receipt.Correction.Id,
+            new { ChangeId = receipt.Correction.Id, receipt.RequestId, Status = status, QueueAccepted = status == "IMPRESO" },
+            CancellationToken.None);
+        await db.SaveChangesAsync(CancellationToken.None);
+        return new CorrectionPrintResultDto(status, status switch
+        {
+            "FALLIDO" => "La impresora no recibió el comprobante. Revisa que esté encendida y vuelve a imprimirlo con «Comprobante de corrección».",
+            "INCIERTO" => "No se sabe si el comprobante salió. Revisa la impresora antes de imprimirlo otra vez.",
+            _ => null
+        });
     }
 
     private async Task WriteAuditAsync(Guid userId, AuditAction action, string entity,

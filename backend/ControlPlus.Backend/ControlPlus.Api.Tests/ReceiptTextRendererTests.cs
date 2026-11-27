@@ -191,4 +191,32 @@ public sealed class ReceiptTextRendererTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             ReceiptTextRenderer.Render(receipt, "Baratísimo", columns));
     }
+
+    [Fact]
+    public void RenderCorrection_ShowsWhatChangedAndWhatIsReturned_ForTheTicketPrinter()
+    {
+        // Pruebas del usuario del 26/11/2026: el comprobante de una corrección sale en la impresora de tickets.
+        var change = new SaleChangeDto(Guid.CreateVersion7(), Guid.CreateVersion7(), "CAM-000007", "CONFIRMADO",
+            new DateTimeOffset(2026, 11, 26, 20, 0, 0, TimeSpan.Zero), 8200m, 0m, -8200m, "DEVOLUCION", 0m, 8200m,
+            Guid.CreateVersion7(),
+            [new SaleChangeDetailDto(Guid.CreateVersion7(), "DEVUELTO", Guid.CreateVersion7(), null, 1, 8200m, 0m, 8200m,
+                "P-1", "Camisa\u0007FALSA")],
+            [new SaleChangePaymentDto(Guid.CreateVersion7(), "DEVOLUCION", "NEQUI", 8200m, null, 0m, null)],
+            "Devolución del cliente sin reemplazo");
+        var receipt = new SaleCorrectionReceiptDto(Guid.CreateVersion7(), change.SaleId, "VTA-000123",
+            DateTimeOffset.UtcNow, change, "Baratísimo");
+
+        var text = Encoding.UTF8.GetString(ReceiptTextRenderer.RenderCorrection(receipt,
+            new ReceiptEstablishmentInfo("Baratísimo", "900123"), 32));
+
+        Assert.Contains("CORRECCIÓN CAM-000007", text, StringComparison.Ordinal);
+        Assert.Contains("Venta VTA-000123", text, StringComparison.Ordinal);
+        Assert.Contains("- 1 CamisaFALSA", text, StringComparison.Ordinal);
+        Assert.Contains("Se devuelve", text, StringComparison.Ordinal);
+        Assert.Contains("Nequi", text, StringComparison.Ordinal);
+        Assert.Contains("8.200", text, StringComparison.Ordinal);
+        Assert.Contains("La venta original se conserva.", text, StringComparison.Ordinal);
+        Assert.All(text.Split('\n').Where(line => line.Length > 0),
+            line => Assert.True(line.TrimEnd('\r').Length <= 32, line));
+    }
 }

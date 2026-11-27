@@ -11,7 +11,7 @@ const sale = (state = 'CONFIRMADA', version = 3): SaleDetail => ({ id: 's1', vis
 const reasons = [{ id: 'r1', code: 'ERROR_REGISTRO', name: 'Error de registro', displayOrder: 1 }, { id: 'r2', code: 'OTRO', name: 'Otro', displayOrder: 3 }];
 
 describe('SalesHistory: historial y anulación', () => {
-  const api = { list: vi.fn(), detail: vi.fn(), changes: vi.fn(), correctionReceipt: vi.fn(), cancellationReasons: vi.fn(), cancel: vi.fn(), printJobs: vi.fn(), requestReprint: vi.fn(), retryPrintJob: vi.fn() };
+  const api = { list: vi.fn(), detail: vi.fn(), changes: vi.fn(), printCorrectionReceipt: vi.fn(), cancellationReasons: vi.fn(), cancel: vi.fn(), printJobs: vi.fn(), requestReprint: vi.fn(), retryPrintJob: vi.fn() };
   const printer = { print: vi.fn() };
   let permissions: string[]; let roles: string[];
   const session = { user: () => ({ userName: 'admin' }), has: (code: string) => permissions.includes(code), hasRole: (...codes: string[]) => codes.some(code => roles.includes(code)) };
@@ -65,23 +65,36 @@ describe('SalesHistory: historial y anulación', () => {
     c.beginCorrection('remove'); expect(c.correctionMode()).toBe('remove'); expect(c.correcting()).toBe(false); expect(c.changing()).toBe(true);
   });
 
-  it('audita el comprobante antes de abrir impresión y conserva la clave si falla', async () => {
+  it('sin impresora de tickets abre la impresión del navegador y conserva la clave si falla', async () => {
     permissions.push('SALES.REPRINT'); const c = await create();
     const correction = { id: 'a', saleId: 's1', visibleNumber: 'CAM-1', difference: -2000, totalReturned: 2000, totalDelivered: 0, treatment: 'DEVOLUCION', paidOrRefunded: 2000, creditAdjustment: 0, state: 'CONFIRMADO' };
-    api.correctionReceipt.mockRejectedValueOnce(new HttpErrorResponse({ status: 500 })).mockResolvedValue({ requestId: 'r', saleId: 's1', saleNumber: 'VTA-1', correction, establishmentName: 'Tienda' });
+    api.printCorrectionReceipt.mockRejectedValueOnce(new HttpErrorResponse({ status: 500 }))
+      .mockResolvedValue({ receipt: { requestId: 'r', saleId: 's1', saleNumber: 'VTA-1', correction, establishmentName: 'Tienda' }, status: 'SIN_PERFIL', message: null });
     await c.printCorrection(correction); expect(printer.print).not.toHaveBeenCalled();
     await c.printCorrection(correction);
-    expect(api.correctionReceipt.mock.calls[0][2]).toBe(api.correctionReceipt.mock.calls[1][2]);
+    expect(api.printCorrectionReceipt.mock.calls[0][2]).toBe(api.printCorrectionReceipt.mock.calls[1][2]);
     expect(printer.print).toHaveBeenCalledWith(expect.stringContaining('CAM-1'));
   });
-  it('al aprobar un cambio imprime solo su comprobante (pruebas del 26/11/2026)', async () => {
+  it('al aprobar un cambio manda solo su comprobante a la impresora de tickets (pruebas del 26/11/2026)', async () => {
     permissions.push('SALES.REPRINT', 'SALES.CREATE'); const c = await create();
     const correction = { id: 'a', saleId: 's1', visibleNumber: 'CAM-7', difference: -2000, totalReturned: 2000, totalDelivered: 0, treatment: 'DEVOLUCION', paidOrRefunded: 2000, creditAdjustment: 0, state: 'CONFIRMADO' };
-    api.correctionReceipt.mockResolvedValue({ requestId: 'r', saleId: 's1', saleNumber: 'VTA-1', correction, establishmentName: 'Tienda' });
+    api.printCorrectionReceipt.mockResolvedValue({ receipt: { requestId: 'r', saleId: 's1', saleNumber: 'VTA-1', correction, establishmentName: 'Tienda' }, status: 'IMPRESO', message: null });
     await c.changeDone(correction as never);
-    expect(api.correctionReceipt).toHaveBeenCalledWith('s1', 'a', expect.any(String));
-    expect(printer.print).toHaveBeenCalledWith(expect.stringContaining('CAM-7'));
-    expect(c.notice()).toContain('CAM-7');
+    expect(api.printCorrectionReceipt).toHaveBeenCalledWith('s1', 'a', expect.any(String));
+    expect(printer.print).not.toHaveBeenCalled();
+    expect(c.notice()).toContain('CAM-7'); expect(c.notice()).toContain('impresora de tickets');
+  });
+  it('si la impresora de tickets falla lo dice y deja volver a imprimir con la misma clave', async () => {
+    permissions.push('SALES.REPRINT', 'SALES.CREATE'); const c = await create();
+    const correction = { id: 'a', saleId: 's1', visibleNumber: 'CAM-8', difference: 0, totalReturned: 0, totalDelivered: 0, treatment: 'SIN_DIFERENCIA', paidOrRefunded: 0, creditAdjustment: 0, state: 'CONFIRMADO' };
+    const receipt = { requestId: 'r', saleId: 's1', saleNumber: 'VTA-1', correction, establishmentName: 'Tienda' };
+    api.printCorrectionReceipt.mockResolvedValueOnce({ receipt, status: 'FALLIDO', message: 'La impresora no recibió el comprobante.' })
+      .mockResolvedValue({ receipt, status: 'IMPRESO', message: null });
+    await c.changeDone(correction as never);
+    expect(c.error()).toContain('La impresora no recibió'); expect(c.notice()).toContain('CAM-8');
+    await c.printCorrection(correction as never);
+    expect(api.printCorrectionReceipt.mock.calls[0][2]).toBe(api.printCorrectionReceipt.mock.calls[1][2]);
+    expect(printer.print).not.toHaveBeenCalled();
   });
   it('muestra el detalle en una ventana modal y permite cerrarla', async () => {
     const fixture = TestBed.createComponent(SalesHistory);

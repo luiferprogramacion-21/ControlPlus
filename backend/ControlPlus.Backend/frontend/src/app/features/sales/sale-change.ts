@@ -61,16 +61,19 @@ export class SaleChange implements OnInit, DoCheck {
     const s = this.settlement;
     if (s.mode === 'none') { this.autoAmount = null; this.refundMethodChosen = false; return; }
     if (this.drafts.length !== 1) return;
-    const draft = this.drafts[0];
-    const current = Number(draft.appliedAmount) || 0;
-    if ((current === 0 || current === this.autoAmount) && current !== s.cashAmount) draft.appliedAmount = s.cashAmount;
-    if (current === 0 || current === this.autoAmount) this.autoAmount = s.cashAmount;
+    // El medio de pago se reemplaza por uno nuevo, no se modifica por dentro: así la casilla muestra el valor nuevo
+    // (pruebas del usuario del 26/11/2026: el total pasaba a $ 91.800 y la casilla seguía en 41.800).
+    const next = { ...this.drafts[0] };
+    const current = Number(next.appliedAmount) || 0;
+    if (current === 0 || current === this.autoAmount) { next.appliedAmount = s.cashAmount; this.autoAmount = s.cashAmount; }
     if (s.mode === 'refund' && !this.refundMethodChosen) {
       const method = this.originalMethod;
-      if (method) draft.methodCode = method;
+      if (method) next.methodCode = method;
       this.refundMethodChosen = true;
     }
     if (s.mode === 'payment') this.refundMethodChosen = false;
+    const draft = this.drafts[0];
+    if (next.appliedAmount !== draft.appliedAmount || next.methodCode !== draft.methodCode) this.drafts = [next];
   }
   /** Medio con el que se pagó la venta, si fue uno solo. */
   get originalMethod(): PaymentMethod | null {

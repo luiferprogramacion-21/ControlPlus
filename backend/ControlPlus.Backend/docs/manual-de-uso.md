@@ -389,7 +389,7 @@ Menú **Historial de ventas**: lista las ventas con sus pagos y productos. **Ver
    Cuando se le devuelve dinero, arriba se ve en grande **con qué medio se pagó la venta** y ese medio viene elegido: devuélvelo por el mismo.
    Lo devuelto vuelve al inventario. Si un producto llegó dañado, recíbelo igual y avísale al Administrador para que lo saque con un ajuste **Merma o daño**.
 4. Autoriza un **Administrador**.
-5. Al aprobarse, el **comprobante de la corrección se imprime solo**. Si necesitas otra copia, en la venta pulsa **Comprobante de corrección**.
+5. Al aprobarse, el **comprobante de la corrección se imprime solo** en la impresora de tickets, como el ticket de la venta (si no hay impresora de tickets configurada, se abre la impresión del navegador). Si la impresora no lo recibió, el aviso lo dice: revísala y, en la venta, pulsa **Comprobante de corrección** para imprimir otra copia.
 
 En **Corregir venta** cada opción dice qué pasa y quién la autoriza; elige la que corresponda a lo que ocurrió.
 
@@ -418,10 +418,16 @@ En **Créditos y abonos** puedes registrar abonos (como el Cajero) y además:
 
 Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor**, **Mercancía recibida** y **Compras sin pedido**.
 
-- **Pedir mercancía:** **Nuevo pedido al proveedor** (al lado de Recibir mercancía) → elige el proveedor, agrega productos con su cantidad → **Crear pedido**.
+Arriba hay un botón para cada cosa:
+
+- **Recibir un pedido**: llegó mercancía de un pedido que le hiciste al proveedor.
+- **Compra sin pedido**: llegó mercancía que no estaba pedida (compraste en el momento).
+- **Nuevo pedido al proveedor**: vas a pedirle mercancía a un proveedor.
+
+- **Pedir mercancía:** **Nuevo pedido al proveedor** → elige el proveedor, agrega productos con su cantidad → **Crear pedido**.
 - **Pedir algo que aún no está en el sistema:** en el mismo pedido pulsa **+ Producto nuevo**, escribe el nombre, elige la categoría y la cantidad y pulsa **Agregar al pedido**. Queda creado en Catálogo con ese proveedor. El **precio de venta es opcional**: si aún no lo sabes, déjalo vacío. Mientras no tenga precio se ve como **Sin precio** y **no se puede vender**; el Administrador se lo pone al recibir la mercancía o en Catálogo.
-- **Cuando llega mercancía:** pulsa **Recibir mercancía** (también en Inicio). Son tres pasos, que se ven arriba de cada ventana: **1. ¿De dónde viene?**, **2. Productos y cantidades** y **3. Confirmar**. El sistema pregunta si viene de un pedido:
-  - **Sí, viene de un pedido:** eliges el pedido; las cantidades pendientes **vienen listas**. Si llegó menos (recepción **parcial**), corrígelas.
+- **Cuando llega mercancía:** pulsa **Recibir un pedido** o **Compra sin pedido**. Desde Inicio, **Recibir mercancía** te pregunta si viene de un pedido. Los pasos se ven arriba de cada ventana: **1. ¿De dónde viene?**, **2. Productos y cantidades** y **3. Confirmar**.
+  - **Recibir un pedido:** eliges el pedido; las cantidades pendientes **vienen listas**. Si llegó menos (recepción **parcial**), corrígelas.
     Cada producto llega en su propia **tarjeta** con tres preguntas:
     - **¿Cuántas llegaron?**: viene con lo pendiente; corrígelo con **−** y **+** o escribiéndolo.
     - **Costo por unidad**: viene con el costo actual. Si lo cambias, la tarjeta dice si **subió** o **bajó** frente al de antes.
@@ -429,7 +435,8 @@ Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor*
 
     Abajo se ve cuántos productos y unidades recibes, el total y cuántos precios cambian.
     Un producto **Sin precio** (creado desde un pedido) dice **Escribe su precio**: hay que ponerle el precio de venta y su costo para recibirlo. Desde ese momento ya se puede vender.
-  - **No, es una compra sin pedido:** anotas el proveedor, el número de factura, los productos y sus costos.
+  - **Compra sin pedido:** anotas el proveedor, el número de factura, los productos y sus costos.
+    Si llegó un producto que **aún no está en el sistema**, pulsa **+ Producto nuevo (no está en el sistema)** (aparece después de elegir el proveedor): escribe el nombre, la categoría, cuántas llegaron, el costo por unidad y el **precio de venta** (aquí es obligatorio, porque la mercancía ya llegó) y pulsa **Agregar a la compra**. Queda creado en Catálogo con ese proveedor y su propio código de barras, y sus existencias se suman al confirmar la compra.
 
   Lo recibido entra al inventario y actualiza el costo.
 - **Al enviar un pedido** se descarga solo su **PDF** para mandarlo al proveedor. En el pedido puedes volver a pulsar **Descargar PDF** o **Imprimir documento**.

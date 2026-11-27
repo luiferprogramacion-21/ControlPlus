@@ -153,3 +153,54 @@ describe('Purchases: proveedor nuevo en la compra sin pedido (pruebas del 26/11/
     expect(cashier.canCreateSupplier).toBe(false);
   });
 });
+
+describe('Purchases: producto nuevo en la compra sin pedido (pruebas del 26/11/2026)', () => {
+  const createProduct = vi.fn();
+  const catalog = {
+    createProduct,
+    categories: vi.fn(async () => ({ items: [{ id: 'c1', name: 'Papelería', isActive: true }, { id: 'c2', name: 'Vieja', isActive: false }] })),
+    units: vi.fn(async () => [{ id: 'u-paquete', code: 'PAQUETE' }, { id: 'u-unidad', code: 'UNIDAD' }]),
+  };
+  let permissions: string[];
+  function build(): Purchases {
+    TestBed.configureTestingModule({ providers: [
+      { provide: PurchasesApi, useValue: {} }, { provide: OrdersApi, useValue: {} }, { provide: AuthorizationDialog, useValue: {} },
+      { provide: SuppliersApi, useValue: {} }, { provide: CatalogApi, useValue: catalog },
+      { provide: SessionService, useValue: { has: (p: string) => permissions.includes(p), hasRole: () => false, user: () => ({ roles: ['SUPERVISOR'] }) } },
+    ] });
+    return TestBed.runInInjectionContext(() => new Purchases());
+  }
+  beforeEach(() => { vi.clearAllMocks(); permissions = ['PURCHASES.RECEIVE', 'PRODUCTS.CREATE']; });
+
+  it('lo crea en Catálogo con el proveedor de la compra y lo agrega como línea con su costo', async () => {
+    const component = build();
+    await component.startPurchaseProduct();
+    expect(component.error()).toContain('proveedor');
+    expect(component.newPurchaseProduct()).toBeNull();
+    component.form.supplierId = 's1';
+    await component.startPurchaseProduct();
+    expect(component.orderCategories().map(c => c.id)).toEqual(['c1']);
+    const draft = component.newPurchaseProduct()!;
+    Object.assign(draft, { name: ' Cuaderno rayado ', categoryId: 'c1', quantity: 4, unitCost: 1500, retailPrice: null });
+    await component.addPurchaseProduct();
+    expect(createProduct).not.toHaveBeenCalled();
+    expect(component.error()).toContain('precio de venta');
+    draft.retailPrice = 3000;
+    createProduct.mockResolvedValue({ id: 'p-new', name: 'Cuaderno rayado', internalCode: 'PAP-000009', retailPrice: 3000, isActive: true });
+    await component.addPurchaseProduct();
+    expect(createProduct).toHaveBeenCalledWith(expect.objectContaining({ name: 'Cuaderno rayado', categoryId: 'c1', measurementUnitId: 'u-unidad', supplierId: 's1',
+      retailPrice: 3000, initialQuantity: 0, initialUnitCost: null }), true, draft.key);
+    expect(component.form.lines).toEqual([{ productId: 'p-new', quantity: 4, unitCost: 1500, vatPercentage: null, newRetailPrice: null }]);
+    expect(component.newPurchaseProduct()).toBeNull();
+    expect(component.notice()).toContain('Cuaderno rayado');
+  });
+
+  it('sin permiso para crear productos no se ofrece', async () => {
+    permissions = ['PURCHASES.RECEIVE'];
+    const component = build();
+    component.form.supplierId = 's1';
+    expect(component.canCreatePurchaseProduct).toBe(false);
+    await component.startPurchaseProduct();
+    expect(component.newPurchaseProduct()).toBeNull();
+  });
+});

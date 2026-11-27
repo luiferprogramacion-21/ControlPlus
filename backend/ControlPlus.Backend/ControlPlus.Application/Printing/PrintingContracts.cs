@@ -1,3 +1,4 @@
+using ControlPlus.Application.Sales.Contracts;
 using ControlPlus.Application.Common;
 using ControlPlus.Application.Security.Contracts;
 using System.Text.Json.Serialization;
@@ -30,6 +31,15 @@ public sealed record PrintJobDto(Guid Id, Guid SaleId, string CopyType, int Copy
 
 public sealed record PrintJobsQuery(int Page = 1, int PageSize = 20);
 
+/// <summary>
+/// Resultado de mandar el comprobante de una corrección a la impresora de tickets (pruebas del usuario del 26/11/2026):
+/// IMPRESO (Windows lo aceptó), FALLIDO, INCIERTO o SIN_PERFIL (no hay impresora de tickets; se imprime en el navegador).
+/// </summary>
+public sealed record CorrectionPrintResultDto(string Status, string? Message);
+
+/// <summary>El comprobante preparado y cómo le fue al mandarlo a la impresora de tickets.</summary>
+public sealed record SaleCorrectionPrintDto(SaleCorrectionReceiptDto Receipt, string Status, string? Message);
+
 public interface IReceiptPrintingService
 {
     Task<Result<PrintProfileDto>> CreateProfileAsync(ActorContext actor,
@@ -54,4 +64,7 @@ public interface IReceiptPrintingService
         CancellationToken ct = default);
     Task<bool> RecoverOneOriginalAsync(CancellationToken ct = default);
     Task<bool> ProcessOneAsync(CancellationToken ct = default);
+    /// <summary>Manda el comprobante de una corrección a la impresora de tickets predeterminada, sin guardar un trabajo.</summary>
+    Task<CorrectionPrintResultDto> PrintCorrectionAsync(Guid actorId, SaleCorrectionReceiptDto receipt,
+        CancellationToken ct = default);
 }

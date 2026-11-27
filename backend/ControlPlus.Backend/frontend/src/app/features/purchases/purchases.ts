@@ -223,11 +223,48 @@ export class Purchases implements OnInit {
     if (!this.canCreateOrderProduct) return;
     if (!this.orderSupplierId) { this.error.set('Elige primero el proveedor.'); return; }
     this.error.set('');
+    if (await this.loadNewProductOptions()) this.newOrderProduct.set({ name: '', categoryId: '', retailPrice: null, quantity: 1, key: crypto.randomUUID() });
+  }
+  /** Categorías activas y la unidad «Unidad» para crear un producto desde un pedido o una compra. */
+  private async loadNewProductOptions(): Promise<boolean> {
     try {
       if (!this.orderCategories().length) this.orderCategories.set((await this.catalog.categories({ page: 1, pageSize: 100 })).items.filter(c => c.isActive));
       if (!this.orderUnitId) { const units = await this.catalog.units(); this.orderUnitId = (units.find(u => u.code === 'UNIDAD') ?? units[0])?.id ?? ''; }
-      this.newOrderProduct.set({ name: '', categoryId: '', retailPrice: null, quantity: 1, key: crypto.randomUUID() });
-    } catch (e) { this.error.set(errorText(e)); }
+      return true;
+    } catch (e) { this.error.set(errorText(e)); return false; }
+  }
+  /**
+   * Pruebas del usuario del 26/11/2026: en la compra sin pedido también se crea el producto que aún no está en el
+   * sistema. La mercancía llega ya, así que aquí el precio de venta es obligatorio; queda en Catálogo con el proveedor de
+   * la compra, sin existencias: las pone la compra al confirmarla.
+   */
+  readonly newPurchaseProduct = signal<{ name: string; categoryId: string; retailPrice: number | null; quantity: number; unitCost: number | null; key: string } | null>(null);
+  get canCreatePurchaseProduct(): boolean { return this.canReceive && this.session.has('PRODUCTS.CREATE'); }
+  async startPurchaseProduct(): Promise<void> {
+    if (!this.canCreatePurchaseProduct) return;
+    if (!this.form.supplierId) { this.error.set('Elige primero el proveedor.'); return; }
+    this.error.set('');
+    if (await this.loadNewProductOptions()) this.newPurchaseProduct.set({ name: '', categoryId: '', retailPrice: null, quantity: 1, unitCost: null, key: crypto.randomUUID() });
+  }
+  async addPurchaseProduct(): Promise<void> {
+    const draft = this.newPurchaseProduct(); if (!draft || this.saving()) return;
+    const name = draft.name.trim(), quantity = Number(draft.quantity), price = Number(draft.retailPrice), cost = Number(draft.unitCost);
+    if (!name) { this.error.set('Escribe el nombre del producto nuevo.'); return; }
+    if (!draft.categoryId) { this.error.set('Elige la categoría del producto nuevo.'); return; }
+    if (!Number.isInteger(price) || price <= 0) { this.error.set('Escribe el precio de venta en pesos enteros: el producto queda listo para vender al confirmar la compra.'); return; }
+    if (!Number.isInteger(quantity) || quantity <= 0) { this.error.set('La cantidad que llegó debe ser un número entero mayor que cero.'); return; }
+    if (!(cost > 0)) { this.error.set('Escribe el costo por unidad del producto nuevo.'); return; }
+    this.saving.set(true); this.error.set('');
+    try {
+      const product = await this.catalog.createProduct({ name, categoryId: draft.categoryId, measurementUnitId: this.orderUnitId, supplierId: this.form.supplierId,
+        barcode: null, barcodeFormat: null, description: null, retailPrice: price, wholesalePrice: null, taxPercentage: null, minimumStock: 0,
+        initialQuantity: 0, initialUnitCost: null }, true, draft.key);
+      this.products.update(list => [...list, product]);
+      this.form.lines = [...this.form.lines, { productId: product.id, quantity, unitCost: cost, vatPercentage: null, newRetailPrice: null }];
+      this.newPurchaseProduct.set(null);
+      this.notice.set(`${product.name} quedó en Catálogo y en la compra. Sus existencias se suman al confirmar la compra.`);
+    } catch (e) { this.error.set(reasonOr(e, 'No se pudo crear el producto nuevo. Revisa los datos e inténtalo de nuevo.')); }
+    finally { this.saving.set(false); }
   }
   async addOrderProduct(): Promise<void> {
     const draft = this.newOrderProduct(); if (!draft || this.saving()) return;

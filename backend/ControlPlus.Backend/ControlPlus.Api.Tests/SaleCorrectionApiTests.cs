@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using ControlPlus.Application.Cash.Contracts;
 using ControlPlus.Application.Credits.Contracts;
+using ControlPlus.Application.Printing;
 using ControlPlus.Application.Sales.Contracts;
 using ControlPlus.Infrastructure.Persistence.Official;
 using Microsoft.EntityFrameworkCore;
@@ -61,6 +62,15 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(JsonSerializer.Serialize(document), JsonSerializer.Serialize(documentReplay));
         Assert.Equal(change.VisibleNumber, document.Correction.VisibleNumber);
         Assert.Equal(1, await db.OperacionIdempotente.CountAsync(x => x.TipoOperacion == "COMPROBANTE_CAMBIO"));
+        // Pruebas del usuario del 26/11/2026: al aprobar la corrección el comprobante se manda a la impresora de tickets;
+        // sin impresora configurada responde SIN_PERFIL y la pantalla lo imprime en el navegador.
+        using (var print = new HttpRequestMessage(HttpMethod.Post, $"/api/sales/{sale.Id}/changes/{change.Id}/receipt-requests/print"))
+        {
+            print.Headers.Add("Idempotency-Key", "correction-receipt-print");
+            var printed = await ReadAsync<SaleCorrectionPrintDto>(await client.SendAsync(print), HttpStatusCode.OK);
+            Assert.Equal("SIN_PERFIL", printed.Status);
+            Assert.Equal(change.VisibleNumber, printed.Receipt.Correction.VisibleNumber);
+        }
         Assert.Equal(state, await CaptureChangeStateAsync(db, sale.Id, setup.Products.Standard, setup.Products.ResidueA));
     }
 

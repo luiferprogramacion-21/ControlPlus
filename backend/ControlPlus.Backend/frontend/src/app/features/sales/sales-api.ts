@@ -69,6 +69,8 @@ export interface ConfirmedChange extends CashDrawerDispatch { id: string; saleId
 /** Reglas para vender: mínimo mayorista y descuento máximo de cada rol (decisión D7 del 23/11/2026). */
 export interface PricingRules { wholesaleMinimumQuantity: number; cashierMaxDiscountPercent?: number; supervisorMaxDiscountPercent?: number; administratorMaxDiscountPercent?: number; }
 export interface CorrectionReceipt { requestId: string; saleId: string; saleNumber: string; requestedAtUtc: string; correction: ConfirmedChange; establishmentName: string; }
+/** Comprobante de corrección mandado a la impresora de tickets: IMPRESO, FALLIDO, INCIERTO o SIN_PERFIL (se imprime en el navegador). */
+export interface PrintedCorrectionReceipt { receipt: CorrectionReceipt; status: 'IMPRESO' | 'FALLIDO' | 'INCIERTO' | 'SIN_PERFIL'; message: string | null; }
 
 export interface PrintProfile {
   id: string; name: string; systemQueueName: string; columns: number; isDefault: boolean; active: boolean; version: number;
@@ -149,7 +151,7 @@ export class SalesApi {
   findChangeSale(visibleNumber: string): Promise<ChangePreparation> { return firstValueFrom(this.http.get<ChangePreparation>('/api/sales/change-search', { params: { visibleNumber } })); }
   changePreparation(saleId: string): Promise<ChangePreparation> { return firstValueFrom(this.http.get<ChangePreparation>(`/api/sales/${saleId}/change-preparation`)); }
   changes(saleId: string): Promise<ConfirmedChange[]> { return firstValueFrom(this.http.get<ConfirmedChange[]>(`/api/sales/${saleId}/changes`)); }
-  correctionReceipt(saleId: string, changeId: string, key: string): Promise<CorrectionReceipt> { return firstValueFrom(this.http.post<CorrectionReceipt>(`/api/sales/${saleId}/changes/${changeId}/receipt-requests`, null, { headers: new HttpHeaders({ 'Idempotency-Key': key }) })); }
+  printCorrectionReceipt(saleId: string, changeId: string, key: string): Promise<PrintedCorrectionReceipt> { return firstValueFrom(this.http.post<PrintedCorrectionReceipt>(`/api/sales/${saleId}/changes/${changeId}/receipt-requests/print`, null, { headers: new HttpHeaders({ 'Idempotency-Key': key }) })); }
   async confirmChange(saleId: string, input: ConfirmChangeInput, key: string): Promise<ConfirmedChange> {
     const response = await firstValueFrom(this.http.post<ConfirmedChange>(`/api/sales/${saleId}/changes`, input, {
       headers: new HttpHeaders({ 'Idempotency-Key': key }), context: input.authorization ? authorizationContext() : undefined,

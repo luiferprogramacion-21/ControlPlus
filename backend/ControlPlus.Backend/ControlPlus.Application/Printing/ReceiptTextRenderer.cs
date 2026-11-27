@@ -97,6 +97,47 @@ public static class ReceiptTextRenderer
         return Encoding.UTF8.GetBytes(text.ToString());
     }
 
+    /// <summary>
+    /// Comprobante de una corrección (cambio, quitar producto) para la impresora de tickets (pruebas del usuario del
+    /// 26/11/2026): el mismo contenido que el comprobante del navegador, en texto. La venta original no cambia.
+    /// </summary>
+    public static byte[] RenderCorrection(SaleCorrectionReceiptDto receipt, ReceiptEstablishmentInfo establishment, int columns)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        ArgumentNullException.ThrowIfNull(establishment);
+        if (columns is < 24 or > 80) throw new ArgumentOutOfRangeException(nameof(columns));
+        var correction = receipt.Correction;
+        var storeName = string.IsNullOrWhiteSpace(establishment.Name) ? receipt.EstablishmentName : establishment.Name;
+        var text = new StringBuilder();
+        AppendCentered(text, Clean(storeName), columns);
+        AppendBusinessLine(text, "NIT: ", establishment.Identification, columns);
+        AppendCentered(text, "CORRECCIÓN " + Clean(correction.VisibleNumber), columns);
+        AppendCentered(text, "Venta " + Clean(receipt.SaleNumber), columns);
+        AppendCentered(text, TimeZoneInfo.ConvertTime(correction.OccurredAtUtc, ReceiptTimeZone)
+            .ToString("dd/MM/yyyy HH:mm", ColombianCulture), columns);
+        if (!string.IsNullOrWhiteSpace(correction.Reason))
+            foreach (var part in Wrap("Motivo: " + Clean(correction.Reason), columns)) text.AppendLine(part);
+        AppendRule(text, columns);
+        foreach (var line in correction.Details)
+        {
+            var sign = line.Type == "DEVUELTO" ? "-" : "+";
+            foreach (var part in Wrap($"{sign} {line.Quantity.ToString("N0", ColombianCulture)} {Clean(line.ProductName ?? line.ProductCode ?? "Producto")}", columns))
+                text.AppendLine(part);
+            AppendAmount(text, string.Empty, line.NetAmount, columns);
+        }
+        AppendRule(text, columns);
+        if (correction.Difference == 0) AppendAmount(text, "Sin diferencia", 0, columns);
+        else AppendAmount(text, correction.Difference < 0 ? "Se devuelve" : "Se cobra", Math.Abs(correction.Difference), columns);
+        foreach (var payment in correction.Payments)
+            AppendAmount(text, PaymentName(Clean(payment.MethodCode)), payment.Amount, columns);
+        if (correction.CreditAdjustment > 0)
+            AppendAmount(text, correction.Difference < 0 ? "Baja la deuda" : "Sube la deuda", correction.CreditAdjustment, columns);
+        AppendRule(text, columns);
+        AppendCentered(text, "La venta original se conserva.", columns);
+        text.AppendLine();
+        return Encoding.UTF8.GetBytes(text.ToString());
+    }
+
     private static void AppendBusinessLine(StringBuilder text, string prefix, string? value, int columns)
     {
         if (string.IsNullOrWhiteSpace(value)) return;

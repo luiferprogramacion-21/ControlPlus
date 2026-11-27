@@ -120,12 +120,21 @@ export class SalesHistory implements OnInit {
     if (this.correctionPrintKey?.changeId !== change.id) this.correctionPrintKey = { changeId: change.id, key: crypto.randomUUID() };
     this.printingCorrection.set(change.id); this.error.set('');
     try {
-      const receipt = await this.api.correctionReceipt(sale.id, change.id, this.correctionPrintKey.key);
-      await this.ticketPrinter.print(buildCorrectionReceiptHtml(receipt));
-      this.correctionPrintKey = null;
-      this.notice.set(afterConfirm
-        ? `Corrección ${change.visibleNumber} registrada. Se abrió la impresión de su comprobante; revisa la salida en papel.`
-        : 'Comprobante de corrección preparado. Se abrió la impresión del navegador; revisa la salida en papel.');
+      // Pruebas del usuario del 26/11/2026: el comprobante sale en la impresora de tickets, como el ticket de venta.
+      // Sin impresora de tickets configurada se abre la impresión del navegador, como antes.
+      const printed = await this.api.printCorrectionReceipt(sale.id, change.id, this.correctionPrintKey.key);
+      const registered = afterConfirm ? `Corrección ${change.visibleNumber} registrada. ` : '';
+      if (printed.status === 'SIN_PERFIL') {
+        await this.ticketPrinter.print(buildCorrectionReceiptHtml(printed.receipt));
+        this.correctionPrintKey = null;
+        this.notice.set(`${registered}Se abrió la impresión de su comprobante; revisa la salida en papel.`);
+      } else if (printed.status === 'IMPRESO') {
+        this.correctionPrintKey = null;
+        this.notice.set(`${registered}El comprobante se mandó a la impresora de tickets.`);
+      } else {
+        if (afterConfirm) this.notice.set(`Corrección ${change.visibleNumber} registrada.`);
+        this.error.set(printed.message ?? 'No se sabe si el comprobante salió. Revisa la impresora.');
+      }
     } catch (error) { this.error.set(errorText(error)); }
     finally { this.printingCorrection.set(null); }
   }
@@ -144,9 +153,10 @@ export class SalesHistory implements OnInit {
     this.drawerNotice.set(cashDrawerNotice(change.drawerStatus));
     const id = this.detail()?.id;
     try { if (id) { this.detail.set(await this.api.detail(id)); await this.loadChanges(id); } } catch { this.detail.set(null); }
+    // La lista se recarga antes de imprimir para que un aviso de la impresora no se borre al recargarla.
+    await this.reload();
     // Pruebas del usuario del 26/11/2026: el comprobante de la corrección se imprime solo al aprobarla.
     if (this.detail()) await this.printCorrection(change, true);
-    await this.reload();
   }
   canPrint(sale: SaleSummary): boolean { return sale.state === 'CONFIRMADA' && this.session.has('SALES.REPRINT'); }
   /** A failed request keeps its Idempotency-Key so a retry never duplicates the request; it rotates after a success. */
