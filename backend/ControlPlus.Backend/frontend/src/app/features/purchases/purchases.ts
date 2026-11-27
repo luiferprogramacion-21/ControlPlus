@@ -26,7 +26,7 @@ export function currentColombiaDate(now = new Date()): string {
   const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
   return `${value['year']}-${value['month']}-${value['day']}`;
 }
-@Component({ selector: 'cp-purchases', imports: [WindowSheet, NumberInput, InputFormat, CommonModule, FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './purchases.html', styleUrls: ['../directory.scss', './purchases.scss'] })
+@Component({ selector: 'cp-purchases', imports: [WindowSheet, NumberInput, InputFormat, CommonModule, FormsModule, MatPaginatorModule, Icon, RouterLink], templateUrl: './purchases.html', styleUrls: ['../directory.scss', './purchases.scss', './purchases-receipt.scss'] })
 export class Purchases implements OnInit {
   private readonly api = inject(PurchasesApi); private readonly ordersApi = inject(OrdersApi); private readonly suppliersApi = inject(SuppliersApi); private readonly catalog = inject(CatalogApi);
   private readonly authorization = inject(AuthorizationDialog);
@@ -70,8 +70,12 @@ export class Purchases implements OnInit {
   /** Producto creado sin precio desde un pedido (punto 17): se recibe poniéndole su precio de venta. */
   hasNoPrice(productId: string): boolean { return this.productRetailPrice(productId) === 0; }
 
-  /** Pruebas del usuario del 26/11/2026: en una compra sin pedido el Administrador crea el proveedor ahí mismo. */
-  get canCreateSupplier(): boolean { return this.session.has('SUPPLIERS.MANAGE') && this.session.hasRole('ADMINISTRADOR'); }
+  /**
+   * Pruebas del usuario del 26/11/2026: en una compra sin pedido se crea el proveedor ahí mismo. El Administrador lo hace
+   * solo; el Supervisor que recibe mercancía, con la autorización del Administrador.
+   */
+  get canCreateSupplier(): boolean { return this.createsSupplierAlone || (this.session.hasRole('SUPERVISOR') && this.session.has('PURCHASES.RECEIVE')); }
+  private get createsSupplierAlone(): boolean { return this.session.has('SUPPLIERS.MANAGE') && this.session.hasRole('ADMINISTRADOR'); }
   readonly addingSupplier = signal(false);
   newSupplier = { name: '', documentNumber: '', phone: '' };
   startNewSupplier(): void { if (!this.canCreateSupplier) return; this.newSupplier = { name: '', documentNumber: '', phone: '' }; this.addingSupplier.set(true); }
@@ -79,15 +83,31 @@ export class Purchases implements OnInit {
     if (!this.canCreateSupplier || this.saving()) return;
     const name = this.newSupplier.name.trim(); const document = this.newSupplier.documentNumber.trim();
     if (!name) { this.error.set('Escribe el nombre del proveedor.'); return; }
-    this.saving.set(true); this.error.set('');
-    try {
-      const supplier = await this.suppliersApi.create({ name, documentType: document ? 'NIT' : null, documentNumber: document || null,
-        phone: this.newSupplier.phone.trim() || null, address: null, email: null, observations: null });
-      this.suppliers.update(list => [...list, supplier].sort((a, b) => a.name.localeCompare(b.name, 'es')));
-      this.form.supplierId = supplier.id; this.addingSupplier.set(false);
-      this.notice.set(`Proveedor ${supplier.name} creado y elegido para esta compra.`);
-    } catch (e) { this.error.set(reasonOr(e, 'No se pudo crear el proveedor.')); }
+    const input = { name, documentType: document ? 'NIT' : null, documentNumber: document || null,
+      phone: this.newSupplier.phone.trim() || null, address: null, email: null, observations: null };
+    this.error.set('');
+    if (!this.createsSupplierAlone) {
+      await this.authorization.open({ title: 'Autorizar proveedor nuevo',
+        description: 'El Administrador autoriza crear este proveedor (su carné, o su usuario y contraseña).',
+        detail: name, operatorUserName: this.session.user()?.userName ?? '', requireDifferentUser: true, allowCredential: true,
+        onError: message => this.error.set(message),
+        run: async credentials => {
+          this.saving.set(true);
+          try { this.supplierCreated(await this.suppliersApi.create(input, credentials ? authorizationBody(credentials) : undefined)); }
+          catch (e) { throw new Error(reasonOr(e, 'No se autorizó el proveedor nuevo. Lo autoriza un Administrador activo.')); }
+          finally { this.saving.set(false); }
+        } });
+      return;
+    }
+    this.saving.set(true);
+    try { this.supplierCreated(await this.suppliersApi.create(input)); }
+    catch (e) { this.error.set(reasonOr(e, 'No se pudo crear el proveedor.')); }
     finally { this.saving.set(false); }
+  }
+  private supplierCreated(supplier: Supplier): void {
+    this.suppliers.update(list => [...list, supplier].sort((a, b) => a.name.localeCompare(b.name, 'es')));
+    this.form.supplierId = supplier.id; this.addingSupplier.set(false);
+    this.notice.set(`Proveedor ${supplier.name} creado y elegido para esta compra.`);
   }
   setSamePrice(line: ReceiptLine, same: boolean): void {
     this.newPrice = { ...this.newPrice, [line.orderLineId]: !same };
@@ -255,6 +275,35 @@ export class Purchases implements OnInit {
   selectPurchaseProduct(line: PurchaseLineInput, productId: string): void { line.productId = productId; line.newRetailPrice = null; }
   /** Porcentaje de ganancia escrito en la calculadora, por producto (no viaja al servidor). */
   profit: Record<string, number | null> = {};
+  /** Costo con el que se comparó cada línea al empezar la recepción, para avisar si subió o bajó. */
+  previousCost: Record<string, number | null> = {};
+  requestedFor(orderLineId: string): number { return this.selectedOrder()?.lines.find(l => l.id === orderLineId)?.requestedQuantity ?? 0; }
+  /** Botones − y + de «¿Cuántas llegaron?», entre 0 y lo pendiente. */
+  stepReceived(line: ReceiptLine, delta: number): void {
+    line.quantity = Math.min(Math.max((Number(line.quantity) || 0) + delta, 0), this.pendingFor(line.orderLineId));
+  }
+  /** «Subió: antes $ 6.000», «Bajó: …» o «Igual que antes». */
+  costHint(line: ReceiptLine): { text: string; up: boolean } | null {
+    const before = this.previousCost[line.orderLineId]; const now = Number(line.unitCost);
+    if (before == null || !(before > 0) || !(now > 0)) return null;
+    if (now === before) return { text: 'Igual que antes', up: false };
+    return { text: `${now > before ? 'Subió' : 'Bajó'}: antes $ ${groupedNumber(before)}`, up: now > before };
+  }
+  /** Pruebas del usuario del 26/11/2026: con el % de ganancia escrito, el precio nuevo se calcula solo, también si cambia el costo. */
+  refreshPrice(line: ReceiptLine): void {
+    if (!this.newPrice[line.orderLineId]) return;
+    const percent = this.profit[line.orderLineId];
+    if (percent == null || `${percent}` === '') return;
+    const price = suggestedPrice(line.unitCost, percent);
+    if (price !== null) line.newRetailPrice = price;
+  }
+  /** Lo que se está recibiendo: productos, unidades, valor y cuántos precios cambian. */
+  receiptTotals(): { products: number; units: number; total: number; priceChanges: number } {
+    const lines = this.receipt.lines.filter(l => Number(l.quantity) > 0);
+    return { products: lines.length, units: lines.reduce((sum, l) => sum + Number(l.quantity), 0),
+      total: Math.round(lines.reduce((sum, l) => sum + Number(l.quantity) * (Number(l.unitCost) || 0), 0)),
+      priceChanges: lines.filter(l => this.newPrice[l.orderLineId] && this.changedPrice(l.productId, l.newRetailPrice) != null).length };
+  }
   /** Pone en «precio nuevo» el precio que deja la ganancia indicada sobre el costo de la línea. */
   applyProfit(key: string, line: { unitCost: number; newRetailPrice: number | null }): void {
     const price = suggestedPrice(line.unitCost, this.profit[key]);
@@ -273,7 +322,7 @@ export class Purchases implements OnInit {
   purchaseValidation(): string { const f = this.form; if (!f.supplierId || !this.suppliers().some(s => s.id === f.supplierId && s.isActive)) return 'Selecciona un proveedor activo.'; if (!f.invoiceDate) return 'Indica la fecha de factura.'; if ((f.supplierDocumentNumber?.trim().length ?? 0) > 100) return 'El número de factura supera 100 caracteres.'; if (!f.lines.length || f.lines.length > 200) return 'Incluye entre 1 y 200 productos.'; if (new Set(f.lines.map(l => l.productId)).size !== f.lines.length) return 'Cada producto debe aparecer una sola vez.'; for (const l of f.lines) { if (!l.productId || !Number.isInteger(l.quantity) || l.quantity <= 0) return 'Indica producto y cantidad entera positiva.'; if (!Number.isFinite(l.unitCost) || l.unitCost <= 0 || Math.round(l.unitCost * 10000) !== l.unitCost * 10000) return 'Indica un costo positivo de hasta cuatro decimales.'; if (this.hasNoPrice(l.productId) && !(Number(l.newRetailPrice) > 0)) return this.canChangeRetailPrice ? `${this.productName(l.productId)} todavía no tiene precio de venta: escríbelo en «Precio nuevo».` : `${this.productName(l.productId)} todavía no tiene precio de venta: pídele al Administrador que lo reciba y le ponga el precio.`; if (l.newRetailPrice != null && (!Number.isFinite(l.newRetailPrice) || l.newRetailPrice <= 0 || !Number.isInteger(l.newRetailPrice))) return 'El precio nuevo debe ser un valor entero mayor que cero.'; if (l.vatPercentage != null && (!Number.isFinite(l.vatPercentage) || l.vatPercentage < 0 || l.vatPercentage > 100 || Math.round(l.vatPercentage * 100) !== l.vatPercentage * 100)) return 'Revisa el IVA de las líneas.'; if (f.vatMode === 'NO_DISCRIMINADO' && l.vatPercentage != null) return 'Este modo de IVA no admite porcentaje por producto.'; } return ''; }
   async savePurchase(): Promise<void> { if (this.saving() || !this.canReceive) return; const issue = this.purchaseValidation(); if (issue) { this.error.set(issue); return; } this.saving.set(true); this.error.set(''); try { const selected = this.selectedPurchase(); const input = { ...this.form, supplierDocumentNumber: this.form.supplierDocumentNumber?.trim() || null, lines: this.form.lines.map(l => ({ ...l, vatPercentage: this.form.vatMode === 'NO_DISCRIMINADO' ? null : l.vatPercentage })) }; const result = selected ? await this.api.update(selected, input) : await this.api.create(input); this.selectedPurchase.set(result); this.editing.set(false); this.notice.set('Borrador guardado.'); await this.reload(); } catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); } }
   async confirmPurchase(): Promise<void> { const p = this.selectedPurchase(); if (!p || p.status !== 'BORRADOR' || this.saving() || !this.canReceive) return; this.saving.set(true); this.error.set(''); const key = crypto.randomUUID(); try { this.selectedPurchase.set(await this.api.confirm(p, key)); this.notice.set('Compra confirmada.'); await this.reload(); } catch (e) { this.error.set(errorText(e)); } finally { this.saving.set(false); } }
-  startReceipt(): void { const order = this.selectedOrder(); if (!order || !this.canReceive || this.orderConflict() || (order.status !== 'ENVIADO' && order.status !== 'RECIBIDO_PARCIAL') || !order.lines.some(l => l.pendingQuantity > 0)) return; this.receipt = { supplierDocumentNumber: null, invoiceDate: currentColombiaDate(), vatMode: 'NO_DISCRIMINADO', lines: order.lines.filter(l => l.pendingQuantity > 0).map(l => ({ orderLineId: l.id, productId: l.productId, quantity: l.pendingQuantity, unitCost: l.estimatedUnitCost ?? l.currentUnitCost ?? 0, vatPercentage: null, newRetailPrice: null })) }; this.profit = {}; this.newPrice = Object.fromEntries(this.receipt.lines.filter(l => this.hasNoPrice(l.productId)).map(l => [l.orderLineId, true])); this.receiving.set(true); }
+  startReceipt(): void { const order = this.selectedOrder(); if (!order || !this.canReceive || this.orderConflict() || (order.status !== 'ENVIADO' && order.status !== 'RECIBIDO_PARCIAL') || !order.lines.some(l => l.pendingQuantity > 0)) return; this.receipt = { supplierDocumentNumber: null, invoiceDate: currentColombiaDate(), vatMode: 'NO_DISCRIMINADO', lines: order.lines.filter(l => l.pendingQuantity > 0).map(l => ({ orderLineId: l.id, productId: l.productId, quantity: l.pendingQuantity, unitCost: l.estimatedUnitCost ?? l.currentUnitCost ?? 0, vatPercentage: null, newRetailPrice: null })) }; this.profit = {}; this.previousCost = Object.fromEntries(order.lines.map(l => [l.id, l.currentUnitCost ?? l.estimatedUnitCost ?? null])); this.newPrice = Object.fromEntries(this.receipt.lines.filter(l => this.hasNoPrice(l.productId)).map(l => [l.orderLineId, true])); this.receiving.set(true); }
   receiveAllPending(): void { if (!this.receiving() || this.saving() || this.orderConflict()) return; for (const line of this.receipt.lines) line.quantity = this.pendingFor(line.orderLineId); }
   pendingFor(orderLineId: string): number { return this.selectedOrder()?.lines.find(l => l.id === orderLineId)?.pendingQuantity ?? 0; }
   receiptValidation(): string { const order = this.selectedOrder(); if (!order || !this.receipt.invoiceDate) return 'Indica la fecha de factura.'; const lines = this.receipt.lines.filter(l => l.quantity > 0); if (!lines.length) return 'Indica al menos una cantidad a recibir.'; for (const line of this.receipt.lines) { const original = order.lines.find(l => l.id === line.orderLineId); if (!original || !Number.isInteger(line.quantity) || line.quantity < 0 || line.quantity > original.pendingQuantity) return 'La cantidad debe ser entera y no superar lo pendiente.'; if (line.quantity > 0 && !(Number(line.unitCost) > 0)) return `Escribe el costo de ${this.productName(line.productId)}: lo que cobró el proveedor por unidad.`; if (line.quantity > 0 && this.hasNoPrice(line.productId) && !(Number(line.newRetailPrice) > 0)) return `${this.productName(line.productId)} todavía no tiene precio de venta: escríbelo en «Precio nuevo».`; if (line.quantity > 0 && (!Number.isFinite(line.unitCost) || line.unitCost <= 0 || Math.round(line.unitCost * 10000) !== line.unitCost * 10000 || (this.receipt.vatMode === 'NO_DISCRIMINADO' && line.vatPercentage != null) || (line.vatPercentage != null && (line.vatPercentage < 0 || line.vatPercentage > 100 || Math.round(line.vatPercentage * 100) !== line.vatPercentage * 100)))) return 'Indica el costo de cada producto recibido.'; if (line.quantity > 0 && this.newPrice[line.orderLineId] && (line.newRetailPrice == null || `${line.newRetailPrice}` === '')) return `Escribe el precio nuevo de ${this.productName(line.productId)} o marca «Mismo precio».`; if (line.quantity > 0 && line.newRetailPrice != null && (!Number.isFinite(line.newRetailPrice) || line.newRetailPrice <= 0 || !Number.isInteger(line.newRetailPrice))) return 'El precio nuevo debe ser un valor entero mayor que cero.'; } return ''; }

@@ -52,6 +52,13 @@ public sealed record CustomerCreditStageDto(
     DateOnly? NextDueOn,
     DateOnly? OldestOverdueOn);
 
+/// <summary>
+/// Resumen de Clientes (pruebas del usuario del 26/11/2026): cuántos deben y cuánto, cuántos están morosos y cuánto tienen
+/// vencido, y cuántos vencen en los próximos días y cuánto deben.
+/// </summary>
+public sealed record CustomerCreditSummaryDto(
+    int Debtors, decimal DebtTotal, int Overdue, decimal OverdueTotal, int DueSoon, decimal DueSoonTotal);
+
 public interface ICreditSettingsService
 {
     Task<Result<CreditSettingsDto>> GetAsync(
@@ -64,6 +71,9 @@ public interface ICreditSettingsService
     Task<Result<CustomerCreditRiskDto>> GetCustomerRiskAsync(
         ActorContext actor, Guid customerId, decimal amount,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Resumen de los clientes que deben, para la parte de arriba de Clientes.</summary>
+    Task<Result<CustomerCreditSummaryDto>> GetCustomerSummaryAsync(ActorContext actor, CancellationToken cancellationToken = default);
 
     /// <summary>Etapa del crédito de hasta 100 clientes; los que no tienen deuda vienen como SIN_DEUDA.</summary>
     Task<Result<IReadOnlyCollection<CustomerCreditStageDto>>> GetCustomerStagesAsync(

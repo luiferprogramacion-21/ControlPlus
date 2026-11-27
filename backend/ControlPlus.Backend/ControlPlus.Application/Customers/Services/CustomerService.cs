@@ -1,18 +1,22 @@
 using System.Net.Mail;
 using ControlPlus.Application.Common;
+using ControlPlus.Application.Credits.Services;
 using ControlPlus.Application.Customers.Contracts;
 using ControlPlus.Application.Customers.Ports;
 using ControlPlus.Application.Security.Contracts;
 using ControlPlus.Application.Security.Ports;
 using ControlPlus.Application.Security.Services;
+using ControlPlus.Domain.Credits;
 using ControlPlus.Domain.OfficialModel;
 using ControlPlus.Domain.Security.Enums;
 
 namespace ControlPlus.Application.Customers.Services;
 
 public sealed class CustomerService(ICustomerRepository repository, IPermissionChecker permissions,
-    IAuditRepository audit, IUnitOfWork unitOfWork, IClock clock) : ICustomerService
+    IAuditRepository audit, IUnitOfWork unitOfWork, IClock clock, ICustomerCreditStages creditStages) : ICustomerService
 {
+    private static readonly string[] CreditFilters = ["DEBEN", "MOROSOS", "POR_VENCER", "AL_DIA", "SIN_DEUDA"];
+
     public async Task<Result<PagedResult<CustomerDto>>> ListAsync(ActorContext actor, CustomerListQuery query, CancellationToken ct = default)
     {
         if (!await HasBasicAccessAsync(actor, ct)) return Denied<PagedResult<CustomerDto>>();
@@ -20,7 +24,20 @@ public sealed class CustomerService(ICustomerRepository repository, IPermissionC
         var status = (query.Status ?? "active").Trim().ToLowerInvariant();
         if (status is not ("active" or "inactive" or "all")) return Result.Failure<PagedResult<CustomerDto>>(ApplicationError.Validation("El estado debe ser active, inactive o all."));
         if (status is "inactive" or "all" && !await HasAsync(actor, PermissionCodes.CustomersManage, ct)) return Denied<PagedResult<CustomerDto>>();
-        var result = await repository.ListAsync(query, status, ct);
+        var filter = string.IsNullOrWhiteSpace(query.Credit) ? null : query.Credit.Trim().ToUpperInvariant();
+        if (filter is not null && !CreditFilters.Contains(filter))
+            return Result.Failure<PagedResult<CustomerDto>>(ApplicationError.Validation("El filtro de crédito debe ser DEBEN, MOROSOS, POR_VENCER, AL_DIA o SIN_DEUDA."));
+        // Pruebas del usuario del 26/11/2026: quien ve los créditos recibe primero a los que deben y puede filtrarlos.
+        var seesCredit = await HasAsync(actor, PermissionCodes.CreditRequest, ct);
+        if (filter is not null && !seesCredit) return Denied<PagedResult<CustomerDto>>();
+        CustomerCreditOrder? credit = null;
+        if (seesCredit && await creditStages.ReadAllAsync(ct) is { } stages)
+        {
+            Guid[] Ids(string stage) => stages.Where(pair => pair.Value.Stage == stage).Select(pair => pair.Key).ToArray();
+            credit = new CustomerCreditOrder(Ids(CustomerCreditStagePolicy.Overdue), Ids(CustomerCreditStagePolicy.DueSoon),
+                Ids(CustomerCreditStagePolicy.Current), filter);
+        }
+        var result = await repository.ListAsync(query, status, credit, ct);
         return Result.Success(new PagedResult<CustomerDto>(result.Items.Select(Map).ToArray(), result.Page, result.PageSize, result.TotalCount));
     }
 

@@ -21,9 +21,19 @@ public sealed class EfCustomerCreditExposureReader(OfficialControlPlusDbContext 
     {
         if (customerIds.Count == 0) return new Dictionary<Guid, CustomerCreditExposure>();
         var ids = customerIds.Distinct().ToArray();
-        var open = await dbContext.Credito.AsNoTracking()
-            .Where(x => x.Venta.ClienteId != null && ids.Contains(x.Venta.ClienteId.Value) &&
-                (x.Estado == "PENDIENTE" || x.Estado == "VENCIDO") && x.SaldoPendiente > 0)
+        return await ReadAsync(ids, today, cancellationToken);
+    }
+
+    public Task<IReadOnlyDictionary<Guid, CustomerCreditExposure>> GetAllAsync(DateOnly today, CancellationToken cancellationToken = default) =>
+        ReadAsync(null, today, cancellationToken);
+
+    private async Task<IReadOnlyDictionary<Guid, CustomerCreditExposure>> ReadAsync(
+        Guid[]? ids, DateOnly today, CancellationToken cancellationToken)
+    {
+        var credits = dbContext.Credito.AsNoTracking()
+            .Where(x => x.Venta.ClienteId != null && (x.Estado == "PENDIENTE" || x.Estado == "VENCIDO") && x.SaldoPendiente > 0);
+        if (ids is not null) credits = credits.Where(x => ids.Contains(x.Venta.ClienteId!.Value));
+        var open = await credits
             .Select(x => new { x.Id, CustomerId = x.Venta.ClienteId!.Value, x.SaldoPendiente })
             .ToListAsync(cancellationToken);
         var creditIds = open.Select(x => x.Id).ToArray();

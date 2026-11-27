@@ -99,6 +99,8 @@ Es una tarjeta con un **código de barras** (Code 128) a nombre de una persona. 
 - desbloquear el punto de venta en **turno compartido** (ver 2.2);
 - autorizar operaciones en lugar de escribir usuario y contraseña.
 
+En turno compartido, mientras alguien tiene su carné activo en el computador, arriba se lee **Operador: nombre · rol** y el menú **apaga** lo que esa persona no puede usar. Cuando termina su venta, vuelve el menú normal.
+
 El Administrador lo emite en Administración → Usuarios → **Carné**. Si se pierde, se emite otro y el anterior deja de servir. El sistema guarda solo una huella del código, no el código.
 
 **Imprimir carné** lo saca en la **impresora de tickets** (rollo de 80 mm), en una tarjeta de 71 × 54 mm (lo más grande que cabe en el rollo; la altura de una tarjeta de crédito) con barras gruesas que el lector láser sí lee. Para el tamaño exacto de tarjeta de crédito (85,6 × 54 mm), usa **Descargar PDF** e imprímelo en una impresora normal en **tamaño real (100 %)**. Recórtalo por la línea punteada y, si puedes, plastifícalo. Para imprimirlo en otra impresora usa **Descargar PDF** o **Descargar JPG**. Los carnés emitidos **antes del 20 de noviembre de 2026** tienen un código más largo que el lector puede no leer: **emite uno nuevo** desde la pestaña Carné (el anterior deja de servir).
@@ -246,6 +248,13 @@ Un apartado separa productos para un cliente mientras los va pagando. Menú **Ap
 Menú **Clientes** → **Nuevo cliente**. Todo cliente lleva **nombre, documento (tipo y número), teléfono y dirección**; el correo es opcional. El documento no se puede repetir. Puedes consultar su **historial**.
 
 Desde el punto de venta (**+ Nuevo cliente**) se piden esos mismos cuatro datos. Si un cliente antiguo no los tiene, al editarlo en Clientes hay que completarlos; sin dirección no sirve para crédito ni apartado.
+
+**La lista de Clientes:** cada cliente tiene un círculo con sus iniciales del color de su crédito, su documento, teléfono y dirección en una línea, su situación y lo que **Debe**. Los que deben salen primero, con los morosos arriba (fila en rojo claro).
+
+- Arriba, el **resumen**: cuántos clientes deben y cuánto, cuántos están **morosos** y cuánto tienen vencido, y cuántos **vencen en 3 días**. Al tocar uno, la lista muestra solo esos.
+- Los botones **Todos**, **Deben**, **Morosos**, **Por vencer** y **Sin deuda** filtran la lista.
+- **Cobrar abono** (si debe) abre **Créditos y abonos** con ese cliente.
+- **Ver ficha** abre una ventana con pestañas: **Datos** (para editar, incluido el cupo), **Créditos** (cada crédito con su saldo y **Cobrar abono**, que deja el abono listo) e **Historial**.
 
 **¿Está al día o moroso?** En la lista **Seleccionar cliente** del punto de venta, al elegir el cliente y en la columna **Crédito** de Clientes, se ve su situación con un color:
 
@@ -413,7 +422,12 @@ Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor*
 - **Pedir algo que aún no está en el sistema:** en el mismo pedido pulsa **+ Producto nuevo**, escribe el nombre, elige la categoría y la cantidad y pulsa **Agregar al pedido**. Queda creado en Catálogo con ese proveedor. El **precio de venta es opcional**: si aún no lo sabes, déjalo vacío. Mientras no tenga precio se ve como **Sin precio** y **no se puede vender**; el Administrador se lo pone al recibir la mercancía o en Catálogo.
 - **Cuando llega mercancía:** pulsa **Recibir mercancía** (también en Inicio). Son tres pasos, que se ven arriba de cada ventana: **1. ¿De dónde viene?**, **2. Productos y cantidades** y **3. Confirmar**. El sistema pregunta si viene de un pedido:
   - **Sí, viene de un pedido:** eliges el pedido; las cantidades pendientes **vienen listas**. Si llegó menos (recepción **parcial**), corrígelas.
-    En **Precio de venta**, cada producto trae marcada la casilla **Mismo precio**. Si el precio cambió, desmárcala y escribe el **precio nuevo** (o calcúlalo con el **% de ganancia**). Si eres Supervisor, al guardar se pide la **autorización del Administrador** (su carné, o su usuario y contraseña).
+    Cada producto llega en su propia **tarjeta** con tres preguntas:
+    - **¿Cuántas llegaron?**: viene con lo pendiente; corrígelo con **−** y **+** o escribiéndolo.
+    - **Costo por unidad**: viene con el costo actual. Si lo cambias, la tarjeta dice si **subió** o **bajó** frente al de antes.
+    - **Precio de venta**: **Igual** (el de hoy) o **Precio nuevo**. Con **Precio nuevo**, escribe el precio o escribe el **% de ganancia** en su casilla y el precio se calcula solo (también si cambias el costo). Si eres Supervisor, al guardar se pide la **autorización del Administrador** (su carné, o su usuario y contraseña).
+
+    Abajo se ve cuántos productos y unidades recibes, el total y cuántos precios cambian.
     Un producto **Sin precio** (creado desde un pedido) dice **Escribe su precio**: hay que ponerle el precio de venta y su costo para recibirlo. Desde ese momento ya se puede vender.
   - **No, es una compra sin pedido:** anotas el proveedor, el número de factura, los productos y sus costos.
 
@@ -421,7 +435,8 @@ Menú **Compras**: una sola pantalla con tres pestañas: **Pedidos al proveedor*
 - **Al enviar un pedido** se descarga solo su **PDF** para mandarlo al proveedor. En el pedido puedes volver a pulsar **Descargar PDF** o **Imprimir documento**.
 - En **Mercancía recibida**, cada pedido muestra **Recibir mercancía** (en azul) solo si todavía falta algo por recibir, y **Ver recepciones** si ya llegó algo.
 - **Si algo se recibió mal:** en **Mercancía recibida**, en el pedido, pulsa **Ver recepciones**; abre la entrega con **Ver detalle** y pulsa **Corregir recepción**. Te muestra cómo queda el pedido, eliges el motivo y pides la **autorización del Administrador**. Las unidades salen del inventario y vuelven a quedar pendientes en el pedido. Si esos productos ya se vendieron o se ajustaron después, la pantalla explica por qué no se puede deshacer.
-- No creas ni editas proveedores, ni anulas compras: eso es del Administrador.
+- **Proveedor nuevo en una compra sin pedido:** pulsa **+ Proveedor nuevo**, escribe el nombre (NIT y teléfono son opcionales) y **Crear proveedor**; se pide la **autorización del Administrador** (su carné, o su usuario y contraseña) y el proveedor queda elegido para la compra.
+- No editas proveedores ni anulas compras: eso es del Administrador.
 
 ---
 
@@ -519,7 +534,7 @@ Para dejar de usarlo, desmarca **Permitir apertura** y guarda. Un perfil de etiq
 
 ## 4.8 Proveedores y compras
 
-- **Proveedores:** solo tú los creas, editas e inactivas. El documento (NIT o cédula) es opcional; si lo informas, debes escribir tipo y número, y no se puede repetir. Al editar puedes retirar ambos datos.
+- **Proveedores:** solo tú los creas, editas e inactivas. El Supervisor también puede crear uno desde una compra sin pedido, con tu autorización. El documento (NIT o cédula) es opcional; si lo informas, debes escribir tipo y número, y no se puede repetir. Al editar puedes retirar ambos datos.
 - **Compras y pedidos:** además de lo del Supervisor (3.10), tú puedes **anular una compra** ya confirmada (completa, con motivo), **anular un pedido** y **Cerrar con pendientes** un pedido cuyo faltante ya no va a llegar.
 - **Proveedor nuevo en una compra sin pedido:** si el proveedor no existe, pulsa **+ Proveedor nuevo** debajo de la lista de proveedores, escribe su nombre (NIT y teléfono son opcionales) y **Crear proveedor**: queda elegido para esa compra.
 - **Anular una compra** resta lo que había entrado al inventario y devuelve el costo anterior. Solo se anulan las **compras sin pedido** (botón **Anular compra** en la compra); lo que llegó de un pedido se corrige con **Corregir recepción**. No se puede si el producto ya tuvo movimientos posteriores (por ejemplo, ya se vendió).
@@ -607,7 +622,7 @@ Estas reglas no se pueden cambiar con permisos:
 | Ver costos | — | — | ✔ |
 | Etiquetas de productos | — | ✔ | ✔ |
 | Pedidos y mercancía recibida | — | ✔ | ✔ |
-| Crear proveedores, anular compras | — | — | ✔ |
+| Crear proveedores, anular compras | — | Crear, con tu autorización | ✔ |
 | Reportes y Dashboard | — | — | ✔ |
 | Usuarios, roles, auditoría | — | — | ✔ |
 | Configuración e impresión | — | modo del turno, con Administrador | ✔ |

@@ -108,10 +108,11 @@ describe('purchase dates', () => {
 
 describe('Purchases: proveedor nuevo en la compra sin pedido (pruebas del 26/11/2026)', () => {
   const createSupplier = vi.fn();
+  const openAuthorization = vi.fn(async (prompt: { run: (credentials: { userName: string; password: string }) => Promise<void> }) => { await prompt.run({ userName: 'jefe', password: '1234' }); return true; });
   let roles: string[];
   function build(): Purchases {
     TestBed.configureTestingModule({ providers: [
-      { provide: PurchasesApi, useValue: {} }, { provide: OrdersApi, useValue: {} }, { provide: AuthorizationDialog, useValue: { open: vi.fn() } },
+      { provide: PurchasesApi, useValue: {} }, { provide: OrdersApi, useValue: {} }, { provide: AuthorizationDialog, useValue: { open: openAuthorization } },
       { provide: SuppliersApi, useValue: { create: createSupplier } }, { provide: CatalogApi, useValue: {} },
       { provide: SessionService, useValue: { has: (p: string) => ['SUPPLIERS.MANAGE', 'PURCHASES.RECEIVE'].includes(p), hasRole: (...codes: string[]) => codes.some(c => roles.includes(c)), user: () => ({ roles }) } },
     ] });
@@ -135,11 +136,20 @@ describe('Purchases: proveedor nuevo en la compra sin pedido (pruebas del 26/11/
     expect(component.addingSupplier()).toBe(false);
   });
 
-  it('el Supervisor no ve la opción', () => {
+  it('el Supervisor lo crea con la autorización del Administrador; el Cajero no ve la opción', async () => {
     roles = ['SUPERVISOR'];
     const component = build();
-    expect(component.canCreateSupplier).toBe(false);
+    createSupplier.mockResolvedValue({ id: 's-sup', name: 'Ferretería Nueva', isActive: true });
+    expect(component.canCreateSupplier).toBe(true);
     component.startNewSupplier();
-    expect(component.addingSupplier()).toBe(false);
+    component.newSupplier = { name: 'Ferretería Nueva', documentNumber: '', phone: '3001234567' };
+    await component.createSupplier();
+    expect(openAuthorization).toHaveBeenCalled();
+    expect(createSupplier).toHaveBeenCalledWith(expect.objectContaining({ name: 'Ferretería Nueva', phone: '3001234567' }), { userName: 'jefe', password: '1234' });
+    expect(component.form.supplierId).toBe('s-sup');
+    TestBed.resetTestingModule();
+    roles = ['CAJERO'];
+    const cashier = build();
+    expect(cashier.canCreateSupplier).toBe(false);
   });
 });

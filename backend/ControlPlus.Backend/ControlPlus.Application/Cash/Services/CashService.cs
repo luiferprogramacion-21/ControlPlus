@@ -114,11 +114,14 @@ public sealed partial class CashService(
             : null;
         var operatorName = ownSession is null ? null : (await userRepository.GetByIdAsync(ownSession.UsuarioId, cancellationToken))?.DisplayName;
         // The seller's role decides whether a discount or wholesale price needs authorization, not the logged-in user's.
-        var operatorRole = ownSession is null ? null
-            : (await userRepository.GetAuthorizationSnapshotAsync(ownSession.UsuarioId, cancellationToken))?.HighestRoleLevel switch
-            {
-                RoleLevel.Administrador => "ADMINISTRADOR", RoleLevel.Supervisor => "SUPERVISOR", RoleLevel.Cajero => "CAJERO", _ => null,
-            };
+        var operatorSnapshot = ownSession is null ? null
+            : await userRepository.GetAuthorizationSnapshotAsync(ownSession.UsuarioId, cancellationToken);
+        var operatorRole = operatorSnapshot?.HighestRoleLevel switch
+        {
+            RoleLevel.Administrador => "ADMINISTRADOR", RoleLevel.Supervisor => "SUPERVISOR", RoleLevel.Cajero => "CAJERO", _ => null,
+        };
+        // Opción B del turno compartido (26/11/2026): con los permisos de quien pasó el carné, el menú apaga lo que no puede usar.
+        IReadOnlyList<string>? operatorPermissions = operatorSnapshot?.PermissionCodes.Order(StringComparer.Ordinal).ToArray();
         var responsibleName = shift?.ModoOperacion == CashConstants.IndividualMode && shift.UsuarioResponsableId is Guid responsibleId
             ? (await userRepository.GetByIdAsync(responsibleId, cancellationToken))?.DisplayName
             : null;
@@ -131,11 +134,13 @@ public sealed partial class CashService(
                 ActiveOperatorName = operatorName,
                 ActiveOperatorRole = operatorRole,
                 LastInitialAmount = canManage && shift is null ? await repository.GetLastInitialAmountAsync(cancellationToken) : null,
+                ActiveOperatorPermissions = operatorPermissions,
             });
 
         return Result.Success(new CashStateDto(null, null, null, null, false, null,
             cash is not null, shift is not null, shared,
-            ownSession is null ? null : Map(ownSession), responsibleName, operatorName, operatorRole));
+            ownSession is null ? null : Map(ownSession), responsibleName, operatorName, operatorRole,
+            ActiveOperatorPermissions: operatorPermissions));
     }
 
     public async Task<Result<CashRegisterDto>> ConfigureCashRegisterAsync(

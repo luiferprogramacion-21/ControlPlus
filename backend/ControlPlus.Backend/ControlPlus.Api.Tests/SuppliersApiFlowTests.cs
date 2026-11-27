@@ -155,6 +155,13 @@ public sealed class SuppliersApiFlowTests : IAsyncLifetime
         var supervisor = await LoginAsync(client, SupervisorName, _supervisorPassword);
         Bearer(client, supervisor.AccessToken);
         await ProblemAsync(await client.PostAsJsonAsync("/api/suppliers", new CreateSupplierRequest(null, null, "Tampoco", null, null, null, null)), HttpStatusCode.Forbidden, "authorization.forbidden");
+        // Pruebas del usuario del 26/11/2026: el Supervisor crea el proveedor de una compra sin pedido con la autorización
+        // del Administrador; otro Supervisor (aquí, él mismo) no sirve.
+        await ProblemAsync(await client.PostAsJsonAsync("/api/suppliers", new CreateSupplierRequest(null, null, "Sin Administrador", null, null, null, null,
+            new SupplierAuthorizationRequest(SupervisorName, _supervisorPassword))), HttpStatusCode.Forbidden, "authorization.forbidden");
+        var authorized = await ReadAsync<SupplierDto>(await client.PostAsJsonAsync("/api/suppliers", new CreateSupplierRequest(null, null, "Gamma autorizado", null, null, null, null,
+            new SupplierAuthorizationRequest(AdminName, _adminPassword))), HttpStatusCode.Created);
+        Assert.Equal("Gamma autorizado", authorized.Name);
         await ProblemAsync(await client.PutAsJsonAsync($"/api/suppliers/{supplier.Id}",
             new UpdateSupplierRequest("NIT", "FILTER-1", "Tampoco", null, null, null, null, supplier.Version)), HttpStatusCode.Forbidden, "authorization.forbidden");
         Bearer(client, users.Cashier.Token.AccessToken);

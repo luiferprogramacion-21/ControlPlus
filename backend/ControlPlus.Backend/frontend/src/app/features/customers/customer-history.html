@@ -1,7 +1,16 @@
+@if (embedded()) {
+  <ng-container [ngTemplateOutlet]="historyBody" />
+} @else {
 <div class="module-form-sheet" role="dialog" aria-modal="true" aria-labelledby="customer-history-title" (keydown.escape)="closed.emit()">
   <div class="module-form-sheet__backdrop" (click)="closed.emit()"></div>
   <section class="panel panel--padded module-form customer-history-sheet">
     <div class="panel-heading"><h2 id="customer-history-title">Historial de {{ customer().fullName }}</h2><p>{{ customer().documentType && customer().documentNumber ? customer().documentType + ' ' + customer().documentNumber + ' · ' : '' }}{{ customer().phone || 'Sin teléfono' }}</p></div>
+    <ng-container [ngTemplateOutlet]="historyBody" />
+    <div class="form-actions"><button class="button button--primary" type="button" (click)="closed.emit()">Cerrar</button></div>
+  </section>
+</div>
+}
+<ng-template #historyBody>
     <p class="muted">Ventas, créditos, apartados y sus abonos, del más reciente al más antiguo. Solo ves los tipos de operación que tus permisos permiten.</p>
     @if (error()) { <p class="field-error" role="alert">{{ error() }} <button class="link-button" type="button" (click)="load()">Reintentar</button></p> }
     @if (loading()) { <p class="muted" role="status">Cargando historial…</p> }
@@ -16,6 +25,4 @@
       } @empty { @if (!loading() && !error()) { <tr class="empty-row"><td colspan="6"><span aria-hidden="true">◇</span><strong>Sin movimientos</strong><small>Este cliente no tiene operaciones visibles para ti.</small></td></tr> } }
     </tbody></table></div>
     @if (result(); as pageResult) { <mat-paginator [length]="pageResult.totalCount" [pageIndex]="page - 1" [pageSize]="pageSize" [pageSizeOptions]="[10,20,50]" (page)="pageChanged($event)" aria-label="Páginas del historial" /> }
-    <div class="form-actions"><button class="button button--primary" type="button" (click)="closed.emit()">Cerrar</button></div>
-  </section>
-</div>
+</ng-template>

@@ -19,4 +19,7 @@ public interface ICustomerCreditExposureReader
     /// <summary>La misma lectura para varios clientes a la vez (una página de Clientes); omite a quien no tiene créditos abiertos.</summary>
     Task<IReadOnlyDictionary<Guid, CustomerCreditExposure>> GetManyAsync(
         IReadOnlyCollection<Guid> customerIds, DateOnly today, CancellationToken cancellationToken = default);
+
+    /// <summary>Todos los clientes con créditos abiertos (resumen y orden de Clientes, 26 de noviembre de 2026).</summary>
+    Task<IReadOnlyDictionary<Guid, CustomerCreditExposure>> GetAllAsync(DateOnly today, CancellationToken cancellationToken = default);
 }

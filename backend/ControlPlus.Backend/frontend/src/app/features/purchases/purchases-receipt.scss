@@ -1,0 +1,32 @@
+/* Pruebas del usuario del 26/11/2026: proveedor nuevo desde la compra sin pedido, y productos sin precio al recibir. */
+.inline-supplier { margin-top: 10px; padding: 12px; border: 1px solid var(--cp-border); border-radius: 10px; background: var(--cp-table-head); }
+.inline-supplier__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.inline-supplier__open { margin-top: 8px; }
+.same-price--required { color: var(--cp-error); font-weight: 600; }
+
+/* Recepción de mercancía con una tarjeta por producto (pruebas del usuario del 26/11/2026). */
+.receipt-cards { display: grid; gap: 10px; margin-top: 12px; }
+.receipt-card { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 14px; align-items: start; padding: 12px 14px; border: 1px solid var(--cp-border); border-radius: 12px; background: var(--cp-surface); }
+.receipt-card--new { border: 2px solid #e8a07a; background: var(--cp-warning-soft); }
+.receipt-card--skip { opacity: .7; }
+.receipt-card__product { display: flex; flex-direction: column; gap: 3px; }
+.receipt-card__product small { color: var(--cp-text-muted); }
+.receipt-card__alert { color: var(--cp-warning) !important; font-weight: 700; }
+.receipt-card__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.receipt-card__label { color: var(--cp-text-secondary); font-size: 13px; font-weight: 600; }
+.receipt-card .stock-steps { display: flex; align-items: center; gap: 4px; }
+.receipt-card .stock-steps .text-field { width: 70px; text-align: center; }
+.receipt-card .money-field input { width: 100%; }
+.receipt-card__hint { color: var(--cp-text-muted); font-size: 12px; }
+.receipt-card__hint--up { color: var(--cp-warning); font-weight: 600; }
+.receipt-switch { display: inline-flex; border: 1px solid var(--cp-control-border); border-radius: 8px; overflow: hidden; }
+.receipt-switch button { min-height: 36px; padding: 6px 12px; border: 0; background: var(--cp-surface); color: var(--cp-text); font: inherit; cursor: pointer; }
+.receipt-switch button.is-on { background: var(--cp-primary); color: white; font-weight: 700; }
+.receipt-card__new { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.receipt-card__new .money-field { flex: 1 1 130px; }
+.receipt-card__percent { display: inline-flex; align-items: center; gap: 6px; color: var(--cp-text-secondary); font-size: 13px; }
+.receipt-card__percent input { width: 64px; min-height: 36px; padding: 4px 8px; border: 1px solid var(--cp-control-border); border-radius: 8px; font: inherit; text-align: right; }
+.receipt-summary { display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--cp-border); color: var(--cp-text-secondary); }
+.receipt-summary strong { color: var(--cp-text); }
+@container cp (max-width: 900px) { .receipt-card { grid-template-columns: 1fr 1fr; } }
+@container cp (max-width: 560px) { .receipt-card { grid-template-columns: 1fr; } }

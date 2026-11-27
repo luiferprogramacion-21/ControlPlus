@@ -3,10 +3,11 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { AuthorizationBody, Page, authorizationContext } from '../../core/api';
 import { type CashDrawerDispatch, withCashDrawerStatus } from '../../shared/cash-drawer-feedback';
+import { OperatorPresence } from '../../core/operator-presence';
 
 export interface OperatorSession { id: string; state: string; }
 export interface CashShift { id: string; mode: string; state: string; operatingDate: string; openedAtUtc: string; initialAmount: number; version: number; responsibleUserId: string | null; }
-export interface CashState { isConfigured: boolean; hasOpenShift: boolean; defaultShiftMode: string | null; configurationVersion?: number | null; requiresPreviousShiftClosure: boolean; requiresOperatorSession: boolean; guidance: string | null; currentShift: CashShift | null; ownOperatorSession: OperatorSession | null; openShiftResponsibleName?: string | null; /** Quien pasó su carné en turno compartido: la venta queda a su nombre. */ activeOperatorName?: string | null; /** Rol de quien pasó el carné. */ activeOperatorRole?: string | null; /** Fondo de la última apertura (solo sin turno abierto). */ lastInitialAmount?: number | null; }
+export interface CashState { isConfigured: boolean; hasOpenShift: boolean; defaultShiftMode: string | null; configurationVersion?: number | null; requiresPreviousShiftClosure: boolean; requiresOperatorSession: boolean; guidance: string | null; currentShift: CashShift | null; ownOperatorSession: OperatorSession | null; openShiftResponsibleName?: string | null; /** Quien pasó su carné en turno compartido: la venta queda a su nombre. */ activeOperatorName?: string | null; /** Rol de quien pasó el carné. */ activeOperatorRole?: string | null; /** Permisos de quien pasó el carné (opción B del 26/11/2026). */ activeOperatorPermissions?: string[] | null; /** Fondo de la última apertura (solo sin turno abierto). */ lastInitialAmount?: number | null; }
 export interface ReconciliationMethod { paymentMethodId: string; code: string; name: string; affectsCash: boolean; expectedAmount: number; countedAmount: number | null; difference: number | null; }
 export interface Reconciliation { shiftId: string; shiftVersion: number; totalExpected: number; totalCounted: number | null; totalDifference: number | null; paymentMethods: ReconciliationMethod[]; cashDifference: number | null; }
 export interface CashMovement extends CashDrawerDispatch { id: string; type: string; category: string; amount: number; concept: string | null; occurredAtUtc: string; }
@@ -24,7 +25,13 @@ export interface CashCloseInput {
 @Injectable({ providedIn: 'root' })
 export class CashApi {
   private readonly http = inject(HttpClient);
-  state(): Promise<CashState> { return firstValueFrom(this.http.get<CashState>('/api/cash/state')); }
+  private readonly presence = inject(OperatorPresence);
+  /** Cada consulta del estado avisa al menú quién tiene su carné activo (opción B del 26/11/2026). */
+  async state(): Promise<CashState> {
+    const state = await firstValueFrom(this.http.get<CashState>('/api/cash/state'));
+    this.presence.update(state);
+    return state;
+  }
   /** A Cajero opens the cash with the authorization of a Supervisor or Administrador. */
   open(initialAmount: number, observations: string | null, authorization?: AuthorizationBody, mode?: 'INDIVIDUAL' | 'COMPARTIDO'): Promise<CashShift> {
     const body = { initialAmount, observations, ...(authorization ? { authorization } : {}), ...(mode ? { mode } : {}) };

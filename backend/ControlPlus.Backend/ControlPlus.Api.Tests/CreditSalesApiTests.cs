@@ -449,6 +449,23 @@ public sealed class CreditSalesApiTests : IAsyncLifetime
             (risky.OverdueBalance, risky.OverdueCredits, risky.Overdue, risky.ExceedsLimit, risky.AvailableCredit, risky.BlockRiskyCredit, risky.Blocked));
         Assert.Equal(("VENCIDO", (DateOnly?)today.AddDays(-1)), (risky.Stage, risky.OldestOverdueOn));
 
+        // Pruebas del usuario del 26/11/2026: Clientes resume lo que deben, pone a los morosos primero y los filtra.
+        var summary = await ReadAsync<CustomerCreditSummaryDto>(await client.GetAsync("/api/sales/customer-credit-summary"), HttpStatusCode.OK);
+        Assert.True(summary.Debtors >= 1 && summary.DebtTotal >= 1_000m);
+        Assert.True(summary.Overdue >= 1 && summary.OverdueTotal >= 1_000m);
+        async Task<Guid[]> CustomerIdsAsync(string query)
+        {
+            using var page = JsonDocument.Parse(await client.GetStringAsync($"/api/customers?pageSize=100{query}"));
+            return page.RootElement.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("id").GetGuid()).ToArray();
+        }
+        var morosos = await CustomerIdsAsync("&credit=MOROSOS");
+        Assert.Contains(scenario.CustomerId, morosos);
+        Assert.Contains(scenario.CustomerId, await CustomerIdsAsync("&credit=DEBEN"));
+        Assert.DoesNotContain(scenario.CustomerId, await CustomerIdsAsync("&credit=SIN_DEUDA"));
+        Assert.DoesNotContain(scenario.CustomerId, await CustomerIdsAsync("&credit=AL_DIA"));
+        Assert.Contains((await CustomerIdsAsync("")).First(), morosos);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/customers?credit=OTRO")).StatusCode);
+
         // Modo aviso (predeterminado): la venta se permite y queda el aviso en la auditoría.
         _ = await StartSessionAsync(client, scenario, scenario.Supervisor);
         SetBearer(client, scenario.Supervisor.AccessToken);

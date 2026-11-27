@@ -859,3 +859,8 @@ kbd { display: inline-block; min-width: 28px; padding: 2px 7px; border: 1px soli
 
 /* Producto creado desde un pedido sin precio de venta todavía (punto 17, 24 de noviembre de 2026). */
 .no-price { color: var(--cp-error); font-weight: 700; }
+
+/* Opción B del turno compartido (26/11/2026): lo que no puede usar quien pasó su carné se ve apagado. */
+.nav-item--off { opacity: .38; cursor: not-allowed; }
+.nav-item--off:hover { background: transparent; }
+.operator-chip { padding: 4px 10px; border-radius: 999px; background: var(--cp-warning-soft); color: var(--cp-warning); font-weight: 700; white-space: nowrap; }

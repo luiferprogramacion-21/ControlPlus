@@ -4,7 +4,7 @@ import { A11yModule } from '@angular/cdk/a11y';
 import { DatePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Page, errorText } from '../../core/api';
 import { SessionService } from '../../core/session.service';
@@ -57,7 +57,22 @@ export class Credits implements OnInit {
   get canFindCustomers(): boolean { return this.session.has('CUSTOMERS.BASIC_MANAGE') || this.session.has('CUSTOMERS.MANAGE'); }
   get appliedTotal(): number { return this.drafts.reduce((sum, draft) => sum + Number(draft.appliedAmount || 0), 0); }
   get change(): number { const cash = this.drafts.find(d => d.methodCode === 'EFECTIVO'); return cash ? Math.max(0, Number(cash.receivedAmount || 0) - Number(cash.appliedAmount || 0)) : 0; }
-  ngOnInit(): void { void this.reload(); }
+  /** Pruebas del usuario del 26/11/2026: «Cobrar abono» en Clientes abre aquí con el cliente y, si se eligió, el crédito. */
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  ngOnInit(): void {
+    const params = this.route?.snapshot.queryParamMap;
+    const customerId = params?.get('cliente');
+    if (customerId) {
+      this.customerId = customerId;
+      const name = params?.get('nombre') ?? '';
+      this.customerLabel.set(name); this.customerSearch = name;
+    }
+    void this.reload().then(() => {
+      const creditId = params?.get('abonar');
+      const credit = creditId ? this.result()?.items.find(item => item.id === creditId) : null;
+      if (credit) this.openPayment(credit);
+    });
+  }
   money(value: number): string { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value); }
   paid(credit: Credit): number { return credit.adjustedAmount - credit.balance; }
   label(state: string): string { return ({ PENDIENTE: 'Pendiente', VENCIDO: 'Vencido', VENCIDA: 'Vencida', PAGADO: 'Pagado', PAGADA: 'Pagada', ANULADO: 'Anulado', ANULADA: 'Anulada', APLICADO: 'Aplicado' } as Record<string, string>)[state] ?? state; }

@@ -8,6 +8,10 @@ export interface Customer { id: string; documentType: string | null; documentNum
   creditLimit?: number | null; }
 export interface CustomerHistoryItem { id: string; type: 'SALE' | 'CREDIT' | 'CREDIT_PAYMENT' | 'LAYAWAY' | 'LAYAWAY_PAYMENT' | string; parentId: string | null; number: string; occurredAt: string; status: string; amount: number; outstandingAmount: number | null; }
 export type CustomerInput = Pick<Customer, 'documentType' | 'documentNumber' | 'fullName' | 'phone' | 'address' | 'email' | 'observations' | 'creditLimit'>;
+/** Grupos de la lista de Clientes según el crédito (pruebas del usuario del 26/11/2026). */
+export type CustomerCreditFilter = '' | 'DEBEN' | 'MOROSOS' | 'POR_VENCER' | 'SIN_DEUDA';
+/** Resumen de arriba de Clientes: cuántos deben y cuánto, morosos (lo vencido) y los que vencen pronto. */
+export interface CustomerCreditSummary { debtors: number; debtTotal: number; overdue: number; overdueTotal: number; dueSoon: number; dueSoonTotal: number; }
 @Injectable({ providedIn: 'root' })
 export class CustomersApi {
   private readonly http = inject(HttpClient);
@@ -16,9 +20,12 @@ export class CustomersApi {
     if (customerIds.length === 0) return Promise.resolve([]);
     return firstValueFrom(this.http.get<(CreditStageData & { customerId: string })[]>('/api/sales/customer-credit-stages', { params: { customerIds } }));
   }
-  list(params: { search?: string; status?: 'active' | 'inactive' | 'all'; page?: number; pageSize?: number } = {}): Promise<Page<Customer>> {
-    return firstValueFrom(this.http.get<Page<Customer>>('/api/customers', { params: { search: params.search ?? '', status: params.status ?? 'active', page: params.page ?? 1, pageSize: params.pageSize ?? 20 } }));
+  list(params: { search?: string; status?: 'active' | 'inactive' | 'all'; page?: number; pageSize?: number; credit?: CustomerCreditFilter } = {}): Promise<Page<Customer>> {
+    const query: Record<string, string | number> = { search: params.search ?? '', status: params.status ?? 'active', page: params.page ?? 1, pageSize: params.pageSize ?? 20 };
+    if (params.credit) query['credit'] = params.credit;
+    return firstValueFrom(this.http.get<Page<Customer>>('/api/customers', { params: query }));
   }
+  creditSummary(): Promise<CustomerCreditSummary> { return firstValueFrom(this.http.get<CustomerCreditSummary>('/api/sales/customer-credit-summary')); }
   get(id: string): Promise<Customer> { return firstValueFrom(this.http.get<Customer>(`/api/customers/${id}`)); }
   history(id: string, page = 1, pageSize = 20): Promise<Page<CustomerHistoryItem>> { return firstValueFrom(this.http.get<Page<CustomerHistoryItem>>(`/api/customers/${id}/history`, { params: { page, pageSize } })); }
   create(input: CustomerInput): Promise<Customer> { return firstValueFrom(this.http.post<Customer>('/api/customers', input)); }

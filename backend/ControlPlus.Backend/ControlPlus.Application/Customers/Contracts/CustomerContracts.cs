@@ -8,7 +8,12 @@ public sealed record CustomerDto(Guid Id, string? DocumentType, string? Document
     string FullName, string? Phone, string? Address, string? Email, string? Observations,
     bool IsActive, long Version, decimal? CreditLimit = null);
 
-public sealed record CustomerListQuery(string? Search = null, string? Status = null, int Page = 1, int PageSize = 20);
+/// <summary>
+/// <c>Credit</c> (pruebas del usuario del 26/11/2026, exige CREDIT.REQUEST): DEBEN, MOROSOS, POR_VENCER, AL_DIA o SIN_DEUDA.
+/// Quien ve los créditos recibe primero a los morosos, luego a los que vencen pronto y luego a los que deben al día.
+/// </summary>
+public sealed record CustomerListQuery(string? Search = null, string? Status = null, int Page = 1, int PageSize = 20,
+    string? Credit = null);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 /// <summary><c>CreditLimit</c>: cupo de crédito en pesos enteros; NULL = sin límite. Solo con CUSTOMERS.MANAGE.</summary>

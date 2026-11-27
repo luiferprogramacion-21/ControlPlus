@@ -23,7 +23,8 @@ public sealed class CreditSettingsService(
     IAuditRepository audits,
     IUnitOfWork unitOfWork,
     IClock clock,
-    ICustomerCreditExposureReader exposureReader) : ICreditSettingsService
+    ICustomerCreditExposureReader exposureReader,
+    ICustomerCreditStages stages) : ICreditSettingsService
 {
     // Decisión D1 del 23/11/2026: hasta 180 días o 6 meses calendario (antes 90 días o 3 meses).
     private const int MaximumDays = 180;
@@ -128,6 +129,22 @@ public sealed class CreditSettingsService(
             establishment.CreditoBloquearRiesgo, risk.HasRisk && establishment.CreditoBloquearRiesgo,
             CustomerCreditStagePolicy.Resolve(exposure.OutstandingBalance, exposure.OverdueBalance, exposure.NextDueOn, today),
             exposure.NextDueOn, exposure.OldestOverdueOn));
+    }
+
+    public async Task<Result<CustomerCreditSummaryDto>> GetCustomerSummaryAsync(ActorContext actor, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await users.GetAuthorizationSnapshotAsync(actor.UserId, cancellationToken);
+        if (snapshot is null) return Result.Failure<CustomerCreditSummaryDto>(ApplicationError.Unauthorized());
+        if (!snapshot.PermissionCodes.Contains(PermissionCodes.CreditRequest, StringComparer.OrdinalIgnoreCase))
+            return Result.Failure<CustomerCreditSummaryDto>(ApplicationError.Forbidden());
+        var all = await stages.ReadAllAsync(cancellationToken);
+        if (all is null) return Result.Failure<CustomerCreditSummaryDto>(ApplicationError.NotFound("el establecimiento activo"));
+        var overdue = all.Values.Where(x => x.Stage == CustomerCreditStagePolicy.Overdue).ToArray();
+        var dueSoon = all.Values.Where(x => x.Stage == CustomerCreditStagePolicy.DueSoon).ToArray();
+        return Result.Success(new CustomerCreditSummaryDto(
+            all.Count, all.Values.Sum(x => x.Exposure.OutstandingBalance),
+            overdue.Length, overdue.Sum(x => x.Exposure.OverdueBalance),
+            dueSoon.Length, dueSoon.Sum(x => x.Exposure.OutstandingBalance)));
     }
 
     public async Task<Result<IReadOnlyCollection<CustomerCreditStageDto>>> GetCustomerStagesAsync(

@@ -2,7 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { SessionService } from '../../core/session.service';
-import { Credit, CreditPayment } from './credits-api';
+import { Credit, CreditPayment, CreditsApi } from './credits-api';
+import { CustomersApi } from '../customers/customers-api';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { Credits } from './credits';
 import { AuthorizationDialog } from '../../shared/authorization-dialog';
 import { OperatorCard } from '../../shared/operator-card';
@@ -173,5 +175,25 @@ describe('Credits', () => {
     await retry;
     expect(component.forgiving()).toBe(false);
     expect(component.selected()?.state).toBe('ANULADO');
+  });
+});
+
+describe('Credits: llega desde Clientes con «Cobrar abono» (pruebas del 26/11/2026)', () => {
+  it('filtra por el cliente y deja listo el abono del crédito elegido', async () => {
+    const pending = { ...credit, id: 'k1', balance: 4000, state: 'PENDIENTE' };
+    const api = { list: vi.fn().mockResolvedValue({ items: [pending], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 }) };
+    TestBed.configureTestingModule({ providers: [
+      { provide: CreditsApi, useValue: api }, { provide: CustomersApi, useValue: {} },
+      { provide: SessionService, useValue: { has: () => true, hasRole: () => true, user: () => ({ userName: 'admin' }) } },
+      { provide: AuthorizationDialog, useValue: {} }, { provide: OperatorCard, useValue: {} },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ cliente: 'c1', nombre: 'Ana', abonar: 'k1' }) } } },
+    ] });
+    const component = TestBed.runInInjectionContext(() => new Credits());
+    component.ngOnInit();
+    await vi.waitFor(() => expect(component.dialog()).toBe(true));
+    expect(api.list).toHaveBeenCalledWith(expect.objectContaining({ customerId: 'c1' }));
+    expect(component.customerLabel()).toBe('Ana');
+    expect(component.selected()?.id).toBe('k1');
+    expect(component.drafts[0].appliedAmount).toBe(4000);
   });
 });

@@ -28,6 +28,10 @@ public sealed partial class SalesApiFlowTests
         Assert.Equal(session.Id, state.OwnOperatorSession?.Id);
         Assert.False(string.IsNullOrWhiteSpace(state.ActiveOperatorName));
         Assert.Equal("CAJERO", state.ActiveOperatorRole);
+        // Opción B (26/11/2026): the menu dims what the cashier cannot use, from her own permissions.
+        Assert.NotNull(state.ActiveOperatorPermissions);
+        Assert.Contains("SALES.CREATE", state.ActiveOperatorPermissions!);
+        Assert.DoesNotContain("USERS.MANAGE", state.ActiveOperatorPermissions!);
 
         // Still logged in as the Administrator, the sale belongs to the cashier and uses up her session.
         var sale = await ReadAsync<SaleDto>(await PostSaleAsync(client, "shared-any-card-sale",

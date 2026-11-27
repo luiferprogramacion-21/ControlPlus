@@ -2,13 +2,16 @@ import { TestBed } from '@angular/core/testing';
 import { Customers } from './customers';
 import { CustomersApi } from './customers-api';
 import { SessionService } from '../../core/session.service';
+import { Router, provideRouter } from '@angular/router';
+import { CreditsApi } from '../credits/credits-api';
 
 describe('Customers', () => {
   let component: Customers;
-  const api = { list: vi.fn(), create: vi.fn(), update: vi.fn(), status: vi.fn(), get: vi.fn(), creditStages: vi.fn() };
+  const api = { list: vi.fn(), create: vi.fn(), update: vi.fn(), status: vi.fn(), get: vi.fn(), creditStages: vi.fn(), creditSummary: vi.fn() };
+  const credits = { list: vi.fn() };
   let permissions = ['CUSTOMERS.MANAGE'];
   const session = { has: (permission: string) => permissions.includes(permission) };
-  beforeEach(() => { vi.clearAllMocks(); permissions = ['CUSTOMERS.MANAGE']; TestBed.configureTestingModule({ providers: [{ provide: CustomersApi, useValue: api }, { provide: SessionService, useValue: session }] }); component = TestBed.runInInjectionContext(() => new Customers()); });
+  beforeEach(() => { vi.clearAllMocks(); permissions = ['CUSTOMERS.MANAGE']; TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: CustomersApi, useValue: api }, { provide: CreditsApi, useValue: credits }, { provide: SessionService, useValue: session }] }); component = TestBed.runInInjectionContext(() => new Customers()); });
   it('valida la pareja documental antes del alta; la dirección es opcional (21 de noviembre de 2026)', async () => {
     component.newCustomer(); component.form.fullName = 'Ana'; component.form.documentType = 'CC';
     await component.save(); expect(api.create).not.toHaveBeenCalled();
@@ -29,6 +32,29 @@ describe('Customers', () => {
     permissions = ['CUSTOMERS.MANAGE']; api.creditStages.mockClear();
     await component.reload();
     expect(api.creditStages).not.toHaveBeenCalled();
+  });
+  it('resume lo que deben, filtra por grupo y lleva a cobrar el abono (pruebas del 26/11/2026)', async () => {
+    permissions = ['CUSTOMERS.MANAGE', 'CREDIT.REQUEST', 'CREDIT.MANAGE'];
+    const customer = { id: 'c1', fullName: 'Carlos Ruiz', documentType: 'CC', documentNumber: '79', phone: '3104567890', address: 'Calle 5', isActive: true, version: 1 };
+    api.list.mockResolvedValue({ items: [customer], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 });
+    api.creditStages.mockResolvedValue([{ customerId: 'c1', stage: 'VENCIDO', outstandingBalance: 90000, overdueBalance: 90000, oldestOverdueOn: '2026-11-10' }]);
+    api.creditSummary.mockResolvedValue({ debtors: 6, debtTotal: 1250000, overdue: 1, overdueTotal: 90000, dueSoon: 1, dueSoonTotal: 60000 });
+    component.setFilter('MOROSOS'); await vi.waitFor(() => expect(component.summary()).not.toBeNull());
+    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ credit: 'MOROSOS', page: 1 }));
+    await vi.waitFor(() => expect(component.stageText('c1')).toBe('Moroso desde 10/11'));
+    expect(component.toneOf('c1')).toBe('error');
+    expect(component.initials('Carlos Ruiz')).toBe('CR');
+    expect(component.contactLine(customer as never)).toBe('CC 79 · 3104567890 · Calle 5');
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    component.collect(customer as never, 'k1');
+    expect(navigate).toHaveBeenCalledWith(['/operacion/creditos'], { queryParams: { cliente: 'c1', nombre: 'Carlos Ruiz', abonar: 'k1' } });
+    credits.list.mockResolvedValue({ items: [{ id: 'k0', balance: 0 }, { id: 'k1', balance: 90000 }], page: 1, pageSize: 50, totalCount: 2, totalPages: 1 });
+    component.openFicha(customer as never, 'creditos');
+    await vi.waitFor(() => expect(component.customerCredits()?.map(c => c.id)).toEqual(['k1', 'k0']));
+    expect(credits.list).toHaveBeenCalledWith({ page: 1, pageSize: 50, customerId: 'c1' });
+    permissions = ['CUSTOMERS.MANAGE'];
+    component.setFilter('DEBEN'); await Promise.resolve();
+    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ credit: '' }));
   });
   it('envía alta válida normalizada', async () => {
     api.create.mockResolvedValue({}); api.list.mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });

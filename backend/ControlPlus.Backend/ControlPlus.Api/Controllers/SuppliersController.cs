@@ -29,7 +29,8 @@ public sealed class SuppliersController(CurrentActorContextResolver actors, ISup
     { var actor = await GetActorAsync(ct); return actor is null ? MissingActor() : FromResult(await suppliers.GetAsync(actor, supplierId, ct), Ok); }
 
     [HttpPost]
-    [PermissionAuthorize(PermissionCodes.SuppliersManage)]
+    // Desde el 26/11/2026 también el Supervisor, con la autorización del Administrador; el servicio decide.
+    [PermissionAuthorize(PermissionCodes.SuppliersRead)]
     [ProducesResponseType<SupplierDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")]

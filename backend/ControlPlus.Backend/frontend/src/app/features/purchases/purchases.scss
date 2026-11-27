@@ -114,10 +114,3 @@
 .order-new-product { margin: 12px 0 0; padding: 14px 16px; border: 1px solid var(--cp-border); border-radius: 12px; background: var(--cp-surface-subtle, #f7f9fc); }
 .order-new-product legend { padding: 0 6px; font-weight: 700; }
 .order-new-product__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 8px; }
-
-
-/* Pruebas del usuario del 26/11/2026: proveedor nuevo desde la compra sin pedido, y productos sin precio al recibir. */
-.inline-supplier { margin-top: 10px; padding: 12px; border: 1px solid var(--cp-border); border-radius: 10px; background: var(--cp-table-head); }
-.inline-supplier__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.inline-supplier__open { margin-top: 8px; }
-.same-price--required { color: var(--cp-error); font-weight: 600; }

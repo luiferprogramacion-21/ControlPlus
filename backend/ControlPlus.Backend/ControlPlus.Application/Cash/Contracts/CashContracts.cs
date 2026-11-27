@@ -51,7 +51,9 @@ public sealed record CashStateDto(
     string? ActiveOperatorRole = null,
     // Fondo inicial de la última apertura (21 de noviembre de 2026): solo para quien administra la caja y sin turno
     // abierto, para ofrecer «Igual que la última vez» al abrir.
-    decimal? LastInitialAmount = null);
+    decimal? LastInitialAmount = null,
+    // Permisos de quien pasó el carné (opción B del 26 de noviembre de 2026): el menú apaga lo que esa persona no puede usar.
+    IReadOnlyList<string>? ActiveOperatorPermissions = null);
 
 public sealed record ConfigureCashRegisterRequest(string Code, string Name);
 

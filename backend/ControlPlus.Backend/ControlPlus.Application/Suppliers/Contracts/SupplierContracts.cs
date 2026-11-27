@@ -13,7 +13,18 @@ public sealed record SupplierListQuery(bool? IsActive = null, string? Name = nul
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CreateSupplierRequest(string? DocumentType, string? DocumentNumber,
-    string? Name, string? Phone, string? Address, string? Email, string? Observations);
+    string? Name, string? Phone, string? Address, string? Email, string? Observations,
+    SupplierAuthorizationRequest? Authorization = null);
+
+/// <summary>
+/// Autorización del Administrador para que un Supervisor cree un proveedor desde una compra sin pedido (pruebas del usuario
+/// del 26/11/2026): su carné, o su usuario y contraseña.
+/// </summary>
+public sealed record SupplierAuthorizationRequest(string? UserName, string? Password, string? CredentialToken = null)
+    : IAuthorizerCredentials
+{
+    [JsonIgnore] public Guid? ResolvedCredentialId { get; init; }
+}
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record UpdateSupplierRequest(string? DocumentType, string? DocumentNumber,

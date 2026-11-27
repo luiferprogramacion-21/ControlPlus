@@ -3,6 +3,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { SessionService } from '../core/session.service';
+import { OperatorPresence } from '../core/operator-presence';
+import { CashApi } from '../features/cash/cash-api';
 import { EstablishmentService } from '../core/establishment';
 import { DisplayScaleService } from '../core/display-scale';
 import { WindowsShortcuts } from '../core/windows-shortcuts';
@@ -69,7 +71,7 @@ function readCollapsed(): boolean { try { return localStorage.getItem(COLLAPSED_
           @for (group of groups(); track group.label) {
             <p class="sidebar__label">{{ group.label }}</p>
             @for (item of group.items; track item.section) {
-              <a [routerLink]="item.link" [queryParams]="item.queryParams ?? null" class="nav-item" [class.nav-item--active]="activeSection() === item.section" [attr.aria-current]="activeSection() === item.section ? 'page' : null" [attr.aria-label]="item.label" [title]="item.label"><span><cp-icon [name]="item.icon" /></span><b>{{ item.label }}</b></a>
+              <a [routerLink]="isOff(item) ? null : item.link" [queryParams]="item.queryParams ?? null" class="nav-item" [class.nav-item--active]="activeSection() === item.section" [class.nav-item--off]="isOff(item)" [attr.aria-disabled]="isOff(item) || null" [attr.tabindex]="isOff(item) ? -1 : null" [attr.aria-current]="activeSection() === item.section ? 'page' : null" [attr.aria-label]="offLabel(item)" [title]="offLabel(item)"><span><cp-icon [name]="item.icon" /></span><b>{{ item.label }}</b></a>
             }
           }
         </nav>
@@ -100,7 +102,7 @@ function readCollapsed(): boolean { try { return localStorage.getItem(COLLAPSED_
       <section class="shell-content">
         <header class="topbar">
           <div class="topbar__leading"><button class="icon-button menu-toggle" type="button" [attr.aria-label]="collapsed() ? 'Mostrar el menú completo' : 'Plegar el menú'" [title]="collapsed() ? 'Mostrar el menú completo' : 'Plegar el menú'" [attr.aria-expanded]="!collapsed()" aria-controls="main-navigation" (click)="toggleCollapsed()"><cp-icon name="menu" /></button><div><h1>{{ pageTitle() }}</h1><p>{{ pageSubtitle() }}</p></div></div>
-          <div class="topbar__status"><strong class="store-name">{{ establishment.name() }}</strong><span>{{ session.user()?.displayName }}</span><button class="icon-button" type="button" (click)="logout()" aria-label="Cerrar sesión" title="Cerrar sesión"><cp-icon name="logout" /></button></div>
+          <div class="topbar__status"><strong class="store-name">{{ establishment.name() }}</strong>@if (operator.active(); as active) { <span class="operator-chip" role="status">Operador: {{ active.name }}@if (operator.roleLabel()) { · {{ operator.roleLabel() }} }</span> }<span>{{ session.user()?.displayName }}</span><button class="icon-button" type="button" (click)="logout()" aria-label="Cerrar sesión" title="Cerrar sesión"><cp-icon name="logout" /></button></div>
         </header>
         <main id="main-content" class="workspace" [class.workspace--bounded]="boundedWorkspace()" tabindex="-1"><router-outlet /></main>
       </section>
@@ -154,6 +156,16 @@ export class Shell implements OnInit {
     return NAVIGATION.map(group => ({ label: group.label, items: group.items.filter(item => item.visible(this.session)) })).filter(group => group.items.length);
   });
   private readonly router = inject(Router);
+  /** Opción B del turno compartido (26/11/2026): quien pasó su carné; el menú apaga lo que esa persona no puede usar. */
+  readonly operator = inject(OperatorPresence);
+  private readonly cash = inject(CashApi);
+  isOff(item: NavItem): boolean {
+    return !!this.operator.active() && !item.visible({ has: (code: string) => this.operator.has(code) } as SessionService);
+  }
+  offLabel(item: NavItem): string {
+    const active = this.operator.active();
+    return active && this.isOff(item) ? `${item.label}: ${active.name} no puede usarlo. Termina su venta o su operación para volver a tu menú.` : item.label;
+  }
 
   constructor() {
     inject(WindowsShortcuts).start();
@@ -161,7 +173,11 @@ export class Shell implements OnInit {
     inject(ListHelpers).start();
     this.syncHeader(this.router.url);
     this.router.events.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd), takeUntilDestroyed())
-      .subscribe(event => { this.userMenuOpen.set(false); this.syncHeader(event.urlAfterRedirects); });
+      .subscribe(event => {
+        this.userMenuOpen.set(false); this.syncHeader(event.urlAfterRedirects);
+        // Si alguien tenía su carné activo, se revisa al cambiar de pantalla si ya terminó.
+        if (this.operator.active() && this.session.has('CASH.OWN_READ')) void this.cash.state().catch(() => undefined);
+      });
   }
 
   ngOnInit(): void { void this.establishment.load().catch(() => undefined); }

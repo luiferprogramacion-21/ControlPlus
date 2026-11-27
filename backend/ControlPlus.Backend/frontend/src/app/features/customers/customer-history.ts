@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, inject, input, OnInit, output, signal } from '@angular/core';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Page, errorText } from '../../core/api';
@@ -17,13 +17,15 @@ const STATUS_LABELS: Record<string, string> = {
 /** Commercial history of one customer: sales, credits, layaways and their payments, newest first. */
 @Component({
   selector: 'cp-customer-history',
-  imports: [WindowSheet, CurrencyPipe, DatePipe, MatPaginatorModule],
+  imports: [WindowSheet, CurrencyPipe, DatePipe, MatPaginatorModule, NgTemplateOutlet],
   templateUrl: './customer-history.html',
   styles: ['.customer-history-sheet { width: min(980px, 100%); max-height: calc(92vh / var(--cp-zoom)); overflow-y: auto; } .is-payment td { color: var(--cp-text-secondary); font-size: 13px; }'],
 })
 export class CustomerHistory implements OnInit {
   private readonly api = inject(CustomersApi);
   readonly customer = input.required<Customer>();
+  /** Dentro de la ficha del cliente (26/11/2026): solo la lista, sin su propia ventana. */
+  readonly embedded = input(false);
   readonly closed = output<void>();
   readonly result = signal<Page<CustomerHistoryItem> | null>(null);
   readonly loading = signal(false);

@@ -11,7 +11,9 @@ using ControlPlus.Domain.Security.Enums;
 namespace ControlPlus.Application.Suppliers.Services;
 
 public sealed class SupplierService(ISupplierRepository repository, IUserRepository users,
-    IAuditRepository audit, IUnitOfWork unitOfWork, IClock clock) : ISupplierService
+    IAuditRepository audit, IUnitOfWork unitOfWork, IClock clock,
+    IPasswordHasher? passwordHasher = null, IPermissionChecker? permissionChecker = null,
+    IAuthorizerCredentialResolver? credentialResolver = null, ILoginAttemptCoordinator? loginAttemptCoordinator = null) : ISupplierService
 {
     public async Task<Result<PagedResult<SupplierDto>>> ListAsync(ActorContext actor, SupplierListQuery query, CancellationToken ct = default)
     {
@@ -39,10 +41,64 @@ public sealed class SupplierService(ISupplierRepository repository, IUserReposit
 
     public async Task<Result<SupplierDto>> CreateAsync(ActorContext actor, CreateSupplierRequest request, CancellationToken ct = default)
     {
-        if (!await HasAsync(actor, PermissionCodes.SuppliersManage, true, ct)) return Denied<SupplierDto>();
-        var input = Validate(request.DocumentType, request.DocumentNumber, request.Name, request.Phone,
+        ArgumentNullException.ThrowIfNull(request);
+        if (await HasAsync(actor, PermissionCodes.SuppliersManage, true, ct))
+        {
+            if (request.Authorization is not null)
+                return Invalid<SupplierDto>("Quien crea proveedores con su propio permiso no envía autorización.");
+            var input = Validate(request.DocumentType, request.DocumentNumber, request.Name, request.Phone,
+                request.Address, request.Email, request.Observations);
+            if (input.Error is not null) return Result.Failure<SupplierDto>(input.Error);
+            await using var transaction = await repository.BeginAsync(ct);
+            var created = await AddSupplierAsync(actor, input, null, null, ct);
+            await transaction.CommitAsync(ct);
+            return created;
+        }
+
+        // Pruebas del usuario del 26/11/2026: el Supervisor que recibe mercancía crea el proveedor de una compra sin pedido
+        // con la autorización del Administrador (su carné, o su usuario y contraseña).
+        if (!await IsReceivingSupervisorAsync(actor, ct) || passwordHasher is null || permissionChecker is null ||
+            credentialResolver is null || loginAttemptCoordinator is null)
+            return Denied<SupplierDto>();
+        if (request.Authorization is null)
+            return Result.Failure<SupplierDto>(ApplicationError.Forbidden(
+                "Para crear un proveedor, un Supervisor necesita la autorización del Administrador (carné o usuario y contraseña)."));
+        var supervisorInput = Validate(request.DocumentType, request.DocumentNumber, request.Name, request.Phone,
             request.Address, request.Email, request.Observations);
-        if (input.Error is not null) return Result.Failure<SupplierDto>(input.Error);
+        if (supervisorInput.Error is not null) return Result.Failure<SupplierDto>(supervisorInput.Error);
+        var authorization = request.Authorization;
+        if (authorization.UsesCredential())
+        {
+            if (authorization.MixesCredentialWithPassword())
+                return Invalid<SupplierDto>("Envíe el carné escaneado o usuario y contraseña, no ambos.");
+            var (scannedUserName, scannedCredentialId) = await credentialResolver.ResolveOrUnknownAsync(authorization.CredentialToken!, ct);
+            authorization = authorization with { UserName = scannedUserName, ResolvedCredentialId = scannedCredentialId };
+        }
+        if (!authorization.IsComplete())
+            return Invalid<SupplierDto>("Indique usuario y contraseña del Administrador o escanee su carné.");
+        var account = authorization.UserName!.Trim().ToUpperInvariant();
+        return await loginAttemptCoordinator.ExecuteAsync(account, async token =>
+        {
+            var validated = await AuthorizerValidator.ValidateAsync(users, passwordHasher, permissionChecker, audit, clock, actor,
+                authorization, PermissionCodes.SuppliersManage, RoleLevel.Administrador, ApplicationError.Forbidden(
+                    "Solo un Administrador activo autoriza crear un proveedor. Revise el usuario y la contraseña o escanee su carné."),
+                token);
+            if (validated.IsFailure)
+            {
+                await AuditWriter.WriteAsync(audit, clock, actor.UserId, AuditAction.SupplierCreated, nameof(Proveedor), null,
+                    new { Failure = "INVALID_AUTHORIZER_CREDENTIALS_OR_PERMISSION" }, token);
+                await unitOfWork.SaveChangesAsync(token);
+                return Result.Failure<SupplierDto>(validated.Error!);
+            }
+            return await AddSupplierAsync(actor, supervisorInput, validated.Value!.UserName,
+                authorization.UsesCredential() ? "CARNE" : "CONTRASENA", token);
+        }, ct);
+    }
+
+    private async Task<Result<SupplierDto>> AddSupplierAsync(ActorContext actor,
+        (string? Type, string? Number, string? Name, string? Phone, string? Address, string? Email, string? Observations, ApplicationError? Error) input,
+        string? authorizedBy, string? authorizedWith, CancellationToken ct)
+    {
         var supplier = new Proveedor
         {
             Id = Guid.CreateVersion7(), TipoDocumento = input.Type, NumeroDocumento = input.Number,
@@ -50,12 +106,23 @@ public sealed class SupplierService(ISupplierRepository repository, IUserReposit
             Correo = input.Email, Observaciones = input.Observations, Activo = true,
             UsuarioCreacionId = actor.UserId, FechaCreacion = clock.UtcNow.UtcDateTime, Version = 1
         };
-        await using var transaction = await repository.BeginAsync(ct);
         await repository.AddAsync(supplier, ct);
-        await WriteAuditAsync(actor.UserId, AuditAction.SupplierCreated, supplier, ["isActive"], 1, ct);
+        if (authorizedBy is null) await WriteAuditAsync(actor.UserId, AuditAction.SupplierCreated, supplier, ["isActive"], 1, ct);
+        else
+            await AuditWriter.WriteAsync(audit, clock, actor.UserId, AuditAction.SupplierCreated, nameof(Proveedor), supplier.Id,
+                new { supplierId = supplier.Id, modifiedFields = new[] { "isActive" }, isActive = supplier.Activo, version = 1L,
+                    AuthorizedBy = authorizedBy, AuthorizedWith = authorizedWith }, ct);
         await unitOfWork.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
         return Result.Success(Map(supplier));
+    }
+
+    /// <summary>Supervisor vigente con permiso de recibir mercancía y de ver proveedores.</summary>
+    private async Task<bool> IsReceivingSupervisorAsync(ActorContext actor, CancellationToken ct)
+    {
+        var snapshot = await users.GetAuthorizationSnapshotAsync(actor.UserId, ct);
+        return snapshot is not null && snapshot.Roles.Any(role => role.Code == RoleCodes.Supervisor) &&
+            snapshot.PermissionCodes.Contains(PermissionCodes.SuppliersRead, StringComparer.OrdinalIgnoreCase) &&
+            snapshot.PermissionCodes.Contains(PermissionCodes.PurchasesReceive, StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<Result<SupplierDto>> UpdateAsync(ActorContext actor, Guid id, UpdateSupplierRequest request, CancellationToken ct = default)
