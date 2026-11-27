@@ -8,7 +8,8 @@ es separar tres estados: cumplimiento acreditado, cumplimiento parcial y falta d
 de una medición no se presenta como un defecto del sistema, pero permanece abierta hasta obtener una
 evidencia reproducible.
 
-El alcance de esta primera revisión quedó confirmado en el commit de código `1bfad86`. Al iniciar existían
+El alcance de esta primera revisión quedó confirmado en el commit de código `1bfad86` y se concilió después
+con la evidencia operativa y el código integrados hasta `351f988`. Al iniciar existían
 modificaciones concurrentes en reportes, documentos PDF, datos del establecimiento y el instalador;
 se conservaron y luego quedaron confirmadas por su responsable en ese commit. Esta auditoría no las
 preparó como propias. No se accedió a la base persistente `controlplus`, no se aplicaron migraciones y
@@ -34,26 +35,29 @@ y añade medidas propias para cubrir el modelo de nueve características de 2501
 | --- | --- | --- |
 | `dotnet build ControlPlus.Backend.slnx -m:1 /warnaserror` con artefactos aislados | Aprobado, 0 advertencias y 0 errores | El intento normal quedó bloqueado por un `testhost` ajeno; la repetición usó `%TEMP%/ControlPlus-IsoAudit-*` sin detenerlo |
 | Pruebas .NET con `Category!=Integration` | 402/402 aprobadas: Domain 100, Infrastructure 49, API 253 | No incluye PostgreSQL ni migraciones |
-| `npx ng test --watch=false` | 858/858 aprobadas en 92 archivos | Pruebas de componentes y servicios Angular; no sustituye la observación de usuarios reales |
-| `npx ng build` | Aprobado | Conserva advertencias de presupuesto en `cash.scss` (+356 bytes) y `sales.scss` (+856 bytes) |
+| `npx ng test --watch=false` | 862/862 aprobadas en 92 archivos sobre `351f988` | Pruebas de componentes y servicios Angular; no sustituye la observación de usuarios reales |
+| `npx ng build` | Aprobado sin advertencias de presupuesto sobre `351f988` | La línea base tenía advertencias en `cash.scss` (+356 bytes) y `sales.scss` (+856 bytes); ambas se corrigieron sin cambiar la pantalla, según `ISO-AUD-006` |
 | `dotnet list ... package --vulnerable --include-transitive` | 0 paquetes vulnerables en los 7 proyectos | Consulta contra NuGet; refleja los avisos publicados en ese momento |
 | `npm audit --omit=dev` | 0 vulnerabilidades en 15 dependencias de producción | La aplicación instalada no incluía el hallazgo de la herramienta de desarrollo |
 | `npm audit` completo | 0 vulnerabilidades después de actualizar Angular a 22.2.5 y Vite a 8.3.5 | Antes de la corrección detectó 1 aviso alto y 1 bajo en dependencias de desarrollo |
 | CI de `1bfad86` | Aprobado, ejecución `46020622376` | Frontend, backend sin base, backend con PostgreSQL 18 y navegador aprobados |
+| CI del código vigente en `351f988` | Aprobado, ejecución `46056425621` | Los cuatro trabajos aprobaron: frontend, backend sin base, backend con PostgreSQL 18 y navegador |
 | SonarQube de `b0a4962` | Quality Gate OK, cobertura nueva 85,0 %, duplicación nueva 0,90667 %, 0 infracciones nuevas | Es la última medición publicada, pero precede a los cambios posteriores y no representa el árbol local actual |
-| Playwright del commit `1bfad86` | Trabajo de navegador aprobado en el CI final | Acredita los recorridos vigentes del repositorio contra una API y PostgreSQL descartables |
+| Playwright del commit `351f988` | Trabajo de navegador aprobado en el CI final | Acredita los recorridos vigentes del repositorio contra una API y PostgreSQL descartables |
+| Simulacro real de recuperación del 27 de noviembre | `RECOVERY_DRILL_OK`: restauración en 1 minuto y copia de 23 minutos de antigüedad, ambas dentro de la meta de 30 minutos | La copia cifrada coincidió con 39 migraciones, 26 productos, 103 ventas y la última venta; la base temporal se eliminó y no se reemplazó `controlplus`. No acredita todavía la instalación en otro equipo |
+| Pruebas reales en la tienda aprobadas por el usuario | Turno compartido, identificación del operador, cajón en cobro y abono, cierre propio autorizado, impresión térmica y desbloqueo con carné/lector | Acredita dispositivos y flujos en el entorno real; no equivale a una sesión de aceptabilidad observada con empleados de los tres roles |
 
 ## Matriz ISO IEC 25010 de calidad del producto
 
 | Característica | Evidencia actual | Estado | Acción siguiente |
 | --- | --- | --- | --- |
-| Adecuación funcional | Pruebas de dominio, API, Angular, integración histórica y 11 recorridos E2E | Parcialmente acreditada | Repetir PostgreSQL y E2E sobre un commit limpio que contenga las correcciones actuales |
+| Adecuación funcional | Pruebas de dominio, API, Angular y recorridos E2E; el CI de `351f988` aprobó PostgreSQL 18 y navegador | Parcialmente acreditada | Mantener la trazabilidad entre requisitos, flujos secundarios/terciarios y pruebas de regresión |
 | Eficiencia de desempeño | Objetivo general de respuesta de hasta un segundo; sin prueba automática de tiempos o carga encontrada | Sin evidencia suficiente | Definir muestra, equipo, volumen, percentil y umbral; medir búsquedas, venta y cierre de caja |
-| Compatibilidad | Build local Windows, CI Linux y navegador Chromium | Parcialmente acreditada | Registrar matriz Windows, Chrome y Edge; comprobar impresión y lector en el equipo de la tienda |
-| Capacidad de interacción | 858 pruebas Angular y 11 recorridos Playwright | Parcialmente acreditada | Ejecutar tareas observadas con Cajero, Supervisor y Administrador reales |
-| Fiabilidad | Pruebas de transacciones, concurrencia, idempotencia y conservación de originales documentadas | Parcialmente acreditada | Añadir ensayo de recuperación ante interrupción y restauración verificable de respaldo |
+| Compatibilidad | Build local Windows, CI Linux, Chromium, impresora térmica, cajón y lector comprobados en la tienda | Parcialmente acreditada | Registrar Edge y ensayar la instalación/recuperación en otro equipo cuando exista uno disponible |
+| Capacidad de interacción | Pruebas Angular y Playwright, más flujos reales aprobados por el usuario en la tienda | Parcialmente acreditada | Ejecutar tareas observadas con empleados Cajero, Supervisor y Administrador y registrar ayuda, errores y tiempo |
+| Fiabilidad | Pruebas transaccionales y simulacro real de respaldo con RPO/RTO dentro de 30 minutos | Parcialmente acreditada | Ensayar recuperación en otro equipo y fallos controlados de servicio/energía sin tocar la base real |
 | Seguridad | JWT, permisos efectivos, bloqueo de cuentas, auditoría, encabezados HTTP y auditoría de dependencias sin vulnerabilidades conocidas | Parcialmente acreditada | Actualizar SonarQube y ampliar pruebas negativas de sesiones |
-| Mantenibilidad | Arquitectura por capas, build con advertencias como error, 402 pruebas .NET y Quality Gate previo | Acreditada con observaciones | Actualizar SonarQube y resolver los dos presupuestos de estilos sin cambiar el prototipo |
+| Mantenibilidad | Arquitectura por capas, build con advertencias como error, 402 pruebas .NET, presupuestos de estilos corregidos y Quality Gate previo | Acreditada con observaciones | Actualizar SonarQube sobre el código vigente |
 | Flexibilidad | Configuraciones de negocio, migraciones controladas y operación local | Parcialmente acreditada | Probar cambio de configuración, reinstalación y operación sin Internet con criterios medibles |
 | Seguridad frente a daños | Invariantes financieros, auditoría, idempotencia y correcciones que conservan originales | Parcialmente acreditada | Crear una matriz de riesgos monetarios e inventario con severidad, prevención y recuperación |
 
@@ -61,9 +65,9 @@ y añade medidas propias para cubrir el modelo de nueve características de 2501
 
 | Característica | Evidencia | Estado |
 | --- | --- | --- |
-| Beneficio obtenido | Los recorridos E2E completan venta, crédito, caja, apartado, compra y correcciones | Parcialmente acreditada; falta validar que representen las tareas reales y su frecuencia |
+| Beneficio obtenido | Los recorridos E2E completan venta, crédito, caja, apartado, compra y correcciones; además se aprobaron flujos de caja, impresión y carné en la tienda | Parcialmente acreditada; falta medir frecuencia, tiempo y éxito con cada rol real |
 | Ausencia de riesgo | Permisos, bloqueos, transacciones, historial e idempotencia | Parcialmente acreditada; falta la matriz consolidada de riesgos y consecuencias |
-| Aceptabilidad | Pruebas automáticas de interfaz | Sin evidencia de usuario real; las pruebas automáticas no miden comprensión, satisfacción ni necesidad de ayuda |
+| Aceptabilidad | Pruebas automáticas y aprobación del usuario de varios flujos en la tienda | Parcialmente acreditada; falta observar empleados de los tres roles y medir comprensión, satisfacción y necesidad de ayuda |
 
 ## Requisitos medibles ISO IEC 25030 y 25023
 
@@ -90,8 +94,8 @@ Requisitos iniciales pendientes de medición:
 | QR-REL-001 | Ninguna operación financiera confirmada queda parcialmente persistida ante un fallo controlado | Cubierto por varios casos de integración; falta inventario consolidado |
 | QR-SEC-001 | Toda respuesta HTTP incluye protecciones básicas contra inferencia de tipo, marcos y capacidades no usadas | Corregido y probado en una respuesta correcta y una solicitud no autorizada |
 | QR-SEC-002 | Las dependencias de producción y construcción no tienen vulnerabilidades conocidas por NuGet o npm | Cumple en la consulta del 27 de noviembre de 2026 |
-| QR-USE-001 | Cada rol completa sus tareas críticas sin ayuda y dentro del tiempo acordado | No evaluado con usuarios reales |
-| QR-REC-001 | Un respaldo se restaura en un tiempo máximo acordado sin pérdida de la muestra verificada | Falta definir RTO, RPO y ensayo |
+| QR-USE-001 | Cada rol completa sus tareas críticas sin ayuda y dentro del tiempo acordado | Parcial: el usuario aprobó flujos reales en la tienda, pero faltan empleados de los tres roles y tiempos acordados |
+| QR-REC-001 | Un respaldo se restaura en un tiempo máximo acordado sin pérdida de la muestra verificada | Cumple en el simulacro del 27 de noviembre: recuperación 1/30 minutos y antigüedad 23/30 minutos; queda pendiente otro equipo |
 
 ## Hallazgos y correcciones
 
@@ -122,14 +126,18 @@ Requisitos iniciales pendientes de medición:
 ### ISO-AUD-004 aceptabilidad sin usuarios reales
 
 - Clasificación: aceptabilidad, ISO/IEC 25019:2023.
-- Evidencia: existen pruebas Angular y E2E, pero no observación documentada de usuarios reales.
-- Estado: abierto; requiere sesiones con los tres roles sin compartir contraseñas con el agente.
+- Evidencia inicial: existían pruebas Angular y E2E, pero no observación documentada en la tienda.
+- Evidencia posterior: el usuario aprobó turno compartido, identificación de operador, apertura del cajón,
+  cierre propio autorizado, impresión térmica y desbloqueo con carné y lector en el entorno real.
+- Estado: parcialmente acreditado; sigue abierta la sesión observada con empleados de los tres roles,
+  sin compartir contraseñas con el agente, para medir tiempo, errores, ayuda y satisfacción.
 
 ### ISO-AUD-005 evidencia publicada desactualizada
 
 - Clasificación: evaluación y medición, ISO/IEC 25040 e ISO/IEC 25023.
-- Evidencia: el último SonarQube publicado corresponde a `b0a4962`, y los 11 recorridos E2E a `84d688b`.
-- Estado: abierto; debe repetirse sobre un commit limpio después de cerrar los cambios concurrentes.
+- Evidencia: el último SonarQube publicado corresponde a `b0a4962`; en cambio, el CI de `351f988`
+  aprobó los trabajos actuales de PostgreSQL 18 y Playwright.
+- Estado: abierto solo para actualizar la medición de SonarQube sobre un commit vigente.
 
 ### ISO-AUD-006 presupuestos de estilos
 
