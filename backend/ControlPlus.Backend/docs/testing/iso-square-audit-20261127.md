@@ -53,7 +53,7 @@ y añade medidas propias para cubrir el modelo de nueve características de 2501
 | Característica | Evidencia actual | Estado | Acción siguiente |
 | --- | --- | --- | --- |
 | Adecuación funcional | Pruebas de dominio, API, Angular y recorridos E2E; el CI de `351f988` aprobó PostgreSQL 18 y navegador | Parcialmente acreditada | Mantener la trazabilidad entre requisitos, flujos secundarios/terciarios y pruebas de regresión |
-| Eficiencia de desempeño | Objetivo general de respuesta de hasta un segundo; sin prueba automática de tiempos o carga encontrada | Sin evidencia suficiente | Definir muestra, equipo, volumen, percentil y umbral; medir búsquedas, venta y cierre de caja |
+| Eficiencia de desempeño | 100 búsquedas, 100 ventas y 100 cierres en API local | Objetivo cumplido en la muestra de un cliente | Véanse los percentiles y límites en ISO-AUD-003 |
 | Compatibilidad | Build local Windows, CI Linux, Chromium, impresora térmica, cajón y lector comprobados en la tienda | Parcialmente acreditada | Registrar Edge y ensayar la instalación/recuperación en otro equipo cuando exista uno disponible |
 | Capacidad de interacción | Pruebas Angular y Playwright, más flujos reales aprobados por el usuario en la tienda | Parcialmente acreditada | Ejecutar tareas observadas con empleados Cajero, Supervisor y Administrador y registrar ayuda, errores y tiempo |
 | Fiabilidad | Pruebas transaccionales y simulacro real de respaldo con RPO/RTO dentro de 30 minutos | Parcialmente acreditada | Ensayar recuperación en otro equipo y fallos controlados de servicio/energía sin tocar la base real |
@@ -87,11 +87,11 @@ existentes en criterios auditables:
 | Resultado | Cumple, no cumple, parcial o no evaluado |
 | Corrección | Cambio vinculado y prueba de regresión |
 
-Requisitos iniciales pendientes de medición:
+Estado de medición de los requisitos iniciales:
 
 | Identificador | Requisito propuesto | Estado |
 | --- | --- | --- |
-| QR-PERF-001 | El 95 % de las búsquedas de producto responde en hasta 1 segundo bajo un volumen y equipo definidos | Falta fijar volumen, equipo y prueba |
+| QR-PERF-001 | El 95 % de las búsquedas de producto responde en hasta 1 segundo bajo un volumen y equipo definidos | Cumplido en la muestra local de 100 productos y un cliente, con p95 de 31,16 ms |
 | QR-REL-001 | Ninguna operación financiera confirmada queda parcialmente persistida ante un fallo controlado | Cubierto por varios casos de integración; falta inventario consolidado |
 | QR-SEC-001 | Toda respuesta HTTP incluye protecciones básicas contra inferencia de tipo, marcos y capacidades no usadas | Corregido y probado en una respuesta correcta y una solicitud no autorizada |
 | QR-SEC-002 | Las dependencias de producción y construcción no tienen vulnerabilidades conocidas por NuGet o npm | Cumple en la consulta del 27 de noviembre de 2026 |
@@ -120,11 +120,19 @@ Requisitos iniciales pendientes de medición:
   .NET sin integración aprobadas; verifica una respuesta `200` y una `401` de la política global.
 - Estado: corregido y validado localmente.
 
-### ISO-AUD-003 evidencia de rendimiento ausente
+### ISO-AUD-003 rendimiento de búsqueda, venta y cierre
 
 - Clasificación: eficiencia de desempeño, ISO/IEC 25010:2023 e ISO/IEC 25023:2016.
-- Evidencia: no se encontraron pruebas que midan latencia, percentiles o carga.
-- Estado: abierto; no se concluye que el sistema sea lento.
+- El 27 de noviembre se midió la API en Windows, compilada en Release, con PostgreSQL 18 temporal en el mismo equipo. El árbol partía de `ae94001` e incluía cambios locales de seguridad. El catálogo contenía 100 productos. Un cliente ejecutó un ciclo de calentamiento y luego 100 ciclos en serie. En cada ciclo se verificaron el producto recuperado, la venta en efectivo y el efectivo esperado al cierre.
+- Criterio fijado antes de medir: al menos 95 de 100 respuestas correctas por operación en un máximo de 1.000 ms. El p95 corresponde al valor número 95 al ordenar las 100 duraciones.
+
+| Operación de API | Mediana (ms) | p95 (ms) | Máximo (ms) | Correctas en hasta 1 s |
+|---|---:|---:|---:|---:|
+| Buscar producto | 20,21 | 31,16 | 40,38 | 100/100 |
+| Registrar venta en efectivo | 42,15 | 58,74 | 82,76 | 100/100 |
+| Cerrar caja | 48,66 | 63,70 | 68,29 | 100/100 |
+
+El hallazgo queda cerrado para este escenario local. La concurrencia entre cajas, los catálogos de mayor tamaño y el tiempo percibido en pantalla o durante la impresión quedan fuera de esta muestra. Para repetirla, ejecutar `py -3 scripts/performance/measure-isolated.py` desde la raíz del repositorio en Windows con PostgreSQL 18 y el SDK .NET 10. El script crea y retira su clúster temporal.
 
 ### ISO-AUD-004 aceptabilidad sin usuarios reales
 
