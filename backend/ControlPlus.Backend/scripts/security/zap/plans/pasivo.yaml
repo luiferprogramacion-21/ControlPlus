@@ -1,0 +1,41 @@
+# Auditoría ZAP de ControlPlus, fase 1: escaneo PASIVO (no ataca).
+# Recorre la pantalla publicada y pide una vez cada operación del OpenAPI, sin sesión; las reglas pasivas analizan
+# cabeceras, cookies, mensajes y contenido de las respuestas. Lo ejecuta scripts/security/zap/Invoke-ZapAudit.ps1
+# contra una API aislada (base controlplus_test_* en un PostgreSQL temporal), nunca contra la tienda.
+env:
+  contexts:
+    - name: controlplus
+      urls:
+        - "${CP_ZAP_TARGET}"
+      includePaths:
+        - "${CP_ZAP_TARGET}.*"
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+jobs:
+  - type: spider
+    parameters:
+      context: controlplus
+      url: "${CP_ZAP_TARGET}/"
+      maxDuration: 3
+  - type: openapi
+    parameters:
+      apiFile: "${CP_ZAP_OPENAPI}"
+      targetUrl: "${CP_ZAP_TARGET}"
+      context: controlplus
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 10
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: "${CP_ZAP_REPORTS}"
+      reportFile: "${CP_ZAP_PHASE}"
+      reportTitle: "ControlPlus - ZAP ${CP_ZAP_PHASE}"
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: "${CP_ZAP_REPORTS}"
+      reportFile: "${CP_ZAP_PHASE}"
+      reportTitle: "ControlPlus - ZAP ${CP_ZAP_PHASE}"

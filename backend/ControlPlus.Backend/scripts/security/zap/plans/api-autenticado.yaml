@@ -1,0 +1,55 @@
+# Auditoría ZAP de ControlPlus, fase 3: API Scan ACTIVO con la sesión de un rol (Cajero, Supervisor o Administrador).
+# ZAP agrega «Authorization: Bearer <token>» a cada petición con su variable de entorno ZAP_AUTH_HEADER_VALUE, que
+# Invoke-ZapAudit.ps1 pone solo en el proceso de ZAP (nunca en archivos); la sesión de ZAP se borra al terminar.
+# (Una regla del Replacer con ${VARIABLE} NO sirve: ZAP no reemplaza variables en ese campo y mandaba el texto tal cual.)
+# Además de los ataques, muestra qué responde cada rol: lo que su permiso no permite debe dar 403.
+# Excluidos del ataque: perfiles de impresora y cajón (dispositivos reales) y /api/auth (cambiaría o cerraría la sesión
+# con la que se escanea). Solo contra la API aislada de Invoke-ZapAudit.ps1 (base controlplus_test_*).
+env:
+  contexts:
+    - name: controlplus
+      urls:
+        - "${CP_ZAP_TARGET}"
+      includePaths:
+        - "${CP_ZAP_TARGET}/api/.*"
+      excludePaths:
+        - "${CP_ZAP_TARGET}/api/printing/profiles.*"
+        - "${CP_ZAP_TARGET}/api/cash/drawer.*"
+        - "${CP_ZAP_TARGET}/api/auth/.*"
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+jobs:
+  - type: openapi
+    parameters:
+      apiFile: "${CP_ZAP_OPENAPI}"
+      targetUrl: "${CP_ZAP_TARGET}"
+      context: controlplus
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  - type: activeScan
+    parameters:
+      context: controlplus
+      maxRuleDurationInMins: 3
+      maxScanDurationInMins: ${CP_ZAP_MINUTES}
+      threadPerHost: 4
+    policyDefinition:
+      defaultStrength: medium
+      defaultThreshold: medium
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: "${CP_ZAP_REPORTS}"
+      reportFile: "${CP_ZAP_PHASE}"
+      reportTitle: "ControlPlus - ZAP ${CP_ZAP_PHASE}"
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: "${CP_ZAP_REPORTS}"
+      reportFile: "${CP_ZAP_PHASE}"
+      reportTitle: "ControlPlus - ZAP ${CP_ZAP_PHASE}"

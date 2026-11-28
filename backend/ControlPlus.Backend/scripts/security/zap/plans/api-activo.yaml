@@ -1,0 +1,52 @@
+# Auditoría ZAP de ControlPlus, fase 2: API Scan ACTIVO sin sesión, guiado por el OpenAPI.
+# Ataca cada operación (inyección, recorrido de rutas, errores, etc.) sin credenciales: comprueba que todo lo protegido
+# responda 401 y que lo público (salud, login, instalación y recuperación) resista entradas maliciosas.
+# Excluidos del ataque: perfiles de impresora y cajón (crearían dispositivos reales; sin perfil no se imprime nada).
+# Solo contra la API aislada de Invoke-ZapAudit.ps1 (base controlplus_test_*), nunca contra la tienda.
+env:
+  contexts:
+    - name: controlplus
+      urls:
+        - "${CP_ZAP_TARGET}"
+      includePaths:
+        - "${CP_ZAP_TARGET}/api/.*"
+      excludePaths:
+        - "${CP_ZAP_TARGET}/api/printing/profiles.*"
+        - "${CP_ZAP_TARGET}/api/cash/drawer.*"
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+jobs:
+  - type: openapi
+    parameters:
+      apiFile: "${CP_ZAP_OPENAPI}"
+      targetUrl: "${CP_ZAP_TARGET}"
+      context: controlplus
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  - type: activeScan
+    parameters:
+      context: controlplus
+      maxRuleDurationInMins: 3
+      maxScanDurationInMins: ${CP_ZAP_MINUTES}
+      threadPerHost: 4
+    policyDefinition:
+      defaultStrength: medium
+      defaultThreshold: medium
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: "${CP_ZAP_REPORTS}"
+      reportFile: "${CP_ZAP_PHASE}"
+      reportTitle: "ControlPlus - ZAP ${CP_ZAP_PHASE}"
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: "${CP_ZAP_REPORTS}"
+      reportFile: "${CP_ZAP_PHASE}"
+      reportTitle: "ControlPlus - ZAP ${CP_ZAP_PHASE}"

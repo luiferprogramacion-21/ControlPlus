@@ -24,6 +24,14 @@ La API normal valida además la conexión antes de iniciar: fuera del entorno `T
 `Include Error Detail` desactivado. Las credenciales de `postgres`, `controlplus_backup` y
 `controlplus_test_admin` quedan rechazadas en el arranque normal; las migraciones autorizadas usan
 sus modos controlados, que terminan antes de construir el servidor HTTP.
+
+Excepción explícita para copias aisladas (decisión del usuario del 27 de noviembre de 2026): con
+`Security:AllowIsolatedTestDatabase=true` la API acepta además una base `controlplus_e2e_*` o
+`controlplus_test_*` en `127.0.0.1` (cualquier puerto y usuario), siempre con contraseña y sin
+`Include Error Detail`. La enciende solo la auditoría con OWASP ZAP (`scripts/security/zap`), que necesita
+la API en modo `Production` como en la tienda, en la variable de su propio proceso; el CI de navegador corre en
+`Testing` y la tienda nunca la tiene. Con la opción encendida tampoco se acepta `controlplus`
+con otro usuario, otro host ni otro nombre de base.
 Fuera de `Testing`, la API falla al iniciar si `CONTROLPLUS_MASTER_KEY` falta o no alcanza 32 bytes UTF-8, o si falta `JWT_SIGNING_KEY`. Después de crear el primer administrador, `CONTROLPLUS_MASTER_KEY` debe conservarse en almacenamiento local seguro o rotarse. El endpoint vuelve a comprobar la existencia de usuarios dentro de una transacción serializable con bloqueo asesor y rechaza cualquier reutilización.
 
 La Master Key se compara en tiempo constante. Nunca se registra, se incluye en respuestas ni se reemplaza por un valor predeterminado en archivos versionados.
@@ -79,6 +87,31 @@ La matriz funcional aprobada y sus códigos estables están en `docs/permissions
 ## Auditoría
 
 Se registran como mínimo inicios de sesión correctos y fallidos, bloqueos, reactivaciones, cambios de contraseña, cambios de estado de usuario, roles y permisos. Cada evento conserva actor, acción, entidad, fecha UTC y metadatos no sensibles.
+
+## Protección del navegador y de la entrada (auditoría ZAP del 27 de noviembre de 2026)
+
+Toda respuesta lleva:
+
+- `X-Content-Type-Options: nosniff`;
+- `X-Frame-Options: DENY`;
+- `Referrer-Policy: no-referrer`;
+- la política de permisos;
+- la política de contenido de `ControlPlus.Api/Security/SecurityHeaders.cs`. Solo admite scripts propios
+  (`script-src 'self'`, sin `unsafe-inline` ni `unsafe-eval`), ninguna página puede mostrar ControlPlus
+  dentro de un marco y no admite objetos incrustados.
+
+Los estilos en línea siguen permitidos porque Angular y las impresiones del navegador los usan: es un riesgo
+residual aceptado provisionalmente. El build de producción no deja scripts en línea en `index.html`
+(`inlineCritical: false` en `angular.json`), y el CI lo comprueba.
+
+La API rechaza con 400 `validation.failed` el carácter nulo, que PostgreSQL no admite, en tres lugares:
+
+- cualquier texto JSON;
+- la ruta;
+- los parámetros de consulta.
+
+Los textos de roles y permisos se validan con el largo de su columna. El método, los hallazgos y la forma de
+repetir el escaneo están en `docs/testing/zap-audit-20261127.md`.
 
 ## Validación con Fase 4
 

@@ -45,6 +45,7 @@ y añade medidas propias para cubrir el modelo de nueve características de 2501
 | SonarQube de `b0a4962` | Quality Gate OK, cobertura nueva 85,0 %, duplicación nueva 0,90667 %, 0 infracciones nuevas | Es la última medición publicada, pero precede a los cambios posteriores y no representa el árbol local actual |
 | Playwright del commit `351f988` | Trabajo de navegador aprobado en el CI final | Acredita los recorridos vigentes del repositorio contra una API y PostgreSQL descartables |
 | Simulacro real de recuperación del 27 de noviembre | `RECOVERY_DRILL_OK`: restauración en 1 minuto y copia de 23 minutos de antigüedad, ambas dentro de la meta de 30 minutos | La copia cifrada coincidió con 39 migraciones, 26 productos, 103 ventas y la última venta; la base temporal se eliminó y no se reemplazó `controlplus`. No acredita todavía la instalación en otro equipo |
+| OWASP ZAP 2.17 contra una API y una base `controlplus_test_*` aisladas | Escaneo pasivo, API Scan anónimo y API Scan con sesión de Cajero, Supervisor y Administrador: unas 420.000 solicitudes. Tres fallas reales corregidas (CSP ausente, carácter nulo y textos largos en permisos), un riesgo residual y seis falsos positivos o alertas informativas | Véase `ISO-AUD-008` y `docs/testing/zap-audit-20261127.md`. No incluye prueba manual de penetración ni reglas de negocio |
 | Pruebas reales en la tienda aprobadas por el usuario | Turno compartido, identificación del operador, cajón en cobro y abono, cierre propio autorizado, impresión térmica y desbloqueo con carné/lector | Acredita dispositivos y flujos en el entorno real; no equivale a una sesión de aceptabilidad observada con empleados de los tres roles |
 
 ## Matriz ISO IEC 25010 de calidad del producto
@@ -56,7 +57,7 @@ y añade medidas propias para cubrir el modelo de nueve características de 2501
 | Compatibilidad | Build local Windows, CI Linux, Chromium, impresora térmica, cajón y lector comprobados en la tienda | Parcialmente acreditada | Registrar Edge y ensayar la instalación/recuperación en otro equipo cuando exista uno disponible |
 | Capacidad de interacción | Pruebas Angular y Playwright, más flujos reales aprobados por el usuario en la tienda | Parcialmente acreditada | Ejecutar tareas observadas con empleados Cajero, Supervisor y Administrador y registrar ayuda, errores y tiempo |
 | Fiabilidad | Pruebas transaccionales y simulacro real de respaldo con RPO/RTO dentro de 30 minutos | Parcialmente acreditada | Ensayar recuperación en otro equipo y fallos controlados de servicio/energía sin tocar la base real |
-| Seguridad | JWT, permisos efectivos, bloqueo de cuentas, auditoría, encabezados HTTP y auditoría de dependencias sin vulnerabilidades conocidas | Parcialmente acreditada | Actualizar SonarQube y ampliar pruebas negativas de sesiones |
+| Seguridad | JWT, permisos efectivos, bloqueo de cuentas, auditoría, encabezados HTTP con CSP, auditoría de dependencias sin vulnerabilidades conocidas y OWASP ZAP por rol sin errores 500 ni alertas altas o medias abiertas, salvo el riesgo aceptado de estilos en línea | Parcialmente acreditada | Actualizar SonarQube, ampliar pruebas negativas de sesiones y decidir el endurecimiento de `style-src` |
 | Mantenibilidad | Arquitectura por capas, build con advertencias como error, 402 pruebas .NET, presupuestos de estilos corregidos y Quality Gate previo | Acreditada con observaciones | Actualizar SonarQube sobre el código vigente |
 | Flexibilidad | Configuraciones de negocio, migraciones controladas y operación local | Parcialmente acreditada | Probar cambio de configuración, reinstalación y operación sin Internet con criterios medibles |
 | Seguridad frente a daños | Invariantes financieros, auditoría, idempotencia y correcciones que conservan originales | Parcialmente acreditada | Crear una matriz de riesgos monetarios e inventario con severidad, prevención y recuperación |
@@ -94,6 +95,7 @@ Requisitos iniciales pendientes de medición:
 | QR-REL-001 | Ninguna operación financiera confirmada queda parcialmente persistida ante un fallo controlado | Cubierto por varios casos de integración; falta inventario consolidado |
 | QR-SEC-001 | Toda respuesta HTTP incluye protecciones básicas contra inferencia de tipo, marcos y capacidades no usadas | Corregido y probado en una respuesta correcta y una solicitud no autorizada |
 | QR-SEC-002 | Las dependencias de producción y construcción no tienen vulnerabilidades conocidas por NuGet o npm | Cumple en la consulta del 27 de noviembre de 2026 |
+| QR-SEC-003 | El escaneo de OWASP ZAP con la política media, sin sesión y con cada rol, no provoca errores 500 ni deja alertas altas o medias sin corregir, aceptar o descartar con motivo | Cumple tras las correcciones de `ISO-AUD-008`; el riesgo de `style-src 'unsafe-inline'` queda aceptado provisionalmente |
 | QR-USE-001 | Cada rol completa sus tareas críticas sin ayuda y dentro del tiempo acordado | Parcial: el usuario aprobó flujos reales en la tienda, pero faltan empleados de los tres roles y tiempos acordados |
 | QR-REC-001 | Un respaldo se restaura en un tiempo máximo acordado sin pérdida de la muestra verificada | Cumple en el simulacro del 27 de noviembre: recuperación 1/30 minutos y antigüedad 23/30 minutos; queda pendiente otro equipo |
 
@@ -113,6 +115,7 @@ Requisitos iniciales pendientes de medición:
 - Corrección: se añadieron `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
   `Referrer-Policy: no-referrer` y una política que deshabilita cámara, micrófono y geolocalización.
 - Límite: no se añadió una política CSP sin validar primero Angular, impresión y recursos de la pantalla.
+  La CSP se añadió después, con la auditoría ZAP (`ISO-AUD-008`, hallazgo `ZAP-PAS-001`).
 - Prueba: `SecurityHeadersTests.Responses_IncludeBaselineBrowserSecurityHeaders`, incluida en las 402 pruebas
   .NET sin integración aprobadas; verifica una respuesta `200` y una `401` de la política global.
 - Estado: corregido y validado localmente.
@@ -160,6 +163,40 @@ Requisitos iniciales pendientes de medición:
   `package-lock.json` sin opciones `--force` ni `--legacy-peer-deps`.
 - Validación: `npm audit` completo con 0 vulnerabilidades, Angular 858/858 y build de producción aprobado.
 - Estado: corregido y validado localmente.
+
+### ISO-AUD-008 escaneo de seguridad con OWASP ZAP
+
+- Clasificación: seguridad (confidencialidad, integridad y resistencia), ISO/IEC 25010:2023, e ISO/IEC 25040.
+- Método:
+  - `scripts/security/zap/Invoke-ZapAudit.ps1` crea un PostgreSQL temporal en `%TEMP%` con la base
+    `controlplus_test_<id>` y publica la API en modo `Production` en un puerto libre;
+  - corre cinco fases: pasivo, API Scan anónimo guiado por el OpenAPI y API Scan con la sesión de Cajero,
+    Supervisor y Administrador;
+  - borra todo al terminar.
+
+  No tocó `controlplus`, el servicio de la tienda ni el puerto 5000. Las contraseñas se generaron en memoria
+  y no se registraron.
+- Evidencia:
+  - unas 420.000 solicitudes, con informes en `%USERPROFILE%\ControlPlus-Evidence\Zap-*`, fuera del
+    repositorio;
+  - sin sesión, todo lo protegido respondió 401 y el límite de inicio de sesión respondió 429;
+  - con sesión, el Cajero recibió 42.195 respuestas 403, el Supervisor 22.949 y el Administrador casi
+    ninguna.
+- Hallazgos corregidos:
+  - `ZAP-PAS-001`: faltaba la política CSP;
+  - `ZAP-ACT-001`: el carácter nulo en el inicio de sesión respondía 500;
+  - `ZAP-ACT-002`: los textos más largos que la base al crear permisos respondían 500 (12 casos).
+- Riesgo residual: `ZAP-PAS-002`, `style-src 'unsafe-inline'`, que piden Angular y las impresiones.
+  Aceptado provisionalmente, con el endurecimiento por `nonce` como opción posterior.
+- Falsos positivos: Path Traversal en la abreviatura de categoría y cinco alertas informativas, cada una con
+  su motivo en `docs/testing/zap-audit-20261127.md`.
+- Pruebas: `SecurityHeadersTests`, `NullCharacterRequestTests` y
+  `SecurityApiFlowTests.PermissionAndRoleTexts_LongerThanTheirColumns_AreRejectedWithBadRequest`. El CI
+  comprueba además que `index.html` no traiga scripts en línea.
+- Validación: la repetición de las fases pasiva y Administrador (`Zap-20261128T001757Z-cdaf…`) terminó con
+  0 errores 500 y sin errores en la API, en 104.759 respuestas. Solo quedaron el riesgo residual y el falso
+  positivo ya explicados.
+- Estado: corregido y validado en el entorno aislado.
 
 ## Criterio de cierre de la auditoría
 

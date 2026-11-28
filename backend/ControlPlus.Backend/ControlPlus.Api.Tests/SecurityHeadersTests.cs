@@ -40,6 +40,13 @@ public sealed class SecurityHeadersTests
         AssertHeader(response, "X-Frame-Options", "DENY");
         AssertHeader(response, "Referrer-Policy", "no-referrer");
         AssertHeader(response, "Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+        // Auditoría ZAP del 27/11/2026 (ZAP-PAS-001): política de contenido sin scripts en línea ni de otros sitios.
+        var csp = Assert.Single(response.Headers.GetValues("Content-Security-Policy"));
+        Assert.Equal(ControlPlus.Api.Security.SecurityHeaders.ContentSecurityPolicy, csp);
+        Assert.Contains("script-src 'self';", csp, StringComparison.Ordinal);
+        Assert.DoesNotContain("unsafe-eval", csp, StringComparison.Ordinal);
+        Assert.Contains("frame-ancestors 'none'", csp, StringComparison.Ordinal);
+        Assert.Contains("object-src 'none'", csp, StringComparison.Ordinal);
     }
 
     private static void AssertHeader(HttpResponseMessage response, string name, string expected) =>

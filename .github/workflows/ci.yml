@@ -206,6 +206,8 @@ jobs:
         run: |
           npm ci
           npm run build
+          # La política de contenido (CSP) solo permite scripts propios: index.html no puede llevar scripts en línea.
+          if grep -q "<script>" dist/controlplus-frontend/browser/index.html; then echo "index.html tiene un script en línea que la CSP bloquearía"; exit 1; fi
 
       - name: Publicar la API con la pantalla dentro
         run: |

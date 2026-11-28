@@ -501,6 +501,51 @@ public sealed class SecurityApiFlowTests : IAsyncLifetime
         Assert.Equal(3, summary.GetProperty("level").GetInt32());
     }
 
+    /// <summary>
+    /// Auditoría ZAP del 27/11/2026 (ZAP-ACT-002): un código de permiso de más de 100 caracteres llegaba a PostgreSQL
+    /// (22001) y respondía 500. Cada campo se rechaza ahora con 400 y su largo máximo, sin crear nada; el largo exacto
+    /// de cada columna sí se guarda.
+    /// </summary>
+    [Fact]
+    public async Task PermissionAndRoleTexts_LongerThanTheirColumns_AreRejectedWithBadRequest()
+    {
+        using var client = _factory!.CreateClient();
+        await SetupInitialAdministratorAsync(client, "Initial-Test-Password-2026!");
+        var administrator = await LoginAsync(client, "initial.admin.test", "Initial-Test-Password-2026!");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", administrator.AccessToken);
+        var before = await client.GetFromJsonAsync<PagedResult<PermissionDto>>("/api/permissions?page=1&pageSize=200");
+
+        foreach (var invalid in new[]
+        {
+            new CreatePermissionRequest(new string('C', 101), "Permiso largo", null, "PRUEBA"),
+            new CreatePermissionRequest("ZAP.LARGO.NOMBRE", new string('n', 151), null, "PRUEBA"),
+            new CreatePermissionRequest("ZAP.LARGO.MODULO", "Permiso", null, new string('M', 51)),
+            new CreatePermissionRequest("ZAP.LARGO.DESCRIPCION", "Permiso", new string('d', 501), "PRUEBA")
+        })
+        {
+            using var response = await client.PostAsJsonAsync("/api/permissions", invalid);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Contains("como máximo", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+
+        var after = await client.GetFromJsonAsync<PagedResult<PermissionDto>>("/api/permissions?page=1&pageSize=200");
+        Assert.Equal(before!.TotalCount, after!.TotalCount);
+
+        using var atLimit = await client.PostAsJsonAsync("/api/permissions", new CreatePermissionRequest(
+            new string('C', 100), new string('n', 150), new string('d', 500), new string('M', 50)));
+        Assert.Equal(HttpStatusCode.Created, atLimit.StatusCode);
+        var created = (await atLimit.Content.ReadFromJsonAsync<PermissionDto>())!;
+
+        using var longUpdate = await client.PutAsJsonAsync(
+            $"/api/permissions/{created.Id}", new UpdatePermissionRequest(new string('n', 151), null));
+        Assert.Equal(HttpStatusCode.BadRequest, longUpdate.StatusCode);
+
+        var cashierRoleId = await GetRoleIdAsync(client, "CAJERO");
+        using var longRoleName = await client.PutAsJsonAsync(
+            $"/api/roles/{cashierRoleId}", new UpdateRoleRequest(new string('n', 101), ControlPlus.Domain.Security.Enums.RoleLevel.Cajero));
+        Assert.Equal(HttpStatusCode.BadRequest, longRoleName.StatusCode);
+    }
+
     [Fact]
     public async Task EffectivePermissions_ReturnsEveryActivePermissionBeyondOnePageOf200()
     {

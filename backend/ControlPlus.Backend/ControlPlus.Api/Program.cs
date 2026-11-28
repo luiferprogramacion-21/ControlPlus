@@ -123,6 +123,10 @@ StartupDatabaseSecurityConfiguration.EnsureLeastPrivilegeConnection(
     builder.Configuration,
     builder.Environment.EnvironmentName);
 
+// Auditoría ZAP del 27/11/2026 (ZAP-ACT-001): ningún texto del cuerpo JSON puede traer el carácter nulo.
+builder.Services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options =>
+    options.JsonSerializerOptions.Converters.Add(new RejectNullCharacterStringConverter()));
+
 builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
 {
     options.InvalidModelStateResponseFactory = context =>
@@ -261,10 +265,33 @@ app.Use(async (context, next) =>
     context.Response.Headers.TryAdd("X-Frame-Options", "DENY");
     context.Response.Headers.TryAdd("Referrer-Policy", "no-referrer");
     context.Response.Headers.TryAdd("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    // Auditoría ZAP del 27/11/2026 (ZAP-PAS-001): solo scripts propios; estilos en línea porque Angular inyecta los de
+    // cada pantalla y el ticket se imprime en un marco con estilos propios; imágenes data:/blob: por los códigos de
+    // barras y el carné. Sin marcos de otros sitios ni formularios hacia afuera.
+    context.Response.Headers.TryAdd("Content-Security-Policy", SecurityHeaders.ContentSecurityPolicy);
     await next();
 });
 
 app.UseExceptionHandler();
+
+// Auditoría ZAP del 27/11/2026 (ZAP-ACT-001): el carácter nulo en la ruta o la consulta se rechaza con 400 antes de
+// llegar a PostgreSQL, que no lo acepta en un texto y respondía 500.
+app.Use(async (context, next) =>
+{
+    if (NullCharacterRequestGuard.HasNullCharacter(context.Request))
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsJsonAsync(new ProblemDetails
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "La solicitud contiene un carácter no permitido.",
+            Type = "https://controlplus.local/problems/validation.failed",
+            Extensions = { ["code"] = "validation.failed" }
+        }, (System.Text.Json.JsonSerializerOptions?)null, "application/problem+json");
+        return;
+    }
+    await next();
+});
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {

@@ -14,6 +14,31 @@ internal static partial class SecurityInput
             : Result.Success(normalized);
     }
 
+    /// <summary>
+    /// Texto obligatorio con el largo máximo de su columna (auditoría ZAP del 27/11/2026: un texto más largo llegaba a
+    /// PostgreSQL y respondía 500). Se mide después de quitar los espacios de los extremos, como se guarda.
+    /// </summary>
+    public static Result<string> RequiredText(string? value, string fieldName, int maxLength)
+    {
+        var required = RequiredText(value, fieldName);
+        if (required.IsFailure) return required;
+        return required.Value!.Length <= maxLength
+            ? required
+            : Result.Failure<string>(ApplicationError.Validation(
+                $"El campo {fieldName} admite como máximo {maxLength} caracteres."));
+    }
+
+    /// <summary>Texto opcional: vacío es «sin dato»; si se da, como máximo <paramref name="maxLength"/> caracteres.</summary>
+    public static Result<string?> OptionalText(string? value, string fieldName, int maxLength)
+    {
+        var normalized = value?.Trim();
+        if (string.IsNullOrEmpty(normalized)) return Result.Success<string?>(null);
+        return normalized.Length <= maxLength
+            ? Result.Success<string?>(normalized)
+            : Result.Failure<string?>(ApplicationError.Validation(
+                $"El campo {fieldName} admite como máximo {maxLength} caracteres."));
+    }
+
     /// <summary>Correo opcional: vacío es «sin correo»; si se da, una dirección simple de hasta 254 caracteres.</summary>
     public static Result<string?> OptionalEmail(string? value)
     {

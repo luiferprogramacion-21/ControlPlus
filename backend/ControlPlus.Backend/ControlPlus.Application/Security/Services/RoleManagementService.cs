@@ -51,8 +51,8 @@ public sealed class RoleManagementService : IRoleManagementService
             return Result.Failure<RoleDto>(authorizationError);
         }
 
-        var code = SecurityInput.RequiredText(request.Code, "código del rol");
-        var name = SecurityInput.RequiredText(request.Name, "nombre del rol");
+        var code = SecurityInput.RequiredText(request.Code, "código del rol", 50);
+        var name = SecurityInput.RequiredText(request.Name, "nombre del rol", 100);
         if (code.IsFailure)
         {
             return Result.Failure<RoleDto>(code.Error!);
@@ -118,7 +118,7 @@ public sealed class RoleManagementService : IRoleManagementService
             return Result.Failure<RoleDto>(authorizationError);
         }
 
-        var name = SecurityInput.RequiredText(request.Name, "nombre del rol");
+        var name = SecurityInput.RequiredText(request.Name, "nombre del rol", 100);
         if (name.IsFailure)
         {
             return Result.Failure<RoleDto>(name.Error!);
@@ -405,8 +405,8 @@ public sealed class RoleManagementService : IRoleManagementService
             return Result.Failure<PermissionDto>(authorizationError);
         }
 
-        var code = SecurityInput.RequiredText(request.Code, "código del permiso");
-        var name = SecurityInput.RequiredText(request.Name, "nombre del permiso");
+        var code = SecurityInput.RequiredText(request.Code, "código del permiso", 100);
+        var name = SecurityInput.RequiredText(request.Name, "nombre del permiso", 150);
         if (code.IsFailure)
         {
             return Result.Failure<PermissionDto>(code.Error!);
@@ -427,13 +427,19 @@ public sealed class RoleManagementService : IRoleManagementService
             return Result.Failure<PermissionDto>(SecurityErrors.PermissionCodeAlreadyExists);
         }
 
-        var module = SecurityInput.RequiredText(request.Module, "módulo");
+        var module = SecurityInput.RequiredText(request.Module, "módulo", 50);
         if (module.IsFailure)
         {
             return Result.Failure<PermissionDto>(module.Error!);
         }
 
-        var permission = Permission.Create(normalizedCode, name.Value!, request.Description, module.Value!, _clock.UtcNow);
+        var description = SecurityInput.OptionalText(request.Description, "descripción", 500);
+        if (description.IsFailure)
+        {
+            return Result.Failure<PermissionDto>(description.Error!);
+        }
+
+        var permission = Permission.Create(normalizedCode, name.Value!, description.Value, module.Value!, _clock.UtcNow);
         await _permissionRepository.AddAsync(permission, cancellationToken);
         await AuditWriter.WriteAsync(
             _auditRepository,
@@ -464,10 +470,16 @@ public sealed class RoleManagementService : IRoleManagementService
             return Result.Failure<PermissionDto>(authorizationError);
         }
 
-        var name = SecurityInput.RequiredText(request.Name, "nombre del permiso");
+        var name = SecurityInput.RequiredText(request.Name, "nombre del permiso", 150);
         if (name.IsFailure)
         {
             return Result.Failure<PermissionDto>(name.Error!);
+        }
+
+        var description = SecurityInput.OptionalText(request.Description, "descripción", 500);
+        if (description.IsFailure)
+        {
+            return Result.Failure<PermissionDto>(description.Error!);
         }
 
         var permission = await _permissionRepository.GetByIdAsync(permissionId, cancellationToken);
@@ -476,7 +488,7 @@ public sealed class RoleManagementService : IRoleManagementService
             return Result.Failure<PermissionDto>(ApplicationError.NotFound("el permiso"));
         }
 
-        permission.Update(name.Value!, request.Description, _clock.UtcNow);
+        permission.Update(name.Value!, description.Value, _clock.UtcNow);
         await _permissionRepository.UpdateAsync(permission, cancellationToken);
         await AuditWriter.WriteAsync(
             _auditRepository,
